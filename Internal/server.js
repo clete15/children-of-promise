@@ -55,7 +55,7 @@ function runSQL(sql) {
     const tmp = path.join(__dirname, '_q.sql');
     fs.writeFileSync(tmp, sql, 'utf8');
     try {
-        const out = execSync(`sqlcmd -S ${DB_SERVER} -d ${DB_NAME} -E -s "|" -W -h -1 -i "${tmp}"`,
+        const out = execSync(`"C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\sqlcmd.exe" -S ${DB_SERVER} -d ${DB_NAME} -E -s "|" -W -h -1 -i "${tmp}"`,
             { encoding: 'utf8', shell: 'cmd.exe' });
         console.log('[SQL]', out.trim());
         return { ok: true, data: out };
