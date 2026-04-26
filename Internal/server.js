@@ -223,25 +223,72 @@ const server = http.createServer((req, res) => {
                     AbuseHistory NVARCHAR(10),
                     MentalIllness NVARCHAR(10)
                 );
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ChildName') ALTER TABLE PreEnrollment ADD ChildName NVARCHAR(200);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ChildBirthDate') ALTER TABLE PreEnrollment ADD ChildBirthDate NVARCHAR(20);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='DcfsInvolvement') ALTER TABLE PreEnrollment ADD DcfsInvolvement NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='SubstanceAbuse') ALTER TABLE PreEnrollment ADD SubstanceAbuse NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='CaregiverOther') ALTER TABLE PreEnrollment ADD CaregiverOther NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='FamilyDeath') ALTER TABLE PreEnrollment ADD FamilyDeath NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='LowBirthWeight') ALTER TABLE PreEnrollment ADD LowBirthWeight NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ParentIncarcerated') ALTER TABLE PreEnrollment ADD ParentIncarcerated NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='Score') ALTER TABLE PreEnrollment ADD Score INT DEFAULT 0;
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='WaitlistStatus') ALTER TABLE PreEnrollment ADD WaitlistStatus NVARCHAR(20) DEFAULT 'Pending';
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='AgeGroup') ALTER TABLE PreEnrollment ADD AgeGroup NVARCHAR(10);
                 INSERT INTO PreEnrollment (
                     FirstName,LastName,Email,Address,City,Zip,Country,Phone,
-                    ChildrenInfo,HouseholdIncome,PublicBenefits,Homeless,IEP,
+                    ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,HouseholdIncome,PublicBenefits,Homeless,IEP,
                     NoHSDiploma,TeenParent,BornOutsideUS,FosterAdopted,
                     NonEnglishHome,ActiveMilitary,PriorEarlyLearning,
                     BrightpointSubsidy,LivingSituation,EarlyIntervention,
-                    AbuseHistory,MentalIllness
+                    AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,
+                    CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,Score
                 ) VALUES (
                     ${esc(d.firstName)},${esc(d.lastName)},${esc(d.email)},
                     ${esc(d.address)},${esc(d.city)},${esc(d.zip)},${esc(d.country)},
-                    ${esc(d.phone)},${esc(d.childrenInfo)},${esc(d.householdIncome)},
-                    ${esc(d.publicBenefits)},${esc(d.homeless)},${esc(d.iep)},
+                    ${esc(d.phone)},${esc(d.childrenInfo)},${esc(d.childName)},${esc(d.childBirthDate)},${esc(d.ageGroup)},
+                    ${esc(d.householdIncome)},${esc(d.publicBenefits)},${esc(d.homeless)},${esc(d.iep)},
                     ${esc(d.noHSDiploma)},${esc(d.teenParent)},${esc(d.bornOutsideUS)},
                     ${esc(d.fosterAdopted)},${esc(d.nonEnglishHome)},${esc(d.activeMilitary)},
                     ${esc(d.priorEarlyLearning)},${esc(d.brightpointSubsidy)},
                     ${esc(d.livingSituation)},${esc(d.earlyIntervention)},
-                    ${esc(d.abuseHistory)},${esc(d.mentalIllness)}
+                    ${esc(d.abuseHistory)},${esc(d.mentalIllness)},
+                    ${esc(d.dcfsInvolvement)},${esc(d.substanceAbuse)},
+                    ${esc(d.caregiverOther)},${esc(d.familyDeath)},
+                    ${esc(d.lowBirthWeight)},${esc(d.parentIncarcerated)},
+                    ${parseInt(d.score)||0}
                 );`;
             const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
+    // GET waiting list (internal - protected)
+    if (req.method === 'GET' && url === '/api/waitinglist') {
+        if (!checkAuth(req, res)) return;
+        const r = runSQL(`SELECT Id,SubmittedAt,FirstName,LastName,Phone,Email,ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,Homeless,FosterAdopted,IEP,EarlyIntervention,AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,TeenParent,NoHSDiploma,BornOutsideUS,NonEnglishHome,ActiveMilitary,PublicBenefits,LivingSituation,City,Score,WaitlistStatus,Notes FROM PreEnrollment ORDER BY Score DESC,SubmittedAt ASC`);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                return { Id:v[0],SubmittedAt:v[1],FirstName:v[2],LastName:v[3],Phone:v[4],Email:v[5],ChildrenInfo:v[6],ChildName:v[7],ChildBirthDate:v[8],AgeGroup:v[9],Homeless:v[10],FosterAdopted:v[11],IEP:v[12],EarlyIntervention:v[13],AbuseHistory:v[14],MentalIllness:v[15],DcfsInvolvement:v[16],SubstanceAbuse:v[17],CaregiverOther:v[18],FamilyDeath:v[19],LowBirthWeight:v[20],ParentIncarcerated:v[21],TeenParent:v[22],NoHSDiploma:v[23],BornOutsideUS:v[24],NonEnglishHome:v[25],ActiveMilitary:v[26],PublicBenefits:v[27],LivingSituation:v[28],City:v[29],Score:v[30],WaitlistStatus:v[31],Notes:v[32] };
+            });
+        return sendJSON(res, 200, rows);
+    }
+
+    // PUT update waitlist status (internal - protected)
+    if (req.method === 'PUT' && url.startsWith('/api/waitinglist/')) {
+        if (!checkAuth(req, res)) return;
+        const id = parseInt(url.split('/')[3]);
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const fields = [];
+            if (d.status !== undefined) fields.push(`WaitlistStatus=${esc(d.status)}`);
+            if (d.notes !== undefined) fields.push(`Notes=${esc(d.notes)}`);
+            if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+            const r = runSQL(`UPDATE PreEnrollment SET ${fields.join(',')} WHERE Id=${id}`);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
         });

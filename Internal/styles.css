@@ -29,13 +29,13 @@ body {
 
 /* ── SITE HEADER ── */
 .site-header {
-    background: linear-gradient(135deg, #1e3a8a 0%, var(--primary) 60%, #1e40af 100%);
-    padding: 18px 32px;
+    background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);
+    padding: 16px 32px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     border-bottom: 3px solid var(--accent);
-    box-shadow: 0 2px 10px rgba(0,0,0,0.18);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.12);
 }
 .brand-link {
     display: flex;
@@ -44,21 +44,21 @@ body {
     text-decoration: none;
 }
 .site-header img {
-    height: 72px;
+    height: 64px;
     width: auto;
-    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.25));
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.15));
     transition: transform 0.2s;
 }
 .brand-link:hover img { transform: scale(1.04); }
-.brand-text h1 { color: white; font-size: 1.3rem; font-weight: 800; line-height: 1.2; }
-.brand-text p  { color: rgba(255,255,255,0.72); font-size: 0.78rem; margin-top: 2px; letter-spacing: 0.03em; }
+.brand-text h1 { color: white; font-size: 1.2rem; font-weight: 800; line-height: 1.2; }
+.brand-text p  { color: rgba(255,255,255,0.75); font-size: 0.75rem; margin-top: 2px; letter-spacing: 0.03em; }
 .header-back {
-    color: rgba(255,255,255,0.85);
+    color: rgba(255,255,255,0.9);
     text-decoration: none;
     font-size: 0.82rem;
     font-weight: 600;
-    padding: 7px 14px;
-    border: 1px solid rgba(255,255,255,0.3);
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.4);
     border-radius: 6px;
     transition: background 0.15s, color 0.15s;
     white-space: nowrap;
@@ -227,8 +227,8 @@ body {
 }
 .roster-header {
     display: grid;
-    grid-template-columns: 2fr 1.5fr 1.8fr 80px;
-    gap: 12px;
+    grid-template-columns: 2fr 1.6fr 1.8fr 1.4fr 80px;
+    gap: 10px;
     padding: 10px 16px;
     background: #f8fafc;
     border-bottom: 2px solid var(--border);
@@ -240,8 +240,8 @@ body {
 }
 .roster-row {
     display: grid;
-    grid-template-columns: 2fr 1.5fr 1.8fr 80px;
-    gap: 12px;
+    grid-template-columns: 2fr 1.6fr 1.8fr 1.4fr 80px;
+    gap: 10px;
     align-items: center;
     padding: 10px 16px;
     border-bottom: 1px solid var(--border);

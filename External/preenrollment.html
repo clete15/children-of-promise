@@ -5,6 +5,63 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Children Of Promise - Pre-Enrollment</title>
     <link rel="stylesheet" href="./styles.css">
+    <style>
+        .child-block {
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            padding: 18px;
+            margin-bottom: 14px;
+            background: white;
+        }
+        .child-block-header {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--primary);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+        .child-block.additional {
+            border-color: #fde68a;
+            background: #fffdf0;
+        }
+        .child-block.additional .child-block-header {
+            color: #92400e;
+        }
+        .child-highlight {
+            background: #fffbeb !important;
+            border-color: #f59e0b !important;
+        }
+        .child-highlight:focus {
+            border-color: #d97706 !important;
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.15) !important;
+        }
+        .btn-add-child {
+            padding: 8px 18px;
+            background: var(--success);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-add-child:hover { background: #15803d; }
+        .btn-remove-child {
+            float: right;
+            padding: 3px 10px;
+            background: #fef2f2;
+            color: var(--danger);
+            border: 1px solid #fecaca;
+            border-radius: 5px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
 
@@ -77,10 +134,50 @@
         </div>
     </div>
 
-    <div class="section-divider">Children</div>
-    <div class="form-group">
-        <label>Names and ages of child/children you are considering enrolling <span class="required">*</span></label>
-        <textarea id="childrenInfo" required placeholder="e.g. Jane, age 2 / John, age 4"></textarea>
+    <div class="section-divider">Child Information</div>
+    <div id="childrenContainer">
+        <div class="child-block" id="child-0">
+            <div class="child-block-header">Child 1</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Child's First Name <span class="required">*</span></label>
+                    <input type="text" class="child-firstName" required placeholder="First name">
+                </div>
+                <div class="form-group">
+                    <label>Child's Last Name <span class="required">*</span></label>
+                    <input type="text" class="child-lastName" required placeholder="Last name">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Child's Date of Birth <span class="required">*</span></label>
+                    <input type="date" class="child-birthDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Program Applying For <span class="required">*</span></label>
+                    <select class="child-ageGroup" required>
+                        <option value="">-- Select Program --</option>
+                        <option value="0-2">Infant &amp; Toddler (Birth – 2 years)</option>
+                        <option value="2-3">2-Year Old Program (2 – 3 years)</option>
+                        <option value="3-5">Pre-School (3 – 5 years)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Does this child have an IEP or have they been referred for special education evaluation? <span class="required">*</span></label>
+                <select class="child-iep" required>
+                    <option value="">Select</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    <div id="addChildPrompt" style="margin-top:14px;display:none;">
+        <div style="background:#f0fdf4;border:1.5px solid #bbf7d0;border-radius:8px;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+            <span style="font-size:0.88rem;font-weight:600;color:#166534;">Do you have another child to enroll?</span>
+            <button type="button" class="btn-add-child" onclick="addChild()">+ Add Another Child</button>
+        </div>
     </div>
 
     <div class="section-divider">Household Income</div>
@@ -237,6 +334,63 @@
         </div>
     </div>
 
+    <div class="form-row">
+        <div class="form-group">
+            <label>Has there been any DCFS involvement with the family?</label>
+            <select id="dcfsInvolvement">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Is there a history of alcohol or drug abuse in the household?</label>
+            <select id="substanceAbuse">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Is the child being raised by a caregiver other than a parent (grandparent, relative, guardian)?</label>
+            <select id="caregiverOther">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Has there been a recent death of a parent, sibling, or child in the immediate family?</label>
+            <select id="familyDeath">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Was the child low birth weight or diagnosed with failure to thrive?</label>
+            <select id="lowBirthWeight">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Is a parent or primary caregiver currently incarcerated?</label>
+            <select id="parentIncarcerated">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+    </div>
+
     <button type="submit" class="btn-submit" id="submitBtn">Submit Pre-Enrollment</button>
 </form>
 </div>
@@ -247,6 +401,70 @@
 </footer>
 
 <script>
+let childCount = 1;
+
+function addChild() {
+    childCount++;
+    const idx = childCount - 1;
+    const container = document.getElementById('childrenContainer');
+    const div = document.createElement('div');
+    div.className = 'child-block additional';
+    div.id = `child-${idx}`;
+    div.innerHTML = `
+        <div class="child-block-header">
+            Child ${childCount}
+            <button type="button" class="btn-remove-child" onclick="removeChild(${idx})">Remove</button>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Child's First Name <span class="required">*</span></label>
+                <input type="text" class="child-firstName child-highlight" required placeholder="First name">
+            </div>
+            <div class="form-group">
+                <label>Child's Last Name <span class="required">*</span></label>
+                <input type="text" class="child-lastName child-highlight" required placeholder="Last name">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Child's Date of Birth <span class="required">*</span></label>
+                <input type="date" class="child-birthDate child-highlight" required>
+            </div>
+            <div class="form-group">
+                <label>Program Applying For <span class="required">*</span></label>
+                <select class="child-ageGroup child-highlight" required>
+                    <option value="">-- Select Program --</option>
+                    <option value="0-2">Infant &amp; Toddler (Birth – 2 years)</option>
+                    <option value="2-3">2-Year Old Program (2 – 3 years)</option>
+                    <option value="3-5">Pre-School (3 – 5 years)</option>
+                </select>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Does this child have an IEP or have they been referred for special education evaluation? <span class="required">*</span></label>
+            <select class="child-iep child-highlight" required>
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>`;
+    container.appendChild(div);
+    div.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function removeChild(idx) {
+    const el = document.getElementById(`child-${idx}`);
+    if (el) el.remove();
+}
+
+// Show "add another child" prompt after first required field is filled
+document.addEventListener('change', e => {
+    const firstChild = document.querySelector('#child-0 .child-ageGroup');
+    if (firstChild && firstChild.value) {
+        document.getElementById('addChildPrompt').style.display = 'block';
+    }
+});
+
 function notify(msg, type = 'success') {
     document.querySelectorAll('.notification').forEach(n => n.remove());
     const n = document.createElement('div');
@@ -256,16 +474,10 @@ function notify(msg, type = 'success') {
     if (type === 'success') setTimeout(() => n.remove(), 6000);
 }
 
-document.getElementById('preEnrollForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    btn.disabled = true;
-    btn.textContent = 'Submitting...';
-
+function collectHouseholdData() {
     const benefits = [...document.querySelectorAll('input[name="benefits"]:checked')]
         .map(cb => cb.value).join(', ');
-
-    const data = {
+    return {
         firstName:          document.getElementById('firstName').value.trim(),
         lastName:           document.getElementById('lastName').value.trim(),
         email:              document.getElementById('email').value.trim(),
@@ -274,11 +486,9 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
         zip:                document.getElementById('zip').value.trim(),
         country:            document.getElementById('country').value.trim(),
         phone:              document.getElementById('phone').value.trim(),
-        childrenInfo:       document.getElementById('childrenInfo').value.trim(),
         householdIncome:    document.getElementById('householdIncome').value.trim(),
         publicBenefits:     benefits,
         homeless:           document.getElementById('homeless').value,
-        iep:                document.getElementById('iep').value,
         noHSDiploma:        document.getElementById('noHSDiploma').value,
         teenParent:         document.getElementById('teenParent').value,
         bornOutsideUS:      document.getElementById('bornOutsideUS').value,
@@ -290,26 +500,96 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
         livingSituation:    document.getElementById('livingSituation').value,
         earlyIntervention:  document.getElementById('earlyIntervention').value,
         abuseHistory:       document.getElementById('abuseHistory').value,
-        mentalIllness:      document.getElementById('mentalIllness').value
+        mentalIllness:      document.getElementById('mentalIllness').value,
+        dcfsInvolvement:    document.getElementById('dcfsInvolvement').value,
+        substanceAbuse:     document.getElementById('substanceAbuse').value,
+        caregiverOther:     document.getElementById('caregiverOther').value,
+        familyDeath:        document.getElementById('familyDeath').value,
+        lowBirthWeight:     document.getElementById('lowBirthWeight').value,
+        parentIncarcerated: document.getElementById('parentIncarcerated').value,
     };
+}
 
-    try {
-        const res = await fetch('/api/preenrollment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        const json = await res.json();
-        if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`);
-        notify('Thank you! Your pre-enrollment has been submitted. We will be in touch soon.');
+function calcScore(d) {
+    let score = 0;
+    const yes = v => v === 'Yes';
+    if (yes(d.homeless))           score += 50;
+    if (yes(d.fosterAdopted))      score += 50;
+    if (yes(d.iep))                score += 5;
+    if (yes(d.earlyIntervention))  score += 5;
+    if (yes(d.abuseHistory))       score += 5;
+    if (yes(d.mentalIllness))      score += 5;
+    if (yes(d.dcfsInvolvement))    score += 5;
+    if (yes(d.substanceAbuse))     score += 5;
+    if (yes(d.caregiverOther))     score += 5;
+    if (yes(d.familyDeath))        score += 5;
+    if (yes(d.lowBirthWeight))     score += 5;
+    if (yes(d.parentIncarcerated)) score += 5;
+    if (yes(d.teenParent))         score += 5;
+    if (yes(d.noHSDiploma))        score += 5;
+    if (yes(d.bornOutsideUS))      score += 5;
+    if (yes(d.nonEnglishHome))     score += 5;
+    if (yes(d.activeMilitary))     score += 5;
+    if (d.publicBenefits)          score += 5;
+    if (d.livingSituation === 'Single Parent') score += 3;
+    return score;
+}
+
+document.getElementById('preEnrollForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    const household = collectHouseholdData();
+    const children = [...document.querySelectorAll('.child-block')].map(block => ({
+        childName: `${block.querySelector('.child-firstName').value.trim()} ${block.querySelector('.child-lastName').value.trim()}`.trim(),
+        childBirthDate: block.querySelector('.child-birthDate').value,
+        ageGroup: block.querySelector('.child-ageGroup').value,
+        iep: block.querySelector('.child-iep').value,
+    }));
+
+    let successCount = 0;
+    let errors = [];
+
+    for (const child of children) {
+        const data = {
+            ...household,
+            childName:      child.childName,
+            childBirthDate: child.childBirthDate,
+            ageGroup:       child.ageGroup,
+            iep:            child.iep,
+            childrenInfo:   child.childName,
+        };
+        data.score = calcScore(data);
+
+        try {
+            const res = await fetch('/api/preenrollment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`);
+            successCount++;
+        } catch (err) {
+            errors.push(`${child.childName}: ${err.message}`);
+        }
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Submit Pre-Enrollment';
+
+    if (errors.length) {
+        notify('Some submissions failed: ' + errors.join('; '), 'error');
+    } else {
+        notify(`Thank you! ${successCount} child${successCount > 1 ? 'ren' : ''} submitted successfully. We will be in touch soon.`);
         e.target.reset();
         document.getElementById('country').value = 'United States';
-    } catch (err) {
-        notify('Submission failed: ' + err.message, 'error');
-        console.error(err);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Submit Pre-Enrollment';
+        // Remove additional child blocks
+        [...document.querySelectorAll('.child-block.additional')].forEach(b => b.remove());
+        childCount = 1;
+        document.getElementById('addChildPrompt').style.display = 'none';
     }
 });
 </script>

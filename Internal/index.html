@@ -198,7 +198,7 @@
             border: 1.5px solid #fecaca;
             border-radius: var(--radius);
             padding: 18px 24px;
-            max-width: 460px;
+            max-width: 560px;
             width: 100%;
             margin-bottom: 24px;
             text-align: center;
@@ -216,12 +216,21 @@
             font-family: monospace;
         }
 
-        /* PORTAL CARD */
+        /* PORTAL CARDS */
+        .portal-grid {
+            display: flex;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 24px;
+            justify-content: center;
+            width: 100%;
+            max-width: 900px;
+        }
         .portal-card {
             background: var(--card-bg);
             border: 2px solid var(--border);
             border-radius: var(--radius);
-            padding: 44px 52px;
+            padding: 36px 32px;
             text-align: center;
             text-decoration: none;
             color: var(--text);
@@ -230,11 +239,10 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 14px;
-            max-width: 420px;
-            width: 100%;
-        }
-        .portal-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 12px 32px rgba(37,99,235,0.18); }
+            gap: 12px;
+            flex: 1 1 240px;
+            max-width: 280px;
+        }        .portal-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 12px 32px rgba(37,99,235,0.18); }
         .portal-card.disabled { opacity: 0.55; pointer-events: none; filter: grayscale(0.4); }
         .card-icon { font-size: 3.4rem; line-height: 1; }
         .portal-card h3 { font-size: 1.3rem; color: var(--primary); font-weight: 800; }
@@ -320,12 +328,20 @@
         <p style="margin-top:8px;">Once started, refresh this page and the EMS will be available.</p>
     </div>
 
-    <a class="portal-card" id="emsCard" href="ems.html">
-        <div class="card-icon">📋</div>
-        <h3>Enrollment Management</h3>
-        <p>View, add, and update student enrollment records. Browse all enrolled students and manage their program details.</p>
-        <span class="card-btn">Open EMS</span>
-    </a>
+    <div class="portal-grid">
+        <a class="portal-card" id="emsCard" href="ems.html">
+            <div class="card-icon">📋</div>
+            <h3>Enrollment Management</h3>
+            <p>View, add, and update student enrollment records.</p>
+            <span class="card-btn">Open EMS</span>
+        </a>
+        <a class="portal-card" href="waitinglist.html">
+            <div class="card-icon">📝</div>
+            <h3>Waiting List</h3>
+            <p>View pre-enrollment submissions sorted by weighted eligibility score.</p>
+            <span class="card-btn">Open Waiting List</span>
+        </a>
+    </div><!-- end portal-grid -->
 </main>
 
 <footer>
@@ -388,7 +404,7 @@ async function checkServer() {
     }
 
     try {
-        const res = await fetch('/api/health', { method: 'GET', signal: AbortSignal.timeout(3000) });
+        const res = await fetch('/api/health', { method: 'GET', signal: AbortSignal.timeout(3000), cache: 'no-store' });
         if (res.ok) {
             badge.className = 'server-status online';
             text.textContent = 'Server Online';
