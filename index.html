@@ -17,159 +17,34 @@
             --radius: 12px;
             --shadow: 0 4px 16px rgba(0,0,0,0.10);
         }
-
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* HEADER */
-        header {
-            background: linear-gradient(135deg, #1e3a8a 0%, var(--primary) 60%, #1e40af 100%);
-            padding: 24px 40px;
-            display: flex;
-            align-items: center;
-            gap: 20px;
-            border-bottom: 3px solid var(--accent);
-            box-shadow: 0 2px 12px rgba(0,0,0,0.18);
-        }
-        header img {
-            height: 90px;
-            width: auto;
-            filter: drop-shadow(0 2px 10px rgba(0,0,0,0.25));
-        }
-        .header-text h1 {
-            color: white;
-            font-size: 1.55rem;
-            font-weight: 800;
-            letter-spacing: -0.01em;
-            line-height: 1.2;
-        }
-        .header-text p {
-            color: rgba(255,255,255,0.72);
-            font-size: 0.82rem;
-            margin-top: 3px;
-            letter-spacing: 0.03em;
-        }
-
-        /* MAIN */
-        main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 56px 24px;
-        }
-
-        .splash-title {
-            text-align: center;
-            margin-bottom: 48px;
-        }
-        .splash-title h2 {
-            font-size: 1.7rem;
-            font-weight: 800;
-            color: var(--text);
-            margin-bottom: 10px;
-        }
-        .splash-title p {
-            color: var(--text-muted);
-            font-size: 1rem;
-        }
-
-        /* PORTAL CARDS */
-        .portal-grid {
-            display: flex;
-            gap: 28px;
-            flex-wrap: wrap;
-            justify-content: center;
-            max-width: 800px;
-            width: 100%;
-        }
-
-        .portal-card {
-            flex: 1 1 300px;
-            max-width: 350px;
-            background: var(--card-bg);
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            padding: 44px 36px;
-            text-align: center;
-            text-decoration: none;
-            color: var(--text);
-            box-shadow: var(--shadow);
-            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 14px;
-        }
-        .portal-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--primary);
-            box-shadow: 0 12px 32px rgba(37,99,235,0.18);
-        }
-        .portal-card .card-icon {
-            font-size: 3.2rem;
-            line-height: 1;
-        }
-        .portal-card h3 {
-            font-size: 1.25rem;
-            color: var(--primary);
-            font-weight: 800;
-        }
-        .portal-card p {
-            font-size: 0.88rem;
-            color: var(--text-muted);
-            line-height: 1.6;
-        }
-        .card-btn {
-            margin-top: 10px;
-            display: inline-block;
-            padding: 11px 30px;
-            border-radius: 8px;
-            font-size: 0.9rem;
-            font-weight: 700;
-            transition: opacity 0.15s, transform 0.15s;
-        }
-        .portal-card:hover .card-btn { transform: translateY(-1px); }
-
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+        header { background: linear-gradient(135deg, #1e3a8a 0%, var(--primary) 60%, #1e40af 100%); padding: 24px 40px; display: flex; align-items: center; gap: 20px; border-bottom: 3px solid var(--accent); box-shadow: 0 2px 12px rgba(0,0,0,0.18); }
+        header img { height: 90px; width: auto; }
+        .header-text h1 { color: white; font-size: 1.55rem; font-weight: 800; }
+        .header-text p { color: rgba(255,255,255,0.72); font-size: 0.82rem; margin-top: 3px; }
+        main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 56px 24px; }
+        .splash-title { text-align: center; margin-bottom: 48px; }
+        .splash-title h2 { font-size: 1.7rem; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+        .splash-title p { color: var(--text-muted); font-size: 1rem; }
+        .portal-grid { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; max-width: 1100px; width: 100%; }
+        .portal-card { flex: 1 1 280px; max-width: 320px; background: var(--card-bg); border: 2px solid var(--border); border-radius: var(--radius); padding: 44px 36px; text-align: center; text-decoration: none; color: var(--text); box-shadow: var(--shadow); transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+        .portal-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 12px 32px rgba(37,99,235,0.18); }
+        .portal-card .card-icon { font-size: 3.2rem; }
+        .portal-card h3 { font-size: 1.25rem; color: var(--primary); font-weight: 800; }
+        .portal-card p { font-size: 0.88rem; color: var(--text-muted); line-height: 1.6; }
+        .card-btn { margin-top: 10px; display: inline-block; padding: 11px 30px; border-radius: 8px; font-size: 0.9rem; font-weight: 700; }
         .external-card .card-btn { background: var(--primary); color: white; }
         .internal-card .card-btn { background: var(--accent); color: #1e293b; }
-
-        /* FOOTER */
-        footer {
-            background: #0f172a;
-            color: rgba(255,255,255,0.6);
-            text-align: center;
-            padding: 24px;
-            font-size: 0.82rem;
-        }
+        footer { background: #0f172a; color: rgba(255,255,255,0.6); text-align: center; padding: 24px; font-size: 0.82rem; }
         footer a { color: rgba(255,255,255,0.85); text-decoration: none; }
-        footer a:hover { color: white; text-decoration: underline; }
         .footer-brand { font-size: 0.95rem; font-weight: 700; color: rgba(255,255,255,0.88); margin-bottom: 6px; }
-
-        @media (max-width: 600px) {
-            header { padding: 18px 20px; }
-            header img { height: 64px; }
-            .header-text h1 { font-size: 1.15rem; }
-            .splash-title h2 { font-size: 1.3rem; }
-            .portal-card { padding: 32px 24px; }
-        }
     </style>
 </head>
 <body>
 
 <header>
-    <a href="index.html" style="display:flex;align-items:center;text-decoration:none;">
-        <img src="External/images/ChildrenOfPromise.png" alt="Children Of Promise">
-    </a>
+    <img src="/public/images/ChildrenOfPromise.png" alt="Children Of Promise">
     <div class="header-text">
         <h1>Children Of Promise</h1>
         <p>Christian Dayschool &nbsp;·&nbsp; Millstadt, IL</p>
@@ -181,25 +56,47 @@
         <h2>Welcome — Where would you like to go?</h2>
         <p>Select a portal below to get started.</p>
     </div>
-
     <div class="portal-grid">
-
-        <a class="portal-card external-card" href="External/index.html">
+        <a class="portal-card external-card" href="/public/">
             <div class="card-icon">🌐</div>
             <h3>Public Website</h3>
-            <p>View the family-facing website including our home page, about us, mission, and pre-enrollment form.</p>
+            <p>View the family-facing website including home, about us, mission, and pre-enrollment form.</p>
             <span class="card-btn">Go to Website</span>
         </a>
-
-        <a class="portal-card internal-card" href="http://localhost:3000">
+        <a class="portal-card internal-card" href="/staff/">
             <div class="card-icon">🔒</div>
             <h3>Staff Portal</h3>
             <p>Access the internal enrollment management system for staff and administrators.</p>
             <span class="card-btn">Go to Staff Portal</span>
         </a>
-
+        <div class="portal-card" style="cursor:pointer;" onclick="runDeploy()">
+            <div class="card-icon">🚀</div>
+            <h3>Deploy Updates</h3>
+            <p>Pull latest changes from GitHub and restart the server.</p>
+            <span class="card-btn" style="background:#16a34a;color:white;">Deploy Now</span>
+        </div>
     </div>
 </main>
+
+<script>
+async function runDeploy() {
+    if (!confirm('Deploy latest changes from GitHub?')) return;
+    const btn = document.querySelector('[onclick="runDeploy()"] .card-btn');
+    btn.textContent = 'Deploying...';
+    try {
+        const res = await fetch('/api/deploy', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+            alert('Deploy complete!');
+        } else {
+            alert('Deploy failed: ' + json.error);
+        }
+    } catch (e) {
+        alert('Deploy failed: ' + e.message);
+    }
+    btn.textContent = 'Deploy Now';
+}
+</script>
 
 <footer>
     <p class="footer-brand">Children Of Promise Christian Dayschool</p>
