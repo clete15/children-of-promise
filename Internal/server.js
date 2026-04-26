@@ -97,6 +97,11 @@ const server = http.createServer((req, res) => {
         return res.end();
     }
 
+    // GET health check (public)
+    if (req.method === 'GET' && url === '/api/health') {
+        return sendJSON(res, 200, { ok: true });
+    }
+
     // GET students (internal - protected)
     if (req.method === 'GET' && url === '/api/students') {
         if (!checkAuth(req, res)) return;
@@ -170,9 +175,11 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url === '/api/deploy') {
         if (!checkAuth(req, res)) return;
         try {
-            const out = execSync('C:\\deploy.bat', { encoding: 'utf8', shell: 'cmd.exe' });
+            const out = execSync('"C:\\Program Files\\Git\\bin\\git.exe" fetch origin && "C:\\Program Files\\Git\\bin\\git.exe" reset --hard origin/master', { encoding: 'utf8', shell: 'cmd.exe', cwd: 'C:\\app' });
             console.log('[DEPLOY]', out);
-            return sendJSON(res, 200, { success: true, output: out });
+            sendJSON(res, 200, { success: true, output: out });
+            // Restart after response is sent
+            setTimeout(() => process.exit(0), 500);
         } catch (e) {
             return sendJSON(res, 500, { error: e.message });
         }
