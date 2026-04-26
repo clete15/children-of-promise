@@ -1,26 +1,607 @@
-PS C:\Users\child\source\repos\Children Of Promise> git add .
-warning: in the working copy of 'External/styles.css', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Internal/ems.html', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Internal/index.html', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Internal/server.js', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Internal/startup.bat', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Internal/styles.css', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'Start Internal Portal.bat', LF will be replaced by CRLF the next time Git touches it
-warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
-PS C:\Users\child\source\repos\Children Of Promise> git commit -m "initial commit"
-Author identity unknown
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMS – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
 
-*** Please tell me who you are.
+<header class="site-header">
+    <a class="brand-link" href="index.html">
+        <img src="ChildrenOfPromise.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Enrollment Management System &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="index.html">← Staff Portal</a>
+</header>
 
-Run
+<!-- MODE TOGGLE -->
+<div class="mode-toggle-bar">
+    <div class="mode-toggle">
+        <button class="toggle-btn active" id="btnViewMode" onclick="setMode('view')">
+            <span class="toggle-icon">📋</span> View / Edit
+        </button>
+        <button class="toggle-btn" id="btnAddMode" onclick="setMode('add')">
+            <span class="toggle-icon">➕</span> Add Student
+        </button>
+        <button class="toggle-btn" id="btnRosterMode" onclick="setMode('roster')">
+            <span class="toggle-icon">🏫</span> Room Roster
+        </button>
+    </div>
+</div>
 
-  git config --global user.email "you@example.com"
-  git config --global user.name "Your Name"
+<!-- ══════════════════════════════════════════
+     VIEW / EDIT MODE
+══════════════════════════════════════════ -->
+<div id="viewMode">
 
-to set your account's default identity.
-Omit --global to set the identity only in this repository.
+    <!-- NAV BAR -->
+    <div class="nav-bar">
+        <button class="nav-arrow" id="btnPrev" onclick="navigate(-1)" disabled>
+            <span class="arrow-icon">◀</span>
+            <span class="arrow-label">Prev</span>
+        </button>
+        <div class="nav-center">
+            <span class="record-counter" id="recordCounter">Loading…</span>
+            <div class="filter-pills" id="filterPills"></div>
+        </div>
+        <button class="nav-arrow" id="btnNext" onclick="navigate(1)" disabled>
+            <span class="arrow-icon">▶</span>
+            <span class="arrow-label">Next</span>
+        </button>
+    </div>
 
-fatal: unable to auto-detect email address (got 'child@CofP.(none)')
-PS C:\Users\child\source\repos\Children Of Promise> git config --global user.email "childrenofpromise15@gmail.com"
-PS C:\Users\child\source\repos\Children Of Promise> git config --global user.name "Children Of Promise"
-PS C:\Users\child\source\repos\Children Of Promise> git commit -m "initial commit"
+    <!-- FILTER BAR -->
+    <div class="filter-bar">
+        <span class="filter-label">Filter:</span>
+        <div class="filter-pills" id="roomFilterPills"></div>
+    </div>
+
+    <!-- FORM -->
+    <div class="page-container">
+        <div class="form-container">
+
+            <!-- Identity -->
+            <div class="card">
+                <div class="card-title">Student Identity</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name <span class="required">*</span></label>
+                        <input type="text" id="firstName">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name <span class="required">*</span></label>
+                        <input type="text" id="lastName">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Birth Date</label>
+                        <input type="date" id="birthDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="startDate">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>City / Town</label>
+                        <input type="text" id="cityTown">
+                    </div>
+                    <div class="form-group">
+                        <label>Days Old</label>
+                        <input type="number" id="daysOld" readonly>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enrollment -->
+            <div class="card">
+                <div class="card-title">Enrollment Details</div>
+                <div class="form-group">
+                    <label>Room</label>
+                    <select id="roomNumber"></select>
+                </div>
+                <div class="form-group">
+                    <label>Active</label>
+                    <select id="active">
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="category">
+                        <option value="">-- Select --</option>
+                        <option>PFA</option>
+                        <option>PI</option>
+                        <option>Private Pay</option>
+                        <option>CCAP</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Days Attending</label>
+                    <div class="checkbox-grid">
+                        <div class="checkbox-item"><input type="checkbox" id="monday"><label for="monday">Mon</label></div>
+                        <div class="checkbox-item"><input type="checkbox" id="tuesday"><label for="tuesday">Tue</label></div>
+                        <div class="checkbox-item"><input type="checkbox" id="wednesday"><label for="wednesday">Wed</label></div>
+                        <div class="checkbox-item"><input type="checkbox" id="thursday"><label for="thursday">Thu</label></div>
+                        <div class="checkbox-item"><input type="checkbox" id="friday"><label for="friday">Fri</label></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flags -->
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-title">Program Flags</div>
+                <div class="checkbox-grid">
+                    <div class="checkbox-item"><input type="checkbox" id="pfaPiNa"><label for="pfaPiNa">PFA/PI N/A</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="frpFood"><label for="frpFood">F/R/P Food</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="iep"><label for="iep">IEP</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="military"><label for="military">Military</label></div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="actions">
+                <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
+                <button class="btn btn-update" id="btnUpdate" onclick="updateStudent()">Update Student</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ADD STUDENT MODE
+══════════════════════════════════════════ -->
+<div id="addMode" style="display:none;">
+    <div class="page-container">
+        <div class="form-container">
+
+            <div class="card">
+                <div class="card-title">Student Identity</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>First Name <span class="required">*</span></label>
+                        <input type="text" id="addFirstName">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Name <span class="required">*</span></label>
+                        <input type="text" id="addLastName">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Birth Date</label>
+                        <input type="date" id="addBirthDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Start Date</label>
+                        <input type="date" id="addStartDate">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>City / Town</label>
+                        <input type="text" id="addCityTown">
+                    </div>
+                    <div class="form-group">
+                        <label>Days Old</label>
+                        <input type="number" id="addDaysOld">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">Enrollment Details</div>
+                <div class="form-group">
+                    <label>Room</label>
+                    <select id="addRoomNumber"></select>
+                </div>
+                <div class="form-group">
+                    <label>Active</label>
+                    <select id="addActive">
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="addCategory">
+                        <option value="">-- Select --</option>
+                        <option>PFA</option>
+                        <option>PI</option>
+                        <option>Private Pay</option>
+                        <option>CCAP</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Days Attending</label>
+                    <div class="checkbox-grid">
+                        <div class="checkbox-item"><input type="checkbox" id="addMonday"><label for="addMonday">Mon</label></div>
+                        <div class="checkbox-item"><input type="checkbox" id="addTuesday"><label for="addTuesday">Tue</label></div>
+                        <div class="checkbox-item"><input type="checkbox" id="addWednesday"><label for="addWednesday">Wed</label></div>
+                        <div class="checkbox-item"><input type="checkbox" id="addThursday"><label for="addThursday">Thu</label></div>
+                        <div class="checkbox-item"><input type="checkbox" id="addFriday"><label for="addFriday">Fri</label></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-title">Program Flags</div>
+                <div class="checkbox-grid">
+                    <div class="checkbox-item"><input type="checkbox" id="addPfaPiNa"><label for="addPfaPiNa">PFA/PI N/A</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="addFrpFood"><label for="addFrpFood">F/R/P Food</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="addIep"><label for="addIep">IEP</label></div>
+                    <div class="checkbox-item"><input type="checkbox" id="addMilitary"><label for="addMilitary">Military</label></div>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button class="btn btn-secondary" onclick="clearAddForm()">Clear</button>
+                <button class="btn btn-save" onclick="saveStudent()">Save Student</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ROOM ROSTER MODE
+══════════════════════════════════════════ -->
+<div id="rosterMode" style="display:none;">
+    <div class="page-container">
+        <div class="roster-card">
+            <div class="roster-header">
+                <div>Student</div>
+                <div>Current Room</div>
+                <div>Assign Room</div>
+                <div>Save</div>
+            </div>
+            <div id="rosterBody">
+                <div class="roster-empty">Loading roster…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="site-footer">
+    <p class="footer-brand">Children Of Promise Christian Dayschool</p>
+    <p>Millstadt, IL &nbsp;|&nbsp; <a href="tel:6185387527">618-538-7527</a> &nbsp;|&nbsp; <a href="mailto:childrenofpromise.millstadt@outlook.com">childrenofpromise.millstadt@outlook.com</a></p>
+</footer>
+
+<script>
+// ── AUTH ──
+const AUTH = 'Basic ' + btoa(':cofpadmin');
+
+function apiFetch(url, opts = {}) {
+    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
+    return fetch(url, opts);
+}
+
+// ── STATE ──
+let students = [];
+let classrooms = [];
+let filtered = [];
+let currentIndex = 0;
+let activeRoom = 'All';
+let currentMode = 'view';
+
+// ── INIT ──
+async function init() {
+    await Promise.all([loadClassrooms(), loadStudents()]);
+}
+
+async function loadClassrooms() {
+    try {
+        const res = await apiFetch('/api/classrooms');
+        classrooms = await res.json();
+        populateRoomDropdowns();
+    } catch (e) {
+        showNotification('Failed to load classrooms', 'error');
+    }
+}
+
+async function loadStudents() {
+    try {
+        const res = await apiFetch('/api/students');
+        students = await res.json();
+        buildRoomFilter();
+        applyFilter();
+        if (currentMode === 'roster') buildRoster();
+    } catch (e) {
+        showNotification('Failed to load students', 'error');
+    }
+}
+
+function populateRoomDropdowns() {
+    const opts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.RoomNumber} – ${r.Room}</option>`).join('');
+    document.getElementById('roomNumber').innerHTML = opts;
+    document.getElementById('addRoomNumber').innerHTML = opts;
+}
+
+// ── ROOM FILTER ──
+function buildRoomFilter() {
+    const rooms = ['All', ...new Set(students.map(s => s.RoomNumber).filter(Boolean).sort())];
+    const container = document.getElementById('roomFilterPills');
+    container.innerHTML = rooms.map(r =>
+        `<button class="filter-pill ${r === activeRoom ? 'active' : ''}" onclick="setRoomFilter('${r}')">${r}</button>`
+    ).join('');
+}
+
+function setRoomFilter(room) {
+    activeRoom = room;
+    buildRoomFilter();
+    applyFilter();
+}
+
+function applyFilter() {
+    filtered = activeRoom === 'All' ? [...students] : students.filter(s => s.RoomNumber === activeRoom);
+    currentIndex = 0;
+    updateCounter();
+    if (filtered.length > 0) loadRecord(0);
+    else clearForm();
+    updateNavButtons();
+}
+
+// ── NAVIGATION ──
+function navigate(dir) {
+    currentIndex = Math.max(0, Math.min(filtered.length - 1, currentIndex + dir));
+    loadRecord(currentIndex);
+    updateNavButtons();
+    updateCounter();
+}
+
+function updateNavButtons() {
+    document.getElementById('btnPrev').disabled = currentIndex <= 0;
+    document.getElementById('btnNext').disabled = currentIndex >= filtered.length - 1;
+}
+
+function updateCounter() {
+    const el = document.getElementById('recordCounter');
+    el.textContent = filtered.length > 0 ? `${currentIndex + 1} of ${filtered.length}` : '0 records';
+}
+
+// ── LOAD RECORD ──
+function loadRecord(i) {
+    const s = filtered[i];
+    if (!s) return;
+    document.getElementById('firstName').value   = s.First_Name || '';
+    document.getElementById('lastName').value    = s.Last_Name || '';
+    document.getElementById('birthDate').value   = formatDateInput(s.Birth_date);
+    document.getElementById('startDate').value   = formatDateInput(s.Start_Date);
+    document.getElementById('cityTown').value    = s.City_Town || '';
+    document.getElementById('daysOld').value     = s.Days_Old || '';
+    document.getElementById('roomNumber').value  = s.RoomNumber || '';
+    document.getElementById('active').value      = s.Active || 'Yes';
+    document.getElementById('category').value    = s.Category || '';
+    document.getElementById('monday').checked    = isTruthy(s.Monday);
+    document.getElementById('tuesday').checked   = isTruthy(s.Tuesday);
+    document.getElementById('wednesday').checked = isTruthy(s.Wednesday);
+    document.getElementById('thursday').checked  = isTruthy(s.Thursday);
+    document.getElementById('friday').checked    = isTruthy(s.Friday);
+    document.getElementById('pfaPiNa').checked   = isTruthy(s.PFA_PI_na);
+    document.getElementById('frpFood').checked   = isTruthy(s.F_R_P_Food);
+    document.getElementById('iep').checked       = isTruthy(s.IEP);
+    document.getElementById('military').checked  = isTruthy(s.Military);
+}
+
+function isTruthy(v) {
+    return v === true || v === 1 || v === '1' || v === 'Yes' || v === 'yes';
+}
+
+function formatDateInput(val) {
+    if (!val) return '';
+    const d = new Date(val);
+    if (isNaN(d)) return '';
+    return d.toISOString().split('T')[0];
+}
+
+// ── CLEAR FORM ──
+function clearForm() {
+    ['firstName','lastName','birthDate','startDate','cityTown','daysOld'].forEach(id => document.getElementById(id).value = '');
+    ['monday','tuesday','wednesday','thursday','friday','pfaPiNa','frpFood','iep','military'].forEach(id => document.getElementById(id).checked = false);
+    document.getElementById('active').value = 'Yes';
+    document.getElementById('category').value = '';
+}
+
+function clearAddForm() {
+    ['addFirstName','addLastName','addBirthDate','addStartDate','addCityTown','addDaysOld'].forEach(id => document.getElementById(id).value = '');
+    ['addMonday','addTuesday','addWednesday','addThursday','addFriday','addPfaPiNa','addFrpFood','addIep','addMilitary'].forEach(id => document.getElementById(id).checked = false);
+    document.getElementById('addActive').value = 'Yes';
+    document.getElementById('addCategory').value = '';
+}
+
+// ── UPDATE STUDENT ──
+async function updateStudent() {
+    const s = filtered[currentIndex];
+    if (!s) return showNotification('No student selected', 'error');
+
+    const btn = document.getElementById('btnUpdate');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const body = buildBody('');
+    try {
+        const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
+            method: 'PUT', body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('Student updated successfully', 'success');
+            await loadStudents();
+        } else {
+            showNotification('Update failed: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (e) {
+        showNotification('Network error', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Update Student';
+    }
+}
+
+// ── SAVE NEW STUDENT ──
+async function saveStudent() {
+    const firstName = document.getElementById('addFirstName').value.trim();
+    const lastName  = document.getElementById('addLastName').value.trim();
+    if (!firstName || !lastName) return showNotification('First and last name are required', 'error');
+
+    const body = {
+        firstName, lastName,
+        birthDate:  document.getElementById('addBirthDate').value,
+        startDate:  document.getElementById('addStartDate').value,
+        cityTown:   document.getElementById('addCityTown').value,
+        daysOld:    document.getElementById('addDaysOld').value,
+        roomNumber: document.getElementById('addRoomNumber').value,
+        active:     document.getElementById('addActive').value,
+        category:   document.getElementById('addCategory').value,
+        monday:     document.getElementById('addMonday').checked,
+        tuesday:    document.getElementById('addTuesday').checked,
+        wednesday:  document.getElementById('addWednesday').checked,
+        thursday:   document.getElementById('addThursday').checked,
+        friday:     document.getElementById('addFriday').checked,
+        pfaPiNa:    document.getElementById('addPfaPiNa').checked,
+        frpFood:    document.getElementById('addFrpFood').checked,
+        iep:        document.getElementById('addIep').checked,
+        military:   document.getElementById('addMilitary').checked,
+    };
+
+    try {
+        const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(body) });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('Student saved successfully', 'success');
+            clearAddForm();
+            await loadStudents();
+        } else {
+            showNotification('Save failed: ' + (data.error || 'Unknown error'), 'error');
+        }
+    } catch (e) {
+        showNotification('Network error', 'error');
+    }
+}
+
+function buildBody(prefix) {
+    return {
+        firstName:  document.getElementById(prefix + 'firstName').value.trim(),
+        lastName:   document.getElementById(prefix + 'lastName').value.trim(),
+        birthDate:  document.getElementById(prefix + 'birthDate').value,
+        startDate:  document.getElementById(prefix + 'startDate').value,
+        cityTown:   document.getElementById(prefix + 'cityTown').value,
+        daysOld:    document.getElementById(prefix + 'daysOld').value,
+        roomNumber: document.getElementById(prefix + 'roomNumber').value,
+        active:     document.getElementById(prefix + 'active').value,
+        category:   document.getElementById(prefix + 'category').value,
+        monday:     document.getElementById(prefix + 'monday').checked,
+        tuesday:    document.getElementById(prefix + 'tuesday').checked,
+        wednesday:  document.getElementById(prefix + 'wednesday').checked,
+        thursday:   document.getElementById(prefix + 'thursday').checked,
+        friday:     document.getElementById(prefix + 'friday').checked,
+        pfaPiNa:    document.getElementById(prefix + 'pfaPiNa').checked,
+        frpFood:    document.getElementById(prefix + 'frpFood').checked,
+        iep:        document.getElementById(prefix + 'iep').checked,
+        military:   document.getElementById(prefix + 'military').checked,
+    };
+}
+
+// ── ROOM ROSTER ──
+function buildRoster() {
+    const body = document.getElementById('rosterBody');
+    if (!students.length) { body.innerHTML = '<div class="roster-empty">No students found.</div>'; return; }
+
+    const roomOpts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.RoomNumber} – ${r.Room}</option>`).join('');
+
+    body.innerHTML = students.map((s, i) => `
+        <div class="roster-row" id="rosterRow${i}">
+            <div class="roster-name">${s.Last_Name}, ${s.First_Name}</div>
+            <div class="roster-current-room">${s.RoomNumber || '—'} ${s.Room ? '· ' + s.Room : ''}</div>
+            <select class="roster-room-select" id="rosterRoom${i}" onchange="markChanged(${i})">${roomOpts}</select>
+            <button class="btn-roster-save" id="rosterSave${i}" onclick="saveRosterRow(${i})" disabled>Save</button>
+        </div>
+    `).join('');
+
+    // Set current values
+    students.forEach((s, i) => {
+        const sel = document.getElementById(`rosterRoom${i}`);
+        if (sel) sel.value = s.RoomNumber || '';
+    });
+}
+
+function markChanged(i) {
+    document.getElementById(`rosterRow${i}`).classList.add('row-changed');
+    document.getElementById(`rosterSave${i}`).disabled = false;
+}
+
+async function saveRosterRow(i) {
+    const s = students[i];
+    const newRoom = document.getElementById(`rosterRoom${i}`).value;
+    const btn = document.getElementById(`rosterSave${i}`);
+    btn.disabled = true;
+    btn.textContent = '…';
+
+    const body = {
+        firstName: s.First_Name, lastName: s.Last_Name,
+        birthDate: s.Birth_date, startDate: s.Start_Date,
+        cityTown: s.City_Town, daysOld: s.Days_Old,
+        roomNumber: newRoom,
+        active: s.Active, category: s.Category,
+        monday: isTruthy(s.Monday), tuesday: isTruthy(s.Tuesday),
+        wednesday: isTruthy(s.Wednesday), thursday: isTruthy(s.Thursday),
+        friday: isTruthy(s.Friday),
+        pfaPiNa: isTruthy(s.PFA_PI_na), frpFood: isTruthy(s.F_R_P_Food),
+        iep: isTruthy(s.IEP), military: isTruthy(s.Military),
+    };
+
+    try {
+        const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
+            method: 'PUT', body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            students[i].RoomNumber = newRoom;
+            document.getElementById(`rosterRow${i}`).classList.remove('row-changed');
+            showNotification(`${s.First_Name} ${s.Last_Name} moved to room ${newRoom}`, 'success');
+        } else {
+            showNotification('Update failed: ' + (data.error || ''), 'error');
+            btn.disabled = false;
+        }
+    } catch (e) {
+        showNotification('Network error', 'error');
+        btn.disabled = false;
+    } finally {
+        btn.textContent = 'Save';
+    }
+}
+
+// ── MODE SWITCHING ──
+function setMode(mode) {
+    currentMode = mode;
+    document.getElementById('viewMode').style.display   = mode === 'view'   ? 'block' : 'none';
+    document.getElementById('addMode').style.display    = mode === 'add'    ? 'block' : 'none';
+    document.getElementById('rosterMode').style.display = mode === 'roster' ? 'block' : 'none';
+    document.getElementById('btnViewMode').classList.toggle('active',   mode === 'view');
+    document.getElementById('btnAddMode').classList.toggle('active',    mode === 'add');
+    document.getElementById('btnRosterMode').classList.toggle('active', mode === 'roster');
+    if (mode === 'roster') buildRoster();
+}
+
+// ── NOTIFICATION ──
+function showNotification(msg, type = 'info') {
+    const el = document.createElement('div');
+    el.className = `notification ${type}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+}
+
+init();
+</script>
+</body>
+</html>
