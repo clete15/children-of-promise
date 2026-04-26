@@ -175,7 +175,7 @@ const server = http.createServer((req, res) => {
     if (req.method === 'POST' && url === '/api/deploy') {
         if (!checkAuth(req, res)) return;
         try {
-            const out = execSync('"C:\\Program Files\\Git\\bin\\git.exe" fetch origin && "C:\\Program Files\\Git\\bin\\git.exe" reset --hard origin/master', { encoding: 'utf8', shell: 'cmd.exe', cwd: 'C:\\app' });
+            const out = execSync('"C:\\Program Files\\Git\\mingw64\\bin\\git.exe" fetch origin && "C:\\Program Files\\Git\\mingw64\\bin\\git.exe" reset --hard origin/master', { encoding: 'utf8', shell: 'cmd.exe', cwd: 'C:\\app' });
             console.log('[DEPLOY]', out);
             sendJSON(res, 200, { success: true, output: out });
             // Restart after response is sent
