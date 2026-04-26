@@ -1,0 +1,299 @@
+:root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --accent: #f59e0b;
+    --success: #16a34a;
+    --danger: #dc2626;
+    --bg: #f1f5f9;
+    --card-bg: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --radius: 10px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+/* ── SITE HEADER (logo banner) ── */
+.site-header {
+    background: #f0f4ff;
+    padding: 22px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 3px solid var(--border);
+}
+.site-header .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    text-decoration: none;
+}
+.site-header img {
+    height: 90px;
+    width: auto;
+    transition: transform 0.2s;
+}
+.site-header .brand-link:hover img { transform: scale(1.03); }
+.site-header .brand-text h1 {
+    color: var(--primary-dark);
+    font-size: 1.55rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+}
+.site-header .brand-text p {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    margin-top: 3px;
+    letter-spacing: 0.03em;
+}
+.site-header .header-contact {
+    text-align: right;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    line-height: 1.8;
+}
+.site-header .header-contact a {
+    color: var(--primary);
+    text-decoration: none;
+}
+.site-header .header-contact a:hover { text-decoration: underline; }
+
+/* ── NAV BAR (links only) ── */
+nav {
+    background: #dce6f5;
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+nav a {
+    color: var(--primary-dark);
+    text-decoration: none;
+    padding: 14px 20px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    border-bottom: 3px solid transparent;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    display: inline-block;
+}
+nav a:hover {
+    color: var(--primary);
+    background: rgba(37,99,235,0.08);
+    border-bottom-color: var(--primary);
+}
+nav a.active {
+    color: var(--primary);
+    font-weight: 700;
+    border-bottom-color: var(--accent);
+}
+
+/* ── HERO ── */
+.hero {
+    background: #e8f0fe;
+    color: var(--text);
+    text-align: center;
+    padding: 72px 24px;
+    border-bottom: 2px solid var(--border);
+}
+.hero::before { content: none; }
+.hero h1 { font-size: 2.4rem; margin-bottom: 12px; font-weight: 800; color: var(--primary-dark); }
+.hero p { font-size: 1.08rem; color: var(--text-muted); max-width: 560px; margin: 0 auto 28px; }
+.hero .btn {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    padding: 13px 32px;
+    border-radius: var(--radius);
+    font-weight: 700;
+    text-decoration: none;
+    font-size: 0.95rem;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 4px 12px rgba(37,99,235,0.25);
+}
+.hero .btn:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(37,99,235,0.35); }
+
+/* ── CONTAINER ── */
+.container { max-width: 880px; margin: 0 auto; padding: 44px 20px; }
+
+/* ── CARDS ── */
+.card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 30px;
+    box-shadow: var(--shadow);
+    margin-bottom: 22px;
+    transition: box-shadow 0.2s;
+}
+.card:hover { box-shadow: var(--shadow-md); }
+.card h2 {
+    color: var(--primary);
+    font-size: 1.15rem;
+    margin-bottom: 14px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+}
+.card p { color: var(--text-muted); margin-bottom: 10px; }
+.card p:last-child { margin-bottom: 0; }
+
+/* ── INFO GRID ── */
+.info-grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 16px;
+    margin-top: 24px;
+}
+.info-card {
+    flex: 1 1 180px;
+    max-width: 220px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px 18px;
+    text-align: center;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.info-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+.info-card .icon { font-size: 2.4rem; margin-bottom: 10px; }
+.info-card h3 { font-size: 0.92rem; color: var(--primary); margin-bottom: 6px; font-weight: 700; }
+.info-card p { font-size: 0.83rem; color: var(--text-muted); }
+
+/* ── FORM ── */
+.form-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 32px;
+    box-shadow: var(--shadow);
+}
+.form-section h2 {
+    color: var(--primary);
+    font-size: 1.15rem;
+    margin-bottom: 22px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--text-muted); margin-bottom: 5px; }
+.form-group input, .form-group select, .form-group textarea {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.88rem;
+    color: var(--text);
+    background: white;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+}
+.form-group textarea { resize: vertical; min-height: 80px; }
+.required { color: var(--danger); }
+
+.checkbox-group { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.checkbox-group label { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 500; color: var(--text); cursor: pointer; }
+.checkbox-group input[type="checkbox"] { width: auto; accent-color: var(--primary); }
+
+.section-divider {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--primary);
+    margin: 22px 0 12px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border);
+}
+
+.btn-submit {
+    width: 100%;
+    padding: 13px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 12px;
+    transition: background 0.15s, transform 0.15s;
+}
+.btn-submit:hover { background: var(--primary-dark); transform: translateY(-1px); }
+.btn-submit:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+/* ── NOTIFICATION ── */
+.notification {
+    position: fixed;
+    top: 20px; right: 20px;
+    padding: 14px 22px;
+    border-radius: var(--radius);
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    z-index: 1000;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    animation: slideIn 0.25s ease;
+    max-width: 360px;
+}
+.notification.success { background: var(--success); }
+.notification.error { background: var(--danger); }
+@keyframes slideIn {
+    from { transform: translateX(110%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* ── FOOTER ── */
+footer {
+    background: #0f172a;
+    color: rgba(255,255,255,0.65);
+    text-align: center;
+    padding: 28px 24px;
+    font-size: 0.84rem;
+    margin-top: 48px;
+}
+footer a { color: rgba(255,255,255,0.85); text-decoration: none; }
+footer a:hover { color: white; text-decoration: underline; }
+footer .footer-brand {
+    font-size: 1rem;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    margin-bottom: 8px;
+}
+
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+    .site-header { padding: 16px 20px; gap: 12px; }
+    .site-header img { height: 64px; }
+    .site-header .brand-text h1 { font-size: 1.15rem; }
+    .site-header .header-contact { display: none; }
+    nav { padding: 0 8px; justify-content: space-around; }
+    nav a { padding: 12px 10px; font-size: 0.8rem; }
+    .hero { padding: 48px 20px; }
+    .hero h1 { font-size: 1.7rem; }
+    .form-row { grid-template-columns: 1fr; }
+    .info-card { flex: 1 1 140px; }
+}

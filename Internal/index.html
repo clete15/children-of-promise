@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Children Of Promise - Staff Portal</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --accent: #f59e0b;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --radius: 12px;
+            --shadow: 0 4px 16px rgba(0,0,0,0.10);
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── PASSWORD OVERLAY ── */
+        #passwordOverlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1e3a8a 0%, var(--primary) 60%, #1e40af 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 24px;
+        }
+        #passwordOverlay img {
+            height: 100px;
+            margin-bottom: 24px;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
+        }
+        #passwordOverlay h2 {
+            color: white;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+        #passwordOverlay p {
+            color: rgba(255,255,255,0.7);
+            font-size: 0.88rem;
+            margin-bottom: 28px;
+        }
+        .pw-box {
+            background: white;
+            border-radius: var(--radius);
+            padding: 32px 36px;
+            width: 100%;
+            max-width: 360px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .pw-box label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .pw-input-wrap { position: relative; }
+        .pw-box input[type="password"],
+        .pw-box input[type="text"] {
+            width: 100%;
+            padding: 11px 40px 11px 13px;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            color: var(--text);
+            transition: border-color 0.15s, box-shadow 0.15s;
+            font-family: inherit;
+        }
+        .pw-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+        }
+        .pw-toggle {
+            position: absolute;
+            right: 11px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            color: var(--text-muted);
+            padding: 2px;
+        }
+        .pw-box button[type="submit"] {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+        }
+        .pw-box button[type="submit"]:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .pw-error {
+            color: var(--danger);
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-align: center;
+            display: none;
+            animation: shake 0.3s ease;
+        }
+        @keyframes shake {
+            0%,100%{transform:translateX(0)}
+            25%{transform:translateX(-6px)}
+            75%{transform:translateX(6px)}
+        }
+
+        /* ── HEADER ── */
+        header {
+            background: linear-gradient(135deg, #1e3a8a 0%, var(--primary) 60%, #1e40af 100%);
+            padding: 24px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            border-bottom: 3px solid var(--accent);
+            box-shadow: 0 2px 12px rgba(0,0,0,0.18);
+        }
+        .header-left { display: flex; align-items: center; gap: 20px; text-decoration: none; }
+        header img.logo {
+            height: 90px;
+            width: auto;
+            filter: drop-shadow(0 2px 10px rgba(0,0,0,0.25));
+            transition: transform 0.2s;
+        }
+        .header-left:hover img.logo { transform: scale(1.03); }
+        .header-text h1 { color: white; font-size: 1.55rem; font-weight: 800; line-height: 1.2; }
+        .header-text p  { color: rgba(255,255,255,0.72); font-size: 0.82rem; margin-top: 3px; letter-spacing: 0.04em; }
+
+        /* SERVER STATUS */
+        .server-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            border: 1.5px solid rgba(255,255,255,0.3);
+            color: rgba(255,255,255,0.9);
+            white-space: nowrap;
+        }
+        .status-dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+            background: #94a3b8;
+            flex-shrink: 0;
+            transition: background 0.3s;
+        }
+        .server-status.checking .status-dot { animation: pulse-grey 1.2s infinite; }
+        .server-status.online  .status-dot { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+        .server-status.offline .status-dot { background: #f87171; box-shadow: 0 0 6px #f87171; }
+        @keyframes pulse-grey { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+        /* MAIN */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 48px 24px;
+        }
+        .splash-title { text-align: center; margin-bottom: 36px; }
+        .splash-title h2 { font-size: 1.7rem; font-weight: 800; color: var(--text); margin-bottom: 10px; }
+        .splash-title p  { color: var(--text-muted); font-size: 1rem; }
+
+        /* OFFLINE WARNING */
+        .offline-warning {
+            display: none;
+            background: #fef2f2;
+            border: 1.5px solid #fecaca;
+            border-radius: var(--radius);
+            padding: 18px 24px;
+            max-width: 460px;
+            width: 100%;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        .offline-warning h4 { color: var(--danger); font-size: 0.95rem; margin-bottom: 6px; }
+        .offline-warning p  { color: #7f1d1d; font-size: 0.83rem; line-height: 1.55; }
+        .offline-warning code {
+            display: inline-block;
+            margin-top: 8px;
+            background: #fee2e2;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 0.82rem;
+            color: #991b1b;
+            font-family: monospace;
+        }
+
+        /* PORTAL CARD */
+        .portal-card {
+            background: var(--card-bg);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 44px 52px;
+            text-align: center;
+            text-decoration: none;
+            color: var(--text);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            max-width: 420px;
+            width: 100%;
+        }
+        .portal-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 12px 32px rgba(37,99,235,0.18); }
+        .portal-card.disabled { opacity: 0.55; pointer-events: none; filter: grayscale(0.4); }
+        .card-icon { font-size: 3.4rem; line-height: 1; }
+        .portal-card h3 { font-size: 1.3rem; color: var(--primary); font-weight: 800; }
+        .portal-card p  { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
+        .card-btn {
+            margin-top: 10px;
+            display: inline-block;
+            padding: 13px 36px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            background: var(--primary);
+            color: white;
+            transition: background 0.15s, transform 0.15s;
+        }
+        .portal-card:hover .card-btn { background: var(--primary-dark); transform: translateY(-1px); }
+
+        /* FOOTER */
+        footer {
+            background: #0f172a;
+            color: rgba(255,255,255,0.6);
+            text-align: center;
+            padding: 24px;
+            font-size: 0.82rem;
+        }
+        footer a { color: rgba(255,255,255,0.85); text-decoration: none; }
+        footer a:hover { color: white; text-decoration: underline; }
+        .footer-brand { font-size: 0.95rem; font-weight: 700; color: rgba(255,255,255,0.88); margin-bottom: 6px; }
+
+        @media (max-width: 600px) {
+            header { padding: 16px 20px; }
+            header img.logo { height: 64px; }
+            .header-text h1 { font-size: 1.1rem; }
+            .portal-card { padding: 32px 24px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- PASSWORD OVERLAY -->
+<div id="passwordOverlay">
+    <img src="ChildrenOfPromise.png" alt="Children Of Promise">
+    <h2>Staff Portal</h2>
+    <p>Children Of Promise &nbsp;·&nbsp; Millstadt, IL</p>
+    <form class="pw-box" id="pwForm">
+        <label for="pwInput">Password</label>
+        <div class="pw-input-wrap">
+            <input type="password" id="pwInput" placeholder="Enter password" autocomplete="current-password" autofocus>
+            <button type="button" class="pw-toggle" id="pwToggle" title="Show/hide password">👁</button>
+        </div>
+        <div class="pw-error" id="pwError">Incorrect password. Please try again.</div>
+        <button type="submit">Sign In</button>
+    </form>
+</div>
+
+<!-- MAIN CONTENT (hidden until authenticated) -->
+<div id="mainContent" style="display:none;flex-direction:column;flex:1;">
+
+<header>
+    <a class="header-left" href="../index.html">
+        <img class="logo" src="ChildrenOfPromise.png" alt="Children Of Promise">
+        <div class="header-text">
+            <h1>Children Of Promise</h1>
+            <p>Staff Portal &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <div class="server-status checking" id="serverStatus">
+        <div class="status-dot"></div>
+        <span id="statusText">Checking server…</span>
+    </div>
+</header>
+
+<main>
+    <div class="splash-title">
+        <h2>Staff Portal</h2>
+        <p>Select a system below to get started.</p>
+    </div>
+
+    <div class="offline-warning" id="offlineWarning">
+        <h4>⚠️ Server Not Running</h4>
+        <p>The database server is offline. To launch it, double-click the file below from your project folder:</p>
+        <code>Start Internal Portal.bat</code>
+        <p style="margin-top:8px;">Once started, refresh this page and the EMS will be available.</p>
+    </div>
+
+    <a class="portal-card" id="emsCard" href="ems.html">
+        <div class="card-icon">📋</div>
+        <h3>Enrollment Management</h3>
+        <p>View, add, and update student enrollment records. Browse all enrolled students and manage their program details.</p>
+        <span class="card-btn">Open EMS</span>
+    </a>
+</main>
+
+<footer>
+    <p class="footer-brand">Children Of Promise Christian Dayschool</p>
+    <p>Millstadt, IL &nbsp;|&nbsp; <a href="tel:6185387527">618-538-7527</a> &nbsp;|&nbsp; <a href="mailto:childrenofpromise.millstadt@outlook.com">childrenofpromise.millstadt@outlook.com</a></p>
+</footer>
+
+</div><!-- end mainContent -->
+
+<script>
+const CORRECT_PASSWORD = 'cofpadmin';
+
+// ── PASSWORD GATE ──
+function checkAuth() {
+    if (sessionStorage.getItem('copStaffAuth') === '1') {
+        showPortal();
+    }
+}
+
+function showPortal() {
+    document.getElementById('passwordOverlay').style.display = 'none';
+    const mc = document.getElementById('mainContent');
+    mc.style.display = 'flex';
+    checkServer();
+}
+
+document.getElementById('pwForm').addEventListener('submit', e => {
+    e.preventDefault();
+    const val = document.getElementById('pwInput').value;
+    const err = document.getElementById('pwError');
+    if (val === CORRECT_PASSWORD) {
+        sessionStorage.setItem('copStaffAuth', '1');
+        err.style.display = 'none';
+        showPortal();
+    } else {
+        err.style.display = 'block';
+        document.getElementById('pwInput').value = '';
+        document.getElementById('pwInput').focus();
+    }
+});
+
+document.getElementById('pwToggle').addEventListener('click', () => {
+    const input = document.getElementById('pwInput');
+    input.type = input.type === 'password' ? 'text' : 'password';
+});
+
+// ── SERVER STATUS ──
+async function checkServer() {
+    const badge   = document.getElementById('serverStatus');
+    const text    = document.getElementById('statusText');
+    const card    = document.getElementById('emsCard');
+    const warning = document.getElementById('offlineWarning');
+
+    if (location.protocol === 'file:') {
+        badge.className = 'server-status offline';
+        text.textContent = 'Server Offline';
+        warning.style.display = 'block';
+        card.classList.add('disabled');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/students', { method: 'GET', signal: AbortSignal.timeout(3000) });
+        if (res.ok) {
+            badge.className = 'server-status online';
+            text.textContent = 'Server Online';
+            warning.style.display = 'none';
+            card.classList.remove('disabled');
+        } else throw new Error();
+    } catch {
+        badge.className = 'server-status offline';
+        text.textContent = 'Server Offline';
+        warning.style.display = 'block';
+        card.classList.add('disabled');
+    }
+}
+
+checkAuth();
+setInterval(checkServer, 10000);
+</script>
+</body>
+</html>

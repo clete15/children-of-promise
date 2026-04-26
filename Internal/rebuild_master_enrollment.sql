@@ -1,0 +1,127 @@
+USE CofPMillstadt;
+
+-- Drop and recreate rptMasterEnrollment with RoomNumber FK, removing redundant columns
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'rptMasterEnrollment')
+    DROP TABLE rptMasterEnrollment;
+
+CREATE TABLE rptMasterEnrollment (
+    Id          INT IDENTITY(1,1) PRIMARY KEY,
+    Last_Name   NVARCHAR(100),
+    First_Name  NVARCHAR(100),
+    Birth_date  NVARCHAR(20),
+    Start_Date  NVARCHAR(20),
+    City_Town   NVARCHAR(100),
+    Days_Old    INT,
+    RoomNumber  INT REFERENCES dimClassrooms(RoomNumber),
+    Monday      INT,
+    Tuesday     INT,
+    Wednesday   INT,
+    Thursday    INT,
+    Friday      INT,
+    Active      NVARCHAR(10),
+    Category    NVARCHAR(50),
+    PFA_PI_na   NVARCHAR(20),
+    F_R_P_Food  NVARCHAR(20),
+    IEP         NVARCHAR(10),
+    Military    NVARCHAR(10)
+);
+
+INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military)
+VALUES
+-- ROOM 1 - Infant
+('Beyer',      'Daniel',   '2025-10-22','2026-01-19','Belleville',       185, 1, 1,1,1,1,1,'YES','Paid',   'PI',    'Paid',   NULL,NULL),
+('Staley',     'Bodie',    '2025-12-19',NULL,        'Millstadt',        127, 1, 1,1,1,1,1,'YES','Paid',   NULL,    NULL,     NULL,NULL),
+('Stickles',   'Lei''Lani','2026-01-12',NULL,        'Belleville',       103, 1, 1,1,1,1,1,'YES','CHASI',  NULL,    NULL,     NULL,NULL),
+('Childerson', 'Scarlett', '2025-11-11',NULL,        'Columbia',         165, 1, 1,1,1,1,1,'YES','Paid',   NULL,    NULL,     NULL,NULL),
+('Williams',   'Stella',   '2026-02-27','2026-04-13','Belleville',       57,  1, 1,1,1,1,1,'YES','CHASI',  NULL,    NULL,     NULL,NULL),
+-- ROOM 2 - Infants / Toddlers
+('Mooney',     'Brayden',  '2025-09-19','2025-11-04','Belleville',       218, 2, 1,1,1,1,1,'YES','CHASI',  'PI',    'Free',   NULL,NULL),
+('McClanahan', 'Kaidyn',   '2025-05-31','2025-08-25','Smithton',         329, 2, 1,1,1,1,0,'Yes','CHASi',  'PI',    'Free',   NULL,NULL),
+('Duby',       'Ruby',     '2025-05-10','2025-07-22','Millstadt',        350, 2, 1,1,1,1,1,'Yes','Paid',   'PI',    'Paid',   NULL,NULL),
+('Overmann',   'Tilly',    '2025-05-20','2025-08-26','Millstadt',        340, 2, 1,1,1,1,1,'Yes','Paid',   'INCCRA','Paid',   NULL,NULL),
+('Green',      'Olin',     '2025-09-11','2026-04-07','Smithton',         226, 2, 1,1,1,1,1,'YES','Paid',   NULL,    NULL,     NULL,NULL),
+-- ROOM 3 - Toddlers
+('Whitehead',  'Kohan',    '2025-02-28','2025-05-07','Freeburg',         421, 3, 1,1,1,1,1,'YES','Chasi',  'PI',    'Reduced',NULL,NULL),
+('Thouvenot',  'Hailey',   '2025-02-27','2025-06-23','Belleville',       422, 3, 1,1,1,1,1,'YES','Paid',   'PI',    'Paid',   NULL,NULL),
+('Kolb',       'Mallie',   '2025-01-08','2025-04-07','Belleville',       472, 3, 1,1,1,1,1,'YES','Paid',   'PI',    'Paid',   NULL,NULL),
+('Mocivnik',   'Mia',      '2025-02-16',NULL,        NULL,               433, 3, 1,0,1,0,1,'YES','Paid',   NULL,    NULL,     NULL,NULL),
+('Pollard',    'Ronan',    '2024-10-05','2025-01-09','Swansea',          567, 3, 1,1,0,1,0,'YES','Paid',   'INCCRA','Paid',   '0', NULL),
+('Smith',      'Hope',     '2024-08-20','2025-09-02','Columbia',         613, 3, 0,1,1,1,0,'Yes','Paid',   'INCCRA','Paid',   NULL,NULL),
+-- ROOM 4 - 2 Year Olds / Toddlers
+('Smith',      'Serena',   '2024-06-07','2025-10-03','Millstadt',        687, 4, 0,1,0,0,1,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+('Wallace',    'Julian',   '2024-02-20','2024-05-07','St. Louis',        795, 4, 1,1,1,1,1,'YES','1/2 price', 'INCCRA','Paid',NULL,NULL),
+('Mense',      'Elia',     '2023-12-28','2024-04-29','Fairview Heights', 849, 4, 1,0,0,1,1,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+('Mense',      'Charles',  '2023-12-28','2024-04-29','Fairview Heights', 849, 4, 1,0,0,1,1,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+('Behrmann',   'Cole',     '2023-09-12','2023-11-14','Millstadt',        956, 4, 0,1,0,1,0,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+('Lewis',      'Josie',    '2023-09-12',NULL,        'Millstadt',        956, 4, 1,1,0,1,1,'YES','Paid',      NULL,    NULL,  NULL,NULL),
+('Pollard',    'Winona',   '2023-06-20','2024-04-02','Swansea',          1040,4, 1,1,0,1,0,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+-- ROOM 5 - 2 Year Olds
+('McClure',    'Greyson',  '2024-05-17','2024-07-15','Belleville',       708, 5, 1,1,1,1,1,'YES','Chasi', 'PI',    'Paid',   NULL,NULL),
+('Gardner',    'Cambri',   '2024-01-26','2024-03-11','Cahokia',          820, 5, 1,1,1,1,1,'YES','Chasi', 'PI',    'Free',   NULL,NULL),
+('Mooney',     'Kaiden',   '2023-12-30','2024-12-09','Belleville',       847, 5, 1,1,1,1,1,'YES','Chasi', 'PI',    'Free',   NULL,NULL),
+('Schneider',  'Nolan',    '2023-10-19','2025-03-17','Millstadt',        919, 5, 1,1,1,1,1,'YES','Chasi', 'PI',    'Paid',   NULL,NULL),
+('Stickels',   'Amoura',   '2023-08-04','2024-08-26','Belleville',       995, 5, 1,1,1,1,1,'YES','Chasi', 'PI',    'Free',   NULL,NULL),
+('Brown',      'Benjamin', '2023-06-02','2025-08-06','Millstadt',        1058,5, 0,0,1,1,1,'YES','Paid',  'PI',    'Paid',   NULL,NULL),
+('Brock',      'Ausar',    '2023-05-10','2025-06-09','Cahokia',          1081,5, 1,1,1,1,1,'YES','Chasi', 'PI',    'Free',   NULL,NULL),
+('Poe',        'Cypress',  '2023-01-20','2024-08-26','Millstadt',        1191,5, 1,1,1,1,1,'YES','Chasi', 'PI',    'Free',   NULL,NULL),
+-- ROOM 6 - Pre-School
+('Gardner',    'Leilani',  '2022-10-02','2024-01-23','Cahokia',          1301,6, 1,1,1,1,1,'YES','Chasi', 'PI',    'Free',   NULL,NULL),
+('Kleinik',    'Rylie',    '2022-09-22','2024-06-26','East Carondelet',  1311,6, 0,1,1,1,0,'YES','Chasi', 'PI',    'Free',   NULL,NULL),
+('Docherty',   'Amelia',   '2022-09-20','2025-11-10',NULL,               1313,6, 1,1,1,1,1,'YES','Chasi', 'PFA',   'Free',   NULL,NULL),
+('Gagliardi',  'Elaina',   '2022-09-17','2025-03-17','Smithon',          1316,6, 1,1,1,1,1,'YES','CHASI', 'PI',    'Free',   '0', '0'),
+('Schlegel',   'Royal',    '2022-02-05','2025-05-26','Caseyville',       1540,6, 1,1,1,1,1,'YES','Chasi', 'PFA',   'Reduced',NULL,NULL),
+('Grissom',    'Ace',      '2021-11-04','2023-02-01','Cahokia',          1633,6, 1,1,1,1,1,'YES','Chasi', 'PFA',   'Paid',   NULL,NULL),
+('McClanahan', 'Kolson',   '2021-10-02','2021-11-15','Freeburg',         1666,6, 1,1,1,1,0,'YES','Chasi', 'PFA',   'Free',   NULL,NULL),
+('Click',      'Kolton',   '2021-08-26','2021-10-11','Dupo',             1703,6, 1,1,1,1,1,'YES','Chasi', 'PFA',   'Reduced',NULL,NULL),
+('Smith',      'Nellie',   '2021-08-17','2023-08-01','Fairview Heights', 1712,6, 1,1,1,1,1,'YES','Paid',  'PFA',   'Paid',   NULL,NULL),
+('Nichols',    'Max',      '2021-07-01','2023-10-02','Belleville',       1759,6, 1,1,1,1,1,'YES','Paid',  'PFA',   'Paid',   NULL,NULL),
+('Gardner',    'Phoenix',  '2021-05-26','2024-01-23','Cahokia',          1795,6, 1,1,1,1,1,'YES','Chasi', 'PFA',   'Free',   NULL,NULL),
+('Weaver',     'Sullivan', '2021-04-06','2023-11-20','Millstadt',        1845,6, 1,1,1,0,0,'YES','Paid',  'PFA',   'Paid',   NULL,NULL),
+('Lovett',     'Caden',    '2021-03-23','2021-06-02','Millstadt',        1859,6, 1,1,1,1,1,'YES','Paid',  'PFA',   'Paid',   NULL,NULL),
+('Shearer',    'Abigail',  '2020-11-04','2022-02-23','East Carondelet',  1998,6, 1,1,1,1,1,'YES','Paid',  'PFA',   'Paid',   NULL,NULL),
+('Tokarski',   'Livie',    '2020-09-25','2021-03-01','Belleville',       2038,6, 1,1,1,1,1,'YES','Paid',  'PFA',   'Paid',   NULL,NULL),
+-- ROOM 7 - Pre-School 2
+('Overmann',   'Mckenna',  '2022-09-15','2023-01-16','Millstadt',        1318,7, 0,1,0,1,0,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+('Cramm',      'Liam',     '2022-04-05','2022-08-10','Millstadt',        1481,7, 1,1,1,1,1,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+('Murray',     'George',   '2022-02-20','2022-06-06','Belleville',       1525,7, 1,0,1,0,1,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+('Wershila',   'Juniper',  '2021-11-16','2024-08-26','Millstadt',        1621,7, 1,1,1,1,1,'YES','Chasi',     'INCCRA','Free',NULL,NULL),
+('Hayes',      'Rylee',    '2021-10-12','2021-11-29','Millstadt',        1656,7, 1,1,1,1,1,'YES','Paid',      'INCCRA','Paid',NULL,NULL),
+('Wallace',    'Genevieve','2021-09-09','2022-05-23','St. Louis',        1689,7, 1,1,1,1,1,'YES','1/2 price', 'INCCRA','Paid',NULL,NULL),
+('Holliday',   'Keeley',   '2021-08-24','2022-02-02','Millstadt',        1705,7, 1,1,1,1,1,'YES','Staff',     'INCCRA','Free',NULL,NULL),
+('Weis',       'Landon',   '2021-05-26','2022-09-06','Millstadt',        1795,7, 1,1,1,1,1,'YES','Paid',      'INCCRA','Free',NULL,NULL),
+('Walker',     'Alyvia',   '2023-03-14',NULL,        NULL,               1138,7, 0,0,1,0,1,'YES','Chasi',     NULL,    NULL,  NULL,NULL),
+('Lewis',      'Aurora',   '2021-11-04',NULL,        'Millstadt',        1633,7, 1,1,0,1,1,'YES','Paid',      NULL,    NULL,  NULL,NULL),
+('Berg',       'Jackson',  '2019-10-28','2021-09-07','Belleville',       2371,7, 1,0,0,1,1,'YES','1/2 price', 'INCCRA','Paid','Yes',NULL),
+-- ROOM 8 - Before and Afterschool
+('Eilers',     'Paisley',  '2021-04-14','2022-05-03','Dupo',             1837,8, 0,0,0,0,0,'No', 'Paid',  'INCCRA','Paid',   NULL,NULL),
+('Horrights',  'Rowan',    '2020-08-22','2020-10-05','Belleville',       2072,8, 1,1,1,1,1,'NO', 'Chasi', 'INCCRA','Free',   NULL,NULL),
+('Hill',       'Alec',     '2020-07-30','2020-02-15','Belleville',       2095,8, 1,1,1,1,1,'NO', 'Chasi', 'INCCRA','Paid',   'Yes',NULL),
+('White',      'Rosie',    '2020-06-01','2022-09-07','Belleville',       2154,8, 0,1,0,1,0,'NO', 'Paid',  'INCCRA','Paid',   NULL,NULL),
+('Casson',     'Avery',    '2019-09-01','2026-05-29','Millstadt',        2428,8, 1,1,1,1,1,'No', 'Chasi', NULL,    NULL,     NULL,NULL),
+('Ehinger',    'Case',     '2020-02-04','2021-07-12','Belleville',       2272,8, 1,1,1,1,1,'YES','Paid',  'INCCRA','Paid',   NULL,NULL),
+('Wallace',    'Evan',     '2020-01-12','2024-07-29','Millstadt',        2295,8, 1,1,1,1,1,'YES','DCFS',  'INCCRA','Free',   'Yes',NULL),
+('Murdock',    'Novella',  '2019-12-23','2021-10-26','Belleville',       2315,8, 1,1,1,1,1,'NO', 'Paid',  'INCCRA','Paid',   NULL,NULL),
+('McHugh',     'Julia',    '2019-10-12','2023-05-30','Millstadt',        2387,8, 1,1,1,1,1,'YES','Chasi', 'INCCRA','Paid',   NULL,NULL),
+('Johnson',    'Chase',    '2019-03-29','2019-10-21','Dupo',             2584,8, 1,1,1,1,1,'YES','Chasi', 'INCCRA','Free',   NULL,NULL),
+('Meng',       'Piper',    '2019-01-26','2021-03-09','Dupo',             2646,8, 1,1,1,1,1,'NO', 'Chasi', 'INCCRA','Reduced',NULL,NULL),
+('Sinclair',   'Vivan',    '2019-01-18','2019-03-11','Belleville',       2654,8, 1,1,1,1,1,'NO', 'Chasi', 'na',    'Free',   NULL,NULL),
+('Wallace',    'Wyatt',    '2018-12-18','2024-07-01','Millstadt',        2685,8, 1,1,1,1,1,'YES','DCFS',  'INCCRA','Free',   NULL,NULL),
+('Wershila',   'Sage',     '2018-08-30','2024-08-26','Millstadt',        2795,8, 1,1,1,1,1,'YES','Chasi', 'INCCRA','Free',   NULL,NULL),
+('Phelps',     'Jolee',    '2018-07-06','2021-10-25','Millstadt',        2850,8, 0,1,0,0,1,'YES','Paid',  'INCCRA','Paid',   NULL,NULL),
+('Peterson',   'Madisyn',  '2018-07-05','2018-06-18','New Athens',       2851,8, 1,1,1,1,1,'NO', 'Staff', 'na',    'Paid',   'Yes',NULL),
+('Duby',       'Sloan',    '2018-02-12','2018-10-03','Millstadt',        2994,8, 1,1,1,1,1,'YES','Paid',  'INCCRA','Paid',   NULL,NULL),
+('Kleinik',    'Kaleb',    '2018-01-11','2024-06-26','East Carondelet',  3026,8, 0,0,1,1,1,'NO', 'Chasi', 'INCCRA','Free',   NULL,NULL),
+('White',      'Jessica',  '2017-10-27','2020-07-01','Millstadt',        3102,8, 1,1,1,1,1,'YES','Staff', 'INCCRA','Free',   NULL,NULL),
+('Eilers',     'Leiton',   '2017-05-23','2020-01-14','Dupo',             3259,8, 0,1,0,1,0,'No', 'Paid',  'INCCRA','Paid',   NULL,NULL),
+('Cronin',     'Aubree',   '2017-02-18','2017-05-01','Belleville',       3353,8, 0,1,0,0,0,'NO', 'Paid',  'INCCRA','Free',   NULL,NULL),
+('Weaver',     'Lucy',     '2017-02-02','2022-09-01','Millstadt',        3369,8, 1,1,1,0,0,'YES','Paid',  'INCCRA','Paid',   NULL,NULL),
+('Peterson',   'Ellie',    '2017-01-16','2017-03-06','New Athens',       3386,8, 1,1,1,1,1,'NO', 'Staff', 'na',    'Paid',   'no', NULL),
+('Fernandez',  'Roman',    '2016-10-09','2017-03-13','Waterloo',         3485,8, 1,1,1,1,1,'NO', 'Paid',  'INCCRA','Paid',   NULL,NULL),
+('Phelps',     'Jax',      '2016-10-04','2021-10-25','Millstadt',        3490,8, 0,1,0,0,1,'YES','Paid',  'INCCRA','Paid',   NULL,NULL),
+('Eilers',     'Waylon',   '2016-01-15','2020-01-14','Dupo',             3753,8, 0,0,0,0,0,'NO', 'Paid',  'INCCRA','Paid',   NULL,NULL),
+('Thomas',     'Sadie',    '2016-01-09','2023-04-06','Millstadt',        3759,8, 1,1,1,1,1,'NO', 'Paid',  'INCCRA','Reduced',NULL,NULL),
+('Johnson',    'Reilly',   '2015-11-04','2018-01-22','Dupo',             3825,8, 1,1,1,1,1,'YES','Chasi', 'INCCRA','Free',   NULL,NULL),
+('Bequette',   'Makenzie', '2014-02-10','2015-07-01','Millstadt',        4457,8, 1,1,1,1,1,'YES','Chasi', 'INCCRA','Free',   NULL,NULL);
+
+PRINT 'rptMasterEnrollment rebuilt successfully.';
+SELECT COUNT(*) AS TotalStudents FROM rptMasterEnrollment;
