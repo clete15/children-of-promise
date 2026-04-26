@@ -166,6 +166,18 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // POST deploy (internal - protected)
+    if (req.method === 'POST' && url === '/api/deploy') {
+        if (!checkAuth(req, res)) return;
+        try {
+            const out = execSync('C:\\deploy.bat', { encoding: 'utf8', shell: 'cmd.exe' });
+            console.log('[DEPLOY]', out);
+            return sendJSON(res, 200, { success: true, output: out });
+        } catch (e) {
+            return sendJSON(res, 500, { error: e.message });
+        }
+    }
+
     // POST pre-enrollment form (public)
     if (req.method === 'POST' && url === '/api/preenrollment') {
         readBody(req, (err, d) => {

@@ -69,8 +69,34 @@
             <p>Access the internal enrollment management system for staff and administrators.</p>
             <span class="card-btn">Go to Staff Portal</span>
         </a>
+        <div class="portal-card" style="cursor:pointer;" onclick="runDeploy()">
+            <div class="card-icon">🚀</div>
+            <h3>Deploy Updates</h3>
+            <p>Pull latest changes from GitHub and restart the server.</p>
+            <span class="card-btn" style="background:#16a34a;color:white;">Deploy Now</span>
+        </div>
     </div>
 </main>
+
+<script>
+async function runDeploy() {
+    if (!confirm('Deploy latest changes from GitHub?')) return;
+    const btn = document.querySelector('[onclick="runDeploy()"] .card-btn');
+    btn.textContent = 'Deploying...';
+    try {
+        const res = await fetch('/api/deploy', { method: 'POST' });
+        const json = await res.json();
+        if (json.success) {
+            alert('Deploy complete!');
+        } else {
+            alert('Deploy failed: ' + json.error);
+        }
+    } catch (e) {
+        alert('Deploy failed: ' + e.message);
+    }
+    btn.textContent = 'Deploy Now';
+}
+</script>
 
 <footer>
     <p class="footer-brand">Children Of Promise Christian Dayschool</p>
