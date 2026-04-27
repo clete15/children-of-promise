@@ -178,8 +178,13 @@ const server = http.createServer((req, res) => {
             const out = execSync('"C:\\Program Files\\Git\\mingw64\\bin\\git.exe" fetch origin && "C:\\Program Files\\Git\\mingw64\\bin\\git.exe" reset --hard origin/master', { encoding: 'utf8', shell: 'cmd.exe', cwd: 'C:\\app' });
             console.log('[DEPLOY]', out);
             sendJSON(res, 200, { success: true, output: out });
-            // Restart after response is sent
-            setTimeout(() => process.exit(0), 500);
+            // Schedule restart via task scheduler after response is sent
+            setTimeout(() => {
+                try {
+                    execSync('schtasks /run /tn "CofPServer"', { shell: 'cmd.exe' });
+                } catch(e) {}
+                process.exit(0);
+            }, 500);
         } catch (e) {
             return sendJSON(res, 500, { error: e.message });
         }

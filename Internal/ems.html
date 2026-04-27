@@ -6,125 +6,142 @@
     <title>EMS – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        /* ── SIDEBAR LAYOUT ── */
-        .view-layout {
-            display: flex;
-            gap: 0;
-            flex: 1;
-            min-height: 0;
-        }
-        .room-sidebar {
-            width: 210px;
-            flex-shrink: 0;
-            background: #fff;
-            border-right: 1px solid var(--border);
-            padding: 16px 0;
+        /* ── CENTERED LAYOUT ── */
+        #viewMode {
             display: flex;
             flex-direction: column;
-            gap: 2px;
-            overflow-y: auto;
+            align-items: center;
+            padding: 16px 24px 40px;
         }
-        .sidebar-label {
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.07em;
-            color: var(--text-muted);
-            padding: 0 16px 8px;
-        }
-        .sidebar-room-btn {
+
+        /* ── ROOM SELECTOR BAR ── */
+        .room-nav-bar {
             display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            padding: 9px 16px;
-            border: none;
-            background: none;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            justify-content: center;
+        }
+        .room-nav-arrow {
+            background: rgba(255,255,255,0.15);
+            border: 1.5px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             cursor: pointer;
-            text-align: left;
+            font-size: 0.85rem;
+            color: white;
+            flex-shrink: 0;
             transition: background 0.15s;
-            border-left: 3px solid transparent;
-            gap: 2px;
         }
-        .sidebar-room-btn:hover { background: #f1f5f9; }
-        .sidebar-room-btn.active {
-            background: #eff6ff;
-            border-left-color: var(--primary);
-        }
-        .sidebar-room-name {
-            font-size: 0.82rem;
+        .room-nav-arrow:hover { background: rgba(255,255,255,0.25); }
+        .room-label {
+            font-size: 0.92rem;
             font-weight: 700;
-            color: var(--text);
-            line-height: 1.2;
+            color: white;
+            white-space: nowrap;
+            width: 260px;
+            text-align: center;
         }
-        .sidebar-room-btn.active .sidebar-room-name { color: var(--primary); }
-        .sidebar-teacher {
-            font-size: 0.72rem;
+        .room-label-teacher {
+            font-size: 0.75rem;
             color: var(--danger);
             font-weight: 600;
-            line-height: 1.2;
+            text-align: center;
         }
-        .sidebar-count {
-            font-size: 0.68rem;
+        .room-label-count {
+            font-size: 0.72rem;
             color: var(--text-muted);
+            text-align: center;
+            margin-bottom: 10px;
         }
 
-        /* ── MAIN CONTENT AREA ── */
-        .view-main {
-            flex: 1;
+        /* ── STUDENT NAV + FORM ── */
+        .student-nav-layout {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            width: 100%;
+            max-width: 820px;
+            justify-content: center;
+        }
+        .student-nav-arrow {
             display: flex;
             flex-direction: column;
-            overflow: hidden;
-        }
-        .view-nav {
-            display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 12px 20px;
-            background: var(--bg);
-            border-bottom: 1px solid var(--border);
+            justify-content: center;
+            gap: 3px;
+            width: 56px;
+            min-height: 120px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 700;
+            transition: background 0.15s, transform 0.15s;
+            flex-shrink: 0;
+            align-self: center;
         }
-        .view-nav .nav-center {
+        .student-nav-arrow:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-2px); }
+        .student-nav-arrow:disabled { background: #cbd5e1; color: #94a3b8; cursor: not-allowed; }
+        .student-nav-arrow .arrow-icon { font-size: 1.2rem; }
+        .student-nav-arrow .arrow-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        .form-center {
             flex: 1;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+            min-width: 0;
         }
-        .view-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px 20px 32px;
+        .record-counter-bar {
+            text-align: center;
+            margin-bottom: 10px;
         }
 
-        /* ── ROOM SELECT WITH TEACHER ── */
-        .room-select-wrap { position: relative; }
-        .room-teacher-hint {
-            font-size: 0.72rem;
-            color: var(--danger);
-            font-weight: 600;
-            margin-top: 3px;
-            min-height: 1em;
-        }
-
-        /* ── ROSTER ROOM LABEL ── */
+        /* ── ROOM SELECT IN FORM ── */
         .roster-room-label { display: flex; flex-direction: column; gap: 2px; }
         .roster-room-teacher { font-size: 0.72rem; color: var(--danger); font-weight: 600; }
 
-        /* ── MODE TOGGLE FIX ── */
+        /* ── MODE TOGGLE ── */
         .mode-toggle-bar {
-            background: var(--bg);
-            padding: 14px 24px;
+            background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);
+            padding: 14px 24px 0;
             display: flex;
             justify-content: center;
-            border-bottom: 1px solid var(--border);
+            border-bottom: none;
         }
         .mode-toggle {
-            display: flex;
-            background: #e2e8f0;
+            display: inline-flex;
+            background: rgba(255,255,255,0.15);
             border-radius: 10px;
             padding: 4px;
             gap: 4px;
-            width: auto;
+            white-space: nowrap;
         }
+        .toggle-btn { color: rgba(255,255,255,0.8) !important; }
+        .toggle-btn.active { background: white !important; color: var(--primary) !important; }
+
+        #viewMode, #addMode, #rosterMode {
+            background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);
+            min-height: calc(100vh - 120px);
+            padding-top: 16px;
+        }
+        #viewMode { padding: 16px 24px 40px; }
+        .room-nav-bar .room-nav-arrow {
+            background: rgba(255,255,255,0.15);
+            border-color: rgba(255,255,255,0.3);
+            color: white;
+        }
+        .room-nav-arrow:hover { background: rgba(255,255,255,0.25) !important; border-color: rgba(255,255,255,0.5) !important; }
+        .room-label { color: white !important; }
+        .room-label-teacher { color: #fca5a5 !important; }
+        .room-label-count { color: rgba(255,255,255,0.7) !important; }
+        .record-counter { background: rgba(255,255,255,0.2); color: white; }
+        .student-nav-arrow { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); }
+        .student-nav-arrow:hover:not(:disabled) { background: rgba(255,255,255,0.25) !important; }
+        .student-nav-arrow:disabled { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.3); }
     </style>
 </head>
 <body>
@@ -143,11 +160,11 @@
 <!-- MODE TOGGLE -->
 <div class="mode-toggle-bar">
     <div class="mode-toggle">
-        <button class="toggle-btn active" id="btnViewMode" onclick="setMode('view')">
-            <span class="toggle-icon">📋</span> View / Edit
-        </button>
-        <button class="toggle-btn" id="btnAddMode" onclick="setMode('add')">
+        <button class="toggle-btn active" id="btnAddMode" onclick="setMode('add')">
             <span class="toggle-icon">➕</span> Add Student
+        </button>
+        <button class="toggle-btn" id="btnViewMode" onclick="setMode('view')">
+            <span class="toggle-icon">📋</span> View / Edit
         </button>
         <button class="toggle-btn" id="btnRosterMode" onclick="setMode('roster')">
             <span class="toggle-icon">🏫</span> Room Roster
@@ -158,152 +175,145 @@
 <!-- ══════════════════════════════════════════
      VIEW / EDIT MODE
 ══════════════════════════════════════════ -->
-<div id="viewMode" style="display:flex;flex:1;flex-direction:column;">
-    <div class="view-layout">
-
+<div id="viewMode" style="display:none;flex-direction:column;align-items:center;padding:16px 24px 40px;">
         <!-- SIDEBAR -->
-        <div class="room-sidebar">
-            <div class="sidebar-label">Rooms</div>
-            <div id="sidebarRooms"></div>
-        </div>
+<!-- ROOM NAV -->
+    <div class="room-nav-bar">
+        <button class="room-nav-arrow" id="btnRoomPrev" onclick="navigateRoom(-1)">◀</button>
+        <div class="room-label" id="roomNavLabel">All Rooms</div>
+        <button class="room-nav-arrow" id="btnRoomNext" onclick="navigateRoom(1)">▶</button>
+    </div>
+    <div class="room-label-teacher" id="roomNavTeacher"></div>
+    <div class="room-label-count" id="roomNavCount"></div>
 
-        <!-- MAIN -->
-        <div class="view-main">
-            <!-- NAV -->
-            <div class="view-nav">
-                <button class="nav-arrow" id="btnPrev" onclick="navigate(-1)" disabled>
-                    <span class="arrow-icon">◀</span>
-                    <span class="arrow-label">Prev</span>
-                </button>
-                <div class="nav-center">
-                    <span class="record-counter" id="recordCounter">Loading…</span>
-                </div>
-                <button class="nav-arrow" id="btnNext" onclick="navigate(1)" disabled>
-                    <span class="arrow-icon">▶</span>
-                    <span class="arrow-label">Next</span>
-                </button>
-            </div>
+    <!-- STUDENT NAV + FORM -->
+    <div class="student-nav-layout">
+        <button class="student-nav-arrow" id="btnPrev" onclick="navigate(-1)" disabled>
+            <span class="arrow-icon">◀</span>
+            <span class="arrow-label">Prev</span>
+        </button>
 
-            <!-- FORM -->
-            <div class="view-content">
-                <div class="form-container">
+        <div class="form-center">
+            <div class="form-container">
 
-                    <!-- Identity -->
-                    <div class="card">
-                        <div class="card-title">Student Identity</div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>First Name <span class="required">*</span></label>
-                                <input type="text" id="firstName">
-                            </div>
-                            <div class="form-group">
-                                <label>Last Name <span class="required">*</span></label>
-                                <input type="text" id="lastName">
-                            </div>
+                <!-- Identity -->
+                <div class="card">
+                    <div class="card-title">Student Identity</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>First Name <span class="required">*</span></label>
+                            <input type="text" id="firstName">
                         </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Birth Date</label>
-                                <input type="date" id="birthDate">
-                            </div>
-                            <div class="form-group">
-                                <label>Start Date</label>
-                                <input type="date" id="startDate">
-                            </div>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>City / Town</label>
-                                <input type="text" id="cityTown">
-                            </div>
-                            <div class="form-group">
-                                <label>Days Old</label>
-                                <input type="number" id="daysOld" readonly>
-                            </div>
+                        <div class="form-group">
+                            <label>Last Name <span class="required">*</span></label>
+                            <input type="text" id="lastName">
                         </div>
                     </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Birth Date</label>
+                            <input type="date" id="birthDate">
+                        </div>
+                        <div class="form-group">
+                            <label>Start Date</label>
+                            <input type="date" id="startDate">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>City / Town</label>
+                            <input type="text" id="cityTown">
+                        </div>
+                        <div class="form-group">
+                            <label>Days Old</label>
+                            <input type="number" id="daysOld" readonly>
+                        </div>
+                    </div>
+                </div>
 
-                    <!-- Enrollment -->
-                    <div class="card">
-                        <div class="card-title">Enrollment Details</div>
-                        <div class="form-group room-select-wrap">
-                            <label>Room</label>
-                            <select id="roomNumber" onchange="updateRoomHint('roomNumber','roomTeacherHint')"></select>
-                            <div class="room-teacher-hint" id="roomTeacherHint"></div>
+                <!-- Enrollment -->
+                <div class="card">
+                    <div class="card-title">Enrollment Details</div>
+                    <div class="form-group">
+                        <label>Room</label>
+                        <select id="roomNumber"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Active</label>
+                        <select id="active">
+                            <option value="Yes">Yes</option>
+                            <option value="No">No</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Pay Type</label>
+                        <select id="category">
+                            <option value="">-- Select --</option>
+                            <option>Paid</option>
+                            <option>CCAP</option>
+                            <option>Foster</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Days Attending</label>
+                        <div class="checkbox-grid">
+                            <div class="checkbox-item"><input type="checkbox" id="monday"><label for="monday">Mon</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="tuesday"><label for="tuesday">Tue</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="wednesday"><label for="wednesday">Wed</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="thursday"><label for="thursday">Thu</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="friday"><label for="friday">Fri</label></div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Flags -->
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card-title">Program Flags</div>
+                    <div class="form-row">
                         <div class="form-group">
-                            <label>Active</label>
-                            <select id="active">
-                                <option value="Yes">Yes</option>
-                                <option value="No">No</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Pay Type</label>
-                            <select id="category">
+                            <label>Program Type</label>
+                            <select id="pfaPiNa">
                                 <option value="">-- Select --</option>
-                                <option>Paid</option>
-                                <option>CCAP</option>
-                                <option>Foster</option>
+                                <option value="PFA">PFA</option>
+                                <option value="PI">PI</option>
+                                <option value="INCCRA">INCCRA</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label>Days Attending</label>
-                            <div class="checkbox-grid">
-                                <div class="checkbox-item"><input type="checkbox" id="monday"><label for="monday">Mon</label></div>
-                                <div class="checkbox-item"><input type="checkbox" id="tuesday"><label for="tuesday">Tue</label></div>
-                                <div class="checkbox-item"><input type="checkbox" id="wednesday"><label for="wednesday">Wed</label></div>
-                                <div class="checkbox-item"><input type="checkbox" id="thursday"><label for="thursday">Thu</label></div>
-                                <div class="checkbox-item"><input type="checkbox" id="friday"><label for="friday">Fri</label></div>
-                            </div>
+                            <label>Food Program</label>
+                            <select id="frpFood">
+                                <option value="">-- Select --</option>
+                                <option value="Free">Free</option>
+                                <option value="Reduced">Reduced</option>
+                                <option value="Paid">Paid</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="display:flex;align-items:flex-end;gap:16px;padding-bottom:2px;">
+                            <div class="checkbox-item"><input type="checkbox" id="iep"><label for="iep">IEP</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="military"><label for="military">Military</label></div>
                         </div>
                     </div>
-
-                    <!-- Flags -->
-                    <div class="card" style="grid-column: 1 / -1;">
-                        <div class="card-title">Program Flags</div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Program Type</label>
-                                <select id="pfaPiNa">
-                                    <option value="">-- Select --</option>
-                                    <option value="PFA">PFA</option>
-                                    <option value="PI">PI</option>
-                                    <option value="N/A">N/A</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>Food Program</label>
-                                <select id="frpFood">
-                                    <option value="">-- Select --</option>
-                                    <option value="Free">Free</option>
-                                    <option value="Reduced">Reduced</option>
-                                    <option value="Paid">Paid</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="display:flex;align-items:flex-end;gap:16px;padding-bottom:2px;">
-                                <div class="checkbox-item"><input type="checkbox" id="iep"><label for="iep">IEP</label></div>
-                                <div class="checkbox-item"><input type="checkbox" id="military"><label for="military">Military</label></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Actions -->
-                    <div class="actions">
-                        <button class="btn btn-secondary" onclick="clearForm()">Clear</button>
-                        <button class="btn btn-update" id="btnUpdate" onclick="updateStudent()">Update Student</button>
-                    </div>
-
                 </div>
+
+                <!-- Actions -->
+                <div class="actions">
+                    <button class="btn btn-update" id="btnUpdate" onclick="updateStudent()">Update Student</button>
+                </div>
+
             </div>
         </div>
+
+        <button class="student-nav-arrow" id="btnNext" onclick="navigate(1)" disabled>
+            <span class="arrow-icon">▶</span>
+            <span class="arrow-label">Next</span>
+        </button>
     </div>
 </div>
 
 <!-- ══════════════════════════════════════════
      ADD STUDENT MODE
 ══════════════════════════════════════════ -->
-<div id="addMode" style="display:none;">
+<div id="addMode" style="display:block;">
     <div class="page-container">
         <div class="form-container">
 
@@ -343,10 +353,9 @@
 
             <div class="card">
                 <div class="card-title">Enrollment Details</div>
-                <div class="form-group room-select-wrap">
+                <div class="form-group">
                     <label>Room</label>
-                    <select id="addRoomNumber" onchange="updateRoomHint('addRoomNumber','addRoomTeacherHint')"></select>
-                    <div class="room-teacher-hint" id="addRoomTeacherHint"></div>
+                    <select id="addRoomNumber"></select>
                 </div>
                 <div class="form-group">
                     <label>Active</label>
@@ -385,7 +394,7 @@
                             <option value="">-- Select --</option>
                             <option value="PFA">PFA</option>
                             <option value="PI">PI</option>
-                            <option value="N/A">N/A</option>
+                            <option value="INCCRA">INCCRA</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -417,6 +426,16 @@
      ROOM ROSTER MODE
 ══════════════════════════════════════════ -->
 <div id="rosterMode" style="display:none;">
+    <!-- ROOM NAV -->
+    <div style="display:flex;flex-direction:column;align-items:center;padding:16px 24px 8px;">
+        <div class="room-nav-bar">
+            <button class="room-nav-arrow" id="btnRosterRoomPrev" onclick="navigateRosterRoom(-1)">◀</button>
+            <div class="room-label" id="rosterRoomNavLabel">All Rooms</div>
+            <button class="room-nav-arrow" id="btnRosterRoomNext" onclick="navigateRosterRoom(1)">▶</button>
+        </div>
+        <div class="room-label-teacher" id="rosterRoomNavTeacher"></div>
+        <div class="room-label-count" id="rosterRoomNavCount"></div>
+    </div>
     <div class="page-container">
         <div class="roster-card">
             <div class="roster-header">
@@ -424,6 +443,8 @@
                 <div>Current Room</div>
                 <div>Assign Room</div>
                 <div>Pay Type</div>
+                <div>Program Type</div>
+                <div>Active</div>
                 <div>Save</div>
             </div>
             <div id="rosterBody">
@@ -433,10 +454,7 @@
     </div>
 </div>
 
-<footer class="site-footer">
-    <p class="footer-brand">Children Of Promise Christian Dayschool</p>
-    <p>Millstadt, IL &nbsp;|&nbsp; <a href="tel:6185387527">618-538-7527</a> &nbsp;|&nbsp; <a href="mailto:childrenofpromise.millstadt@outlook.com">childrenofpromise.millstadt@outlook.com</a></p>
-</footer>
+
 
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
@@ -451,7 +469,7 @@ let classrooms = [];
 let filtered = [];
 let currentIndex = 0;
 let activeRoom = 'All';
-let currentMode = 'view';
+let currentMode = 'add';
 
 async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
@@ -471,7 +489,7 @@ async function loadStudents() {
     try {
         const res = await apiFetch('/api/students');
         students = await res.json();
-        buildSidebar();
+        buildRoomNav();
         applyFilter();
         if (currentMode === 'roster') buildRoster();
     } catch (e) {
@@ -485,7 +503,7 @@ function getClassroom(roomNumber) {
 
 function populateRoomDropdowns() {
     const opts = classrooms.map(r =>
-        `<option value="${r.RoomNumber}">${r.Room}</option>`
+        `<option value="${r.RoomNumber}">${r.Room} — (${r.TeacherDescription})</option>`
     ).join('');
     document.getElementById('roomNumber').innerHTML = opts;
     document.getElementById('addRoomNumber').innerHTML = opts;
@@ -498,33 +516,66 @@ function updateRoomHint(selectId, hintId) {
     hint.textContent = cr ? cr.TeacherDescription : '';
 }
 
-// ── SIDEBAR ──
-function buildSidebar() {
-    const container = document.getElementById('sidebarRooms');
+// ── ROOM NAV ──
+let roomList = []; // ['All', roomNumber, roomNumber, ...]
+let activeRoomIndex = 0;
+let rosterRoomIndex = 0;
+let rosterStudents = [];
 
-    // All button
-    const allCount = students.length;
-    let html = `<button class="sidebar-room-btn ${activeRoom === 'All' ? 'active' : ''}" onclick="setRoomFilter('All')">
-        <span class="sidebar-room-name">All Rooms</span>
-        <span class="sidebar-count">${allCount} students</span>
-    </button>`;
+function buildRoomNav() {
+    roomList = ['All', ...classrooms.map(r => r.RoomNumber)];
+    updateRoomNavDisplay();
+}
 
-    classrooms.forEach(r => {
-        const count = students.filter(s => String(s.RoomNumber) === String(r.RoomNumber)).length;
-        const isActive = String(activeRoom) === String(r.RoomNumber);
-        html += `<button class="sidebar-room-btn ${isActive ? 'active' : ''}" onclick="setRoomFilter('${r.RoomNumber}')">
-            <span class="sidebar-room-name">${r.Room}</span>
-            <span class="sidebar-teacher">${r.TeacherDescription}</span>
-            <span class="sidebar-count">${count} students</span>
-        </button>`;
-    });
+function navigateRoom(dir) {
+    activeRoomIndex = (activeRoomIndex + dir + roomList.length) % roomList.length;
+    activeRoom = roomList[activeRoomIndex];
+    updateRoomNavDisplay();
+    applyFilter();
+}
 
-    container.innerHTML = html;
+function navigateRosterRoom(dir) {
+    if (!roomList.length) return;
+    rosterRoomIndex = (rosterRoomIndex + dir + roomList.length) % roomList.length;
+    updateRosterRoomNavDisplay();
+    buildRoster();
+}
+
+function updateRosterRoomNavDisplay() {
+    const val = roomList[rosterRoomIndex];
+    if (val === 'All') {
+        document.getElementById('rosterRoomNavLabel').textContent = 'All Rooms';
+        document.getElementById('rosterRoomNavTeacher').textContent = '';
+        document.getElementById('rosterRoomNavCount').textContent = `${students.length} students`;
+    } else {
+        const cr = getClassroom(val);
+        const count = students.filter(s => String(s.RoomNumber) === String(val)).length;
+        document.getElementById('rosterRoomNavLabel').textContent = cr ? cr.Room : val;
+        document.getElementById('rosterRoomNavTeacher').textContent = cr ? cr.TeacherDescription : '';
+        document.getElementById('rosterRoomNavCount').textContent = `${count} students`;
+    }
+}
+
+function updateRoomNavDisplay() {
+    const val = roomList[activeRoomIndex];
+    if (val === 'All') {
+        document.getElementById('roomNavLabel').textContent = 'All Rooms';
+        document.getElementById('roomNavTeacher').textContent = '';
+        document.getElementById('roomNavCount').textContent = `${students.length} students`;
+    } else {
+        const cr = getClassroom(val);
+        const count = students.filter(s => String(s.RoomNumber) === String(val)).length;
+        document.getElementById('roomNavLabel').textContent = cr ? cr.Room : val;
+        document.getElementById('roomNavTeacher').textContent = cr ? cr.TeacherDescription : '';
+        document.getElementById('roomNavCount').textContent = `${count} students`;
+    }
 }
 
 function setRoomFilter(room) {
     activeRoom = room;
-    buildSidebar();
+    activeRoomIndex = roomList.indexOf(room);
+    if (activeRoomIndex < 0) activeRoomIndex = 0;
+    updateRoomNavDisplay();
     applyFilter();
 }
 
@@ -552,8 +603,7 @@ function updateNavButtons() {
 }
 
 function updateCounter() {
-    const el = document.getElementById('recordCounter');
-    el.textContent = filtered.length > 0 ? `${currentIndex + 1} of ${filtered.length}` : '0 records';
+    updateRoomNavDisplay();
 }
 
 function loadRecord(i) {
@@ -577,7 +627,6 @@ function loadRecord(i) {
     document.getElementById('frpFood').value     = s.F_R_P_Food || '';
     document.getElementById('iep').checked       = isTruthy(s.IEP);
     document.getElementById('military').checked  = isTruthy(s.Military);
-    updateRoomHint('roomNumber', 'roomTeacherHint');
 }
 
 function isTruthy(v) {
@@ -598,7 +647,6 @@ function clearForm() {
     document.getElementById('category').value = '';
     document.getElementById('pfaPiNa').value = '';
     document.getElementById('frpFood').value = '';
-    document.getElementById('roomTeacherHint').textContent = '';
 }
 
 function clearAddForm() {
@@ -608,7 +656,6 @@ function clearAddForm() {
     document.getElementById('addCategory').value = '';
     document.getElementById('addPfaPiNa').value = '';
     document.getElementById('addFrpFood').value = '';
-    document.getElementById('addRoomTeacherHint').textContent = '';
 }
 
 async function updateStudent() {
@@ -684,14 +731,20 @@ function buildBody(prefix) {
 
 // ── ROOM ROSTER ──
 function buildRoster() {
+    updateRosterRoomNavDisplay();
     const body = document.getElementById('rosterBody');
-    if (!students.length) { body.innerHTML = '<div class="roster-empty">No students found.</div>'; return; }
+    const activeRosterRoom = roomList[rosterRoomIndex];
+    rosterStudents = activeRosterRoom === 'All'
+        ? [...students].sort((a, b) => a.Last_Name.localeCompare(b.Last_Name))
+        : students.filter(s => String(s.RoomNumber) === String(activeRosterRoom));
+
+    if (!rosterStudents.length) { body.innerHTML = '<div class="roster-empty">No students found.</div>'; return; }
 
     const roomOpts = classrooms.map(r =>
         `<option value="${r.RoomNumber}">${r.Room}</option>`
     ).join('');
 
-    body.innerHTML = students.map((s, i) => {
+    body.innerHTML = rosterStudents.map((s, i) => {
         const cr = getClassroom(s.RoomNumber);
         return `
         <div class="roster-row" id="rosterRow${i}">
@@ -702,7 +755,6 @@ function buildRoster() {
             </div>
             <div class="roster-room-label">
                 <select class="roster-room-select" id="rosterRoom${i}" onchange="markChanged(${i})">${roomOpts}</select>
-                <span class="roster-room-teacher" id="rosterTeacher${i}"></span>
             </div>
             <select class="roster-room-select" id="rosterPayType${i}" onchange="markChanged(${i})">
                 <option value="">--</option>
@@ -710,11 +762,21 @@ function buildRoster() {
                 <option ${s.Category==='CCAP'?'selected':''}>CCAP</option>
                 <option ${s.Category==='Foster'?'selected':''}>Foster</option>
             </select>
+            <select class="roster-room-select" id="rosterPfaPiNa${i}" onchange="markChanged(${i})">
+                <option value="">--</option>
+                <option ${s.PFA_PI_na==='PFA'?'selected':''} value="PFA">PFA</option>
+                <option ${s.PFA_PI_na==='PI'?'selected':''} value="PI">PI</option>
+                <option ${s.PFA_PI_na==='INCCRA'?'selected':''} value="INCCRA">INCCRA</option>
+            </select>
+            <select class="roster-room-select" id="rosterActive${i}" onchange="markChanged(${i})">
+                <option ${s.Active==='Yes'||s.Active==='YES'?'selected':''} value="Yes">Yes</option>
+                <option ${s.Active==='No'||s.Active==='NO'?'selected':''} value="No">No</option>
+            </select>
             <button class="btn-roster-save" id="rosterSave${i}" onclick="saveRosterRow(${i})" disabled>Save</button>
         </div>`;
     }).join('');
 
-    students.forEach((s, i) => {
+    rosterStudents.forEach((s, i) => {
         const sel = document.getElementById(`rosterRoom${i}`);
         if (sel) {
             sel.value = s.RoomNumber || '';
@@ -728,16 +790,14 @@ function buildRoster() {
 function markChanged(i) {
     document.getElementById(`rosterRow${i}`).classList.add('row-changed');
     document.getElementById(`rosterSave${i}`).disabled = false;
-    const sel = document.getElementById(`rosterRoom${i}`);
-    const cr = getClassroom(sel.value);
-    const th = document.getElementById(`rosterTeacher${i}`);
-    if (th) th.textContent = cr ? cr.TeacherDescription : '';
 }
 
 async function saveRosterRow(i) {
-    const s = students[i];
+    const s = rosterStudents[i];
     const newRoom = document.getElementById(`rosterRoom${i}`).value;
     const newPayType = document.getElementById(`rosterPayType${i}`).value;
+    const newPfaPiNa = document.getElementById(`rosterPfaPiNa${i}`).value;
+    const newActive = document.getElementById(`rosterActive${i}`).value;
     const btn = document.getElementById(`rosterSave${i}`);
     btn.disabled = true; btn.textContent = '…';
     const body = {
@@ -745,11 +805,11 @@ async function saveRosterRow(i) {
         birthDate: s.Birth_date, startDate: s.Start_Date,
         cityTown: s.City_Town, daysOld: s.Days_Old,
         roomNumber: newRoom,
-        active: s.Active, category: newPayType,
+        active: newActive, category: newPayType,
         monday: isTruthy(s.Monday), tuesday: isTruthy(s.Tuesday),
         wednesday: isTruthy(s.Wednesday), thursday: isTruthy(s.Thursday),
         friday: isTruthy(s.Friday),
-        pfaPiNa: s.PFA_PI_na || '', frpFood: s.F_R_P_Food || '',
+        pfaPiNa: newPfaPiNa, frpFood: s.F_R_P_Food || '',
         iep: isTruthy(s.IEP), military: isTruthy(s.Military),
     };
     try {
@@ -760,6 +820,8 @@ async function saveRosterRow(i) {
         if (data.success) {
             students[i].RoomNumber = newRoom;
             students[i].Category = newPayType;
+            students[i].PFA_PI_na = newPfaPiNa;
+            students[i].Active = newActive;
             document.getElementById(`rosterRow${i}`).classList.remove('row-changed');
             showNotification(`${s.First_Name} ${s.Last_Name} updated`, 'success');
         } else {
@@ -772,13 +834,11 @@ async function saveRosterRow(i) {
 
 function setMode(mode) {
     currentMode = mode;
-    document.getElementById('viewMode').style.display   = mode === 'view'   ? 'flex' : 'none';
-    document.getElementById('addMode').style.display    = mode === 'add'    ? 'block' : 'none';
+    document.getElementById('viewMode').style.display   = mode === 'view'   ? 'flex' : 'none';    document.getElementById('addMode').style.display    = mode === 'add'    ? 'block' : 'none';
     document.getElementById('rosterMode').style.display = mode === 'roster' ? 'block' : 'none';
     document.getElementById('btnViewMode').classList.toggle('active',   mode === 'view');
     document.getElementById('btnAddMode').classList.toggle('active',    mode === 'add');
-    document.getElementById('btnRosterMode').classList.toggle('active', mode === 'roster');
-    if (mode === 'roster') buildRoster();
+    document.getElementById('btnRosterMode').classList.toggle('active', mode === 'roster');    if (mode === 'roster') buildRoster();
 }
 
 function showNotification(msg, type = 'info') {
