@@ -239,6 +239,7 @@
                 <th>Children</th>
                 <th>Score</th>
                 <th>Risk Factors</th>
+                <th style="background:#fffbeb;color:#92400e;">Household Income</th>
                 <th>Submitted</th>
                 <th>Status</th>
                 <th>Notes</th>
@@ -250,134 +251,23 @@
     </table>
 </div>
 
-<div class="modal-overlay" id="enrollModal">
-    <div class="modal">
-        <div class="modal-title">Enroll Student</div>
-        <div class="modal-subtitle" id="enrollModalSubtitle">Pre-populating from waiting list — complete the remaining fields to save.</div>
-        <div class="modal-note">⚠️ The student will only be marked Enrolled after this form is saved successfully to the Enrollment Management System.</div>
-        <div class="modal-grid">
-            <div class="modal-group">
-                <label>First Name *</label>
-                <input type="text" id="enroll-firstName">
-            </div>
-            <div class="modal-group">
-                <label>Last Name *</label>
-                <input type="text" id="enroll-lastName">
-            </div>
-            <div class="modal-group">
-                <label>Birth Date *</label>
-                <input type="date" id="enroll-birthDate">
-            </div>
-            <div class="modal-group">
-                <label>Start Date</label>
-                <input type="date" id="enroll-startDate">
-            </div>
-            <div class="modal-group">
-                <label>City / Town</label>
-                <input type="text" id="enroll-cityTown">
-            </div>
-            <div class="modal-group">
-                <label>Days Old</label>
-                <input type="number" id="enroll-daysOld">
-            </div>
-            <div class="modal-group full">
-                <label>Room *</label>
-                <select id="enroll-roomNumber" onchange="updateEnrollTeacher()"></select>
-                <div class="modal-teacher-hint" id="enroll-teacherHint"></div>
-            </div>
-            <div class="modal-group">
-                <label>Active</label>
-                <select id="enroll-active">
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
-                </select>
-            </div>
-            <div class="modal-group">
-                <label>Pay Type</label>
-                <select id="enroll-category">
-                    <option value="">-- Select --</option>
-                    <option>Paid</option>
-                    <option>CCAP</option>
-                    <option>Foster</option>
-                </select>
-            </div>
-            <div class="modal-group">
-                <label>Program Type</label>
-                <select id="enroll-pfaPiNa">
-                    <option value="">-- Select --</option>
-                    <option value="PFA">PFA</option>
-                    <option value="PI">PI</option>
-                    <option value="N/A">N/A</option>
-                </select>
-            </div>
-            <div class="modal-group">
-                <label>Food Program</label>
-                <select id="enroll-frpFood">
-                    <option value="">-- Select --</option>
-                    <option value="Free">Free</option>
-                    <option value="Reduced">Reduced</option>
-                    <option value="Paid">Paid</option>
-                </select>
-            </div>
-            <div class="modal-group full">
-                <label>Days Attending</label>
-                <div class="modal-days">
-                    <label><input type="checkbox" id="enroll-monday"> Mon</label>
-                    <label><input type="checkbox" id="enroll-tuesday"> Tue</label>
-                    <label><input type="checkbox" id="enroll-wednesday"> Wed</label>
-                    <label><input type="checkbox" id="enroll-thursday"> Thu</label>
-                    <label><input type="checkbox" id="enroll-friday"> Fri</label>
-                </div>
-            </div>
-            <div class="modal-group full">
-                <label>Flags</label>
-                <div class="modal-days">
-                    <label><input type="checkbox" id="enroll-iep"> IEP</label>
-                    <label><input type="checkbox" id="enroll-military"> Military</label>
-                </div>
-            </div>
-        </div>
-        <div class="modal-actions">
-            <button class="btn btn-secondary" onclick="closeEnrollModal()">Cancel</button>
-            <button class="btn btn-save" onclick="submitEnroll()">Save to EMS &amp; Mark Enrolled</button>
-        </div>
-    </div>
-</div>
-
-
-
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 let allRows = [];
 let classrooms = [];
 let activeTab = '0-2';
-let enrollingId = null;
 
 async function load() {
     try {
-        const [wlRes, crRes] = await Promise.all([
+        const [wlRes] = await Promise.all([
             fetch('/api/waitinglist', { headers: { 'Authorization': AUTH } }),
-            fetch('/api/classrooms', { headers: { 'Authorization': AUTH } })
         ]);
         allRows = await wlRes.json();
-        classrooms = await crRes.json();
-        populateRoomDropdown();
         updateTabCounts();
         renderTable();
     } catch (e) {
         document.getElementById('wlBody').innerHTML = `<tr><td colspan="9" class="wl-empty">Failed to load waiting list.</td></tr>`;
     }
-}
-
-function populateRoomDropdown() {
-    const opts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.Room}</option>`).join('');
-    document.getElementById('enroll-roomNumber').innerHTML = opts;
-}
-
-function updateEnrollTeacher() {
-    const val = document.getElementById('enroll-roomNumber').value;
-    const cr = classrooms.find(r => String(r.RoomNumber) === String(val));
-    document.getElementById('enroll-teacherHint').textContent = cr ? cr.TeacherDescription : '';
 }
 
 function updateTabCounts() {
@@ -428,6 +318,7 @@ function renderTable() {
             <td style="max-width:160px;">${r.ChildrenInfo || '—'}</td>
             <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
             <td><div class="flag-list">${flags}</div></td>
+            <td style="background:#fffbeb;font-weight:600;font-size:0.78rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td>
                 <select class="status-select" onchange="handleStatusChange(${r.Id}, this)" ${isEnrolled ? 'disabled' : ''}>
@@ -491,8 +382,8 @@ function handleStatusChange(id, selectEl) {
         return;
     }
 
-    if (val === 'Enrolled') {
-        // Revert — enrollment only happens through the modal
+    if (val === 'Enroll') {
+        // Revert — enrollment only happens through EMS
         const row = allRows.find(r => r.Id == id);
         selectEl.value = row ? row.WaitlistStatus : 'Pending';
         openEnrollModal(id);
@@ -538,90 +429,20 @@ function openEnrollModal(id) {
     const r = allRows.find(x => x.Id == id);
     if (!r) return;
 
-    document.getElementById('enrollModalSubtitle').textContent =
-        `Enrolling: ${r.FirstName} ${r.LastName} — complete all required fields then save to EMS.`;
+    // Store pre-enrollment data and waiting list ID in sessionStorage
+    sessionStorage.setItem('enrollFromWaitlist', JSON.stringify({
+        waitlistId:      r.Id,
+        firstName:       r.ChildName ? r.ChildName.split(' ')[0] : r.FirstName || '',
+        lastName:        r.ChildName ? r.ChildName.split(' ').slice(1).join(' ') || r.LastName : r.LastName || '',
+        cityTown:        r.City || '',
+        birthDate:       r.ChildBirthDate || '',
+        iep:             r.IEP === 'Yes',
+        military:        r.ActiveMilitary === 'Yes',
+        householdIncome: r.HouseholdIncome || '',
+    }));
 
-    // Pre-populate what we have
-    document.getElementById('enroll-firstName').value = r.ChildName ? r.ChildName.split(' ')[0] : r.FirstName || '';
-    document.getElementById('enroll-lastName').value  = r.ChildName ? r.ChildName.split(' ').slice(1).join(' ') || r.LastName : r.LastName || '';
-    document.getElementById('enroll-cityTown').value  = r.City || '';
-    document.getElementById('enroll-birthDate').value = r.ChildBirthDate || '';
-    document.getElementById('enroll-startDate').value = '';
-    document.getElementById('enroll-daysOld').value   = '';
-    document.getElementById('enroll-active').value    = 'Yes';
-    document.getElementById('enroll-category').value  = '';
-    document.getElementById('enroll-pfaPiNa').value   = '';
-    document.getElementById('enroll-frpFood').value   = '';
-    document.getElementById('enroll-iep').checked     = r.IEP === 'Yes';
-    document.getElementById('enroll-military').checked = r.ActiveMilitary === 'Yes';
-    ['monday','tuesday','wednesday','thursday','friday'].forEach(d =>
-        document.getElementById(`enroll-${d}`).checked = false
-    );
-    updateEnrollTeacher();
-    document.getElementById('enrollModal').classList.add('open');
-}
-
-function closeEnrollModal() {
-    document.getElementById('enrollModal').classList.remove('open');
-    enrollingId = null;
-}
-
-async function submitEnroll() {
-    const firstName = document.getElementById('enroll-firstName').value.trim();
-    const lastName  = document.getElementById('enroll-lastName').value.trim();
-    const birthDate = document.getElementById('enroll-birthDate').value;
-    const roomNumber = document.getElementById('enroll-roomNumber').value;
-
-    if (!firstName || !lastName || !birthDate || !roomNumber) {
-        alert('First name, last name, birth date, and room are required.');
-        return;
-    }
-
-    const body = {
-        firstName,
-        lastName,
-        birthDate,
-        startDate:  document.getElementById('enroll-startDate').value,
-        cityTown:   document.getElementById('enroll-cityTown').value,
-        daysOld:    document.getElementById('enroll-daysOld').value,
-        roomNumber,
-        active:     document.getElementById('enroll-active').value,
-        category:   document.getElementById('enroll-category').value,
-        pfaPiNa:    document.getElementById('enroll-pfaPiNa').value,
-        frpFood:    document.getElementById('enroll-frpFood').value,
-        monday:     document.getElementById('enroll-monday').checked,
-        tuesday:    document.getElementById('enroll-tuesday').checked,
-        wednesday:  document.getElementById('enroll-wednesday').checked,
-        thursday:   document.getElementById('enroll-thursday').checked,
-        friday:     document.getElementById('enroll-friday').checked,
-        iep:        document.getElementById('enroll-iep').checked,
-        military:   document.getElementById('enroll-military').checked,
-    };
-
-    try {
-        const emsRes = await fetch('/api/students', {
-            method: 'POST',
-            headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-        const emsData = await emsRes.json();
-        if (!emsData.success) {
-            alert('Failed to save to EMS: ' + (emsData.error || 'Unknown error'));
-            return;
-        }
-
-        // EMS saved — now mark enrolled in waiting list
-        await updateStatusAPI(enrollingId, 'Enrolled');
-        const row = allRows.find(r => r.Id == enrollingId);
-        if (row) row.WaitlistStatus = 'Enrolled';
-
-        closeEnrollModal();
-        updateTabCounts();
-        renderTable();
-        alert(`${firstName} ${lastName} has been enrolled and added to the EMS.`);
-    } catch (e) {
-        alert('Network error: ' + e.message);
-    }
+    // Redirect to EMS Add Student tab
+    window.location.href = 'ems.html?enroll=1';
 }
 
 load();

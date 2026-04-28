@@ -295,6 +295,23 @@
                     </div>
                 </div>
 
+                <!-- Income & Proof -->
+                <div class="card" style="grid-column: 1 / -1;">
+                    <div class="card-title">Household Income</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Annual Household Income</label>
+                            <input type="text" id="householdIncome" placeholder="e.g. 42000">
+                        </div>
+                        <div class="form-group">
+                            <label>Proof of Income</label>
+                            <div id="proofOfIncomeStatus" style="font-size:0.78rem;margin-bottom:6px;"></div>
+                            <input type="file" id="proofOfIncomeFile" accept=".pdf,.jpg,.jpeg,.png" style="font-size:0.78rem;">
+                            <button type="button" class="btn btn-secondary" style="margin-top:6px;padding:6px 14px;font-size:0.78rem;" onclick="uploadProofOfIncome()">Upload</button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Actions -->
                 <div class="actions">
                     <button class="btn btn-update" id="btnUpdate" onclick="updateStudent()">Update Student</button>
@@ -413,6 +430,16 @@
                 </div>
             </div>
 
+            <div class="card" style="grid-column: 1 / -1;">
+                <div class="card-title">Household Income</div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Annual Household Income</label>
+                        <input type="text" id="addHouseholdIncome" placeholder="e.g. 42000">
+                    </div>
+                </div>
+            </div>
+
             <div class="actions">
                 <button class="btn btn-secondary" onclick="clearAddForm()">Clear</button>
                 <button class="btn btn-save" onclick="saveStudent()">Save Student</button>
@@ -473,6 +500,26 @@ let currentMode = 'add';
 
 async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
+    // Check if redirected from waiting list
+    if (new URLSearchParams(window.location.search).get('enroll') === '1') {
+        const data = sessionStorage.getItem('enrollFromWaitlist');
+        if (data) {
+            const d = JSON.parse(data);
+            setMode('add');
+            // Pre-fill after classrooms are loaded
+            setTimeout(() => {
+                document.getElementById('addFirstName').value  = d.firstName || '';
+                document.getElementById('addLastName').value   = d.lastName || '';
+                document.getElementById('addCityTown').value   = d.cityTown || '';
+                document.getElementById('addBirthDate').value  = d.birthDate || '';
+                document.getElementById('addIep').checked      = !!d.iep;
+                document.getElementById('addMilitary').checked = !!d.military;
+                document.getElementById('addHouseholdIncome').value = d.householdIncome || '';
+                // Show banner
+                showNotification(`Pre-filling from waiting list: ${d.firstName} ${d.lastName}`, 'info');
+            }, 300);
+        }
+    }
 }
 
 async function loadClassrooms() {
@@ -627,6 +674,14 @@ function loadRecord(i) {
     document.getElementById('frpFood').value     = s.F_R_P_Food || '';
     document.getElementById('iep').checked       = isTruthy(s.IEP);
     document.getElementById('military').checked  = isTruthy(s.Military);
+    document.getElementById('householdIncome').value = s.HouseholdIncome || '';
+    // Proof of income status
+    const poi = document.getElementById('proofOfIncomeStatus');
+    if (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1) {
+        poi.innerHTML = `<span style="color:var(--success);font-weight:700;">✓ Uploaded</span> <a href="/api/download/income/${encodeURIComponent(s.ProofOfIncomeFile)}" target="_blank" style="margin-left:8px;font-size:0.72rem;">View</a>`;
+    } else {
+        poi.innerHTML = `<span style="color:var(--danger);font-weight:700;">⚠ Not uploaded</span>`;
+    }
 }
 
 function isTruthy(v) {
@@ -656,6 +711,7 @@ function clearAddForm() {
     document.getElementById('addCategory').value = '';
     document.getElementById('addPfaPiNa').value = '';
     document.getElementById('addFrpFood').value = '';
+    document.getElementById('addHouseholdIncome').value = '';
 }
 
 async function updateStudent() {
@@ -697,11 +753,27 @@ async function saveStudent() {
         frpFood:    document.getElementById('addFrpFood').value,
         iep:        document.getElementById('addIep').checked,
         military:   document.getElementById('addMilitary').checked,
+        householdIncome: document.getElementById('addHouseholdIncome').value,
     };
     try {
         const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(body) });
         const data = await res.json();
-        if (data.success) { showNotification('Student saved successfully', 'success'); clearAddForm(); await loadStudents(); }
+        if (data.success) {
+            showNotification('Student saved successfully', 'success');
+            clearAddForm();
+            await loadStudents();
+            // If from waiting list, mark enrolled and redirect back
+            const wlData = sessionStorage.getItem('enrollFromWaitlist');
+            if (wlData) {
+                const d = JSON.parse(wlData);
+                await apiFetch(`/api/waitinglist/${d.waitlistId}`, {
+                    method: 'PUT', body: JSON.stringify({ status: 'Enrolled' })
+                });
+                sessionStorage.removeItem('enrollFromWaitlist');
+                showNotification('Student enrolled and waiting list updated.', 'success');
+                setTimeout(() => window.location.href = 'waitinglist.html', 1500);
+            }
+        }
         else showNotification('Save failed: ' + (data.error || 'Unknown error'), 'error');
     } catch (e) { showNotification('Network error', 'error'); }
 }
@@ -726,6 +798,7 @@ function buildBody(prefix) {
         frpFood:    document.getElementById(prefix + 'frpFood').value,
         iep:        document.getElementById(prefix + 'iep').checked,
         military:   document.getElementById(prefix + 'military').checked,
+        householdIncome: document.getElementById(prefix + 'householdIncome') ? document.getElementById(prefix + 'householdIncome').value : '',
     };
 }
 
@@ -847,6 +920,32 @@ function showNotification(msg, type = 'info') {
     el.textContent = msg;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3500);
+}
+
+async function uploadProofOfIncome() {
+    const s = filtered[currentIndex];
+    if (!s) return showNotification('No student selected', 'error');
+    const fileInput = document.getElementById('proofOfIncomeFile');
+    if (!fileInput.files.length) return showNotification('Please select a file first', 'error');
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+        const res = await fetch(`/api/upload/income/${encodeURIComponent(s.First_Name + '|' + s.Last_Name)}`, {
+            method: 'POST',
+            headers: { 'Authorization': AUTH },
+            body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('Proof of income uploaded successfully', 'success');
+            await loadStudents();
+        } else {
+            showNotification('Upload failed: ' + (data.error || ''), 'error');
+        }
+    } catch (e) {
+        showNotification('Upload error: ' + e.message, 'error');
+    }
 }
 
 init();
