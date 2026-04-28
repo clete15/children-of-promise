@@ -26,7 +26,17 @@
         .bar-fill.green { background: var(--success); }
         .bar-fill.amber { background: #f59e0b; }
         .bar-fill.red   { background: var(--danger); }
-        .loading { text-align: center; color: var(--text-muted); padding: 32px; font-size: 0.88rem; }
+        .room-charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 4px; }
+        .room-chart-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+        .room-chart-title { font-size: 0.78rem; font-weight: 700; color: var(--text); margin-bottom: 12px; text-align: center; }
+        .chart-bars { display: flex; align-items: flex-end; justify-content: center; gap: 8px; height: 120px; }
+        .chart-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+        .chart-bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; }
+        .chart-bar { width: 100%; border-radius: 3px 3px 0 0; transition: height 0.4s ease; min-height: 2px; }
+        .chart-bar.capacity { background: var(--danger); }
+        .chart-bar.attendance { background: var(--primary); }
+        .chart-val { font-size: 0.7rem; font-weight: 700; color: var(--text); }
+        .chart-label { font-size: 0.65rem; color: var(--text-muted); text-align: center; white-space: nowrap; }
         @media (max-width: 680px) { .reports-container { grid-template-columns: 1fr; } .report-card.full { grid-column: 1; } }
     </style>
 </head>
@@ -46,7 +56,7 @@
 <div class="reports-container">
 
     <div class="report-card full" id="cardEnrollment">
-        <div class="report-title">Enrollment by Room</div>
+        <div class="report-title">Projected Attendance by Room</div>
         <div class="loading">Loading…</div>
     </div>
 
@@ -90,40 +100,44 @@
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 
-async function load() {
-    try {
-        const res = await fetch('/api/reports', { headers: { 'Authorization': AUTH } });
-        const data = await res.json();
-        renderEnrollment(data.byRoom);
-        renderBars('cardFood', data.byFood, ['Free','Reduced','Paid','Unknown'], ['green','amber','primary','red']);
-        renderBars('cardProgram', data.byProgram, null, []);
-        renderBars('cardPayType', data.byPayType, null, []);
-        renderBenefits(data.benefits);
-        renderIncome(data.incomeProof);
-        renderFlags(data.flags);
-        renderWaitlist(data.waitlistSummary);
-    } catch (e) {
-        document.querySelectorAll('.loading').forEach(el => el.textContent = 'Failed to load.');
-    }
-}
-
-function renderEnrollment(rows) {
+function renderEnrollment(rows, daily) {
     const card = document.getElementById('cardEnrollment');
-    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
-    const total = rows.reduce((s, r) => s + parseInt(r[1] || 0), 0);
-    const max = Math.max(...rows.map(r => parseInt(r[1] || 0)));
-    card.innerHTML = `<div class="report-title">Enrollment by Room <span style="font-weight:400;color:var(--text-muted);">(${total} total active)</span></div>` +
-        rows.map(r => {
-            const room = r[0] || 'Unknown';
-            const tot = parseInt(r[1] || 0);
-            const act = parseInt(r[2] || 0);
-            const pct = max ? Math.round(act / max * 100) : 0;
-            return `<div class="bar-row">
-                <div class="bar-label">${room}</div>
-                <div class="bar-track"><div class="bar-fill" style="width:${pct}%"><span>${act} active / ${tot} total</span></div></div>
+    if (!daily || !daily.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
+
+    const chartsHtml = daily.map(r => {
+        // r = [Room, DCFSCapacity, Mon, Tue, Wed, Thu, Fri]
+        const room     = r[0] || 'Unknown';
+        const capacity = parseInt(r[1] || 0);
+        const days     = [
+            { label: 'Room\nCapacity', val: capacity, cls: 'capacity' },
+            { label: 'Monday',    val: parseInt(r[2] || 0), cls: 'attendance' },
+            { label: 'Tuesday',   val: parseInt(r[3] || 0), cls: 'attendance' },
+            { label: 'Wednesday', val: parseInt(r[4] || 0), cls: 'attendance' },
+            { label: 'Thursday',  val: parseInt(r[5] || 0), cls: 'attendance' },
+            { label: 'Friday',    val: parseInt(r[6] || 0), cls: 'attendance' },
+        ];
+        const maxVal = Math.max(...days.map(d => d.val), 1);
+        const cols = days.map(d => {
+            const pct = Math.round(d.val / maxVal * 100);
+            return `<div class="chart-col">
+                <div class="chart-val">${d.val}</div>
+                <div class="chart-bar-wrap">
+                    <div class="chart-bar ${d.cls}" style="height:${Math.max(pct, 2)}%;"></div>
+                </div>
+                <div class="chart-label">${d.label.replace('\n', '<br>')}</div>
             </div>`;
         }).join('');
+        return `<div class="room-chart-box">
+            <div class="room-chart-title">${room}</div>
+            <div class="chart-bars">${cols}</div>
+        </div>`;
+    }).join('');
+
+    card.innerHTML = `<div class="report-title">Projected Attendance by Room</div>
+        <div class="room-charts">${chartsHtml}</div>`;
 }
+
+function updateDailyChart() {} // no longer needed
 
 function renderBars(cardId, rows, order, colors) {
     const card = document.getElementById(cardId);
@@ -197,6 +211,23 @@ function renderWaitlist(rows) {
 }
 
 load();
+
+async function load() {
+    try {
+        const res = await fetch('/api/reports', { headers: { 'Authorization': AUTH } });
+        const data = await res.json();
+        renderEnrollment(data.byRoom, data.byRoomDaily);
+        renderBars('cardFood', data.byFood, ['Free','Reduced','Paid','Unknown'], ['green','amber','primary','red']);
+        renderBars('cardProgram', data.byProgram, null, []);
+        renderBars('cardPayType', data.byPayType, null, []);
+        renderBenefits(data.benefits);
+        renderIncome(data.incomeProof);
+        renderFlags(data.flags);
+        renderWaitlist(data.waitlistSummary);
+    } catch (e) {
+        document.querySelectorAll('.loading').forEach(el => el.textContent = 'Failed to load.');
+    }
+}
 </script>
 </body>
 </html>
