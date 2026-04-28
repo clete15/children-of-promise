@@ -293,6 +293,16 @@
                             <div class="checkbox-item"><input type="checkbox" id="military"><label for="military">Military</label></div>
                         </div>
                     </div>
+                    <div class="form-group" style="margin-top:8px;">
+                        <label>Public Benefits</label>
+                        <div class="checkbox-grid">
+                            <div class="checkbox-item"><input type="checkbox" id="benWIC"><label for="benWIC">WIC</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benMedicaid"><label for="benMedicaid">Medicaid</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benSNAP"><label for="benSNAP">SNAP</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benTANF"><label for="benTANF">TANF</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benCCAP"><label for="benCCAP">CCAP</label></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Income & Proof -->
@@ -426,6 +436,16 @@
                     <div class="form-group" style="display:flex;align-items:flex-end;gap:16px;padding-bottom:2px;">
                         <div class="checkbox-item"><input type="checkbox" id="addIep"><label for="addIep">IEP</label></div>
                         <div class="checkbox-item"><input type="checkbox" id="addMilitary"><label for="addMilitary">Military</label></div>
+                    </div>
+                    <div class="form-group" style="margin-top:8px;">
+                        <label>Public Benefits</label>
+                        <div class="checkbox-grid">
+                            <div class="checkbox-item"><input type="checkbox" id="addBenWIC"><label for="addBenWIC">WIC</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="addBenMedicaid"><label for="addBenMedicaid">Medicaid</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="addBenSNAP"><label for="addBenSNAP">SNAP</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="addBenTANF"><label for="addBenTANF">TANF</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="addBenCCAP"><label for="addBenCCAP">CCAP</label></div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -675,6 +695,13 @@ function loadRecord(i) {
     document.getElementById('iep').checked       = isTruthy(s.IEP);
     document.getElementById('military').checked  = isTruthy(s.Military);
     document.getElementById('householdIncome').value = s.HouseholdIncome || '';
+    // Public benefits
+    const ben = s.PublicBenefits || '';
+    document.getElementById('benWIC').checked     = ben.includes('WIC');
+    document.getElementById('benMedicaid').checked = ben.includes('Medicaid');
+    document.getElementById('benSNAP').checked    = ben.includes('SNAP');
+    document.getElementById('benTANF').checked    = ben.includes('TANF');
+    document.getElementById('benCCAP').checked    = ben.includes('CCAP');
     // Proof of income status
     const poi = document.getElementById('proofOfIncomeStatus');
     if (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1) {
@@ -697,7 +724,7 @@ function formatDateInput(val) {
 
 function clearForm() {
     ['firstName','lastName','birthDate','startDate','cityTown','daysOld'].forEach(id => document.getElementById(id).value = '');
-    ['monday','tuesday','wednesday','thursday','friday','iep','military'].forEach(id => document.getElementById(id).checked = false);
+    ['monday','tuesday','wednesday','thursday','friday','iep','military','benWIC','benMedicaid','benSNAP','benTANF','benCCAP'].forEach(id => document.getElementById(id).checked = false);
     document.getElementById('active').value = 'Yes';
     document.getElementById('category').value = '';
     document.getElementById('pfaPiNa').value = '';
@@ -706,7 +733,7 @@ function clearForm() {
 
 function clearAddForm() {
     ['addFirstName','addLastName','addBirthDate','addStartDate','addCityTown','addDaysOld'].forEach(id => document.getElementById(id).value = '');
-    ['addMonday','addTuesday','addWednesday','addThursday','addFriday','addIep','addMilitary'].forEach(id => document.getElementById(id).checked = false);
+    ['addMonday','addTuesday','addWednesday','addThursday','addFriday','addIep','addMilitary','addBenWIC','addBenMedicaid','addBenSNAP','addBenTANF','addBenCCAP'].forEach(id => document.getElementById(id).checked = false);
     document.getElementById('addActive').value = 'Yes';
     document.getElementById('addCategory').value = '';
     document.getElementById('addPfaPiNa').value = '';
@@ -754,6 +781,7 @@ async function saveStudent() {
         iep:        document.getElementById('addIep').checked,
         military:   document.getElementById('addMilitary').checked,
         householdIncome: document.getElementById('addHouseholdIncome').value,
+        publicBenefits:  collectBenefits('add'),
     };
     try {
         const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(body) });
@@ -778,6 +806,17 @@ async function saveStudent() {
     } catch (e) { showNotification('Network error', 'error'); }
 }
 
+function collectBenefits(prefix) {
+    const p = prefix || '';
+    const b = [];
+    if (document.getElementById(p + 'benWIC')?.checked)      b.push('WIC');
+    if (document.getElementById(p + 'benMedicaid')?.checked)  b.push('Medicaid');
+    if (document.getElementById(p + 'benSNAP')?.checked)      b.push('SNAP');
+    if (document.getElementById(p + 'benTANF')?.checked)      b.push('TANF');
+    if (document.getElementById(p + 'benCCAP')?.checked)      b.push('CCAP');
+    return b.join(', ');
+}
+
 function buildBody(prefix) {
     return {
         firstName:  document.getElementById(prefix + 'firstName').value.trim(),
@@ -799,6 +838,7 @@ function buildBody(prefix) {
         iep:        document.getElementById(prefix + 'iep').checked,
         military:   document.getElementById(prefix + 'military').checked,
         householdIncome: document.getElementById(prefix + 'householdIncome') ? document.getElementById(prefix + 'householdIncome').value : '',
+        publicBenefits: collectBenefits(prefix === '' ? '' : prefix),
     };
 }
 

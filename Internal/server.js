@@ -157,7 +157,7 @@ const server = http.createServer((req, res) => {
     // GET students (internal - protected)
     if (req.method === 'GET' && url === '/api/students') {
         if (!checkAuth(req, res)) return;
-        const r = runSQL(`SELECT e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
+        const r = runSQL(`SELECT e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
@@ -170,7 +170,7 @@ const server = http.createServer((req, res) => {
                     Monday: v[11], Tuesday: v[12], Wednesday: v[13], Thursday: v[14], Friday: v[15],
                     Active: v[16], Category: v[17], PFA_PI_na: v[18], F_R_P_Food: v[19],
                     IEP: v[20], Military: v[21], HouseholdIncome: v[22],
-                    ProofOfIncomeFile: v[23], ProofOfIncomeUploaded: v[24]
+                    ProofOfIncomeFile: v[23], ProofOfIncomeUploaded: v[24], PublicBenefits: v[25]
                 };
             });
         return sendJSON(res, 200, rows);
@@ -196,7 +196,7 @@ const server = http.createServer((req, res) => {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             console.log('[POST] Saving:', d.firstName, d.lastName);
-            const sql = `INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,ProofOfIncomeUploaded) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(d.frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},0)`;
+            const sql = `INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,PublicBenefits,ProofOfIncomeUploaded) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(d.frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${esc(d.publicBenefits)},0)`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             if (!r.data.includes('rows affected')) return sendJSON(res, 500, { error: 'No rows written: ' + r.data });
@@ -213,7 +213,7 @@ const server = http.createServer((req, res) => {
         const origLast  = decodeURIComponent(parts[4] || '');
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
-            const sql = `UPDATE rptMasterEnrollment SET Last_Name=${esc(d.lastName)},First_Name=${esc(d.firstName)},Birth_date=${esc(d.birthDate)},Start_Date=${esc(d.startDate)},City_Town=${esc(d.cityTown)},Days_Old=${esc(d.daysOld)},RoomNumber=${esc(d.roomNumber)},Monday=${d.monday?1:0},Tuesday=${d.tuesday?1:0},Wednesday=${d.wednesday?1:0},Thursday=${d.thursday?1:0},Friday=${d.friday?1:0},Active=${esc(d.active)},Category=${esc(d.category)},PFA_PI_na=${esc(d.pfaPiNa)},F_R_P_Food=${esc(d.frpFood)},IEP=${esc(d.iep)},Military=${esc(d.military)} WHERE First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
+            const sql = `UPDATE rptMasterEnrollment SET Last_Name=${esc(d.lastName)},First_Name=${esc(d.firstName)},Birth_date=${esc(d.birthDate)},Start_Date=${esc(d.startDate)},City_Town=${esc(d.cityTown)},Days_Old=${esc(d.daysOld)},RoomNumber=${esc(d.roomNumber)},Monday=${d.monday?1:0},Tuesday=${d.tuesday?1:0},Wednesday=${d.wednesday?1:0},Thursday=${d.thursday?1:0},Friday=${d.friday?1:0},Active=${esc(d.active)},Category=${esc(d.category)},PFA_PI_na=${esc(d.pfaPiNa)},F_R_P_Food=${esc(d.frpFood)},IEP=${esc(d.iep)},Military=${esc(d.military)},HouseholdIncome=${esc(d.householdIncome)},PublicBenefits=${esc(d.publicBenefits)} WHERE First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
             console.log('[PUT SQL]', sql);
             const r = runSQL(sql);
             console.log('[PUT RESULT]', JSON.stringify(r));
@@ -320,6 +320,30 @@ const server = http.createServer((req, res) => {
             sendJSON(res, 200, { success: true });
         });
         return;
+    }
+
+    // GET management reports (internal - protected)
+    if (req.method === 'GET' && url === '/api/reports') {
+        if (!checkAuth(req, res)) return;
+        const queries = {
+            byRoom:        `SELECT r.Room, COUNT(*) AS Total, SUM(CASE WHEN e.Active='Yes' OR e.Active='YES' THEN 1 ELSE 0 END) AS Active FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber GROUP BY r.Room ORDER BY r.Room`,
+            byProgram:     `SELECT ISNULL(PFA_PI_na,'Unknown') AS ProgramType, COUNT(*) AS Total FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' GROUP BY PFA_PI_na`,
+            byFood:        `SELECT ISNULL(F_R_P_Food,'Unknown') AS FoodProgram, COUNT(*) AS Total FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' GROUP BY F_R_P_Food`,
+            byPayType:     `SELECT ISNULL(Category,'Unknown') AS PayType, COUNT(*) AS Total FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' GROUP BY Category`,
+            benefits:      `SELECT SUM(CASE WHEN PublicBenefits LIKE '%WIC%' THEN 1 ELSE 0 END) AS WIC, SUM(CASE WHEN PublicBenefits LIKE '%Medicaid%' THEN 1 ELSE 0 END) AS Medicaid, SUM(CASE WHEN PublicBenefits LIKE '%SNAP%' THEN 1 ELSE 0 END) AS SNAP, SUM(CASE WHEN PublicBenefits LIKE '%TANF%' THEN 1 ELSE 0 END) AS TANF, SUM(CASE WHEN PublicBenefits LIKE '%CCAP%' THEN 1 ELSE 0 END) AS CCAP FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES'`,
+            incomeProof:   `SELECT SUM(CASE WHEN ISNULL(ProofOfIncomeUploaded,0)=1 THEN 1 ELSE 0 END) AS Uploaded, SUM(CASE WHEN ISNULL(ProofOfIncomeUploaded,0)=0 THEN 1 ELSE 0 END) AS Missing FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES'`,
+            flags:         `SELECT SUM(CASE WHEN IEP='Yes' OR IEP='YES' THEN 1 ELSE 0 END) AS IEP, SUM(CASE WHEN Military='Yes' OR Military='YES' THEN 1 ELSE 0 END) AS Military FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES'`,
+            waitlistSummary: `SELECT AgeGroup, COUNT(*) AS Total, AVG(CAST(Score AS FLOAT)) AS AvgScore FROM PreEnrollment WHERE WaitlistStatus NOT IN ('Enrolled','Declined') GROUP BY AgeGroup`,
+        };
+        const results = {};
+        for (const [key, sql] of Object.entries(queries)) {
+            const r = runSQL(sql);
+            if (!r.ok) { results[key] = { error: r.error }; continue; }
+            results[key] = r.data.trim().split('\n')
+                .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+                .map(l => l.split('|').map(x => x.trim()));
+        }
+        return sendJSON(res, 200, results);
     }
 
     // GET waiting list (internal - protected)

@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reports – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        .reports-container { max-width: 1100px; margin: 24px auto 48px; padding: 0 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .report-card { background: white; border-radius: var(--radius); padding: 20px 24px; box-shadow: var(--shadow-md); }
+        .report-card.full { grid-column: 1 / -1; }
+        .report-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--primary); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+        .stat-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+        .stat-box { flex: 1 1 100px; background: #f8fafc; border-radius: 8px; padding: 14px 16px; text-align: center; border: 1px solid var(--border); }
+        .stat-value { font-size: 1.8rem; font-weight: 800; color: var(--primary); line-height: 1; }
+        .stat-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
+        .stat-box.danger .stat-value { color: var(--danger); }
+        .stat-box.success .stat-value { color: var(--success); }
+        .stat-box.warning .stat-value { color: #b45309; }
+        .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .bar-label { font-size: 0.8rem; font-weight: 600; color: var(--text); min-width: 120px; }
+        .bar-track { flex: 1; background: #e2e8f0; border-radius: 4px; height: 18px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 4px; background: var(--primary); transition: width 0.4s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; }
+        .bar-fill span { font-size: 0.68rem; font-weight: 700; color: white; white-space: nowrap; }
+        .bar-fill.green { background: var(--success); }
+        .bar-fill.amber { background: #f59e0b; }
+        .bar-fill.red   { background: var(--danger); }
+        .loading { text-align: center; color: var(--text-muted); padding: 32px; font-size: 0.88rem; }
+        @media (max-width: 680px) { .reports-container { grid-template-columns: 1fr; } .report-card.full { grid-column: 1; } }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="index.html">
+        <img src="ChildrenOfPromise.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Management Reports &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="index.html">← Staff Portal</a>
+</header>
+
+<div class="reports-container">
+
+    <div class="report-card full" id="cardEnrollment">
+        <div class="report-title">Enrollment by Room</div>
+        <div class="loading">Loading…</div>
+    </div>
+
+    <div class="report-card" id="cardFood">
+        <div class="report-title">Food Program Breakdown</div>
+        <div class="loading">Loading…</div>
+    </div>
+
+    <div class="report-card" id="cardProgram">
+        <div class="report-title">Program Type Breakdown</div>
+        <div class="loading">Loading…</div>
+    </div>
+
+    <div class="report-card" id="cardPayType">
+        <div class="report-title">Pay Type Breakdown</div>
+        <div class="loading">Loading…</div>
+    </div>
+
+    <div class="report-card" id="cardBenefits">
+        <div class="report-title">Public Benefits (Active Students)</div>
+        <div class="loading">Loading…</div>
+    </div>
+
+    <div class="report-card" id="cardIncome">
+        <div class="report-title">Proof of Income Status</div>
+        <div class="loading">Loading…</div>
+    </div>
+
+    <div class="report-card" id="cardFlags">
+        <div class="report-title">Special Flags</div>
+        <div class="loading">Loading…</div>
+    </div>
+
+    <div class="report-card" id="cardWaitlist">
+        <div class="report-title">Waiting List Summary</div>
+        <div class="loading">Loading…</div>
+    </div>
+
+</div>
+
+<script>
+const AUTH = 'Basic ' + btoa(':cofpadmin');
+
+async function load() {
+    try {
+        const res = await fetch('/api/reports', { headers: { 'Authorization': AUTH } });
+        const data = await res.json();
+        renderEnrollment(data.byRoom);
+        renderBars('cardFood', data.byFood, ['Free','Reduced','Paid','Unknown'], ['green','amber','primary','red']);
+        renderBars('cardProgram', data.byProgram, null, []);
+        renderBars('cardPayType', data.byPayType, null, []);
+        renderBenefits(data.benefits);
+        renderIncome(data.incomeProof);
+        renderFlags(data.flags);
+        renderWaitlist(data.waitlistSummary);
+    } catch (e) {
+        document.querySelectorAll('.loading').forEach(el => el.textContent = 'Failed to load.');
+    }
+}
+
+function renderEnrollment(rows) {
+    const card = document.getElementById('cardEnrollment');
+    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
+    const total = rows.reduce((s, r) => s + parseInt(r[1] || 0), 0);
+    const max = Math.max(...rows.map(r => parseInt(r[1] || 0)));
+    card.innerHTML = `<div class="report-title">Enrollment by Room <span style="font-weight:400;color:var(--text-muted);">(${total} total active)</span></div>` +
+        rows.map(r => {
+            const room = r[0] || 'Unknown';
+            const tot = parseInt(r[1] || 0);
+            const act = parseInt(r[2] || 0);
+            const pct = max ? Math.round(act / max * 100) : 0;
+            return `<div class="bar-row">
+                <div class="bar-label">${room}</div>
+                <div class="bar-track"><div class="bar-fill" style="width:${pct}%"><span>${act} active / ${tot} total</span></div></div>
+            </div>`;
+        }).join('');
+}
+
+function renderBars(cardId, rows, order, colors) {
+    const card = document.getElementById(cardId);
+    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
+    const total = rows.reduce((s, r) => s + parseInt(r[1] || 0), 0);
+    const sorted = order ? order.map(o => rows.find(r => r[0] === o) || [o, 0]) : rows;
+    const max = Math.max(...sorted.map(r => parseInt(r[1] || 0)));
+    card.innerHTML = `<div class="report-title">${card.querySelector('.report-title')?.textContent || ''}</div>` +
+        sorted.map((r, i) => {
+            const label = r[0] || 'Unknown';
+            const val = parseInt(r[1] || 0);
+            const pct = max ? Math.round(val / max * 100) : 0;
+            const cls = colors[i] || 'primary';
+            return `<div class="bar-row">
+                <div class="bar-label">${label}</div>
+                <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.max(pct,4)}%"><span>${val}</span></div></div>
+            </div>`;
+        }).join('');
+}
+
+function renderBenefits(rows) {
+    const card = document.getElementById('cardBenefits');
+    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
+    const r = rows[0];
+    const labels = ['WIC','Medicaid','SNAP','TANF','CCAP'];
+    card.innerHTML = `<div class="report-title">Public Benefits (Active Students)</div>
+        <div class="stat-grid">${labels.map((l, i) => `
+            <div class="stat-box">
+                <div class="stat-value">${r[i] || 0}</div>
+                <div class="stat-label">${l}</div>
+            </div>`).join('')}
+        </div>`;
+}
+
+function renderIncome(rows) {
+    const card = document.getElementById('cardIncome');
+    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
+    const r = rows[0];
+    const uploaded = parseInt(r[0] || 0);
+    const missing  = parseInt(r[1] || 0);
+    card.innerHTML = `<div class="report-title">Proof of Income Status</div>
+        <div class="stat-grid">
+            <div class="stat-box success"><div class="stat-value">${uploaded}</div><div class="stat-label">Uploaded</div></div>
+            <div class="stat-box danger"><div class="stat-value">${missing}</div><div class="stat-label">Missing ⚠</div></div>
+        </div>`;
+}
+
+function renderFlags(rows) {
+    const card = document.getElementById('cardFlags');
+    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
+    const r = rows[0];
+    card.innerHTML = `<div class="report-title">Special Flags</div>
+        <div class="stat-grid">
+            <div class="stat-box warning"><div class="stat-value">${r[0] || 0}</div><div class="stat-label">IEP</div></div>
+            <div class="stat-box"><div class="stat-value">${r[1] || 0}</div><div class="stat-label">Military</div></div>
+        </div>`;
+}
+
+function renderWaitlist(rows) {
+    const card = document.getElementById('cardWaitlist');
+    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No pending records.'; return; }
+    const labels = { '0-2': 'Infant & Toddler', '2-3': '2-Year Olds', '3-5': 'Pre-School' };
+    card.innerHTML = `<div class="report-title">Waiting List Summary</div>
+        <div class="stat-grid">${rows.map(r => `
+            <div class="stat-box">
+                <div class="stat-value">${r[1] || 0}</div>
+                <div class="stat-label">${labels[r[0]] || r[0]}</div>
+                <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">Avg score: ${parseFloat(r[2] || 0).toFixed(0)}</div>
+            </div>`).join('')}
+        </div>`;
+}
+
+load();
+</script>
+</body>
+</html>
