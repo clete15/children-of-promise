@@ -78,6 +78,19 @@
     </div>
 </main>
 
+<!-- SQL RUNNER -->
+<div style="max-width:800px;margin:0 auto 40px;padding:0 24px;">
+    <div style="background:var(--card-bg);border:2px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);">
+        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:12px;">🗄️ Run SQL</h3>
+        <textarea id="sqlInput" placeholder="Paste SQL here..." style="width:100%;min-height:120px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:0.82rem;resize:vertical;"></textarea>
+        <div style="display:flex;gap:10px;margin-top:10px;align-items:center;">
+            <button onclick="runSQL()" style="padding:10px 24px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:700;font-size:0.88rem;cursor:pointer;">Execute</button>
+            <span id="sqlStatus" style="font-size:0.8rem;color:var(--text-muted);"></span>
+        </div>
+        <pre id="sqlOutput" style="margin-top:12px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:12px;font-size:0.75rem;max-height:300px;overflow:auto;display:none;white-space:pre-wrap;"></pre>
+    </div>
+</div>
+
 <script>
 async function runDeploy() {
     if (!confirm('Deploy latest changes from GitHub?')) return;
@@ -95,6 +108,37 @@ async function runDeploy() {
         alert('Deploy failed: ' + e.message);
     }
     btn.textContent = 'Deploy Now';
+}
+
+async function runSQL() {
+    const query = document.getElementById('sqlInput').value.trim();
+    if (!query) return;
+    const status = document.getElementById('sqlStatus');
+    const output = document.getElementById('sqlOutput');
+    status.textContent = 'Running...';
+    output.style.display = 'none';
+    try {
+        const res = await fetch('/api/sql', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        const json = await res.json();
+        if (json.success) {
+            status.textContent = '✓ Success';
+            status.style.color = 'var(--success)';
+            output.textContent = json.output || 'Query executed successfully.';
+            output.style.display = 'block';
+        } else {
+            status.textContent = '✗ Error';
+            status.style.color = 'var(--danger)';
+            output.textContent = json.error;
+            output.style.display = 'block';
+        }
+    } catch (e) {
+        status.textContent = '✗ Network error';
+        status.style.color = 'var(--danger)';
+    }
 }
 </script>
 

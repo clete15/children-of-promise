@@ -232,6 +232,19 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    // POST run SQL (internal - protected)
+    if (req.method === 'POST' && url === '/api/sql') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            if (!d.query) return sendJSON(res, 400, { error: 'No query provided' });
+            const r = runSQL(d.query);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true, output: r.data });
+        });
+        return;
+    }
+
     // POST deploy (internal - protected)
     if (req.method === 'POST' && url === '/api/deploy') {
         if (!checkAuth(req, res)) return;
