@@ -473,30 +473,27 @@
      ROOM ROSTER MODE
 ══════════════════════════════════════════ -->
 <div id="rosterMode" style="display:none;">
-    <!-- ROOM NAV -->
-    <div style="display:flex;flex-direction:column;align-items:center;padding:16px 24px 8px;">
-        <div class="room-nav-bar">
-            <button class="room-nav-arrow" id="btnRosterRoomPrev" onclick="navigateRosterRoom(-1)">◀</button>
-            <div class="room-label" id="rosterRoomNavLabel">All Rooms</div>
-            <button class="room-nav-arrow" id="btnRosterRoomNext" onclick="navigateRosterRoom(1)">▶</button>
-        </div>
-        <div class="room-label-teacher" id="rosterRoomNavTeacher"></div>
-        <div class="room-label-count" id="rosterRoomNavCount"></div>
-    </div>
-    <div class="page-container">
-        <div class="roster-card">
-            <div class="roster-header">
-                <div>Student</div>
-                <div>Current Room</div>
-                <div>Assign Room</div>
-                <div>Pay Type</div>
-                <div>Program Type</div>
-                <div>Active</div>
-                <div>Save</div>
+    <div style="display:flex;height:calc(100vh - 140px);background:linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);align-items:flex-start;justify-content:center;padding:20px;">
+
+        <!-- SIDEBAR + CARD UNIT centered together -->
+        <div style="display:flex;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 180px);">
+
+            <!-- LEFT SIDEBAR -->
+            <div id="rosterSidebar" style="width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;"></div>
+
+            <!-- WHITE TABLE CARD -->
+            <div style="background:white;display:flex;flex-direction:column;overflow:hidden;">
+                <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;">
+                    <div id="rosterRoomTitle" style="font-size:1rem;font-weight:800;color:var(--text);"></div>
+                    <div id="rosterRoomTeacher" style="font-size:0.75rem;color:var(--danger);font-weight:600;flex:1;"></div>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;color:var(--text-muted);cursor:pointer;white-space:nowrap;">
+                        <input type="checkbox" id="rosterActiveOnly" checked onchange="renderRosterRoom()" style="width:auto;accent-color:var(--primary);">
+                        Active only
+                    </label>
+                </div>
+                <div id="rosterStudentGrid" style="overflow:auto;"></div>
             </div>
-            <div id="rosterBody">
-                <div class="roster-empty">Loading roster…</div>
-            </div>
+
         </div>
     </div>
 </div>
@@ -586,7 +583,6 @@ function updateRoomHint(selectId, hintId) {
 // ── ROOM NAV ──
 let roomList = []; // ['All', roomNumber, roomNumber, ...]
 let activeRoomIndex = 0;
-let rosterRoomIndex = 0;
 let rosterStudents = [];
 
 function buildRoomNav() {
@@ -599,28 +595,6 @@ function navigateRoom(dir) {
     activeRoom = roomList[activeRoomIndex];
     updateRoomNavDisplay();
     applyFilter();
-}
-
-function navigateRosterRoom(dir) {
-    if (!roomList.length) return;
-    rosterRoomIndex = (rosterRoomIndex + dir + roomList.length) % roomList.length;
-    updateRosterRoomNavDisplay();
-    buildRoster();
-}
-
-function updateRosterRoomNavDisplay() {
-    const val = roomList[rosterRoomIndex];
-    if (val === 'All') {
-        document.getElementById('rosterRoomNavLabel').textContent = 'All Rooms';
-        document.getElementById('rosterRoomNavTeacher').textContent = '';
-        document.getElementById('rosterRoomNavCount').textContent = `${students.length} students`;
-    } else {
-        const cr = getClassroom(val);
-        const count = students.filter(s => String(s.RoomNumber) === String(val)).length;
-        document.getElementById('rosterRoomNavLabel').textContent = cr ? cr.Room : val;
-        document.getElementById('rosterRoomNavTeacher').textContent = cr ? cr.TeacherDescription : '';
-        document.getElementById('rosterRoomNavCount').textContent = `${count} students`;
-    }
 }
 
 function updateRoomNavDisplay() {
@@ -843,74 +817,140 @@ function buildBody(prefix) {
 }
 
 // ── ROOM ROSTER ──
+let activeRosterRoomNum = 'All';
+
 function buildRoster() {
-    updateRosterRoomNavDisplay();
-    const body = document.getElementById('rosterBody');
-    const activeRosterRoom = roomList[rosterRoomIndex];
-    rosterStudents = activeRosterRoom === 'All'
-        ? [...students].sort((a, b) => a.Last_Name.localeCompare(b.Last_Name))
-        : students.filter(s => String(s.RoomNumber) === String(activeRosterRoom));
-
-    if (!rosterStudents.length) { body.innerHTML = '<div class="roster-empty">No students found.</div>'; return; }
-
-    const roomOpts = classrooms.map(r =>
-        `<option value="${r.RoomNumber}">${r.Room}</option>`
-    ).join('');
-
-    body.innerHTML = rosterStudents.map((s, i) => {
-        const cr = getClassroom(s.RoomNumber);
-        return `
-        <div class="roster-row" id="rosterRow${i}">
-            <div class="roster-name">${s.Last_Name}, ${s.First_Name}</div>
-            <div class="roster-room-label">
-                <span>${cr ? cr.Room : (s.RoomNumber || '—')}</span>
-                ${cr ? `<span class="roster-room-teacher">${cr.TeacherDescription}</span>` : ''}
-            </div>
-            <div class="roster-room-label">
-                <select class="roster-room-select" id="rosterRoom${i}" onchange="markChanged(${i})">${roomOpts}</select>
-            </div>
-            <select class="roster-room-select" id="rosterPayType${i}" onchange="markChanged(${i})">
-                <option value="">--</option>
-                <option ${s.Category==='Paid'?'selected':''}>Paid</option>
-                <option ${s.Category==='CCAP'?'selected':''}>CCAP</option>
-                <option ${s.Category==='Foster'?'selected':''}>Foster</option>
-            </select>
-            <select class="roster-room-select" id="rosterPfaPiNa${i}" onchange="markChanged(${i})">
-                <option value="">--</option>
-                <option ${s.PFA_PI_na==='PFA'?'selected':''} value="PFA">PFA</option>
-                <option ${s.PFA_PI_na==='PI'?'selected':''} value="PI">PI</option>
-                <option ${s.PFA_PI_na==='INCCRA'?'selected':''} value="INCCRA">INCCRA</option>
-            </select>
-            <select class="roster-room-select" id="rosterActive${i}" onchange="markChanged(${i})">
-                <option ${s.Active==='Yes'||s.Active==='YES'?'selected':''} value="Yes">Yes</option>
-                <option ${s.Active==='No'||s.Active==='NO'?'selected':''} value="No">No</option>
-            </select>
-            <button class="btn-roster-save" id="rosterSave${i}" onclick="saveRosterRow(${i})" disabled>Save</button>
-        </div>`;
+    // Build sidebar
+    const sidebar = document.getElementById('rosterSidebar');
+    const sidebarRooms = ['All', ...classrooms.map(r => r.RoomNumber)];
+    sidebar.innerHTML = sidebarRooms.map(rn => {
+        const cr = rn === 'All' ? null : getClassroom(rn);
+        const label = rn === 'All' ? 'All Rooms' : (cr ? cr.Room : rn);
+        const isActive = String(activeRosterRoomNum) === String(rn);
+        return `<button onclick="selectRosterRoom('${rn}')"
+            style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
+            background:${isActive?'rgba(255,255,255,0.2)':'transparent'};
+            border-left:3px solid ${isActive?'white':'transparent'};
+            transition:background 0.15s;"
+            onmouseover="if('${rn}'!=='${activeRosterRoomNum}')this.style.background='rgba(255,255,255,0.1)'"
+            onmouseout="if('${rn}'!=='${activeRosterRoomNum}')this.style.background='transparent'">
+            <div style="font-size:0.82rem;font-weight:700;color:white;">${label}</div>
+        </button>`;
     }).join('');
 
+    renderRosterRoom();
+}
+
+function selectRosterRoom(rn) {
+    activeRosterRoomNum = rn;
+    buildRoster();
+}
+
+function renderRosterRoom() {
+    const rn = activeRosterRoomNum;
+    const cr = rn === 'All' ? null : getClassroom(rn);
+    document.getElementById('rosterRoomTitle').textContent = rn === 'All' ? 'All Rooms' : (cr ? cr.Room : rn);
+    document.getElementById('rosterRoomTeacher').textContent = cr ? cr.TeacherDescription : '';
+
+    const activeOnly = document.getElementById('rosterActiveOnly')?.checked !== false;
+    rosterStudents = rn === 'All'
+        ? [...students].filter(s => !activeOnly || isTruthy(s.Active)).sort((a, b) => a.Last_Name.localeCompare(b.Last_Name))
+        : students.filter(s => String(s.RoomNumber) === String(rn) && (!activeOnly || isTruthy(s.Active)));
+
+    const grid = document.getElementById('rosterStudentGrid');
+    if (!rosterStudents.length) {
+        grid.innerHTML = '<div style="color:rgba(255,255,255,0.6);font-size:0.88rem;">No students found.</div>';
+        return;
+    }
+
+    const roomOpts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.Room}</option>`).join('');
+    const dayKeys  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
+
+    grid.innerHTML = `
+        <table style="border-collapse:collapse;font-size:0.78rem;">
+            <thead>
+                <tr style="border-bottom:2px solid var(--border);">
+                    <th style="padding:8px 12px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);min-width:140px;max-width:180px;">Student</th>
+                    ${dayLabels.map(d => `<th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:38px;">${d}</th>`).join('')}
+                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:52px;">Active</th>
+                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:60px;">Pay</th>
+                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:80px;">Program</th>
+                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:160px;">Room</th>
+                    <th style="padding:8px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:44px;">Save</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rosterStudents.map((s, i) => {
+                    const dd = (id, opts) => `<select id="${id}" onchange="markRosterChanged(${i})"
+                        style="padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.72rem;color:var(--text);background:white;width:100%;">${opts}</select>`;
+                    const dayChecks = dayKeys.map((k, di) =>
+                        `<td style="padding:7px 8px;text-align:center;border-bottom:1px solid var(--border);">
+                            <input type="checkbox" id="rDay${i}_${di}" ${isTruthy(s[k])?'checked':''} onchange="markRosterChanged(${i})" style="width:auto;accent-color:var(--primary);">
+                        </td>`
+                    ).join('');
+                    return `<tr id="rosterCard${i}" style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                        <td style="padding:7px 12px;font-weight:600;color:var(--text);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;">${s.Last_Name}, ${s.First_Name}</td>
+                        ${dayChecks}
+                        <td style="padding:5px 6px;">${dd(`rosterActive${i}`, `<option ${isTruthy(s.Active)?'selected':''} value="Yes">Yes</option><option ${!isTruthy(s.Active)?'selected':''} value="No">No</option>`)}</td>
+                        <td style="padding:5px 6px;">${dd(`rosterPayType${i}`, `<option value="">--</option><option ${s.Category==='Paid'?'selected':''}>Paid</option><option ${s.Category==='CCAP'?'selected':''}>CCAP</option><option ${s.Category==='Foster'?'selected':''}>Foster</option>`)}</td>
+                        <td style="padding:5px 6px;">${dd(`rosterPfaPiNa${i}`, `<option value="">--</option><option ${s.PFA_PI_na==='PFA'?'selected':''} value="PFA">PFA</option><option ${s.PFA_PI_na==='PI'?'selected':''} value="PI">PI</option><option ${s.PFA_PI_na==='INCCRA'?'selected':''} value="INCCRA">INCCRA</option>`)}</td>
+                        <td style="padding:5px 6px;">${dd(`rosterRoom${i}`, roomOpts)}</td>
+                        <td style="padding:5px 6px;text-align:center;">
+                            <button id="rosterSave${i}" onclick="saveRosterRow(${i})" disabled
+                                style="padding:3px 8px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.7rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button>
+                        </td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+            <tfoot>
+                <tr style="background:#f8fafc;border-top:2px solid var(--border);">
+                    <td style="padding:7px 12px;font-size:0.65rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:0.05em;">Daily Total</td>
+                    ${dayKeys.map((k, di) => {
+                        const total = rosterStudents.filter(s => isTruthy(s[k])).length;
+                        return `<td id="dayTotal${di}" style="padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--primary);">${total}</td>`;
+                    }).join('')}
+                    <td colspan="5"></td>
+                </tr>
+            </tfoot>
+        </table>`;
+
+    // Set room dropdowns
     rosterStudents.forEach((s, i) => {
         const sel = document.getElementById(`rosterRoom${i}`);
-        if (sel) {
-            sel.value = s.RoomNumber || '';
-            const cr = getClassroom(sel.value);
-            const th = document.getElementById(`rosterTeacher${i}`);
-            if (th && cr) th.textContent = cr.TeacherDescription;
-        }
+        if (sel) sel.value = s.RoomNumber || '';
+    });}
+
+let rosterIndex = 0;
+function showRosterCard() { renderRosterRoom(); }
+function rosterNav(dir) {}
+
+function markRosterChanged(i) {
+    const btn = document.getElementById(`rosterSave${i}`);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    // Refresh daily totals
+    const dayKeys = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    dayKeys.forEach((k, di) => {
+        let total = 0;
+        rosterStudents.forEach((s, si) => {
+            const cb = document.getElementById(`rDay${si}_${di}`);
+            if (cb) total += cb.checked ? 1 : 0;
+            else total += isTruthy(s[k]) ? 1 : 0;
+        });
+        const cell = document.getElementById(`dayTotal${di}`);
+        if (cell) cell.textContent = total;
     });
 }
 
-function markChanged(i) {
-    document.getElementById(`rosterRow${i}`).classList.add('row-changed');
-    document.getElementById(`rosterSave${i}`).disabled = false;
-}
+// keep old markChanged alias for compatibility
+function markChanged(i) { markRosterChanged(i); }
 
 async function saveRosterRow(i) {
     const s = rosterStudents[i];
-    const newRoom = document.getElementById(`rosterRoom${i}`).value;
-    const newPayType = document.getElementById(`rosterPayType${i}`).value;
-    const newPfaPiNa = document.getElementById(`rosterPfaPiNa${i}`).value;
-    const newActive = document.getElementById(`rosterActive${i}`).value;
+    const newRoom    = document.getElementById(`rosterRoom${i}`)?.value || s.RoomNumber || '';
+    const newPayType = document.getElementById(`rosterPayType${i}`)?.value || s.Category || '';
+    const newPfaPiNa = document.getElementById(`rosterPfaPiNa${i}`)?.value || s.PFA_PI_na || '';
+    const newActive  = document.getElementById(`rosterActive${i}`)?.value || s.Active || 'Yes';
     const btn = document.getElementById(`rosterSave${i}`);
     btn.disabled = true; btn.textContent = '…';
     const body = {
@@ -919,11 +959,15 @@ async function saveRosterRow(i) {
         cityTown: s.City_Town, daysOld: s.Days_Old,
         roomNumber: newRoom,
         active: newActive, category: newPayType,
-        monday: isTruthy(s.Monday), tuesday: isTruthy(s.Tuesday),
-        wednesday: isTruthy(s.Wednesday), thursday: isTruthy(s.Thursday),
-        friday: isTruthy(s.Friday),
+        monday:    document.getElementById(`rDay${i}_0`)?.checked || false,
+        tuesday:   document.getElementById(`rDay${i}_1`)?.checked || false,
+        wednesday: document.getElementById(`rDay${i}_2`)?.checked || false,
+        thursday:  document.getElementById(`rDay${i}_3`)?.checked || false,
+        friday:    document.getElementById(`rDay${i}_4`)?.checked || false,
         pfaPiNa: newPfaPiNa, frpFood: s.F_R_P_Food || '',
         iep: isTruthy(s.IEP), military: isTruthy(s.Military),
+        householdIncome: s.HouseholdIncome || '',
+        publicBenefits: s.PublicBenefits || '',
     };
     try {
         const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
@@ -931,18 +975,18 @@ async function saveRosterRow(i) {
         });
         const data = await res.json();
         if (data.success) {
-            students[i].RoomNumber = newRoom;
-            students[i].Category = newPayType;
-            students[i].PFA_PI_na = newPfaPiNa;
-            students[i].Active = newActive;
-            document.getElementById(`rosterRow${i}`).classList.remove('row-changed');
+            rosterStudents[i].RoomNumber = newRoom;
+            rosterStudents[i].Category = newPayType;
+            rosterStudents[i].PFA_PI_na = newPfaPiNa;
+            rosterStudents[i].Active = newActive;
+            btn.style.opacity = '0.4';
             showNotification(`${s.First_Name} ${s.Last_Name} updated`, 'success');
         } else {
             showNotification('Update failed: ' + (data.error || ''), 'error');
             btn.disabled = false;
         }
     } catch (e) { showNotification('Network error', 'error'); btn.disabled = false; }
-    finally { btn.textContent = 'Save'; }
+    finally { btn.textContent = 'Save Changes'; }
 }
 
 function setMode(mode) {

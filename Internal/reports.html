@@ -28,15 +28,12 @@
         .bar-fill.red   { background: var(--danger); }
         .room-charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 4px; }
         .room-chart-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
-        .room-chart-title { font-size: 0.78rem; font-weight: 700; color: var(--text); margin-bottom: 12px; text-align: center; }
-        .chart-bars { display: flex; align-items: flex-end; justify-content: center; gap: 8px; height: 120px; }
-        .chart-col { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
-        .chart-bar-wrap { flex: 1; display: flex; align-items: flex-end; width: 100%; }
-        .chart-bar { width: 100%; border-radius: 3px 3px 0 0; transition: height 0.4s ease; min-height: 2px; }
-        .chart-bar.capacity { background: var(--danger); }
-        .chart-bar.attendance { background: var(--primary); }
-        .chart-val { font-size: 0.7rem; font-weight: 700; color: var(--text); }
-        .chart-label { font-size: 0.65rem; color: var(--text-muted); text-align: center; white-space: nowrap; }
+        .room-chart-title { font-size: 0.82rem; font-weight: 700; color: var(--text); margin-bottom: 12px; text-align: center; }
+        .day-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .day-name { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); width: 36px; flex-shrink: 0; }
+        .capacity-track { flex: 1; background: #fecaca; border-radius: 5px; height: 22px; position: relative; overflow: hidden; }
+        .attendance-fill { height: 100%; background: var(--primary); border-radius: 5px; transition: width 0.4s ease; }
+        .day-label { font-size: 0.72rem; font-weight: 700; color: var(--text); white-space: nowrap; min-width: 60px; text-align: right; }
         @media (max-width: 680px) { .reports-container { grid-template-columns: 1fr; } .report-card.full { grid-column: 1; } }
     </style>
 </head>
@@ -57,7 +54,12 @@
 
     <div class="report-card full" id="cardEnrollment">
         <div class="report-title">Projected Attendance by Room</div>
-        <div class="loading">Loading…</div>
+        <div style="display:flex;gap:0;min-height:320px;">
+            <div id="roomSidebar" style="width:180px;flex-shrink:0;border-right:1px solid var(--border);padding-right:0;overflow-y:auto;"></div>
+            <div id="roomChartArea" style="flex:1;padding:16px 20px;">
+                <div class="loading">Loading…</div>
+            </div>
+        </div>
     </div>
 
     <div class="report-card" id="cardFood">
@@ -100,44 +102,85 @@
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 
-function renderEnrollment(rows, daily) {
-    const card = document.getElementById('cardEnrollment');
-    if (!daily || !daily.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
+let allDailyData = [];
 
-    const chartsHtml = daily.map(r => {
-        // r = [Room, DCFSCapacity, Mon, Tue, Wed, Thu, Fri]
-        const room     = r[0] || 'Unknown';
-        const capacity = parseInt(r[1] || 0);
-        const days     = [
-            { label: 'Room\nCapacity', val: capacity, cls: 'capacity' },
-            { label: 'Monday',    val: parseInt(r[2] || 0), cls: 'attendance' },
-            { label: 'Tuesday',   val: parseInt(r[3] || 0), cls: 'attendance' },
-            { label: 'Wednesday', val: parseInt(r[4] || 0), cls: 'attendance' },
-            { label: 'Thursday',  val: parseInt(r[5] || 0), cls: 'attendance' },
-            { label: 'Friday',    val: parseInt(r[6] || 0), cls: 'attendance' },
-        ];
-        const maxVal = Math.max(...days.map(d => d.val), 1);
-        const cols = days.map(d => {
-            const pct = Math.round(d.val / maxVal * 100);
-            return `<div class="chart-col">
-                <div class="chart-val">${d.val}</div>
-                <div class="chart-bar-wrap">
-                    <div class="chart-bar ${d.cls}" style="height:${Math.max(pct, 2)}%;"></div>
-                </div>
-                <div class="chart-label">${d.label.replace('\n', '<br>')}</div>
-            </div>`;
-        }).join('');
-        return `<div class="room-chart-box">
-            <div class="room-chart-title">${room}</div>
-            <div class="chart-bars">${cols}</div>
+function renderEnrollment(rows, daily) {
+    if (!daily || !daily.length) {
+        document.getElementById('roomChartArea').innerHTML = '<div class="loading">No data.</div>';
+        return;
+    }
+    allDailyData = daily;
+
+    // Build sidebar
+    const sidebar = document.getElementById('roomSidebar');
+    sidebar.innerHTML = daily.map((r, i) =>
+        `<button onclick="showRoomChart(${i})" id="rsBtn${i}"
+            style="display:block;width:100%;text-align:left;padding:10px 14px;border:none;background:none;cursor:pointer;font-size:0.8rem;font-weight:600;color:var(--text);border-left:3px solid transparent;transition:background 0.15s;"
+            onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=activeRoom===${i}?'#eff6ff':'none'">
+            ${r[0] || 'Unknown'}
+        </button>`
+    ).join('');
+
+    showRoomChart(0);
+}
+
+let activeRoom = 0;
+
+function showRoomChart(idx) {
+    activeRoom = idx;
+    // Update sidebar active state
+    allDailyData.forEach((_, i) => {
+        const btn = document.getElementById(`rsBtn${i}`);
+        if (!btn) return;
+        btn.style.background = i === idx ? '#eff6ff' : 'none';
+        btn.style.borderLeftColor = i === idx ? 'var(--primary)' : 'transparent';
+        btn.style.color = i === idx ? 'var(--primary)' : 'var(--text)';
+    });
+
+    const r = allDailyData[idx];
+    const room     = r[0] || 'Unknown';
+    const capacity = parseInt(r[1] || 1);
+    const days     = ['Mon','Tue','Wed','Thu','Fri'];
+    const counts   = [parseInt(r[2]||0), parseInt(r[3]||0), parseInt(r[4]||0), parseInt(r[5]||0), parseInt(r[6]||0)];
+    const chartH   = 220;
+
+    // For rooms with dual capacity (2 Year Olds / Toddlers), show toggle
+    const isDualCap = room.toLowerCase().includes('2 year') && room.toLowerCase().includes('toddler');
+    const altCap = isDualCap ? (capacity === 5 ? 8 : 5) : null;
+    const toggleHtml = isDualCap ? `
+        <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px;">
+            <span style="font-size:0.75rem;color:var(--text-muted);">Capacity:</span>
+            <button onclick="toggleCapacity(${idx},5)" id="cap5btn"
+                style="padding:4px 12px;border-radius:5px;border:1.5px solid var(--border);font-size:0.78rem;font-weight:700;cursor:pointer;background:${capacity===5?'var(--primary)':'white'};color:${capacity===5?'white':'var(--text)'};">5</button>
+            <button onclick="toggleCapacity(${idx},8)" id="cap8btn"
+                style="padding:4px 12px;border-radius:5px;border:1.5px solid var(--border);font-size:0.78rem;font-weight:700;cursor:pointer;background:${capacity===8?'var(--primary)':'white'};color:${capacity===8?'white':'var(--text)'};">8</button>
+        </div>` : '';
+
+    const cols = days.map((day, i) => {
+        const count = counts[i];
+        const fillPct = Math.min(count / capacity, 1);
+        const fillH = Math.round(fillPct * chartH);
+        const capH  = chartH;
+        return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text);">${count}/${capacity}</div>
+            <div style="position:relative;width:100%;height:${capH}px;background:#fecaca;border-radius:6px 6px 0 0;display:flex;align-items:flex-end;">
+                <div style="width:100%;height:${fillH}px;background:var(--primary);border-radius:6px 6px 0 0;transition:height 0.4s;"></div>
+            </div>
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);">${day}</div>
         </div>`;
     }).join('');
 
-    card.innerHTML = `<div class="report-title">Projected Attendance by Room</div>
-        <div class="room-charts">${chartsHtml}</div>`;
+    document.getElementById('roomChartArea').innerHTML = `
+        <div style="font-size:0.9rem;font-weight:800;color:var(--text);margin-bottom:12px;text-align:center;">${room}</div>
+        ${toggleHtml}
+        <div style="display:flex;align-items:flex-end;gap:12px;height:${chartH + 60}px;padding:0 8px;">
+            ${cols}
+        </div>
+        <div style="display:flex;gap:16px;margin-top:12px;justify-content:center;">
+            <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;"><div style="width:14px;height:14px;background:#fecaca;border-radius:3px;"></div> Capacity (${capacity})</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;"><div style="width:14px;height:14px;background:var(--primary);border-radius:3px;"></div> Projected</div>
+        </div>`;
 }
-
-function updateDailyChart() {} // no longer needed
 
 function renderBars(cardId, rows, order, colors) {
     const card = document.getElementById(cardId);
@@ -211,6 +254,11 @@ function renderWaitlist(rows) {
 }
 
 load();
+
+function toggleCapacity(idx, cap) {
+    allDailyData[idx][1] = cap;
+    showRoomChart(idx);
+}
 
 async function load() {
     try {
