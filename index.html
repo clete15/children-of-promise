@@ -69,27 +69,20 @@
             <p>Access the internal enrollment management system for staff and administrators.</p>
             <span class="card-btn">Go to Staff Portal</span>
         </a>
-        <div class="portal-card" style="cursor:pointer;" onclick="runDeploy()">
+        <div class="portal-card" style="cursor:default;max-width:420px;flex:1 1 380px;">
             <div class="card-icon">🚀</div>
-            <h3>Deploy Updates</h3>
-            <p>Pull latest changes from GitHub and restart the server.</p>
-            <span class="card-btn" style="background:#16a34a;color:white;">Deploy Now</span>
+            <h3>Deploy & Database</h3>
+            <p style="margin-bottom:12px;">Pull latest from GitHub, then run SQL if needed.</p>
+            <button onclick="runDeploy()" style="width:100%;padding:11px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:16px;transition:background 0.15s;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">Deploy Now</button>
+            <textarea id="sqlInput" placeholder="Paste SQL here..." style="width:100%;min-height:90px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:0.78rem;resize:vertical;margin-bottom:10px;"></textarea>
+            <div style="display:flex;gap:10px;align-items:center;width:100%;">
+                <button onclick="runSQL()" style="padding:9px 20px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:700;font-size:0.82rem;cursor:pointer;">Execute SQL</button>
+                <span id="sqlStatus" style="font-size:0.78rem;color:var(--text-muted);"></span>
+            </div>
+            <pre id="sqlOutput" style="margin-top:10px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:10px;font-size:0.72rem;max-height:200px;overflow:auto;display:none;white-space:pre-wrap;width:100%;text-align:left;"></pre>
         </div>
     </div>
 </main>
-
-<!-- SQL RUNNER -->
-<div style="max-width:800px;margin:0 auto 40px;padding:0 24px;">
-    <div style="background:var(--card-bg);border:2px solid var(--border);border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);">
-        <h3 style="font-size:1rem;font-weight:800;color:var(--text);margin-bottom:12px;">🗄️ Run SQL</h3>
-        <textarea id="sqlInput" placeholder="Paste SQL here..." style="width:100%;min-height:120px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:0.82rem;resize:vertical;"></textarea>
-        <div style="display:flex;gap:10px;margin-top:10px;align-items:center;">
-            <button onclick="runSQL()" style="padding:10px 24px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:700;font-size:0.88rem;cursor:pointer;">Execute</button>
-            <span id="sqlStatus" style="font-size:0.8rem;color:var(--text-muted);"></span>
-        </div>
-        <pre id="sqlOutput" style="margin-top:12px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;padding:12px;font-size:0.75rem;max-height:300px;overflow:auto;display:none;white-space:pre-wrap;"></pre>
-    </div>
-</div>
 
 <script>
 async function runDeploy() {
