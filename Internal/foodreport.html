@@ -96,16 +96,20 @@
 
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
+let allStudents = [];
 
 async function load() {
     try {
         const res = await fetch('/api/students', { headers: { 'Authorization': AUTH } });
         const students = await res.json();
-        const active = students.filter(s => s.Active === 'Yes' || s.Active === 'YES');
+        allStudents = students.filter(s => {
+            if (!s.Active) return false;
+            return s.Active.toLowerCase() === 'yes';
+        });
 
         // Group by room
         const rooms = {};
-        active.forEach(s => {
+        allStudents.forEach(s => {
             const room = s.Room || 'Unknown';
             if (!rooms[room]) rooms[room] = [];
             rooms[room].push(s);
@@ -113,20 +117,21 @@ async function load() {
 
         const tbody = document.getElementById('foodBody');
         let html = '';
+        let globalIdx = 0;
         for (const [room, students] of Object.entries(rooms)) {
-            html += `<tr class="room-group"><td colspan="5">${room}</td></tr>`;
+            html += `<tr class="room-group"><td colspan="6">${room}</td></tr>`;
             students.sort((a, b) => a.Last_Name.localeCompare(b.Last_Name));
-            students.forEach(s => {
+            students.forEach((s, idx) => {
                 const frp = s.F_R_P_Food || 'Paid';
                 const badge = frp === 'Free' ? 'badge-free' : frp === 'Reduced' ? 'badge-reduced' : 'badge-paid';
-                const key = encodeURIComponent(s.First_Name) + '/' + encodeURIComponent(s.Last_Name);
+                const gi = globalIdx++;
                 html += `<tr>
                     <td style="font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
                     <td>${room}</td>
-                    <td><input type="number" value="${s.HouseholdIncome || ''}" id="inc-${key}" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;" max="100000" min="0"></td>
-                    <td><input type="number" value="${s.HouseholdSize || ''}" id="hs-${key}" style="width:50px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;" min="1" max="15"></td>
-                    <td><span class="${badge}">${frp}</span></td>
-                    <td><button onclick="saveIncome('${key}')" style="padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:4px;font-size:0.7rem;font-weight:700;cursor:pointer;">Save</button></td>
+                    <td><input type="number" value="${s.HouseholdIncome || ''}" id="inc-${gi}" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;" max="100000" min="0"></td>
+                    <td><input type="number" value="${s.HouseholdSize || ''}" id="hs-${gi}" style="width:50px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;" min="1" max="15"></td>
+                    <td><span class="${badge}" id="badge-${gi}">${frp}</span></td>
+                    <td><button onclick="saveIncome(${gi},'${s.First_Name.replace(/'/g,"\\'")}','${s.Last_Name.replace(/'/g,"\\'")}')" style="padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:4px;font-size:0.7rem;font-weight:700;cursor:pointer;">Save</button></td>
                 </tr>`;
             });
         }
@@ -138,26 +143,24 @@ async function load() {
 
 load();
 
-async function saveIncome(key) {
-    const income = document.getElementById(`inc-${key}`)?.value || '';
-    const hhSize = document.getElementById(`hs-${key}`)?.value || '';
-    const [firstName, lastName] = key.split('/').map(decodeURIComponent);
+async function saveIncome(idx, firstName, lastName) {
+    const income = document.getElementById(`inc-${idx}`)?.value || '';
+    const hhSize = document.getElementById(`hs-${idx}`)?.value || '';
 
     // Auto-calculate F/R/P
     const freeThresholds    = [19578,26572,33566,40560,47554,54548,61542,68536];
     const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
-    const idx = Math.max(0, Math.min(parseInt(hhSize)||1, 8) - 1);
+    const sizeIdx = Math.max(0, Math.min(parseInt(hhSize)||1, 8) - 1);
     const inc = parseInt(income) || 100000;
     let frpFood = 'Paid';
-    if (inc <= freeThresholds[idx]) frpFood = 'Free';
-    else if (inc <= reducedThresholds[idx]) frpFood = 'Reduced';
+    if (inc <= freeThresholds[sizeIdx]) frpFood = 'Free';
+    else if (inc <= reducedThresholds[sizeIdx]) frpFood = 'Reduced';
 
     try {
         const res = await fetch(`/api/students/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}`, {
             method: 'PUT',
             headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                firstName, lastName,
                 householdIncome: income,
                 householdSize: hhSize,
                 frpFood: frpFood,
@@ -165,8 +168,11 @@ async function saveIncome(key) {
         });
         const data = await res.json();
         if (data.success) {
-            alert(`${firstName} ${lastName} updated — ${frpFood}`);
-            load(); // refresh
+            const badge = document.getElementById(`badge-${idx}`);
+            if (badge) {
+                badge.textContent = frpFood;
+                badge.className = frpFood === 'Free' ? 'badge-free' : frpFood === 'Reduced' ? 'badge-reduced' : 'badge-paid';
+            }
         } else {
             alert('Failed: ' + (data.error || ''));
         }
