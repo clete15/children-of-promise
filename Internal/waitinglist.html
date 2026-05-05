@@ -439,6 +439,7 @@ function openEnrollModal(id) {
         iep:             r.IEP === 'Yes',
         military:        r.ActiveMilitary === 'Yes',
         householdIncome: r.HouseholdIncome || '',
+        householdSize:   r.HouseholdSize || '',
     }));
 
     // Redirect to EMS Add Student tab

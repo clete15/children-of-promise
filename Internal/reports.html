@@ -63,7 +63,7 @@
     </div>
 
     <div class="report-card" id="cardFood">
-        <div class="report-title">Food Program Breakdown</div>
+        <div class="report-title">Food Program Breakdown <a href="foodreport.html" style="float:right;font-size:0.7rem;font-weight:600;color:var(--primary);text-decoration:none;">View Full Report →</a></div>
         <div class="loading">Loading…</div>
     </div>
 
@@ -188,7 +188,9 @@ function renderBars(cardId, rows, order, colors) {
     const total = rows.reduce((s, r) => s + parseInt(r[1] || 0), 0);
     const sorted = order ? order.map(o => rows.find(r => r[0] === o) || [o, 0]) : rows;
     const max = Math.max(...sorted.map(r => parseInt(r[1] || 0)));
-    card.innerHTML = `<div class="report-title">${card.querySelector('.report-title')?.textContent || ''}</div>` +
+    const titleEl = card.querySelector('.report-title');
+    const titleHtml = titleEl ? titleEl.innerHTML : '';
+    card.innerHTML = `<div class="report-title">${titleHtml}</div>` +
         sorted.map((r, i) => {
             const label = r[0] || 'Unknown';
             const val = parseInt(r[1] || 0);

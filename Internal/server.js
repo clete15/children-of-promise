@@ -157,7 +157,7 @@ const server = http.createServer((req, res) => {
     // GET students (internal - protected)
     if (req.method === 'GET' && url === '/api/students') {
         if (!checkAuth(req, res)) return;
-        const r = runSQL(`SELECT e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
+        const r = runSQL(`SELECT e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
@@ -170,7 +170,7 @@ const server = http.createServer((req, res) => {
                     Monday: v[11], Tuesday: v[12], Wednesday: v[13], Thursday: v[14], Friday: v[15],
                     Active: v[16], Category: v[17], PFA_PI_na: v[18], F_R_P_Food: v[19],
                     IEP: v[20], Military: v[21], HouseholdIncome: v[22],
-                    ProofOfIncomeFile: v[23], ProofOfIncomeUploaded: v[24], PublicBenefits: v[25]
+                    ProofOfIncomeFile: v[23], ProofOfIncomeUploaded: v[24], PublicBenefits: v[25], HouseholdSize: v[26]
                 };
             });
         return sendJSON(res, 200, rows);
@@ -196,7 +196,15 @@ const server = http.createServer((req, res) => {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             console.log('[POST] Saving:', d.firstName, d.lastName);
-            const sql = `INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,PublicBenefits,ProofOfIncomeUploaded) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(d.frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${esc(d.publicBenefits)},0)`;
+            // Auto-calculate F/R/P based on USDA income guidelines
+            const freeThresholds  = [19578,26572,33566,40560,47554,54548,61542,68536];
+            const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
+            const hhSize = Math.max(1, Math.min(parseInt(d.householdSize)||1, 8)) - 1;
+            const income = parseInt(d.householdIncome) || 100000;
+            let frpFood = 'Paid';
+            if (income <= freeThresholds[hhSize]) frpFood = 'Free';
+            else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
+            const sql = `INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,HouseholdSize,PublicBenefits,ProofOfIncomeUploaded) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${parseInt(d.householdSize)||0},${esc(d.publicBenefits)},0)`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             if (!r.data.includes('rows affected')) return sendJSON(res, 500, { error: 'No rows written: ' + r.data });
@@ -213,7 +221,7 @@ const server = http.createServer((req, res) => {
         const origLast  = decodeURIComponent(parts[4] || '');
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
-            const sql = `UPDATE rptMasterEnrollment SET Last_Name=${esc(d.lastName)},First_Name=${esc(d.firstName)},Birth_date=${esc(d.birthDate)},Start_Date=${esc(d.startDate)},City_Town=${esc(d.cityTown)},Days_Old=${esc(d.daysOld)},RoomNumber=${esc(d.roomNumber)},Monday=${d.monday?1:0},Tuesday=${d.tuesday?1:0},Wednesday=${d.wednesday?1:0},Thursday=${d.thursday?1:0},Friday=${d.friday?1:0},Active=${esc(d.active)},Category=${esc(d.category)},PFA_PI_na=${esc(d.pfaPiNa)},F_R_P_Food=${esc(d.frpFood)},IEP=${esc(d.iep)},Military=${esc(d.military)},HouseholdIncome=${esc(d.householdIncome)},PublicBenefits=${esc(d.publicBenefits)} WHERE First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
+            const sql = `UPDATE rptMasterEnrollment SET Last_Name=${esc(d.lastName)},First_Name=${esc(d.firstName)},Birth_date=${esc(d.birthDate)},Start_Date=${esc(d.startDate)},City_Town=${esc(d.cityTown)},Days_Old=${esc(d.daysOld)},RoomNumber=${esc(d.roomNumber)},Monday=${d.monday?1:0},Tuesday=${d.tuesday?1:0},Wednesday=${d.wednesday?1:0},Thursday=${d.thursday?1:0},Friday=${d.friday?1:0},Active=${esc(d.active)},Category=${esc(d.category)},PFA_PI_na=${esc(d.pfaPiNa)},F_R_P_Food=${esc(d.frpFood)},IEP=${esc(d.iep)},Military=${esc(d.military)},HouseholdIncome=${esc(d.householdIncome)},HouseholdSize=${d.householdSize?parseInt(d.householdSize):'NULL'},PublicBenefits=${esc(d.publicBenefits)} WHERE First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
             console.log('[PUT SQL]', sql);
             const r = runSQL(sql);
             console.log('[PUT RESULT]', JSON.stringify(r));
@@ -283,6 +291,7 @@ const server = http.createServer((req, res) => {
                 );
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ChildName') ALTER TABLE PreEnrollment ADD ChildName NVARCHAR(200);
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ChildBirthDate') ALTER TABLE PreEnrollment ADD ChildBirthDate NVARCHAR(20);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='HouseholdSize') ALTER TABLE PreEnrollment ADD HouseholdSize INT;
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='DcfsInvolvement') ALTER TABLE PreEnrollment ADD DcfsInvolvement NVARCHAR(10);
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='SubstanceAbuse') ALTER TABLE PreEnrollment ADD SubstanceAbuse NVARCHAR(10);
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='CaregiverOther') ALTER TABLE PreEnrollment ADD CaregiverOther NVARCHAR(10);
@@ -294,7 +303,7 @@ const server = http.createServer((req, res) => {
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='AgeGroup') ALTER TABLE PreEnrollment ADD AgeGroup NVARCHAR(10);
                 INSERT INTO PreEnrollment (
                     FirstName,LastName,Email,Address,City,Zip,Country,Phone,
-                    ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,HouseholdIncome,PublicBenefits,Homeless,IEP,
+                    ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,HouseholdIncome,HouseholdSize,PublicBenefits,Homeless,IEP,
                     NoHSDiploma,TeenParent,BornOutsideUS,FosterAdopted,
                     NonEnglishHome,ActiveMilitary,PriorEarlyLearning,
                     BrightpointSubsidy,LivingSituation,EarlyIntervention,
@@ -304,7 +313,7 @@ const server = http.createServer((req, res) => {
                     ${esc(d.firstName)},${esc(d.lastName)},${esc(d.email)},
                     ${esc(d.address)},${esc(d.city)},${esc(d.zip)},${esc(d.country)},
                     ${esc(d.phone)},${esc(d.childrenInfo)},${esc(d.childName)},${esc(d.childBirthDate)},${esc(d.ageGroup)},
-                    ${esc(d.householdIncome)},${esc(d.publicBenefits)},${esc(d.homeless)},${esc(d.iep)},
+                    ${esc(d.householdIncome)},${parseInt(d.householdSize)||0},${esc(d.publicBenefits)},${esc(d.homeless)},${esc(d.iep)},
                     ${esc(d.noHSDiploma)},${esc(d.teenParent)},${esc(d.bornOutsideUS)},
                     ${esc(d.fosterAdopted)},${esc(d.nonEnglishHome)},${esc(d.activeMilitary)},
                     ${esc(d.priorEarlyLearning)},${esc(d.brightpointSubsidy)},
@@ -350,13 +359,13 @@ const server = http.createServer((req, res) => {
     // GET waiting list (internal - protected)
     if (req.method === 'GET' && url === '/api/waitinglist') {
         if (!checkAuth(req, res)) return;
-        const r = runSQL(`SELECT Id,SubmittedAt,FirstName,LastName,Phone,Email,ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,Homeless,FosterAdopted,IEP,EarlyIntervention,AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,TeenParent,NoHSDiploma,BornOutsideUS,NonEnglishHome,ActiveMilitary,PublicBenefits,LivingSituation,City,HouseholdIncome,Score,WaitlistStatus,Notes FROM PreEnrollment ORDER BY Score DESC,SubmittedAt ASC`);
+        const r = runSQL(`SELECT Id,SubmittedAt,FirstName,LastName,Phone,Email,ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,Homeless,FosterAdopted,IEP,EarlyIntervention,AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,TeenParent,NoHSDiploma,BornOutsideUS,NonEnglishHome,ActiveMilitary,PublicBenefits,LivingSituation,City,HouseholdIncome,ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,Score,WaitlistStatus,Notes FROM PreEnrollment ORDER BY Score DESC,SubmittedAt ASC`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
-                return { Id:v[0],SubmittedAt:v[1],FirstName:v[2],LastName:v[3],Phone:v[4],Email:v[5],ChildrenInfo:v[6],ChildName:v[7],ChildBirthDate:v[8],AgeGroup:v[9],Homeless:v[10],FosterAdopted:v[11],IEP:v[12],EarlyIntervention:v[13],AbuseHistory:v[14],MentalIllness:v[15],DcfsInvolvement:v[16],SubstanceAbuse:v[17],CaregiverOther:v[18],FamilyDeath:v[19],LowBirthWeight:v[20],ParentIncarcerated:v[21],TeenParent:v[22],NoHSDiploma:v[23],BornOutsideUS:v[24],NonEnglishHome:v[25],ActiveMilitary:v[26],PublicBenefits:v[27],LivingSituation:v[28],City:v[29],HouseholdIncome:v[30],Score:v[31],WaitlistStatus:v[32],Notes:v[33] };
+                return { Id:v[0],SubmittedAt:v[1],FirstName:v[2],LastName:v[3],Phone:v[4],Email:v[5],ChildrenInfo:v[6],ChildName:v[7],ChildBirthDate:v[8],AgeGroup:v[9],Homeless:v[10],FosterAdopted:v[11],IEP:v[12],EarlyIntervention:v[13],AbuseHistory:v[14],MentalIllness:v[15],DcfsInvolvement:v[16],SubstanceAbuse:v[17],CaregiverOther:v[18],FamilyDeath:v[19],LowBirthWeight:v[20],ParentIncarcerated:v[21],TeenParent:v[22],NoHSDiploma:v[23],BornOutsideUS:v[24],NonEnglishHome:v[25],ActiveMilitary:v[26],PublicBenefits:v[27],LivingSituation:v[28],City:v[29],HouseholdIncome:v[30],HouseholdSize:v[31],Score:v[32],WaitlistStatus:v[33],Notes:v[34] };
             });
         return sendJSON(res, 200, rows);
     }

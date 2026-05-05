@@ -455,7 +455,11 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Annual Household Income</label>
-                        <input type="text" id="addHouseholdIncome" placeholder="e.g. 42000">
+                        <input type="number" id="addHouseholdIncome" placeholder="e.g. 42000" max="100000" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Household Size</label>
+                        <input type="number" id="addHouseholdSize" placeholder="e.g. 4" min="1" max="15">
                     </div>
                 </div>
             </div>
@@ -532,6 +536,7 @@ async function init() {
                 document.getElementById('addIep').checked      = !!d.iep;
                 document.getElementById('addMilitary').checked = !!d.military;
                 document.getElementById('addHouseholdIncome').value = d.householdIncome || '';
+                document.getElementById('addHouseholdSize').value = d.householdSize || '';
                 // Show banner
                 showNotification(`Pre-filling from waiting list: ${d.firstName} ${d.lastName}`, 'info');
             }, 300);
@@ -686,7 +691,9 @@ function loadRecord(i) {
 }
 
 function isTruthy(v) {
-    return v === true || v === 1 || v === '1' || v === 'Yes' || v === 'yes';
+    if (v === true || v === 1 || v === '1') return true;
+    if (typeof v === 'string') return v.toLowerCase() === 'yes';
+    return false;
 }
 
 function formatDateInput(val) {
@@ -755,6 +762,7 @@ async function saveStudent() {
         iep:        document.getElementById('addIep').checked,
         military:   document.getElementById('addMilitary').checked,
         householdIncome: document.getElementById('addHouseholdIncome').value,
+        householdSize:   document.getElementById('addHouseholdSize').value,
         publicBenefits:  collectBenefits('add'),
     };
     try {

@@ -181,10 +181,16 @@
     </div>
 
     <div class="section-divider">Household Income</div>
-    <div class="form-group">
-        <label>Household Income <span class="required">*</span></label>
-        <input type="text" id="householdIncome" required placeholder="Annual household income (required by state)">
-        <p style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">We are required by the state to retain household income in our files and to determine if your family qualifies for free daycare through Brightpoint.</p>
+    <div class="form-row">
+        <div class="form-group">
+            <label>Annual Household Income <span class="required">*</span></label>
+            <input type="number" id="householdIncome" required placeholder="e.g. 42000" max="100000" min="0">
+            <p style="font-size:0.75rem;color:var(--text-muted);margin-top:4px;">Enter combined annual income up to $100,000. If over $100,000 enter 100000.</p>
+        </div>
+        <div class="form-group">
+            <label>Household Size (total people in home) <span class="required">*</span></label>
+            <input type="number" id="householdSize" required placeholder="e.g. 4" min="1" max="15">
+        </div>
     </div>
 
     <div class="section-divider">Public Benefits</div>
@@ -487,6 +493,7 @@ function collectHouseholdData() {
         country:            document.getElementById('country').value.trim(),
         phone:              document.getElementById('phone').value.trim(),
         householdIncome:    document.getElementById('householdIncome').value.trim(),
+        householdSize:      document.getElementById('householdSize').value.trim(),
         publicBenefits:     benefits,
         homeless:           document.getElementById('homeless').value,
         noHSDiploma:        document.getElementById('noHSDiploma').value,
