@@ -83,6 +83,7 @@
                     <th>Room</th>
                     <th>Household Income</th>
                     <th>Household Size</th>
+                    <th>Qualifiers</th>
                     <th>Food Program</th>
                     <th>Save</th>
                 </tr>
@@ -119,10 +120,25 @@ async function load() {
         let html = '';
         let globalIdx = 0;
         for (const [room, students] of Object.entries(rooms)) {
-            html += `<tr class="room-group"><td colspan="6">${room}</td></tr>`;
+            html += `<tr class="room-group"><td colspan="7">${room}</td></tr>`;
             students.sort((a, b) => a.Last_Name.localeCompare(b.Last_Name));
             students.forEach((s, idx) => {
-                const frp = s.F_R_P_Food || 'Paid';
+                // Build qualifiers
+                const quals = [];
+                const benefits = (s.PublicBenefits || '').toLowerCase();
+                if (benefits.includes('wic'))      quals.push('WIC');
+                if (benefits.includes('snap'))     quals.push('SNAP');
+                if (benefits.includes('tanf'))     quals.push('TANF');
+                if (benefits.includes('ccap'))     quals.push('CCAP');
+                if (benefits.includes('medicaid')) quals.push('Medicaid');
+                if (s.Military && s.Military.toLowerCase() === 'yes') quals.push('Military');
+                if (s.Category && s.Category.toLowerCase() === 'foster') quals.push('Foster');
+                const qualStr = quals.join(', ');
+
+                // If any qualifier, default to Free
+                let frp = s.F_R_P_Food || 'Paid';
+                if (quals.length > 0) frp = 'Free';
+
                 const badge = frp === 'Free' ? 'badge-free' : frp === 'Reduced' ? 'badge-reduced' : 'badge-paid';
                 const gi = globalIdx++;
                 html += `<tr>
@@ -130,6 +146,7 @@ async function load() {
                     <td>${room}</td>
                     <td><input type="number" value="${s.HouseholdIncome || ''}" id="inc-${gi}" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;" max="100000" min="0"></td>
                     <td><input type="number" value="${s.HouseholdSize || ''}" id="hs-${gi}" style="width:50px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;" min="1" max="15"></td>
+                    <td style="font-size:0.75rem;color:var(--primary);font-weight:600;">${qualStr || '—'}</td>
                     <td><span class="${badge}" id="badge-${gi}">${frp}</span></td>
                     <td><button onclick="saveIncome(${gi},'${s.First_Name.replace(/'/g,"\\'")}','${s.Last_Name.replace(/'/g,"\\'")}')" style="padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:4px;font-size:0.7rem;font-weight:700;cursor:pointer;">Save</button></td>
                 </tr>`;
