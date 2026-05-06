@@ -531,6 +531,8 @@ async function init() {
                 document.getElementById('addMilitary').checked = !!d.military;
                 document.getElementById('addHouseholdIncome').value = d.householdIncome || '';
                 document.getElementById('addHouseholdSize').value = d.householdSize || '';
+                // Auto-calculate food program
+                calcFRP('addHouseholdIncome','addHouseholdSize','addFrpFood','add');
                 // Set pay type based on foster
                 if (d.fosterAdopted) document.getElementById('addCategory').value = 'Foster';
                 // Set public benefits
