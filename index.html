@@ -44,7 +44,7 @@
 <body>
 
 <header>
-    <img src="/public/images/ChildrenOfPromise.png" alt="Children Of Promise">
+    <img src="/public/images/logo-sm.png" alt="Children Of Promise">
     <div class="header-text">
         <h1>Children Of Promise</h1>
         <p>Christian Dayschool &nbsp;·&nbsp; Millstadt, IL</p>
@@ -122,6 +122,7 @@ async function runSQL() {
             status.style.color = 'var(--success)';
             output.textContent = json.output || 'Query executed successfully.';
             output.style.display = 'block';
+            document.getElementById('sqlInput').value = '';
         } else {
             status.textContent = '✗ Error';
             status.style.color = 'var(--danger)';
