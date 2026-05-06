@@ -268,23 +268,27 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // POST deploy (internal - protected)
+    // POST deploy (internal - protected) — pulls code only, no restart
     if (req.method === 'POST' && url === '/api/deploy') {
         if (!checkAuth(req, res)) return;
         try {
             const out = execSync('"C:\\Program Files\\Git\\mingw64\\bin\\git.exe" fetch origin && "C:\\Program Files\\Git\\mingw64\\bin\\git.exe" reset --hard origin/master', { encoding: 'utf8', shell: 'cmd.exe', cwd: 'C:\\app' });
             console.log('[DEPLOY]', out);
-            sendJSON(res, 200, { success: true, output: out });
-            // Wait longer so the response reaches the browser before exit
-            setTimeout(() => {
-                try {
-                    execSync('schtasks /run /tn "CofPServer"', { shell: 'cmd.exe' });
-                } catch(e) {}
-                process.exit(0);
-            }, 2000);
+            return sendJSON(res, 200, { success: true, output: out, message: 'Code updated. Static files active immediately. Restart server if server.js changed.' });
         } catch (e) {
             return sendJSON(res, 500, { error: e.message });
         }
+    }
+
+    // POST restart server (internal - protected)
+    if (req.method === 'POST' && url === '/api/restart') {
+        if (!checkAuth(req, res)) return;
+        sendJSON(res, 200, { success: true, message: 'Server restarting...' });
+        setTimeout(() => {
+            try { execSync('schtasks /run /tn "CofPServer"', { shell: 'cmd.exe' }); } catch(e) {}
+            process.exit(0);
+        }, 1000);
+        return;
     }
 
     // POST pre-enrollment form (public)

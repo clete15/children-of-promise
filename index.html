@@ -72,8 +72,12 @@
         <div class="portal-card" style="cursor:default;max-width:420px;flex:1 1 380px;">
             <div class="card-icon">🚀</div>
             <h3>Deploy & Database</h3>
-            <p style="margin-bottom:12px;">Pull latest from GitHub, then run SQL if needed.</p>
-            <button onclick="runDeploy()" style="width:100%;padding:11px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:0.9rem;font-weight:700;cursor:pointer;margin-bottom:16px;transition:background 0.15s;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">Deploy Now</button>
+            <p style="margin-bottom:12px;">Pull latest from GitHub, run SQL, or restart the server.</p>
+            <div style="display:flex;gap:8px;width:100%;margin-bottom:16px;">
+                <button onclick="runDeploy()" style="flex:1;padding:11px;background:#16a34a;color:white;border:none;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'">Deploy Code</button>
+                <button onclick="restartServer()" style="padding:11px 16px;background:#dc2626;color:white;border:none;border-radius:8px;font-size:0.85rem;font-weight:700;cursor:pointer;transition:background 0.15s;" onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='#dc2626'">Restart</button>
+            </div>
+            <div id="deployMsg" style="font-size:0.78rem;margin-bottom:12px;padding:8px 12px;border-radius:6px;display:none;"></div>
             <textarea id="sqlInput" placeholder="Paste SQL here..." style="width:100%;min-height:90px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:0.78rem;resize:vertical;margin-bottom:10px;"></textarea>
             <div style="display:flex;gap:10px;align-items:center;width:100%;">
                 <button onclick="runSQL()" style="padding:9px 20px;background:var(--primary);color:white;border:none;border-radius:6px;font-weight:700;font-size:0.82rem;cursor:pointer;">Execute SQL</button>
@@ -86,21 +90,43 @@
 
 <script>
 async function runDeploy() {
-    if (!confirm('Deploy latest changes from GitHub?')) return;
-    const btn = document.querySelector('[onclick="runDeploy()"] .card-btn');
-    btn.textContent = 'Deploying...';
+    if (!confirm('Pull latest code from GitHub?')) return;
+    const msg = document.getElementById('deployMsg');
+    msg.style.display = 'block';
+    msg.style.background = '#f0fdf4';
+    msg.style.color = '#166534';
+    msg.textContent = 'Deploying...';
     try {
         const res = await fetch('/api/deploy', { method: 'POST' });
         const json = await res.json();
         if (json.success) {
-            alert('Deploy complete!');
+            msg.textContent = '✓ ' + (json.message || 'Code updated successfully.');
+            msg.style.background = '#f0fdf4';
+            msg.style.color = '#166534';
         } else {
-            alert('Deploy failed: ' + json.error);
+            msg.textContent = '✗ ' + (json.error || 'Deploy failed.');
+            msg.style.background = '#fef2f2';
+            msg.style.color = '#991b1b';
         }
     } catch (e) {
-        alert('Deploy failed: ' + e.message);
+        msg.textContent = '✗ Network error: ' + e.message;
+        msg.style.background = '#fef2f2';
+        msg.style.color = '#991b1b';
     }
-    btn.textContent = 'Deploy Now';
+}
+
+async function restartServer() {
+    if (!confirm('Restart the server? The page will be unavailable for ~10 seconds.')) return;
+    const msg = document.getElementById('deployMsg');
+    msg.style.display = 'block';
+    msg.style.background = '#fffbeb';
+    msg.style.color = '#92400e';
+    msg.textContent = 'Restarting server...';
+    try {
+        await fetch('/api/restart', { method: 'POST' });
+    } catch (e) {}
+    msg.textContent = 'Server restarting — refresh in 10 seconds.';
+    setTimeout(() => location.reload(), 10000);
 }
 
 async function runSQL() {
