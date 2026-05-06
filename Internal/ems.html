@@ -527,8 +527,8 @@ async function init() {
         if (data) {
             const d = JSON.parse(data);
             setMode('add');
-            // Pre-fill after classrooms are loaded
             setTimeout(() => {
+                // Pre-fill available fields
                 document.getElementById('addFirstName').value  = d.firstName || '';
                 document.getElementById('addLastName').value   = d.lastName || '';
                 document.getElementById('addCityTown').value   = d.cityTown || '';
@@ -537,8 +537,33 @@ async function init() {
                 document.getElementById('addMilitary').checked = !!d.military;
                 document.getElementById('addHouseholdIncome').value = d.householdIncome || '';
                 document.getElementById('addHouseholdSize').value = d.householdSize || '';
-                // Show banner
-                showNotification(`Pre-filling from waiting list: ${d.firstName} ${d.lastName}`, 'info');
+                // Set pay type based on foster
+                if (d.fosterAdopted) document.getElementById('addCategory').value = 'Foster';
+                // Set public benefits
+                if (d.publicBenefits) {
+                    const ben = d.publicBenefits.toLowerCase();
+                    if (ben.includes('wic'))      document.getElementById('addBenWIC').checked = true;
+                    if (ben.includes('medicaid')) document.getElementById('addBenMedicaid').checked = true;
+                    if (ben.includes('snap'))     document.getElementById('addBenSNAP').checked = true;
+                    if (ben.includes('tanf'))     document.getElementById('addBenTANF').checked = true;
+                    if (ben.includes('ccap'))     document.getElementById('addBenCCAP').checked = true;
+                }
+                // Highlight empty required fields in yellow
+                const fieldsToCheck = ['addFirstName','addLastName','addBirthDate','addStartDate','addRoomNumber','addCategory','addPfaPiNa'];
+                fieldsToCheck.forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el && !el.value) {
+                        el.style.background = '#fffbeb';
+                        el.style.borderColor = '#f59e0b';
+                        el.addEventListener('change', function() {
+                            if (this.value) { this.style.background = 'white'; this.style.borderColor = ''; }
+                        });
+                        el.addEventListener('input', function() {
+                            if (this.value) { this.style.background = 'white'; this.style.borderColor = ''; }
+                        });
+                    }
+                });
+                showNotification(`Pre-filling from waiting list: ${d.firstName} ${d.lastName}. Complete yellow fields.`, 'info');
             }, 300);
         }
     }

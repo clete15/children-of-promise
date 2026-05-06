@@ -324,7 +324,7 @@ function renderTable() {
                 <select class="status-select" onchange="handleStatusChange(${r.Id}, this)" ${isEnrolled ? 'disabled' : ''}>
                     <option ${r.WaitlistStatus==='Pending'?'selected':''}>Pending</option>
                     <option ${r.WaitlistStatus==='Contacted'?'selected':''}>Contacted</option>
-                    <option ${r.WaitlistStatus==='Enrolled'?'selected':''}>Enrolled</option>
+                    <option value="Enroll">Enroll</option>
                     <option value="Declined">Declined</option>
                 </select>
             </td>
@@ -423,13 +423,12 @@ async function saveNotes(id) {
     } catch (e) { alert('Failed to save notes'); }
 }
 
-// ── ENROLL MODAL ──
+// ── ENROLL ──
 function openEnrollModal(id) {
-    enrollingId = id;
     const r = allRows.find(x => x.Id == id);
     if (!r) return;
 
-    // Store pre-enrollment data and waiting list ID in sessionStorage
+    // Store all available pre-enrollment data in sessionStorage
     sessionStorage.setItem('enrollFromWaitlist', JSON.stringify({
         waitlistId:      r.Id,
         firstName:       r.ChildName ? r.ChildName.split(' ')[0] : r.FirstName || '',
@@ -440,6 +439,8 @@ function openEnrollModal(id) {
         military:        r.ActiveMilitary === 'Yes',
         householdIncome: r.HouseholdIncome || '',
         householdSize:   r.HouseholdSize || '',
+        publicBenefits:  r.PublicBenefits || '',
+        fosterAdopted:   r.FosterAdopted === 'Yes',
     }));
 
     // Redirect to EMS Add Student tab
