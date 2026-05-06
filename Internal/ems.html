@@ -531,8 +531,6 @@ async function init() {
                 document.getElementById('addMilitary').checked = !!d.military;
                 document.getElementById('addHouseholdIncome').value = d.householdIncome || '';
                 document.getElementById('addHouseholdSize').value = d.householdSize || '';
-                // Auto-calculate food program
-                calcFRP('addHouseholdIncome','addHouseholdSize','addFrpFood','add');
                 // Set pay type based on foster
                 if (d.fosterAdopted) document.getElementById('addCategory').value = 'Foster';
                 // Set public benefits
@@ -544,6 +542,8 @@ async function init() {
                     if (ben.includes('tanf'))     document.getElementById('addBenTANF').checked = true;
                     if (ben.includes('ccap'))     document.getElementById('addBenCCAP').checked = true;
                 }
+                // Auto-calculate food program AFTER benefits are set
+                calcFRP('addHouseholdIncome','addHouseholdSize','addFrpFood','add');
                 // Highlight empty required fields in yellow
                 const fieldsToCheck = ['addFirstName','addLastName','addBirthDate','addStartDate','addRoomNumber','addCategory','addPfaPiNa'];
                 fieldsToCheck.forEach(id => {
