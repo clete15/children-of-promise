@@ -281,12 +281,7 @@
                         </div>
                         <div class="form-group">
                             <label>Food Program</label>
-                            <select id="frpFood">
-                                <option value="">-- Select --</option>
-                                <option value="Free">Free</option>
-                                <option value="Reduced">Reduced</option>
-                                <option value="Paid">Paid</option>
-                            </select>
+                            <input type="text" id="frpFood" readonly style="background:#f8fafc;font-weight:700;">
                         </div>
                         <div class="form-group" style="display:flex;align-items:flex-end;gap:16px;padding-bottom:2px;">
                             <div class="checkbox-item"><input type="checkbox" id="iep"><label for="iep">IEP</label></div>
@@ -296,11 +291,11 @@
                     <div class="form-group" style="margin-top:8px;">
                         <label>Public Benefits</label>
                         <div class="checkbox-grid">
-                            <div class="checkbox-item"><input type="checkbox" id="benWIC"><label for="benWIC">WIC</label></div>
-                            <div class="checkbox-item"><input type="checkbox" id="benMedicaid"><label for="benMedicaid">Medicaid</label></div>
-                            <div class="checkbox-item"><input type="checkbox" id="benSNAP"><label for="benSNAP">SNAP</label></div>
-                            <div class="checkbox-item"><input type="checkbox" id="benTANF"><label for="benTANF">TANF</label></div>
-                            <div class="checkbox-item"><input type="checkbox" id="benCCAP"><label for="benCCAP">CCAP</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benWIC" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benWIC">WIC</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benMedicaid" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benMedicaid">Medicaid</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benSNAP" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benSNAP">SNAP</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benTANF" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benTANF">TANF</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benCCAP" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benCCAP">CCAP</label></div>
                         </div>
                     </div>
                 </div>
@@ -311,7 +306,11 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Annual Household Income</label>
-                            <input type="text" id="householdIncome" placeholder="e.g. 42000">
+                            <input type="number" id="householdIncome" placeholder="e.g. 42000" max="100000" min="0" oninput="calcFRP('householdIncome','householdSize','frpFood','')">
+                        </div>
+                        <div class="form-group">
+                            <label>Household Size</label>
+                            <input type="number" id="householdSize" placeholder="e.g. 4" min="1" max="15" oninput="calcFRP('householdIncome','householdSize','frpFood','')">
                         </div>
                         <div class="form-group">
                             <label>Proof of Income</label>
@@ -426,12 +425,7 @@
                     </div>
                     <div class="form-group">
                         <label>Food Program</label>
-                        <select id="addFrpFood">
-                            <option value="">-- Select --</option>
-                            <option value="Free">Free</option>
-                            <option value="Reduced">Reduced</option>
-                            <option value="Paid">Paid</option>
-                        </select>
+                        <input type="text" id="addFrpFood" readonly style="background:#f8fafc;font-weight:700;">
                     </div>
                     <div class="form-group" style="display:flex;align-items:flex-end;gap:16px;padding-bottom:2px;">
                         <div class="checkbox-item"><input type="checkbox" id="addIep"><label for="addIep">IEP</label></div>
@@ -455,11 +449,11 @@
                 <div class="form-row">
                     <div class="form-group">
                         <label>Annual Household Income</label>
-                        <input type="number" id="addHouseholdIncome" placeholder="e.g. 42000" max="100000" min="0">
+                        <input type="number" id="addHouseholdIncome" placeholder="e.g. 42000" max="100000" min="0" oninput="calcFRP('addHouseholdIncome','addHouseholdSize','addFrpFood','add')">
                     </div>
                     <div class="form-group">
                         <label>Household Size</label>
-                        <input type="number" id="addHouseholdSize" placeholder="e.g. 4" min="1" max="15">
+                        <input type="number" id="addHouseholdSize" placeholder="e.g. 4" min="1" max="15" oninput="calcFRP('addHouseholdIncome','addHouseholdSize','addFrpFood','add')">
                     </div>
                 </div>
             </div>
@@ -699,6 +693,9 @@ function loadRecord(i) {
     document.getElementById('iep').checked       = isTruthy(s.IEP);
     document.getElementById('military').checked  = isTruthy(s.Military);
     document.getElementById('householdIncome').value = s.HouseholdIncome || '';
+    document.getElementById('householdSize').value = s.HouseholdSize || '';
+    // Auto-calc food program
+    calcFRP('householdIncome','householdSize','frpFood','');
     // Public benefits
     const ben = s.PublicBenefits || '';
     document.getElementById('benWIC').checked     = ben.includes('WIC');
@@ -822,6 +819,18 @@ function collectBenefits(prefix) {
     if (document.getElementById(p + 'benTANF')?.checked)      b.push('TANF');
     if (document.getElementById(p + 'benCCAP')?.checked)      b.push('CCAP');
     return b.join(', ');
+}
+
+function calcFRP(incomeId, sizeId, outputId, benefitsPrefix) {
+    const freeThresholds    = [19578,26572,33566,40560,47554,54548,61542,68536];
+    const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
+    const income = parseInt(document.getElementById(incomeId)?.value) || 100000;
+    const hhSize = Math.max(1, Math.min(parseInt(document.getElementById(sizeId)?.value) || 1, 8)) - 1;
+    const benefits = collectBenefits(benefitsPrefix);
+    let frp = 'Paid';
+    if (benefits || income <= freeThresholds[hhSize]) frp = 'Free';
+    else if (income <= reducedThresholds[hhSize]) frp = 'Reduced';
+    document.getElementById(outputId).value = frp;
 }
 
 function buildBody(prefix) {
