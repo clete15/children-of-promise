@@ -1,5 +1,6 @@
 USE CofPMillstadt;
 DELETE FROM rptMasterEnrollment;
+GO
 INSERT INTO rptMasterEnrollment (RoomNumber,Last_Name,First_Name,HouseholdIncome,HouseholdSize,Birth_date,Start_Date,City_Town,Days_Old,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military)
 VALUES
 (1,'Staley','Bodie','164000',5,'2025-12-19','2026-03-02','Millstadt',138,1,1,1,1,1,'YES','Paid','INCCRA','Paid','no','no'),
@@ -72,3 +73,5 @@ VALUES
 (8,'Phelps','Jax','124800',4,'2016-10-04','2021-10-25','Millstadt',3501,0,0,1,0,1,'YES','Paid','INCCRA','Paid','no','no'),
 (8,'Johnson','Reilly','36826',4,'2015-11-04','2018-01-22','Dupo',3836,1,1,1,1,1,'YES','Chasi','INCCRA','Free','no','no'),
 (8,'Bequette','Makenzie','32760',6,'2014-02-10','2015-07-01','Millstadt',4468,1,1,1,1,1,'YES','Chasi','INCCRA','Free','no','no');
+GO
+SELECT COUNT(*) AS TotalStudents FROM rptMasterEnrollment;
