@@ -321,9 +321,9 @@ function renderTable() {
             <td style="background:#fffbeb;font-weight:600;font-size:0.78rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td>
-                <select class="status-select" onchange="handleStatusChange(${r.Id}, this)" ${isEnrolled ? 'disabled' : ''}>
-                    <option ${r.WaitlistStatus==='Pending'?'selected':''}>Pending</option>
-                    <option ${r.WaitlistStatus==='Contacted'?'selected':''}>Contacted</option>
+                <select class="status-select" onchange="handleStatusChange(${parseInt(r.Id)}, this)" ${isEnrolled ? 'disabled' : ''}>
+                    <option value="Pending" ${r.WaitlistStatus==='Pending'?'selected':''}>Pending</option>
+                    <option value="Contacted" ${r.WaitlistStatus==='Contacted'?'selected':''}>Contacted</option>
                     <option value="Enroll">Enroll</option>
                     <option value="Declined">Declined</option>
                 </select>
