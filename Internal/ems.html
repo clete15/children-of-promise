@@ -694,7 +694,7 @@ function loadRecord(i) {
     document.getElementById('cityTown').value    = s.City_Town || '';
     document.getElementById('daysOld').value     = s.Days_Old || '';
     document.getElementById('roomNumber').value  = s.RoomNumber || '';
-    document.getElementById('active').value      = s.Active || 'Yes';
+    document.getElementById('active').value      = isTruthy(s.Active) ? 'Yes' : 'No';
     // Normalize legacy pay type values
     const rawCat = (s.Category || '').trim();
     const catUp = rawCat.toUpperCase();
