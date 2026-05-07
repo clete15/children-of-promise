@@ -251,6 +251,8 @@
                             <option value="">-- Select --</option>
                             <option>Paid</option>
                             <option>CCAP</option>
+                            <option value="Half Price">Half Price</option>
+                            <option>Free</option>
                             <option>Foster</option>
                         </select>
                     </div>
@@ -396,6 +398,8 @@
                         <option value="">-- Select --</option>
                         <option>Paid</option>
                         <option>CCAP</option>
+                        <option value="Half Price">Half Price</option>
+                        <option>Free</option>
                         <option>Foster</option>
                     </select>
                 </div>
@@ -691,7 +695,17 @@ function loadRecord(i) {
     document.getElementById('daysOld').value     = s.Days_Old || '';
     document.getElementById('roomNumber').value  = s.RoomNumber || '';
     document.getElementById('active').value      = s.Active || 'Yes';
-    document.getElementById('category').value    = s.Category || '';
+    // Normalize legacy pay type values
+    const rawCat = (s.Category || '').trim();
+    const catUp = rawCat.toUpperCase();
+    let normalizedCategory = rawCat;
+    if (catUp === 'CHASI' || catUp === 'CHASI' || catUp === 'CCAP') normalizedCategory = 'CCAP';
+    else if (catUp === 'DCFS') normalizedCategory = 'Foster';
+    else if (rawCat === '1/2 price' || catUp === 'HALF PRICE') normalizedCategory = 'Half Price';
+    else if (catUp === 'STAFF') normalizedCategory = 'Free';
+    else if (catUp === 'PAID') normalizedCategory = 'Paid';
+    else if (catUp === 'FOSTER') normalizedCategory = 'Foster';
+    document.getElementById('category').value    = normalizedCategory;
     document.getElementById('monday').checked    = isTruthy(s.Monday);
     document.getElementById('tuesday').checked   = isTruthy(s.Tuesday);
     document.getElementById('wednesday').checked = isTruthy(s.Wednesday);
@@ -863,6 +877,7 @@ function buildBody(prefix) {
         iep:        document.getElementById(prefix + 'iep').checked,
         military:   document.getElementById(prefix + 'military').checked,
         householdIncome: document.getElementById(prefix + 'householdIncome') ? document.getElementById(prefix + 'householdIncome').value : '',
+        householdSize: document.getElementById(prefix + 'householdSize') ? document.getElementById(prefix + 'householdSize').value : '',
         publicBenefits: collectBenefits(prefix === '' ? '' : prefix),
     };
 }
@@ -917,6 +932,7 @@ function renderRosterRoom() {
     const roomOpts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.Room}</option>`).join('');
     const dayKeys  = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
     const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
+    const payOptions = '<option value="">--</option><option value="Paid">Paid</option><option value="CCAP">CCAP</option><option value="Half Price">Half Price</option><option value="Free">Free</option><option value="Foster">Foster</option>';
 
     grid.innerHTML = `
         <table style="border-collapse:collapse;font-size:0.78rem;">
@@ -925,7 +941,8 @@ function renderRosterRoom() {
                     <th style="padding:8px 12px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);min-width:140px;max-width:180px;">Student</th>
                     ${dayLabels.map(d => `<th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:38px;">${d}</th>`).join('')}
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:52px;">Active</th>
-                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:60px;">Pay</th>
+                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:90px;">Pay</th>
+                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:52px;">Food</th>
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:80px;">Program</th>
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:160px;">Room</th>
                     <th style="padding:8px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:44px;">Save</th>
@@ -933,8 +950,27 @@ function renderRosterRoom() {
             </thead>
             <tbody>
                 ${rosterStudents.map((s, i) => {
-                    const dd = (id, opts) => `<select id="${id}" onchange="markRosterChanged(${i})"
-                        style="padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.72rem;color:var(--text);background:white;width:100%;">${opts}</select>`;
+                    // Calculate F/R/P for display
+                    const _freeT  = [19578,26572,33566,40560,47554,54548,61542,68536];
+                    const _redT   = [27861,37814,47767,57720,67673,77626,87579,97532];
+                    const _inc    = parseInt(s.HouseholdIncome) || 100000;
+                    const _hh     = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
+                    const _ben    = s.PublicBenefits || '';
+                    let _frp = 'Paid';
+                    if (_ben || _inc <= _freeT[_hh]) _frp = 'Free';
+                    else if (_inc <= _redT[_hh]) _frp = 'Reduced';
+                    const _frpColor = _frp === 'Free' ? '#16a34a' : _frp === 'Reduced' ? '#d97706' : '#64748b';
+                    // Normalize pay type
+                    const _cat = (s.Category||'').trim();
+                    const _catUp = _cat.toUpperCase();
+                    let _norm = _cat;
+                    if (_catUp === 'CHASI' || _catUp === 'CCAP') _norm = 'CCAP';
+                    else if (_catUp === 'DCFS') _norm = 'Foster';
+                    else if (_cat === '1/2 price' || _catUp === 'HALF PRICE') _norm = 'Half Price';
+                    else if (_catUp === 'STAFF') _norm = 'Free';
+                    else if (_catUp === 'PAID') _norm = 'Paid';
+                    else if (_catUp === 'FOSTER') _norm = 'Foster';
+                    const dd = (id, opts) => '<select id="'+id+'" onchange="markRosterChanged('+i+')" style="padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.72rem;color:var(--text);background:white;width:100%;">'+opts+'</select>';
                     const dayChecks = dayKeys.map((k, di) =>
                         `<td style="padding:7px 8px;text-align:center;border-bottom:1px solid var(--border);">
                             <input type="checkbox" id="rDay${i}_${di}" ${isTruthy(s[k])?'checked':''} onchange="markRosterChanged(${i})" style="width:auto;accent-color:var(--primary);">
@@ -943,10 +979,11 @@ function renderRosterRoom() {
                     return `<tr id="rosterCard${i}" style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
                         <td style="padding:7px 12px;font-weight:600;color:var(--text);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;">${s.Last_Name}, ${s.First_Name}</td>
                         ${dayChecks}
-                        <td style="padding:5px 6px;">${dd(`rosterActive${i}`, `<option ${isTruthy(s.Active)?'selected':''} value="Yes">Yes</option><option ${!isTruthy(s.Active)?'selected':''} value="No">No</option>`)}</td>
-                        <td style="padding:5px 6px;">${dd(`rosterPayType${i}`, `<option value="">--</option><option ${s.Category==='Paid'?'selected':''}>Paid</option><option ${s.Category==='CCAP'?'selected':''}>CCAP</option><option ${s.Category==='Foster'?'selected':''}>Foster</option>`)}</td>
-                        <td style="padding:5px 6px;">${dd(`rosterPfaPiNa${i}`, `<option value="">--</option><option ${s.PFA_PI_na==='PFA'?'selected':''} value="PFA">PFA</option><option ${s.PFA_PI_na==='PI'?'selected':''} value="PI">PI</option><option ${s.PFA_PI_na==='INCCRA'?'selected':''} value="INCCRA">INCCRA</option>`)}</td>
-                        <td style="padding:5px 6px;">${dd(`rosterRoom${i}`, roomOpts)}</td>
+                        <td style="padding:5px 6px;">${dd('rosterActive'+i, '<option '+(isTruthy(s.Active)?'selected':'')+' value="Yes">Yes</option><option '+(!isTruthy(s.Active)?'selected':'')+' value="No">No</option>')}</td>
+                        <td style="padding:5px 6px;">${dd('rosterPayType'+i, payOptions)}</td>
+                        <td style="padding:5px 6px;text-align:center;font-size:0.72rem;font-weight:700;color:${_frpColor};">${_frp}</td>
+                        <td style="padding:5px 6px;">${dd('rosterPfaPiNa'+i, '<option value="">--</option><option '+(s.PFA_PI_na==='PFA'?'selected':'')+' value="PFA">PFA</option><option '+(s.PFA_PI_na==='PI'?'selected':'')+' value="PI">PI</option><option '+(s.PFA_PI_na==='INCCRA'?'selected':'')+' value="INCCRA">INCCRA</option>')}</td>
+                        <td style="padding:5px 6px;">${dd('rosterRoom'+i, roomOpts)}</td>
                         <td style="padding:5px 6px;text-align:center;">
                             <button id="rosterSave${i}" onclick="saveRosterRow(${i})" disabled
                                 style="padding:3px 8px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.7rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button>
@@ -961,15 +998,29 @@ function renderRosterRoom() {
                         const total = rosterStudents.filter(s => isTruthy(s[k])).length;
                         return `<td id="dayTotal${di}" style="padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--primary);">${total}</td>`;
                     }).join('')}
-                    <td colspan="5"></td>
+                    <td colspan="6"></td>
                 </tr>
             </tfoot>
         </table>`;
 
-    // Set room dropdowns
+    // Set room and pay type dropdowns after render
     rosterStudents.forEach((s, i) => {
         const sel = document.getElementById(`rosterRoom${i}`);
         if (sel) sel.value = s.RoomNumber || '';
+        // Normalize and set pay type
+        const paySel = document.getElementById(`rosterPayType${i}`);
+        if (paySel) {
+            const cat = (s.Category||'').trim();
+            const catUp = cat.toUpperCase();
+            let norm = '';
+            if (catUp === 'CHASI' || catUp === 'CCAP') norm = 'CCAP';
+            else if (catUp === 'DCFS' || catUp === 'FOSTER') norm = 'Foster';
+            else if (cat === '1/2 price' || catUp === 'HALF PRICE') norm = 'Half Price';
+            else if (catUp === 'STAFF' || catUp === 'FREE') norm = 'Free';
+            else if (catUp === 'PAID') norm = 'Paid';
+            else norm = cat;
+            paySel.value = norm;
+        }
     });}
 
 let rosterIndex = 0;
@@ -1004,6 +1055,15 @@ async function saveRosterRow(i) {
     const newActive  = document.getElementById(`rosterActive${i}`)?.value || s.Active || 'Yes';
     const btn = document.getElementById(`rosterSave${i}`);
     btn.disabled = true; btn.textContent = '…';
+    // Auto-calculate F_R_P_Food from income/size/benefits
+    const freeThresholds    = [19578,26572,33566,40560,47554,54548,61542,68536];
+    const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
+    const income = parseInt(s.HouseholdIncome) || 100000;
+    const hhSize = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
+    const benefits = s.PublicBenefits || '';
+    let calcFrpFood = 'Paid';
+    if (benefits || income <= freeThresholds[hhSize]) calcFrpFood = 'Free';
+    else if (income <= reducedThresholds[hhSize]) calcFrpFood = 'Reduced';
     const body = {
         firstName: s.First_Name, lastName: s.Last_Name,
         birthDate: s.Birth_date, startDate: s.Start_Date,
@@ -1015,9 +1075,10 @@ async function saveRosterRow(i) {
         wednesday: document.getElementById(`rDay${i}_2`)?.checked || false,
         thursday:  document.getElementById(`rDay${i}_3`)?.checked || false,
         friday:    document.getElementById(`rDay${i}_4`)?.checked || false,
-        pfaPiNa: newPfaPiNa, frpFood: s.F_R_P_Food || '',
+        pfaPiNa: newPfaPiNa, frpFood: calcFrpFood,
         iep: isTruthy(s.IEP), military: isTruthy(s.Military),
         householdIncome: s.HouseholdIncome || '',
+        householdSize: s.HouseholdSize || '',
         publicBenefits: s.PublicBenefits || '',
     };
     try {

@@ -221,6 +221,22 @@ const server = http.createServer((req, res) => {
         const origLast  = decodeURIComponent(parts[4] || '');
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+
+            // Auto-calculate F_R_P_Food from income/size/benefits if available
+            const freeThresholds  = [19578,26572,33566,40560,47554,54548,61542,68536];
+            const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
+            const hasIncome = d.householdIncome !== undefined && d.householdIncome !== '';
+            const hasSize   = d.householdSize !== undefined && d.householdSize !== '';
+            if (hasIncome && hasSize) {
+                const hhSize = Math.max(1, Math.min(parseInt(d.householdSize)||1, 8)) - 1;
+                const income = parseInt(d.householdIncome) || 100000;
+                const benefits = d.publicBenefits || '';
+                let frpFood = 'Paid';
+                if (benefits || income <= freeThresholds[hhSize]) frpFood = 'Free';
+                else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
+                d.frpFood = frpFood;
+            }
+
             const fields = [];
             if (d.lastName !== undefined)        fields.push(`Last_Name=${esc(d.lastName)}`);
             if (d.firstName !== undefined)       fields.push(`First_Name=${esc(d.firstName)}`);
