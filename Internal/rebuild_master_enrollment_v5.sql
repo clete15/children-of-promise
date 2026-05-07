@@ -1,11 +1,12 @@
 USE CofPMillstadt;
 DELETE FROM rptMasterEnrollment;
+GO
 INSERT INTO rptMasterEnrollment (RoomNumber,Last_Name,First_Name,HouseholdIncome,HouseholdSize,Birth_date,Start_Date,City_Town,Days_Old,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military)
 VALUES
 (1,'Staley','Bodie','164000',5,'2025-12-19','2026-03-02','Millstadt',138,1,1,1,1,1,'YES','Paid','INCCRA','Paid','no','no'),
 (1,'Stickles','Lei''Lani','26000',4,'2026-01-12','2026-03-02','Belleville',114,1,1,1,1,1,'YES','CHASI','PI','Free','no','no'),
 (1,'Childerson','Scarlett','136436',3,'2025-11-11','2026-02-02','Columbia',176,1,1,1,1,1,'YES','Paid','INCCRA','Paid','no','no'),
-(1,'Williams','Stella','31200',3,'2026-02-27','2026-04-13','Belleville',68,1,1,0,1,1,'YES','CHASI','PI',NULL,'no','no'),
+(1,'Williams','Stella','31200',3,'2026-02-27','2026-04-13','Belleville',68,1,1,0,1,1,'YES','CHASI','PI','Free','no','no'),
 (1,'Beyer','Daniel','120000',3,'2025-10-22','2026-01-19','Belleville',196,1,1,1,1,1,'YES','Paid','PI','Paid','no','no'),
 (2,'Mooney','Brayden','0',4,'2025-09-19','2025-11-04','Belleville',229,1,1,1,1,1,'YES','CHASI','PI','Free','no','no'),
 (2,'McClanahan','Kaidyn','41600',5,'2025-05-31','2025-08-25','Smithton',340,1,1,1,1,0,'Yes','CHASi','PI','Free','no','no'),
@@ -17,14 +18,14 @@ VALUES
 (3,'Kolb','Mallie','51480',3,'2025-01-08','2025-04-07','Belleville',483,1,1,1,1,1,'YES','Paid','PI','Paid','no','no'),
 (3,'Pollard','Ronan','162000',5,'2024-10-05','2025-01-09','Swansea',578,1,1,0,1,0,'YES','Paid','INCCRA','Paid','no','no'),
 (3,'Smith','Hope','100000',6,'2024-08-20','2025-09-02','Columbia',624,0,1,1,1,0,'Yes','Paid','INCCRA','Paid','no','no'),
-(3,'Mocivnik','Mia','109590',1,'2025-02-16','2026-02-04',NULL,444,1,0,1,0,1,'YES','Paid','INCCRA',NULL,'no','no'),
+(3,'Mocivnik','Mia','109590',1,'2025-02-16','2026-02-04',NULL,444,1,0,1,0,1,'YES','Paid','INCCRA','Paid','no','no'),
 (4,'Smith','Serena','60000',3,'2024-06-07','2025-10-03','Millstadt',698,0,1,0,0,1,'YES','Paid','INCCRA','Paid','no','no'),
 (4,'Wallace','Julian','97595',5,'2024-02-20','2024-05-07','St. Louis',806,1,1,1,1,1,'YES','1/2 price','INCCRA','Paid','no','no'),
 (4,'Mense','Elia','100000',4,'2023-12-28','2024-04-29','Fairview Heights',860,1,0,0,1,1,'YES','Paid','INCCRA','Paid','no','no'),
 (4,'Mense','Charles','100000',4,'2023-12-28','2024-04-29','Fairview Heights',860,1,0,0,1,1,'YES','Paid','INCCRA','Paid','no','no'),
 (4,'Behrmann','Cole','100000',3,'2023-09-12','2023-11-14','Millstadt',967,0,1,0,1,0,'YES','Paid','INCCRA','Paid','no','no'),
-(4,'Lewis','Josie','50000',3,'2023-09-12','2026-02-10','Millstadt',967,1,1,0,1,1,'YES','Paid','INCCRA',NULL,'no','no'),
 (4,'Pollard','Winona','162000',5,'2023-06-20','2024-04-02','Swansea',1051,1,1,0,1,0,'YES','Paid','INCCRA','Paid','no','no'),
+(4,'Lewis','Josie','50000',3,'2023-09-12','2026-02-10','Millstadt',967,1,1,0,1,1,'YES','Paid','INCCRA','Paid','no','no'),
 (5,'McClure','Greyson','88140',3,'2024-05-17','2024-07-15','Belleville',719,1,1,1,1,1,'YES','Chasi','PI','Paid','no','no'),
 (5,'Gardner','Cambri','14400',5,'2024-01-26','2024-03-11','Cahokia',831,1,1,1,1,1,'YES','Chasi','PI','Free','no','no'),
 (5,'Mooney','Kaiden','0',4,'2023-12-30','2024-12-09','Belleville',858,1,1,1,1,1,'YES','Chasi','PI','Free','no','no'),
@@ -56,8 +57,8 @@ VALUES
 (7,'Wallace','Genevieve','97595',4,'2021-09-09','2022-05-23','St. Louis',1700,1,1,1,1,1,'YES','1/2 price','INCCRA','Paid','no','no'),
 (7,'Holliday','Keeley','100000',3,'2021-08-24','2022-02-02','Millstadt',1716,1,1,1,1,1,'YES','Staff','INCCRA','Free','no','no'),
 (7,'Weis','Landon','100000',4,'2021-05-26','2022-09-06','Millstadt',1806,1,1,1,1,1,'YES','Paid','INCCRA','Free','no','no'),
-(7,'Walker','Alyvia','8900',3,'2023-03-14','2026-02-09','Millstadt',1149,0,0,1,0,1,'YES','Chasi','INCCRA',NULL,'no','no'),
-(7,'Lewis','Aurora','50000',3,'2021-11-04','2026-02-10','Millstadt',1644,1,1,0,1,1,'YES','Paid','INCCRA',NULL,'no','no'),
+(7,'Walker','Alyvia','8900',3,'2023-03-14','2026-02-09','Millstadt',1149,0,0,1,0,1,'YES','Chasi','INCCRA','Free','no','no'),
+(7,'Lewis','Aurora','50000',3,'2021-11-04','2026-02-10','Millstadt',1644,1,1,0,1,1,'YES','Paid','INCCRA','Paid','no','no'),
 (7,'Berg','Jackson','59520',3,'2019-10-28','2021-09-07','Belleville',2382,1,0,0,1,1,'YES','1/2 price','INCCRA','Paid','Yes','no'),
 (8,'Ehinger','Case','104000',2,'2020-02-04','2021-07-12','Belleville',2283,1,1,1,1,1,'YES','Paid','INCCRA','Paid','no','no'),
 (8,'Wallace','Evan','100000',4,'2020-01-12','2024-07-29','Millstadt',2306,1,1,1,1,1,'YES','DCFS','INCCRA','Free','Yes','no'),
@@ -72,3 +73,5 @@ VALUES
 (8,'Phelps','Jax','124800',4,'2016-10-04','2021-10-25','Millstadt',3501,0,0,1,0,1,'YES','Paid','INCCRA','Paid','no','no'),
 (8,'Johnson','Reilly','36826',4,'2015-11-04','2018-01-22','Dupo',3836,1,1,1,1,1,'YES','Chasi','INCCRA','Free','no','no'),
 (8,'Bequette','Makenzie','32760',6,'2014-02-10','2015-07-01','Millstadt',4468,1,1,1,1,1,'YES','Chasi','INCCRA','Free','no','no');
+GO
+SELECT COUNT(*) AS TotalStudents FROM rptMasterEnrollment;
