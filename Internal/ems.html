@@ -565,7 +565,8 @@ async function init() {
                         });
                     }
                 });
-                showNotification(`Pre-filling from waiting list: ${d.firstName} ${d.lastName}. Complete yellow fields.`, 'info');
+                showNotification(`Pre-filling from waiting list: ${d.firstName} ${d.lastName}. Complete remaining fields.`, 'info');
+                calcFRP('addHouseholdIncome','addHouseholdSize','addFrpFood','add');
             }, 300);
         }
     }
