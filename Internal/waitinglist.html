@@ -289,6 +289,7 @@ function renderTable() {
     const rows = allRows.filter(r =>
         r.AgeGroup === activeTab &&
         r.WaitlistStatus !== 'Declined' &&
+        r.WaitlistStatus !== 'Enrolled' &&
         (!q || `${r.FirstName} ${r.LastName}`.toLowerCase().includes(q) ||
          (r.Phone || '').toLowerCase().includes(q) ||
          (r.Email || '').toLowerCase().includes(q))
@@ -327,6 +328,7 @@ function renderTable() {
                 <select class="status-select" onchange="handleStatusChange(${parseInt(r.Id)}, this)" ${isEnrolled ? 'disabled' : ''}>
                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
                     <option value="Contacted" ${status==='Contacted'?'selected':''}>Contacted</option>
+                    <option value="Enrolled" ${status==='Enrolled'?'selected':''} disabled>Enrolled</option>
                     <option value="Enroll">Enroll</option>
                     <option value="Declined">Declined</option>
                 </select>
