@@ -306,7 +306,10 @@ function renderTable() {
         const scoreClass = score >= 50 ? 'score-high' : score >= 10 ? 'score-medium' : 'score-low';
         const flags = buildFlags(r);
         const date = r.SubmittedAt ? r.SubmittedAt.split(' ')[0] : '—';
-        const isEnrolled = r.WaitlistStatus === 'Enrolled';
+        // Normalize status - treat NULL string or missing as Pending
+        const status = (!r.WaitlistStatus || r.WaitlistStatus === 'NULL') ? 'Pending' : r.WaitlistStatus;
+        const isEnrolled = status === 'Enrolled';
+        const notes = (!r.Notes || r.Notes === 'NULL') ? '' : r.Notes;
 
         return `<tr>
             <td>${i + 1}</td>
@@ -322,14 +325,14 @@ function renderTable() {
             <td><span class="submitted-date">${date}</span></td>
             <td>
                 <select class="status-select" onchange="handleStatusChange(${parseInt(r.Id)}, this)" ${isEnrolled ? 'disabled' : ''}>
-                    <option value="Pending" ${r.WaitlistStatus==='Pending'?'selected':''}>Pending</option>
-                    <option value="Contacted" ${r.WaitlistStatus==='Contacted'?'selected':''}>Contacted</option>
+                    <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
+                    <option value="Contacted" ${status==='Contacted'?'selected':''}>Contacted</option>
                     <option value="Enroll">Enroll</option>
                     <option value="Declined">Declined</option>
                 </select>
             </td>
             <td class="notes-cell">
-                <textarea class="notes-input" id="notes-${r.Id}" placeholder="Add notes…">${r.Notes || ''}</textarea>
+                <textarea class="notes-input" id="notes-${r.Id}" placeholder="Add notes…">${notes}</textarea>
                 <button class="btn-save-notes" onclick="saveNotes(${r.Id})">Save</button>
             </td>
         </tr>`;
