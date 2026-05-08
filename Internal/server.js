@@ -415,7 +415,7 @@ const server = http.createServer((req, res) => {
     // GET waiting list (internal - protected)
     if (req.method === 'GET' && url === '/api/waitinglist') {
         if (!checkAuth(req, res)) return;
-        const r = runSQL(`SELECT Id,SubmittedAt,FirstName,LastName,Phone,Email,ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,Homeless,FosterAdopted,IEP,EarlyIntervention,AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,TeenParent,NoHSDiploma,BornOutsideUS,NonEnglishHome,ActiveMilitary,PublicBenefits,LivingSituation,City,HouseholdIncome,ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,Score,WaitlistStatus,Notes FROM PreEnrollment ORDER BY Score DESC,SubmittedAt ASC`);
+        const r = runSQL(`SELECT Id,SubmittedAt,FirstName,LastName,Phone,Email,ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,Homeless,FosterAdopted,IEP,EarlyIntervention,AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,TeenParent,NoHSDiploma,BornOutsideUS,NonEnglishHome,ActiveMilitary,PublicBenefits,LivingSituation,City,HouseholdIncome,ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,Score,ISNULL(WaitlistStatus,'Pending') AS WaitlistStatus,ISNULL(Notes,'') AS Notes FROM PreEnrollment ORDER BY Score DESC,SubmittedAt ASC`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
