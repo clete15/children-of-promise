@@ -309,7 +309,6 @@ function renderTable() {
         const date = r.SubmittedAt ? r.SubmittedAt.split(' ')[0] : '—';
         // Normalize status - treat NULL string or missing as Pending
         const status = (!r.WaitlistStatus || r.WaitlistStatus === 'NULL') ? 'Pending' : r.WaitlistStatus;
-        const isEnrolled = status === 'Enrolled';
         const notes = (!r.Notes || r.Notes === 'NULL') ? '' : r.Notes;
 
         return `<tr>
@@ -325,11 +324,11 @@ function renderTable() {
             <td style="background:#fffbeb;font-weight:600;font-size:0.78rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td>
-                <select class="status-select" onchange="handleStatusChange(${parseInt(r.Id)}, this)" ${isEnrolled ? 'disabled' : ''}>
+                <select class="status-select" id="status-${r.Id}" onchange="handleStatusChange(${parseInt(r.Id)}, this)">
                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
                     <option value="Contacted" ${status==='Contacted'?'selected':''}>Contacted</option>
-                    <option value="Enrolled" ${status==='Enrolled'?'selected':''} disabled>Enrolled</option>
-                    <option value="Enroll">Enroll</option>
+                    <option value="Enrolled" ${status==='Enrolled'?'selected':''}>Enrolled</option>
+                    <option value="Enroll">Enroll →</option>
                     <option value="Declined">Declined</option>
                 </select>
             </td>
