@@ -190,6 +190,26 @@ const server = http.createServer((req, res) => {
         return sendJSON(res, 200, rows);
     }
 
+    // PUT update classroom (internal - protected)
+    if (req.method === 'PUT' && url.startsWith('/api/classrooms/')) {
+        if (!checkAuth(req, res)) return;
+        const roomNumber = decodeURIComponent(url.split('/')[3] || '');
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const fields = [];
+            if (d.room !== undefined)     fields.push(`Room=${esc(d.room)}`);
+            if (d.teacher !== undefined)  fields.push(`TeacherDescription=${esc(d.teacher)}`);
+            if (d.capacity !== undefined) fields.push(`DCFSCapacity=${parseInt(d.capacity) || 0}`);
+            if (d.ageRange !== undefined) fields.push(`AgeRange=${esc(d.ageRange)}`);
+            if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+            const sql = `UPDATE dimClassrooms SET ${fields.join(',')} WHERE RoomNumber=${esc(roomNumber)}`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     // POST new student (internal - protected)
     if (req.method === 'POST' && url === '/api/students') {
         if (!checkAuth(req, res)) return;

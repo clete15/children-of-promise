@@ -55,7 +55,7 @@
         .toggle-btn.active { background: white !important; color: var(--primary) !important; }
         .tab-count { font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
 
-        #emsMode, #rosterMode, #waitlistMode, #reportsMode {
+        #emsMode, #rosterMode, #waitlistMode, #reportsMode, #settingsMode {
             background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);
             min-height: calc(100vh - 120px);
             padding-top: 0;
@@ -93,6 +93,9 @@
         </button>
         <button class="toggle-btn" id="btnReportsMode" onclick="setMode('reports')">
             <span class="toggle-icon">📊</span> Reports
+        </button>
+        <button class="toggle-btn" id="btnSettingsMode" onclick="setMode('settings')">
+            <span class="toggle-icon">⚙️</span> Settings
         </button>
     </div>
 </div>
@@ -376,6 +379,32 @@
         <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptWaitlist">
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Waiting List Summary</div>
             <div>Loading…</div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SETTINGS MODE
+══════════════════════════════════════════ -->
+<div id="settingsMode" style="display:none;">
+    <div style="max-width:900px;margin:0 auto;padding:24px;">
+        <div style="background:white;border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Room &amp; Teacher Settings</div>
+            <table style="width:100%;border-collapse:collapse;font-size:0.82rem;" id="settingsTable">
+                <thead>
+                    <tr style="border-bottom:2px solid var(--border);">
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:50px;">#</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Room Name</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Teacher</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:80px;">Capacity</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:100px;">Age Range</th>
+                        <th style="padding:10px 12px;text-align:center;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:60px;">Save</th>
+                    </tr>
+                </thead>
+                <tbody id="settingsBody">
+                    <tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">Loading…</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
@@ -1029,14 +1058,17 @@ function setMode(mode) {
     document.getElementById('rosterMode').style.display   = mode === 'roster'   ? 'block' : 'none';
     document.getElementById('waitlistMode').style.display = mode === 'waitlist' ? 'block' : 'none';
     document.getElementById('reportsMode').style.display  = mode === 'reports'  ? 'block' : 'none';
+    document.getElementById('settingsMode').style.display = mode === 'settings' ? 'block' : 'none';
     document.getElementById('btnEmsMode').classList.toggle('active',      mode === 'ems');
     document.getElementById('btnRosterMode').classList.toggle('active',   mode === 'roster');
     document.getElementById('btnWaitlistMode').classList.toggle('active', mode === 'waitlist');
     document.getElementById('btnReportsMode').classList.toggle('active',  mode === 'reports');
+    document.getElementById('btnSettingsMode').classList.toggle('active', mode === 'settings');
     if (mode === 'roster') buildRoster();
     if (mode === 'ems') { buildViewSidebar(); updateRoomNavDisplay(); }
     if (mode === 'waitlist' && !wlLoaded) loadWaitlist();
     if (mode === 'reports' && !reportsLoaded) loadReports();
+    if (mode === 'settings') renderSettings();
 }
 
 function showNotification(msg, type = 'info') {
@@ -1390,6 +1422,52 @@ function renderRptWaitlist(rows) {
                 <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">Avg: ${parseFloat(r[2] || 0).toFixed(0)} pts</div>
             </div>`).join('')}
         </div>`;
+}
+
+// ══════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════
+function renderSettings() {
+    const tbody = document.getElementById('settingsBody');
+    if (!classrooms.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:var(--text-muted);">No classrooms loaded.</td></tr>'; return; }
+    tbody.innerHTML = classrooms.map((r, i) => `
+        <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+            <td style="padding:10px 12px;font-weight:700;color:var(--text-muted);">${r.RoomNumber}</td>
+            <td style="padding:10px 12px;"><input type="text" id="setRoom${i}" value="${r.Room || ''}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
+            <td style="padding:10px 12px;"><input type="text" id="setTeacher${i}" value="${r.TeacherDescription || ''}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
+            <td style="padding:10px 12px;"><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
+            <td style="padding:10px 12px;"><input type="text" id="setAge${i}" value="${r.AgeRange || ''}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
+            <td style="padding:10px 12px;text-align:center;">
+                <button onclick="saveRoom(${i})" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.75rem;font-weight:700;cursor:pointer;">Save</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function saveRoom(i) {
+    const r = classrooms[i];
+    const room = document.getElementById(`setRoom${i}`).value.trim();
+    const teacher = document.getElementById(`setTeacher${i}`).value.trim();
+    const capacity = document.getElementById(`setCap${i}`).value;
+    const ageRange = document.getElementById(`setAge${i}`).value.trim();
+    try {
+        const res = await apiFetch(`/api/classrooms/${r.RoomNumber}`, {
+            method: 'PUT',
+            body: JSON.stringify({ room, teacher, capacity, ageRange })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotification(`Room ${r.RoomNumber} updated`, 'success');
+            // Update local data
+            classrooms[i].Room = room;
+            classrooms[i].TeacherDescription = teacher;
+            classrooms[i].DCFSCapacity = capacity;
+            classrooms[i].AgeRange = ageRange;
+            populateRoomDropdowns();
+        } else {
+            showNotification('Update failed: ' + (data.error || ''), 'error');
+        }
+    } catch (e) { showNotification('Network error', 'error'); }
 }
 
 init();
