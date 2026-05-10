@@ -53,8 +53,9 @@
         }
         .toggle-btn { color: rgba(255,255,255,0.8) !important; }
         .toggle-btn.active { background: white !important; color: var(--primary) !important; }
+        .tab-count { font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
 
-        #emsMode, #rosterMode {
+        #emsMode, #rosterMode, #waitlistMode, #reportsMode {
             background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);
             min-height: calc(100vh - 120px);
             padding-top: 0;
@@ -81,11 +82,17 @@
 <!-- MODE TOGGLE -->
 <div class="mode-toggle-bar">
     <div class="mode-toggle">
+        <button class="toggle-btn" id="btnWaitlistMode" onclick="setMode('waitlist')">
+            <span class="toggle-icon">📝</span> Waiting List
+        </button>
         <button class="toggle-btn active" id="btnEmsMode" onclick="setMode('ems')">
             <span class="toggle-icon">📋</span> EMS
         </button>
         <button class="toggle-btn" id="btnRosterMode" onclick="setMode('roster')">
             <span class="toggle-icon">🏫</span> Room Roster
+        </button>
+        <button class="toggle-btn" id="btnReportsMode" onclick="setMode('reports')">
+            <span class="toggle-icon">📊</span> Reports
         </button>
     </div>
 </div>
@@ -292,6 +299,85 @@
     </div>
 </div>
 
+<!-- ══════════════════════════════════════════
+     WAITING LIST MODE
+══════════════════════════════════════════ -->
+<div id="waitlistMode" style="display:none;">
+    <div style="max-width:1100px;margin:0 auto;padding:16px 24px;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
+            <div class="mode-toggle" style="background:rgba(255,255,255,0.15);max-width:520px;width:100%;">
+                <button class="toggle-btn active" id="wl-tab-0-2" onclick="setWlTab('0-2')">🍼 Infant &amp; Toddler <span class="tab-count" id="wl-count-0-2"></span></button>
+                <button class="toggle-btn" id="wl-tab-2-3" onclick="setWlTab('2-3')">🧒 2-Year Olds <span class="tab-count" id="wl-count-2-3"></span></button>
+                <button class="toggle-btn" id="wl-tab-3-5" onclick="setWlTab('3-5')">🎨 Pre-School <span class="tab-count" id="wl-count-3-5"></span></button>
+            </div>
+            <input style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;background:rgba(255,255,255,0.9);" type="text" id="wlSearchInput" placeholder="Search by name, phone, or email…" oninput="renderWlTable()">
+            <span style="font-size:0.8rem;color:rgba(255,255,255,0.8);white-space:nowrap;" id="wlCount"></span>
+        </div>
+        <div style="background:white;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);">
+            <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                <thead>
+                    <tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">#</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Name</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Contact</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Children</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Score</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Risk Factors</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);background:#fffbeb;color:#92400e;">Income</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Status</th>
+                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Notes</th>
+                    </tr>
+                </thead>
+                <tbody id="wlBody">
+                    <tr><td colspan="9" style="text-align:center;padding:48px;color:var(--text-muted);">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     REPORTS MODE
+══════════════════════════════════════════ -->
+<div id="reportsMode" style="display:none;">
+    <div style="max-width:1100px;margin:0 auto;padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <div class="report-card" style="grid-column:1/-1;background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptEnrollment">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Projected Attendance by Room</div>
+            <div style="display:flex;gap:0;min-height:320px;">
+                <div id="rptRoomSidebar" style="width:180px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;"></div>
+                <div id="rptRoomChartArea" style="flex:1;padding:16px 20px;"><div>Loading…</div></div>
+            </div>
+        </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptFood">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Food Program</div>
+            <div>Loading…</div>
+        </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptProgram">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Program Type</div>
+            <div>Loading…</div>
+        </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptPayType">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Pay Type</div>
+            <div>Loading…</div>
+        </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptBenefits">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Public Benefits (Active)</div>
+            <div>Loading…</div>
+        </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptIncome">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Proof of Income</div>
+            <div>Loading…</div>
+        </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptFlags">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Special Flags</div>
+            <div>Loading…</div>
+        </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptWaitlist">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Waiting List Summary</div>
+            <div>Loading…</div>
+        </div>
+    </div>
+</div>
 
 
 <script>
@@ -924,12 +1010,18 @@ async function saveRosterRow(i) {
 
 function setMode(mode) {
     currentMode = mode;
-    document.getElementById('emsMode').style.display    = mode === 'ems'    ? 'block' : 'none';
-    document.getElementById('rosterMode').style.display = mode === 'roster' ? 'block' : 'none';
-    document.getElementById('btnEmsMode').classList.toggle('active',    mode === 'ems');
-    document.getElementById('btnRosterMode').classList.toggle('active', mode === 'roster');
+    document.getElementById('emsMode').style.display      = mode === 'ems'      ? 'block' : 'none';
+    document.getElementById('rosterMode').style.display   = mode === 'roster'   ? 'block' : 'none';
+    document.getElementById('waitlistMode').style.display = mode === 'waitlist' ? 'block' : 'none';
+    document.getElementById('reportsMode').style.display  = mode === 'reports'  ? 'block' : 'none';
+    document.getElementById('btnEmsMode').classList.toggle('active',      mode === 'ems');
+    document.getElementById('btnRosterMode').classList.toggle('active',   mode === 'roster');
+    document.getElementById('btnWaitlistMode').classList.toggle('active', mode === 'waitlist');
+    document.getElementById('btnReportsMode').classList.toggle('active',  mode === 'reports');
     if (mode === 'roster') buildRoster();
     if (mode === 'ems') { buildViewSidebar(); updateRoomNavDisplay(); }
+    if (mode === 'waitlist' && !wlLoaded) loadWaitlist();
+    if (mode === 'reports' && !reportsLoaded) loadReports();
 }
 
 function showNotification(msg, type = 'info') {
@@ -938,6 +1030,336 @@ function showNotification(msg, type = 'info') {
     el.textContent = msg;
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 3500);
+}
+
+// ══════════════════════════════════════════
+// WAITING LIST
+// ══════════════════════════════════════════
+let wlRows = [];
+let wlLoaded = false;
+let wlActiveTab = '0-2';
+
+async function loadWaitlist() {
+    try {
+        const res = await apiFetch('/api/waitinglist');
+        wlRows = await res.json();
+        wlLoaded = true;
+        updateWlTabCounts();
+        renderWlTable();
+    } catch (e) {
+        document.getElementById('wlBody').innerHTML = '<tr><td colspan="9" style="text-align:center;padding:48px;color:var(--text-muted);">Failed to load.</td></tr>';
+    }
+}
+
+function updateWlTabCounts() {
+    ['0-2','2-3','3-5'].forEach(tab => {
+        const count = wlRows.filter(r => r.AgeGroup === tab && r.WaitlistStatus !== 'Declined').length;
+        const el = document.getElementById(`wl-count-${tab}`);
+        if (el) el.textContent = count ? `(${count})` : '';
+    });
+}
+
+function setWlTab(tab) {
+    wlActiveTab = tab;
+    ['0-2','2-3','3-5'].forEach(t => document.getElementById(`wl-tab-${t}`).classList.toggle('active', t === tab));
+    renderWlTable();
+}
+
+function renderWlTable() {
+    const q = (document.getElementById('wlSearchInput')?.value || '').toLowerCase();
+    const rows = wlRows.filter(r =>
+        r.AgeGroup === wlActiveTab &&
+        r.WaitlistStatus !== 'Declined' &&
+        r.WaitlistStatus !== 'Enrolled' &&
+        (!q || `${r.FirstName} ${r.LastName}`.toLowerCase().includes(q) ||
+         (r.Phone || '').toLowerCase().includes(q) ||
+         (r.Email || '').toLowerCase().includes(q))
+    );
+    document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
+    if (!rows.length) {
+        document.getElementById('wlBody').innerHTML = '<tr><td colspan="9" style="text-align:center;padding:48px;color:var(--text-muted);">No records found.</td></tr>';
+        return;
+    }
+    document.getElementById('wlBody').innerHTML = rows.map((r, i) => {
+        const score = parseInt(r.Score) || 0;
+        const scoreClass = score >= 50 ? 'color:var(--danger)' : score >= 10 ? 'color:#b45309' : 'color:var(--success)';
+        const flags = buildWlFlags(r);
+        const status = (!r.WaitlistStatus || r.WaitlistStatus === 'NULL') ? 'Pending' : r.WaitlistStatus;
+        const notes = (!r.Notes || r.Notes === 'NULL') ? '' : r.Notes;
+        return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+            <td style="padding:10px 12px;">${i + 1}</td>
+            <td style="padding:10px 12px;font-weight:700;">${r.LastName}, ${r.FirstName}</td>
+            <td style="padding:10px 12px;"><div>${r.Phone || '—'}</div><div style="font-size:0.72rem;color:var(--text-muted);">${r.Email || ''}</div></td>
+            <td style="padding:10px 12px;max-width:160px;">${r.ChildrenInfo || '—'}</td>
+            <td style="padding:10px 12px;"><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:#f8fafc;${scoreClass}">${score} pts</span></td>
+            <td style="padding:10px 12px;"><div style="display:flex;flex-wrap:wrap;gap:4px;">${flags}</div></td>
+            <td style="padding:10px 12px;background:#fffbeb;font-weight:600;font-size:0.78rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
+            <td style="padding:10px 12px;">
+                <select style="padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.78rem;width:100%;min-width:110px;" onchange="handleWlStatus(${parseInt(r.Id)}, this)">
+                    <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
+                    <option value="Contacted" ${status==='Contacted'?'selected':''}>Contacted</option>
+                    <option value="Enroll">Enroll →</option>
+                    <option value="Declined">Declined</option>
+                </select>
+            </td>
+            <td style="padding:10px 12px;min-width:200px;">
+                <textarea style="width:100%;padding:7px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.78rem;resize:vertical;min-height:60px;" id="wlNotes-${r.Id}" placeholder="Add notes…">${notes}</textarea>
+                <button onclick="saveWlNotes(${r.Id})" style="margin-top:4px;padding:4px 12px;background:var(--primary);color:white;border:none;border-radius:4px;font-size:0.72rem;font-weight:700;cursor:pointer;">Save</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function buildWlFlags(r) {
+    const flags = [];
+    const hi = l => `<span style="padding:2px 7px;border-radius:4px;font-size:0.68rem;font-weight:700;background:#fef2f2;color:var(--danger);white-space:nowrap;">${l}</span>`;
+    const lo = l => `<span style="padding:2px 7px;border-radius:4px;font-size:0.68rem;font-weight:700;background:#eff6ff;color:var(--primary);white-space:nowrap;">${l}</span>`;
+    if (r.Homeless === 'Yes')           flags.push(hi('Homeless'));
+    if (r.FosterAdopted === 'Yes')      flags.push(hi('Foster'));
+    if (r.IEP === 'Yes')                flags.push(lo('IEP'));
+    if (r.EarlyIntervention === 'Yes')  flags.push(lo('Early Int.'));
+    if (r.AbuseHistory === 'Yes')       flags.push(lo('Abuse/DV'));
+    if (r.MentalIllness === 'Yes')      flags.push(lo('Mental'));
+    if (r.DcfsInvolvement === 'Yes')    flags.push(lo('DCFS'));
+    if (r.SubstanceAbuse === 'Yes')     flags.push(lo('Substance'));
+    if (r.ActiveMilitary === 'Yes')     flags.push(lo('Military'));
+    if (r.PublicBenefits)               flags.push(lo('Benefits'));
+    return flags.join('') || '<span style="color:var(--text-muted);font-size:0.72rem;">None</span>';
+}
+
+function handleWlStatus(id, selectEl) {
+    const val = selectEl.value;
+    if (val === 'Declined') {
+        if (!confirm('Remove this family from the waiting list?')) {
+            const row = wlRows.find(r => r.Id == id);
+            selectEl.value = row ? row.WaitlistStatus : 'Pending';
+            return;
+        }
+        updateWlStatusAPI(id, 'Declined').then(() => {
+            const row = wlRows.find(r => r.Id == id);
+            if (row) row.WaitlistStatus = 'Declined';
+            updateWlTabCounts();
+            renderWlTable();
+        });
+        return;
+    }
+    if (val === 'Enroll') {
+        const row = wlRows.find(r => r.Id == id);
+        selectEl.value = row ? row.WaitlistStatus : 'Pending';
+        enrollFromWaitlist(id);
+        return;
+    }
+    updateWlStatusAPI(id, val).then(() => {
+        const row = wlRows.find(r => r.Id == id);
+        if (row) row.WaitlistStatus = val;
+    });
+}
+
+async function updateWlStatusAPI(id, status) {
+    try {
+        await apiFetch(`/api/waitinglist/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
+    } catch (e) { showNotification('Failed to update status', 'error'); }
+}
+
+async function saveWlNotes(id) {
+    const notes = document.getElementById(`wlNotes-${id}`).value;
+    try {
+        const res = await apiFetch(`/api/waitinglist/${id}`, { method: 'PUT', body: JSON.stringify({ notes }) });
+        const data = await res.json();
+        if (data.success) showNotification('Notes saved', 'success');
+    } catch (e) { showNotification('Failed to save notes', 'error'); }
+}
+
+function enrollFromWaitlist(id) {
+    const r = wlRows.find(x => x.Id == id);
+    if (!r) return;
+    // Switch to EMS tab and start new student with pre-filled data
+    waitlistId = r.Id;
+    setMode('ems');
+    startNewStudent();
+    setTimeout(() => {
+        document.getElementById('firstName').value  = r.ChildName ? r.ChildName.split(' ')[0] : r.FirstName || '';
+        document.getElementById('lastName').value   = r.ChildName ? r.ChildName.split(' ').slice(1).join(' ') || r.LastName : r.LastName || '';
+        document.getElementById('cityTown').value   = r.City || '';
+        document.getElementById('birthDate').value  = r.ChildBirthDate || '';
+        document.getElementById('iep').checked      = r.IEP === 'Yes';
+        document.getElementById('military').checked = r.ActiveMilitary === 'Yes';
+        document.getElementById('householdIncome').value = r.HouseholdIncome || '';
+        document.getElementById('householdSize').value = r.HouseholdSize || '';
+        if (r.PublicBenefits) {
+            const ben = r.PublicBenefits.toLowerCase();
+            if (ben.includes('wic'))      document.getElementById('benWIC').checked = true;
+            if (ben.includes('medicaid')) document.getElementById('benMedicaid').checked = true;
+            if (ben.includes('snap'))     document.getElementById('benSNAP').checked = true;
+            if (ben.includes('tanf'))     document.getElementById('benTANF').checked = true;
+            if (ben.includes('ccap'))     document.getElementById('benCCAP').checked = true;
+        }
+        if (r.FosterAdopted === 'Yes') document.getElementById('category').value = 'Foster';
+        calcFRP('householdIncome','householdSize','frpFood','');
+        calcDaysOld();
+        highlightEmptyFields();
+        showNotification(`Pre-filling: ${r.ChildName || r.FirstName + ' ' + r.LastName}. Complete highlighted fields.`, 'info');
+    }, 100);
+}
+
+// ══════════════════════════════════════════
+// REPORTS
+// ══════════════════════════════════════════
+let reportsLoaded = false;
+let rptDailyData = [];
+let rptActiveRoom = 0;
+
+async function loadReports() {
+    try {
+        const res = await apiFetch('/api/reports');
+        const data = await res.json();
+        reportsLoaded = true;
+        renderRptEnrollment(data.byRoomDaily);
+        renderRptBars('rptFood', 'Food Program', data.byFood, ['Free','Reduced','Paid','Unknown']);
+        renderRptBars('rptProgram', 'Program Type', data.byProgram, null);
+        renderRptBars('rptPayType', 'Pay Type', data.byPayType, null);
+        renderRptBenefits(data.benefits);
+        renderRptIncome(data.incomeProof);
+        renderRptFlags(data.flags);
+        renderRptWaitlist(data.waitlistSummary);
+    } catch (e) {
+        document.querySelectorAll('#reportsMode [id^=rpt]').forEach(el => {
+            const loading = el.querySelector('div:last-child');
+            if (loading) loading.textContent = 'Failed to load.';
+        });
+    }
+}
+
+function renderRptEnrollment(daily) {
+    if (!daily || !daily.length) { document.getElementById('rptRoomChartArea').innerHTML = 'No data.'; return; }
+    rptDailyData = daily;
+    const sidebar = document.getElementById('rptRoomSidebar');
+    sidebar.innerHTML = daily.map((r, i) =>
+        `<button onclick="showRptRoomChart(${i})" id="rptRsBtn${i}"
+            style="display:block;width:100%;text-align:left;padding:10px 14px;border:none;background:none;cursor:pointer;font-size:0.8rem;font-weight:600;color:var(--text);border-left:3px solid transparent;transition:background 0.15s;"
+            onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=rptActiveRoom===${i}?'#eff6ff':'none'">
+            ${r[0] || 'Unknown'}
+        </button>`
+    ).join('');
+    showRptRoomChart(0);
+}
+
+function showRptRoomChart(idx) {
+    rptActiveRoom = idx;
+    rptDailyData.forEach((_, i) => {
+        const btn = document.getElementById(`rptRsBtn${i}`);
+        if (!btn) return;
+        btn.style.background = i === idx ? '#eff6ff' : 'none';
+        btn.style.borderLeftColor = i === idx ? 'var(--primary)' : 'transparent';
+        btn.style.color = i === idx ? 'var(--primary)' : 'var(--text)';
+    });
+    const r = rptDailyData[idx];
+    const room = r[0] || 'Unknown';
+    const capacity = parseInt(r[1] || 1);
+    const days = ['Mon','Tue','Wed','Thu','Fri'];
+    const counts = [parseInt(r[2]||0), parseInt(r[3]||0), parseInt(r[4]||0), parseInt(r[5]||0), parseInt(r[6]||0)];
+    const chartH = 200;
+    const cols = days.map((day, i) => {
+        const count = counts[i];
+        const fillH = Math.round(Math.min(count / capacity, 1) * chartH);
+        return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text);">${count}/${capacity}</div>
+            <div style="position:relative;width:100%;height:${chartH}px;background:#fecaca;border-radius:6px 6px 0 0;display:flex;align-items:flex-end;">
+                <div style="width:100%;height:${fillH}px;background:var(--primary);border-radius:6px 6px 0 0;transition:height 0.4s;"></div>
+            </div>
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);">${day}</div>
+        </div>`;
+    }).join('');
+    document.getElementById('rptRoomChartArea').innerHTML = `
+        <div style="font-size:0.9rem;font-weight:800;color:var(--text);margin-bottom:12px;text-align:center;">${room}</div>
+        <div style="display:flex;align-items:flex-end;gap:12px;height:${chartH + 50}px;padding:0 8px;">${cols}</div>
+        <div style="display:flex;gap:16px;margin-top:12px;justify-content:center;">
+            <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;"><div style="width:14px;height:14px;background:#fecaca;border-radius:3px;"></div> Capacity (${capacity})</div>
+            <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;"><div style="width:14px;height:14px;background:var(--primary);border-radius:3px;"></div> Projected</div>
+        </div>`;
+}
+
+function renderRptBars(cardId, title, rows, order) {
+    const card = document.getElementById(cardId);
+    if (!rows || !rows.length) { card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">${title}</div><div style="color:var(--text-muted);font-size:0.85rem;">No data.</div>`; return; }
+    const sorted = order ? order.map(o => rows.find(r => r[0] === o) || [o, 0]) : rows;
+    const max = Math.max(...sorted.map(r => parseInt(r[1] || 0)));
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">${title}</div>` +
+        sorted.map(r => {
+            const label = r[0] || 'Unknown';
+            const val = parseInt(r[1] || 0);
+            const pct = max ? Math.round(val / max * 100) : 0;
+            return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+                <div style="font-size:0.8rem;font-weight:600;color:var(--text);min-width:100px;">${label}</div>
+                <div style="flex:1;background:#e2e8f0;border-radius:4px;height:18px;overflow:hidden;">
+                    <div style="height:100%;width:${Math.max(pct,4)}%;background:var(--primary);border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;">
+                        <span style="font-size:0.68rem;font-weight:700;color:white;">${val}</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+}
+
+function renderRptBenefits(rows) {
+    const card = document.getElementById('rptBenefits');
+    if (!rows || !rows.length) return;
+    const r = rows[0];
+    const labels = ['WIC','Medicaid','SNAP','TANF','CCAP'];
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Public Benefits (Active)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;">${labels.map((l, i) => `
+            <div style="flex:1 1 80px;background:#f8fafc;border-radius:8px;padding:14px 16px;text-align:center;border:1px solid var(--border);">
+                <div style="font-size:1.8rem;font-weight:800;color:var(--primary);line-height:1;">${r[i] || 0}</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;font-weight:600;">${l}</div>
+            </div>`).join('')}
+        </div>`;
+}
+
+function renderRptIncome(rows) {
+    const card = document.getElementById('rptIncome');
+    if (!rows || !rows.length) return;
+    const r = rows[0];
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Proof of Income</div>
+        <div style="display:flex;gap:12px;">
+            <div style="flex:1;background:#f8fafc;border-radius:8px;padding:14px 16px;text-align:center;border:1px solid var(--border);">
+                <div style="font-size:1.8rem;font-weight:800;color:var(--success);line-height:1;">${r[0] || 0}</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;font-weight:600;">Uploaded</div>
+            </div>
+            <div style="flex:1;background:#f8fafc;border-radius:8px;padding:14px 16px;text-align:center;border:1px solid var(--border);">
+                <div style="font-size:1.8rem;font-weight:800;color:var(--danger);line-height:1;">${r[1] || 0}</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;font-weight:600;">Missing ⚠</div>
+            </div>
+        </div>`;
+}
+
+function renderRptFlags(rows) {
+    const card = document.getElementById('rptFlags');
+    if (!rows || !rows.length) return;
+    const r = rows[0];
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Special Flags</div>
+        <div style="display:flex;gap:12px;">
+            <div style="flex:1;background:#f8fafc;border-radius:8px;padding:14px 16px;text-align:center;border:1px solid var(--border);">
+                <div style="font-size:1.8rem;font-weight:800;color:#b45309;line-height:1;">${r[0] || 0}</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;font-weight:600;">IEP</div>
+            </div>
+            <div style="flex:1;background:#f8fafc;border-radius:8px;padding:14px 16px;text-align:center;border:1px solid var(--border);">
+                <div style="font-size:1.8rem;font-weight:800;color:var(--primary);line-height:1;">${r[1] || 0}</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;font-weight:600;">Military</div>
+            </div>
+        </div>`;
+}
+
+function renderRptWaitlist(rows) {
+    const card = document.getElementById('rptWaitlist');
+    if (!rows || !rows.length) { card.querySelector('div:last-child').textContent = 'No pending records.'; return; }
+    const labels = { '0-2': 'Infant & Toddler', '2-3': '2-Year Olds', '3-5': 'Pre-School' };
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Waiting List Summary</div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;">${rows.map(r => `
+            <div style="flex:1 1 100px;background:#f8fafc;border-radius:8px;padding:14px 16px;text-align:center;border:1px solid var(--border);">
+                <div style="font-size:1.8rem;font-weight:800;color:var(--primary);line-height:1;">${r[1] || 0}</div>
+                <div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px;font-weight:600;">${labels[r[0]] || r[0]}</div>
+                <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">Avg: ${parseFloat(r[2] || 0).toFixed(0)} pts</div>
+            </div>`).join('')}
+        </div>`;
 }
 
 init();
