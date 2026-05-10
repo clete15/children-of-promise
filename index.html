@@ -97,7 +97,7 @@ async function runDeploy() {
     msg.style.color = '#166534';
     msg.textContent = 'Deploying...';
     try {
-        const res = await fetch('/api/deploy', { method: 'POST' });
+        const res = await fetch('/api/deploy', { method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(':cofpadmin') } });
         const json = await res.json();
         if (json.success) {
             msg.textContent = '✓ ' + (json.message || 'Code updated successfully.');
@@ -123,7 +123,7 @@ async function restartServer() {
     msg.style.color = '#92400e';
     msg.textContent = 'Restarting server...';
     try {
-        await fetch('/api/restart', { method: 'POST' });
+        await fetch('/api/restart', { method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(':cofpadmin') } });
     } catch (e) {}
     msg.textContent = 'Server restarting — refresh in 10 seconds.';
     setTimeout(() => location.reload(), 10000);
@@ -139,7 +139,7 @@ async function runSQL() {
     try {
         const res = await fetch('/api/sql', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + btoa(':cofpadmin') },
             body: JSON.stringify({ query })
         });
         const json = await res.json();

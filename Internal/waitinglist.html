@@ -327,7 +327,6 @@ function renderTable() {
                 <select class="status-select" id="status-${r.Id}" onchange="handleStatusChange(${parseInt(r.Id)}, this)">
                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
                     <option value="Contacted" ${status==='Contacted'?'selected':''}>Contacted</option>
-                    <option value="Enrolled" ${status==='Enrolled'?'selected':''}>Enrolled</option>
                     <option value="Enroll">Enroll →</option>
                     <option value="Declined">Declined</option>
                 </select>
