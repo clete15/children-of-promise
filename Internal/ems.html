@@ -83,7 +83,7 @@
 <div class="mode-toggle-bar">
     <div class="mode-toggle">
         <button class="toggle-btn" id="btnWaitlistMode" onclick="setMode('waitlist')">
-            <span class="toggle-icon">📝</span> Waiting List
+            <span class="toggle-icon">📝</span> Waiting List <span id="wlBadge" style="display:none;background:#dc2626;color:white;font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;"></span>
         </button>
         <button class="toggle-btn active" id="btnEmsMode" onclick="setMode('ems')">
             <span class="toggle-icon">📋</span> EMS
@@ -125,6 +125,7 @@
                         <span class="arrow-icon">▶</span>
                     </button>
                     <button class="btn btn-save" id="btnNewStudent" onclick="startNewStudent()" style="margin-left:12px;padding:8px 14px;font-size:0.78rem;white-space:nowrap;">➕ New</button>
+                    <div id="todayAttendance" style="margin-left:8px;padding:6px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:0.72rem;font-weight:700;color:#166534;white-space:nowrap;display:none;"></div>
                 </div>
 
                 <!-- SCROLLABLE FORM -->
@@ -399,7 +400,7 @@ let waitlistId = null;
 
 async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
-    // Check if redirected from waiting list
+    loadWlBadge();    // Check if redirected from waiting list
     if (new URLSearchParams(window.location.search).get('enroll') === '1') {
         const data = sessionStorage.getItem('enrollFromWaitlist');
         if (data) {
@@ -499,9 +500,23 @@ async function loadStudents() {
         buildRoomNav();
         applyFilter();
         if (currentMode === 'roster') buildRoster();
+        updateTodayAttendance();
     } catch (e) {
         showNotification('Failed to load students', 'error');
     }
+}
+
+function updateTodayAttendance() {
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const today = days[new Date().getDay()];
+    if (today === 'Sunday' || today === 'Saturday') {
+        document.getElementById('todayAttendance').style.display = 'none';
+        return;
+    }
+    const active = students.filter(s => isTruthy(s.Active) && isTruthy(s[today]));
+    const el = document.getElementById('todayAttendance');
+    el.textContent = `📅 Today: ${active.length} students`;
+    el.style.display = 'inline-block';
 }
 
 function getClassroom(roomNumber) {
@@ -1038,6 +1053,21 @@ function showNotification(msg, type = 'info') {
 let wlRows = [];
 let wlLoaded = false;
 let wlActiveTab = '0-2';
+
+async function loadWlBadge() {
+    try {
+        const res = await apiFetch('/api/waitinglist');
+        const rows = await res.json();
+        const pending = rows.filter(r => r.WaitlistStatus !== 'Declined' && r.WaitlistStatus !== 'Enrolled').length;
+        const badge = document.getElementById('wlBadge');
+        if (pending > 0) { badge.textContent = pending; badge.style.display = 'inline'; }
+        else { badge.style.display = 'none'; }
+        // Cache for when tab is opened
+        wlRows = rows;
+        wlLoaded = true;
+        updateWlTabCounts();
+    } catch (e) {}
+}
 
 async function loadWaitlist() {
     try {
