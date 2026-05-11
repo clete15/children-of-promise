@@ -466,7 +466,7 @@ const server = http.createServer((req, res) => {
 
     // External public site static files
     if (url.startsWith('/public')) {
-        let subPath = url.slice('/public'.length) || '/';
+        let subPath = decodeURIComponent(url.slice('/public'.length) || '/');
         if (subPath === '' || subPath === '/') subPath = '/index.html';
         const filePath = path.join(EXTERNAL_DIR, subPath);
         console.log('[PUBLIC]', url, '->', filePath);
