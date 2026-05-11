@@ -136,6 +136,13 @@ nav a.active {
 }
 .hero .info-grid .info-card h3 { color: white; }
 .hero .info-grid .info-card p { color: rgba(255,255,255,0.78); }
+.hero-photo .info-grid .info-card {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    backdrop-filter: blur(4px);
+}
+.hero-photo .info-grid .info-card h3 { color: white; }
+.hero-photo .info-grid .info-card p { color: rgba(255,255,255,0.78); }
 
 /* ── CONTAINER ── */
 .container { max-width: 880px; margin: 0 auto; padding: 44px 20px; }
