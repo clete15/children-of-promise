@@ -177,8 +177,8 @@ nav a.active {
     margin-top: 24px;
 }
 .info-card {
-    flex: 1 1 180px;
-    max-width: 220px;
+    flex: 1 1 150px;
+    max-width: 200px;
     background: var(--card-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius);
