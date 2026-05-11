@@ -1,12 +1,32 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
 const PORT = process.env.PORT || 80;
+const HTTPS_PORT = 443;
 const DB_SERVER = 'localhost\\SQLEXPRESS';
 const DB_NAME = 'CofPMillstadt';
 const EXTERNAL_DIR = path.join(__dirname, '..', 'External');
+
+// SSL Certificate paths (from win-acme / Let's Encrypt)
+const CERT_DIR = 'C:\\certs';
+let sslOptions = null;
+try {
+    const certFiles = fs.readdirSync(CERT_DIR);
+    const keyFile = certFiles.find(f => f.endsWith('-key.pem'));
+    const chainFile = certFiles.find(f => f.endsWith('-chain.pem'));
+    if (keyFile && chainFile) {
+        sslOptions = {
+            key: fs.readFileSync(path.join(CERT_DIR, keyFile)),
+            cert: fs.readFileSync(path.join(CERT_DIR, chainFile)),
+        };
+        console.log('[SSL] Certificates loaded from', CERT_DIR);
+    }
+} catch (e) {
+    console.log('[SSL] No certificates found, HTTPS disabled');
+}
 
 const MIME = {
     '.html': 'text/html', '.css': 'text/css',
@@ -90,6 +110,24 @@ function readBody(req, cb) {
 }
 
 const server = http.createServer((req, res) => {
+    // If HTTPS is available, redirect HTTP to HTTPS (except for ACME challenges)
+    if (sslOptions && !req.url.startsWith('/.well-known/acme-challenge')) {
+        const host = (req.headers.host || '').split(':')[0];
+        res.writeHead(301, { 'Location': `https://${host}${req.url}` });
+        return res.end();
+    }
+    handleRequest(req, res);
+});
+
+// HTTPS server
+let httpsServer = null;
+if (sslOptions) {
+    httpsServer = https.createServer(sslOptions, (req, res) => {
+        handleRequest(req, res);
+    });
+}
+
+function handleRequest(req, res) {
     const url = req.url.split('?')[0];
 
     if (req.method === 'OPTIONS') {
@@ -524,9 +562,15 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': MIME[path.extname(extFile)] || 'text/plain' });
         res.end(data);
     });
-});
+}
 
 server.listen(PORT, () => {
-    console.log(`Server: http://localhost:${PORT}`);
+    console.log(`HTTP Server: http://localhost:${PORT}`);
     console.log(`DB: ${DB_SERVER} / ${DB_NAME}`);
 });
+
+if (httpsServer) {
+    httpsServer.listen(HTTPS_PORT, () => {
+        console.log(`HTTPS Server: https://localhost:${HTTPS_PORT}`);
+    });
+}
