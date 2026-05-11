@@ -1,12 +1,13 @@
 # Site URLs
 
 Server IP: `160.153.187.39` (Port 80)
+Domain: `childrenofpromisedaycare.com`
 
 | Site | URL |
 |------|-----|
-| External / Public Site | http://160.153.187.39/public/index.html |
-| Root Portal | http://160.153.187.39/ |
-| Internal Staff Portal | http://160.153.187.39/staff/ |
+| External / Public Site | http://childrenofpromisedaycare.com/ |
+| Admin Portal | http://childrenofpromisedaycare.com/portal |
+| Internal Staff Portal | http://childrenofpromisedaycare.com/staff/ |
 
 ## Backlog
 

@@ -481,10 +481,21 @@ const server = http.createServer((req, res) => {
         return;
     }
 
-    // Root landing page
-    if (url === '/') {
+    // Portal page (admin splash)
+    if (url === '/portal' || url === '/portal/') {
         const rootIndex = path.join(__dirname, '..', 'index.html');
         fs.readFile(rootIndex, (err, data) => {
+            if (err) { res.writeHead(404); return res.end('Not found'); }
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(data);
+        });
+        return;
+    }
+
+    // Root landing page — serve public site
+    if (url === '/' || url === '/index.html') {
+        const pubIndex = path.join(EXTERNAL_DIR, 'index.html');
+        fs.readFile(pubIndex, (err, data) => {
             if (err) { res.writeHead(404); return res.end('Not found'); }
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(data);
@@ -504,6 +515,15 @@ const server = http.createServer((req, res) => {
         });
         return;
     }
+
+    // Fallback: try serving from External directory (public site assets at root level)
+    const extPath = decodeURIComponent(url);
+    const extFile = path.join(EXTERNAL_DIR, extPath);
+    fs.readFile(extFile, (err, data) => {
+        if (err) { res.writeHead(404); return res.end('Not found'); }
+        res.writeHead(200, { 'Content-Type': MIME[path.extname(extFile)] || 'text/plain' });
+        res.end(data);
+    });
 });
 
 server.listen(PORT, () => {
