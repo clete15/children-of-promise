@@ -95,7 +95,7 @@
             <span class="toggle-icon">📊</span> Reports
         </button>
         <button class="toggle-btn" id="btnSettingsMode" onclick="setMode('settings')">
-            <span class="toggle-icon">⚙️</span> Settings
+            <span class="toggle-icon">⚙️</span> Room Settings
         </button>
     </div>
 </div>
@@ -1458,12 +1458,9 @@ async function saveRoom(i) {
         const data = await res.json();
         if (data.success) {
             showNotification(`Room ${r.RoomNumber} updated`, 'success');
-            // Update local data
-            classrooms[i].Room = room;
-            classrooms[i].TeacherDescription = teacher;
-            classrooms[i].DCFSCapacity = capacity;
-            classrooms[i].AgeRange = ageRange;
-            populateRoomDropdowns();
+            // Reload classrooms from server to ensure consistency
+            await loadClassrooms();
+            renderSettings();
         } else {
             showNotification('Update failed: ' + (data.error || ''), 'error');
         }

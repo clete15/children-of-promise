@@ -202,7 +202,10 @@ const server = http.createServer((req, res) => {
             if (d.capacity !== undefined) fields.push(`DCFSCapacity=${parseInt(d.capacity) || 0}`);
             if (d.ageRange !== undefined) fields.push(`AgeRange=${esc(d.ageRange)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
-            const sql = `UPDATE dimClassrooms SET ${fields.join(',')} WHERE RoomNumber=${esc(roomNumber)}`;
+            const rn = parseInt(roomNumber);
+            const whereClause = isNaN(rn) ? `RoomNumber=${esc(roomNumber)}` : `RoomNumber=${rn}`;
+            const sql = `UPDATE dimClassrooms SET ${fields.join(',')} WHERE ${whereClause}`;
+            console.log('[PUT CLASSROOM]', sql);
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
