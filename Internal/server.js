@@ -474,6 +474,16 @@ function handleRequest(req, res) {
         return sendJSON(res, 200, results);
     }
 
+    // GET waiting list count (lightweight - for badge)
+    if (req.method === 'GET' && url === '/api/waitinglist/count') {
+        if (!checkAuth(req, res)) return;
+        const r = runSQL(`SELECT COUNT(*) AS Total FROM PreEnrollment WHERE ISNULL(WaitlistStatus,'Pending') NOT IN ('Enrolled','Declined')`);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const line = r.data.trim().split('\n').find(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+        const count = parseInt(line) || 0;
+        return sendJSON(res, 200, { count });
+    }
+
     // GET waiting list (internal - protected)
     if (req.method === 'GET' && url === '/api/waitinglist') {
         if (!checkAuth(req, res)) return;

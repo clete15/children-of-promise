@@ -1088,16 +1088,11 @@ let wlActiveTab = '0-2';
 
 async function loadWlBadge() {
     try {
-        const res = await apiFetch('/api/waitinglist');
-        const rows = await res.json();
-        const pending = rows.filter(r => r.WaitlistStatus !== 'Declined' && r.WaitlistStatus !== 'Enrolled').length;
+        const res = await apiFetch('/api/waitinglist/count');
+        const data = await res.json();
         const badge = document.getElementById('wlBadge');
-        if (pending > 0) { badge.textContent = pending; badge.style.display = 'inline'; }
+        if (data.count > 0) { badge.textContent = data.count; badge.style.display = 'inline'; }
         else { badge.style.display = 'none'; }
-        // Cache for when tab is opened
-        wlRows = rows;
-        wlLoaded = true;
-        updateWlTabCounts();
     } catch (e) {}
 }
 
