@@ -115,19 +115,21 @@
             <!-- RIGHT: STUDENT NAV + FORM -->
             <div style="background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;">
 
-                <!-- TOP NAV BAR: arrows + counter + new button -->
-                <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
-                    <button class="student-nav-arrow" id="btnPrev" onclick="navigate(-1)" disabled style="width:36px;height:36px;min-height:36px;border-radius:6px;font-size:0.85rem;">
-                        <span class="arrow-icon">◀</span>
-                    </button>
-                    <div style="flex:1;text-align:center;">
-                        <div id="viewStudentName" style="font-size:1rem;font-weight:800;color:var(--text);"></div>
-                        <div id="viewRecordCounter" style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;"></div>
+                <!-- TOP NAV BAR: arrows + counter -->
+                <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;">
+                    <div style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;">
+                        <button class="student-nav-arrow" id="btnPrev" onclick="navigate(-1)" disabled style="width:32px;height:32px;min-height:32px;border-radius:6px;font-size:0.85rem;">
+                            <span class="arrow-icon">◀</span>
+                        </button>
+                        <div style="text-align:center;">
+                            <div id="viewStudentName" style="font-size:1rem;font-weight:800;color:var(--text);"></div>
+                            <div id="viewRecordCounter" style="font-size:0.72rem;color:var(--text-muted);margin-top:2px;"></div>
+                        </div>
+                        <button class="student-nav-arrow" id="btnNext" onclick="navigate(1)" disabled style="width:32px;height:32px;min-height:32px;border-radius:6px;font-size:0.85rem;">
+                            <span class="arrow-icon">▶</span>
+                        </button>
                     </div>
-                    <button class="student-nav-arrow" id="btnNext" onclick="navigate(1)" disabled style="width:36px;height:36px;min-height:36px;border-radius:6px;font-size:0.85rem;">
-                        <span class="arrow-icon">▶</span>
-                    </button>
-                    <div id="todayAttendance" style="margin-left:8px;padding:6px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:0.72rem;font-weight:700;color:#166534;white-space:nowrap;display:none;"></div>
+                    <div id="todayAttendance" style="padding:6px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:0.72rem;font-weight:700;color:#166534;white-space:nowrap;display:none;"></div>
                 </div>
 
                 <!-- SCROLLABLE FORM -->
