@@ -1274,6 +1274,7 @@ async function loadReports() {
         reportsLoaded = true;
         renderRptEnrollment(data.byRoomDaily);
         renderRptBars('rptFood', 'Food Program', data.byFood, ['Free','Reduced','Paid','Unknown']);
+        renderRptFoodDetail(data.foodDetail);
         renderRptBars('rptProgram', 'Program Type', data.byProgram, null);
         renderRptBars('rptPayType', 'Pay Type', data.byPayType, null);
         renderRptBenefits(data.benefits);
@@ -1343,7 +1344,7 @@ function renderRptBars(cardId, title, rows, order) {
     if (!rows || !rows.length) { card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">${title}</div><div style="color:var(--text-muted);font-size:0.85rem;">No data.</div>`; return; }
     const sorted = order ? order.map(o => rows.find(r => r[0] === o) || [o, 0]) : rows;
     const max = Math.max(...sorted.map(r => parseInt(r[1] || 0)));
-    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">${title}</div>` +
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">${title}${cardId==='rptFood'?'<a href="#" onclick="toggleFoodDetail();return false;" style="float:right;font-size:0.7rem;font-weight:600;color:var(--primary);text-decoration:none;">View Detail →</a>':''}</div>` +
         sorted.map(r => {
             const label = r[0] || 'Unknown';
             const val = parseInt(r[1] || 0);
@@ -1357,6 +1358,39 @@ function renderRptBars(cardId, title, rows, order) {
                 </div>
             </div>`;
         }).join('');
+}
+
+let foodDetailData = [];
+function renderRptFoodDetail(rows) { foodDetailData = rows || []; }
+
+function toggleFoodDetail() {
+    const card = document.getElementById('rptFood');
+    const existing = document.getElementById('foodDetailTable');
+    if (existing) { existing.remove(); return; }
+    if (!foodDetailData.length) return;
+    const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
+    const table = document.createElement('div');
+    table.id = 'foodDetailTable';
+    table.style.cssText = 'margin-top:14px;max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:6px;';
+    table.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Name</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Food Program</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Benefits</th>
+        </tr></thead>
+        <tbody>${foodDetailData.map(r => `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px 10px;">${r[0] || '—'}</td>
+            <td style="padding:6px 10px;font-weight:600;">${r[1]}, ${r[2]}</td>
+            <td style="padding:6px 10px;">${r[3] ? '$'+parseInt(r[3]).toLocaleString() : '—'}</td>
+            <td style="padding:6px 10px;">${r[4] || '—'}</td>
+            <td style="padding:6px 10px;font-weight:700;color:${frpColor(r[5])};">${r[5] || '—'}</td>
+            <td style="padding:6px 10px;font-size:0.7rem;">${r[6] || '—'}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+    card.appendChild(table);
 }
 
 function renderRptBenefits(rows) {
