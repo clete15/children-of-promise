@@ -314,15 +314,15 @@
 
             <!-- LEFT SIDEBAR (age group filters) -->
             <div id="wlSidebar" style="width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;">
-                <button onclick="setWlTab('0-2')" id="wl-tab-0-2" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:rgba(255,255,255,0.2);border-left:3px solid white;transition:background 0.15s;">
+                <button onclick="setWlTab('0-2')" id="wl-tab-0-2" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:rgba(255,255,255,0.2);border-left:none;transition:background 0.15s;">
                     <div style="font-size:0.82rem;font-weight:700;color:white;">🍼 Infant & Toddler</div>
                     <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;" id="wl-count-0-2"></div>
                 </button>
-                <button onclick="setWlTab('2-3')" id="wl-tab-2-3" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:3px solid transparent;transition:background 0.15s;">
+                <button onclick="setWlTab('2-3')" id="wl-tab-2-3" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
                     <div style="font-size:0.82rem;font-weight:700;color:white;">🧒 2-Year Olds</div>
                     <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;" id="wl-count-2-3"></div>
                 </button>
-                <button onclick="setWlTab('3-5')" id="wl-tab-3-5" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:3px solid transparent;transition:background 0.15s;">
+                <button onclick="setWlTab('3-5')" id="wl-tab-3-5" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
                     <div style="font-size:0.82rem;font-weight:700;color:white;">🎨 Pre-School</div>
                     <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;" id="wl-count-3-5"></div>
                 </button>
@@ -614,7 +614,7 @@ function buildViewSidebar() {
         return `<button onclick="setRoomFilter('${rn}')"
             style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
             background:${isActive?'rgba(255,255,255,0.2)':'transparent'};
-            border-left:3px solid ${isActive?'white':'transparent'};
+            border-left:none;
             transition:background 0.15s;"
             onmouseover="if(!${isActive})this.style.background='rgba(255,255,255,0.1)'"
             onmouseout="if(!${isActive})this.style.background='transparent'">
@@ -875,7 +875,7 @@ function buildRoster() {
         return `<button onclick="selectRosterRoom('${rn}')"
             style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
             background:${isActive?'rgba(255,255,255,0.2)':'transparent'};
-            border-left:3px solid ${isActive?'white':'transparent'};
+            border-left:none;
             transition:background 0.15s;"
             onmouseover="if('${rn}'!=='${String(activeRosterRoomNum)}')this.style.background='rgba(255,255,255,0.1)'"
             onmouseout="if('${rn}'!=='${String(activeRosterRoomNum)}')this.style.background='transparent'">
@@ -1151,7 +1151,6 @@ function setWlTab(tab) {
         const btn = document.getElementById(`wl-tab-${t}`);
         if (btn) {
             btn.style.background = t === tab ? 'rgba(255,255,255,0.2)' : 'transparent';
-            btn.style.borderLeftColor = t === tab ? 'white' : 'transparent';
         }
     });
     renderWlTable();
