@@ -351,7 +351,7 @@
                 <div style="overflow:auto;flex:1;">
                     <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
                         <thead>
-                            <tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+                            <tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">#</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Name</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Contact</th>
@@ -887,7 +887,7 @@ function renderRosterRoom() {
     grid.innerHTML = `
         <table style="border-collapse:collapse;font-size:0.78rem;">
             <thead>
-                <tr style="border-bottom:2px solid var(--border);">
+                <tr style="border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;background:white;">
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:160px;">Room</th>
                     <th style="padding:8px 12px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);min-width:140px;max-width:180px;">Student</th>
                     ${dayLabels.map(d => `<th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:38px;">${d}</th>`).join('')}
