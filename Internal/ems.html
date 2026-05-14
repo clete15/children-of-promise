@@ -862,23 +862,24 @@ function buildBody(prefix) {
 }
 
 // ── ROOM ROSTER ──
-let activeRosterRoomNum = 'All';
+let activeRosterRoomNum = null;
 
 function buildRoster() {
     // Build sidebar
     const sidebar = document.getElementById('rosterSidebar');
-    const sidebarRooms = ['All', ...classrooms.map(r => r.RoomNumber)];
+    const sidebarRooms = classrooms.map(r => r.RoomNumber);
+    if (!activeRosterRoomNum && sidebarRooms.length) activeRosterRoomNum = sidebarRooms[0];
     sidebar.innerHTML = sidebarRooms.map(rn => {
-        const cr = rn === 'All' ? null : getClassroom(rn);
-        const label = rn === 'All' ? 'All Rooms' : (cr ? cr.Room : rn);
+        const cr = getClassroom(rn);
+        const label = cr ? cr.Room : rn;
         const isActive = String(activeRosterRoomNum) === String(rn);
         return `<button onclick="selectRosterRoom('${rn}')"
             style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
             background:${isActive?'rgba(255,255,255,0.2)':'transparent'};
             border-left:3px solid ${isActive?'white':'transparent'};
             transition:background 0.15s;"
-            onmouseover="if('${rn}'!=='${activeRosterRoomNum}')this.style.background='rgba(255,255,255,0.1)'"
-            onmouseout="if('${rn}'!=='${activeRosterRoomNum}')this.style.background='transparent'">
+            onmouseover="if('${rn}'!=='${String(activeRosterRoomNum)}')this.style.background='rgba(255,255,255,0.1)'"
+            onmouseout="if('${rn}'!=='${String(activeRosterRoomNum)}')this.style.background='transparent'">
             <div style="font-size:0.82rem;font-weight:700;color:white;">${label}</div>
         </button>`;
     }).join('');
@@ -893,14 +894,12 @@ function selectRosterRoom(rn) {
 
 function renderRosterRoom() {
     const rn = activeRosterRoomNum;
-    const cr = rn === 'All' ? null : getClassroom(rn);
-    document.getElementById('rosterRoomTitle').textContent = rn === 'All' ? 'All Rooms' : (cr ? cr.Room : rn);
+    const cr = getClassroom(rn);
+    document.getElementById('rosterRoomTitle').textContent = cr ? cr.Room : rn;
     document.getElementById('rosterRoomTeacher').textContent = cr ? cr.TeacherDescription : '';
 
     const activeOnly = document.getElementById('rosterActiveOnly')?.checked !== false;
-    rosterStudents = rn === 'All'
-        ? [...students].filter(s => !activeOnly || isTruthy(s.Active)).sort((a, b) => a.Last_Name.localeCompare(b.Last_Name))
-        : students.filter(s => String(s.RoomNumber) === String(rn) && (!activeOnly || isTruthy(s.Active)));
+    rosterStudents = students.filter(s => String(s.RoomNumber) === String(rn) && (!activeOnly || isTruthy(s.Active)));
 
     const grid = document.getElementById('rosterStudentGrid');
     if (!rosterStudents.length) {
