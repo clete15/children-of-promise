@@ -307,35 +307,55 @@
      WAITING LIST MODE
 ══════════════════════════════════════════ -->
 <div id="waitlistMode" style="display:none;">
-    <div style="max-width:1100px;margin:0 auto;padding:16px 24px;">
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;">
-            <div class="mode-toggle" style="background:rgba(255,255,255,0.15);max-width:520px;width:100%;">
-                <button class="toggle-btn active" id="wl-tab-0-2" onclick="setWlTab('0-2')">🍼 Infant &amp; Toddler <span class="tab-count" id="wl-count-0-2"></span></button>
-                <button class="toggle-btn" id="wl-tab-2-3" onclick="setWlTab('2-3')">🧒 2-Year Olds <span class="tab-count" id="wl-count-2-3"></span></button>
-                <button class="toggle-btn" id="wl-tab-3-5" onclick="setWlTab('3-5')">🎨 Pre-School <span class="tab-count" id="wl-count-3-5"></span></button>
+    <div style="display:flex;height:calc(100vh - 140px);background:linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);align-items:flex-start;justify-content:center;padding:20px;">
+
+        <!-- SIDEBAR + TABLE centered together -->
+        <div style="display:flex;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 180px);width:100%;max-width:1100px;">
+
+            <!-- LEFT SIDEBAR (age group filters) -->
+            <div id="wlSidebar" style="width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;">
+                <button onclick="setWlTab('0-2')" id="wl-tab-0-2" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:rgba(255,255,255,0.2);border-left:3px solid white;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">🍼 Infant & Toddler</div>
+                    <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;" id="wl-count-0-2"></div>
+                </button>
+                <button onclick="setWlTab('2-3')" id="wl-tab-2-3" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:3px solid transparent;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">🧒 2-Year Olds</div>
+                    <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;" id="wl-count-2-3"></div>
+                </button>
+                <button onclick="setWlTab('3-5')" id="wl-tab-3-5" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:3px solid transparent;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">🎨 Pre-School</div>
+                    <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;" id="wl-count-3-5"></div>
+                </button>
             </div>
-            <input style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;background:rgba(255,255,255,0.9);" type="text" id="wlSearchInput" placeholder="Search by name, phone, or email…" oninput="renderWlTable()">
-            <span style="font-size:0.8rem;color:rgba(255,255,255,0.8);white-space:nowrap;" id="wlCount"></span>
-        </div>
-        <div style="background:white;border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);">
-            <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
-                <thead>
-                    <tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">#</th>
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Name</th>
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Contact</th>
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Children</th>
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Score</th>
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Risk Factors</th>
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);background:#fffbeb;color:#92400e;">Income</th>
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Status</th>
-                        <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Notes</th>
-                    </tr>
-                </thead>
-                <tbody id="wlBody">
-                    <tr><td colspan="9" style="text-align:center;padding:48px;color:var(--text-muted);">Loading…</td></tr>
-                </tbody>
-            </table>
+
+            <!-- RIGHT: TABLE -->
+            <div style="background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;">
+                <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+                    <div style="font-size:1rem;font-weight:800;color:var(--text);" id="wlTitle">Infant & Toddler</div>
+                    <span style="font-size:0.78rem;color:var(--text-muted);" id="wlCount"></span>
+                </div>
+                <div style="overflow:auto;flex:1;">
+                    <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                        <thead>
+                            <tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">#</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Name</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Contact</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Children</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Score</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Risk Factors</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#92400e;background:#fffbeb;">Income</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Status</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody id="wlBody">
+                            <tr><td colspan="9" style="text-align:center;padding:48px;color:var(--text-muted);">Loading…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -1110,27 +1130,32 @@ async function loadWaitlist() {
 
 function updateWlTabCounts() {
     ['0-2','2-3','3-5'].forEach(tab => {
-        const count = wlRows.filter(r => r.AgeGroup === tab && r.WaitlistStatus !== 'Declined').length;
+        const count = wlRows.filter(r => r.AgeGroup === tab && r.WaitlistStatus !== 'Declined' && r.WaitlistStatus !== 'Enrolled').length;
         const el = document.getElementById(`wl-count-${tab}`);
-        if (el) el.textContent = count ? `(${count})` : '';
+        if (el) el.textContent = count ? `${count} pending` : 'None';
     });
 }
 
 function setWlTab(tab) {
     wlActiveTab = tab;
-    ['0-2','2-3','3-5'].forEach(t => document.getElementById(`wl-tab-${t}`).classList.toggle('active', t === tab));
+    const labels = { '0-2': '🍼 Infant & Toddler', '2-3': '🧒 2-Year Olds', '3-5': '🎨 Pre-School' };
+    document.getElementById('wlTitle').textContent = labels[tab] || tab;
+    // Update sidebar active state
+    ['0-2','2-3','3-5'].forEach(t => {
+        const btn = document.getElementById(`wl-tab-${t}`);
+        if (btn) {
+            btn.style.background = t === tab ? 'rgba(255,255,255,0.2)' : 'transparent';
+            btn.style.borderLeftColor = t === tab ? 'white' : 'transparent';
+        }
+    });
     renderWlTable();
 }
 
 function renderWlTable() {
-    const q = (document.getElementById('wlSearchInput')?.value || '').toLowerCase();
     const rows = wlRows.filter(r =>
         r.AgeGroup === wlActiveTab &&
         r.WaitlistStatus !== 'Declined' &&
-        r.WaitlistStatus !== 'Enrolled' &&
-        (!q || `${r.FirstName} ${r.LastName}`.toLowerCase().includes(q) ||
-         (r.Phone || '').toLowerCase().includes(q) ||
-         (r.Email || '').toLowerCase().includes(q))
+        r.WaitlistStatus !== 'Enrolled'
     );
     document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
     if (!rows.length) {
@@ -1428,15 +1453,20 @@ function renderSettings() {
     tbody.innerHTML = classrooms.map((r, i) => `
         <tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
             <td style="padding:10px 12px;font-weight:700;color:var(--text-muted);">${r.RoomNumber}</td>
-            <td style="padding:10px 12px;"><input type="text" id="setRoom${i}" value="${r.Room || ''}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
-            <td style="padding:10px 12px;"><input type="text" id="setTeacher${i}" value="${r.TeacherDescription || ''}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
-            <td style="padding:10px 12px;"><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
-            <td style="padding:10px 12px;"><input type="text" id="setAge${i}" value="${r.AgeRange || ''}" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
+            <td style="padding:10px 12px;"><input type="text" id="setRoom${i}" value="${r.Room || ''}" oninput="markSettingsChanged(${i})" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
+            <td style="padding:10px 12px;"><input type="text" id="setTeacher${i}" value="${r.TeacherDescription || ''}" oninput="markSettingsChanged(${i})" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
+            <td style="padding:10px 12px;"><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" oninput="markSettingsChanged(${i})" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
+            <td style="padding:10px 12px;"><input type="text" id="setAge${i}" value="${r.AgeRange || ''}" oninput="markSettingsChanged(${i})" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.82rem;"></td>
             <td style="padding:10px 12px;text-align:center;">
-                <button onclick="saveRoom(${i})" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.75rem;font-weight:700;cursor:pointer;">Save</button>
+                <button id="setSave${i}" onclick="saveRoom(${i})" disabled style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.75rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button>
             </td>
         </tr>
     `).join('');
+}
+
+function markSettingsChanged(i) {
+    const btn = document.getElementById(`setSave${i}`);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
 }
 
 async function saveRoom(i) {
