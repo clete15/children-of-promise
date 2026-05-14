@@ -257,13 +257,16 @@ function handleRequest(req, res) {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             console.log('[POST] Saving:', d.firstName, d.lastName);
-            // Auto-calculate F/R/P based on USDA income guidelines
-            const freeThresholds  = [19578,26572,33566,40560,47554,54548,61542,68536];
-            const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
+            // Auto-calculate F/R/P based on USDA income guidelines (2026-2027)
+            const freeThresholds  = [20748,28132,35516,42900,50284,57668,65052,72436];
+            const reducedThresholds = [29526,40034,50542,61050,71558,82066,92574,103082];
             const hhSize = Math.max(1, Math.min(parseInt(d.householdSize)||1, 8)) - 1;
             const income = parseInt(d.householdIncome) || 100000;
+            const benefits = d.publicBenefits || '';
+            const isFoster = d.category === 'Foster';
+            const isMilitary = d.military === true || d.military === 'Yes';
             let frpFood = 'Paid';
-            if (income <= freeThresholds[hhSize]) frpFood = 'Free';
+            if (benefits || isFoster || isMilitary || income <= freeThresholds[hhSize]) frpFood = 'Free';
             else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
             const sql = `INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,HouseholdSize,PublicBenefits,ProofOfIncomeUploaded) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${parseInt(d.householdSize)||0},${esc(d.publicBenefits)},0)`;
             const r = runSQL(sql);
@@ -283,17 +286,19 @@ function handleRequest(req, res) {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
 
-            // Auto-calculate F_R_P_Food from income/size/benefits if available
-            const freeThresholds  = [19578,26572,33566,40560,47554,54548,61542,68536];
-            const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
+            // Auto-calculate F_R_P_Food from income/size/benefits (USDA 2026-2027)
+            const freeThresholds  = [20748,28132,35516,42900,50284,57668,65052,72436];
+            const reducedThresholds = [29526,40034,50542,61050,71558,82066,92574,103082];
             const hasIncome = d.householdIncome !== undefined && d.householdIncome !== '';
             const hasSize   = d.householdSize !== undefined && d.householdSize !== '';
             if (hasIncome && hasSize) {
                 const hhSize = Math.max(1, Math.min(parseInt(d.householdSize)||1, 8)) - 1;
                 const income = parseInt(d.householdIncome) || 100000;
                 const benefits = d.publicBenefits || '';
+                const isFoster = d.category === 'Foster';
+                const isMilitary = d.military === true || d.military === 'Yes';
                 let frpFood = 'Paid';
-                if (benefits || income <= freeThresholds[hhSize]) frpFood = 'Free';
+                if (benefits || isFoster || isMilitary || income <= freeThresholds[hhSize]) frpFood = 'Free';
                 else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
                 d.frpFood = frpFood;
             }
@@ -462,6 +467,7 @@ function handleRequest(req, res) {
             incomeProof:   `SELECT SUM(CASE WHEN ISNULL(ProofOfIncomeUploaded,0)=1 THEN 1 ELSE 0 END) AS Uploaded, SUM(CASE WHEN ISNULL(ProofOfIncomeUploaded,0)=0 THEN 1 ELSE 0 END) AS Missing FROM rptMasterEnrollment WHERE (Active='Yes' OR Active='YES') AND (PFA_PI_na='PFA' OR PFA_PI_na='PI')`,
             flags:         `SELECT SUM(CASE WHEN IEP='Yes' OR IEP='YES' THEN 1 ELSE 0 END) AS IEP, SUM(CASE WHEN Military='Yes' OR Military='YES' THEN 1 ELSE 0 END) AS Military FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES'`,
             waitlistSummary: `SELECT AgeGroup, COUNT(*) AS Total, AVG(CAST(Score AS FLOAT)) AS AvgScore FROM PreEnrollment WHERE WaitlistStatus NOT IN ('Enrolled','Declined') GROUP BY AgeGroup`,
+            ccapEligible:  `SELECT First_Name,Last_Name,r.Room,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber WHERE (e.Active='Yes' OR e.Active='YES') AND e.Category<>'CCAP' AND e.Category<>'Foster' AND ISNULL(e.HouseholdIncome,0)>0 AND ISNULL(e.HouseholdSize,0)>0 AND ((e.HouseholdSize=1 AND e.HouseholdIncome<=35888) OR (e.HouseholdSize=2 AND e.HouseholdIncome<=48668) OR (e.HouseholdSize=3 AND e.HouseholdIncome<=61448) OR (e.HouseholdSize=4 AND e.HouseholdIncome<=74228) OR (e.HouseholdSize=5 AND e.HouseholdIncome<=87008) OR (e.HouseholdSize=6 AND e.HouseholdIncome<=99788) OR (e.HouseholdSize=7 AND e.HouseholdIncome<=112568) OR (e.HouseholdSize>=8 AND e.HouseholdIncome<=125348)) ORDER BY e.Last_Name`,
         };
         const results = {};
         for (const [key, sql] of Object.entries(queries)) {

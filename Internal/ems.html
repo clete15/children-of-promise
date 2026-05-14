@@ -400,6 +400,10 @@
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Waiting List Summary</div>
             <div>Loading…</div>
         </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);grid-column:1/-1;" id="rptCcap">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible (Not Currently on CCAP)</div>
+            <div>Loading…</div>
+        </div>
     </div>
 </div>
 
@@ -815,13 +819,17 @@ function calcDaysOld() {
 }
 
 function calcFRP(incomeId, sizeId, outputId, benefitsPrefix) {
-    const freeThresholds    = [19578,26572,33566,40560,47554,54548,61542,68536];
-    const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
+    // USDA Income Eligibility Guidelines 2026-2027 (effective July 1, 2026)
+    const freeThresholds    = [20748,28132,35516,42900,50284,57668,65052,72436];
+    const reducedThresholds = [29526,40034,50542,61050,71558,82066,92574,103082];
     const income = parseInt(document.getElementById(incomeId)?.value) || 100000;
     const hhSize = Math.max(1, Math.min(parseInt(document.getElementById(sizeId)?.value) || 1, 8)) - 1;
     const benefits = collectBenefits(benefitsPrefix);
+    // Foster and Military also qualify for Free
+    const isFoster = document.getElementById((benefitsPrefix || '') + 'category')?.value === 'Foster';
+    const isMilitary = document.getElementById((benefitsPrefix || '') + 'military')?.checked;
     let frp = 'Paid';
-    if (benefits || income <= freeThresholds[hhSize]) frp = 'Free';
+    if (benefits || isFoster || isMilitary || income <= freeThresholds[hhSize]) frp = 'Free';
     else if (income <= reducedThresholds[hhSize]) frp = 'Reduced';
     document.getElementById(outputId).value = frp;
 }
@@ -1024,14 +1032,16 @@ async function saveRosterRow(i) {
     const newActive  = document.getElementById(`rosterActive${i}`)?.value || s.Active || 'Yes';
     const btn = document.getElementById(`rosterSave${i}`);
     btn.disabled = true; btn.textContent = '…';
-    // Auto-calculate F_R_P_Food from income/size/benefits
-    const freeThresholds    = [19578,26572,33566,40560,47554,54548,61542,68536];
-    const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
+    // Auto-calculate F_R_P_Food from income/size/benefits (USDA 2026-2027)
+    const freeThresholds    = [20748,28132,35516,42900,50284,57668,65052,72436];
+    const reducedThresholds = [29526,40034,50542,61050,71558,82066,92574,103082];
     const income = parseInt(s.HouseholdIncome) || 100000;
     const hhSize = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
     const benefits = s.PublicBenefits || '';
+    const isFoster = newPayType === 'Foster';
+    const isMilitary = isTruthy(s.Military);
     let calcFrpFood = 'Paid';
-    if (benefits || income <= freeThresholds[hhSize]) calcFrpFood = 'Free';
+    if (benefits || isFoster || isMilitary || income <= freeThresholds[hhSize]) calcFrpFood = 'Free';
     else if (income <= reducedThresholds[hhSize]) calcFrpFood = 'Reduced';
     const body = {
         firstName: s.First_Name, lastName: s.Last_Name,
@@ -1302,6 +1312,7 @@ async function loadReports() {
         renderRptIncome(data.incomeProof);
         renderRptFlags(data.flags);
         renderRptWaitlist(data.waitlistSummary);
+        renderRptCcap(data.ccapEligible);
     } catch (e) {
         document.querySelectorAll('#reportsMode [id^=rpt]').forEach(el => {
             const loading = el.querySelector('div:last-child');
@@ -1440,6 +1451,26 @@ function renderRptWaitlist(rows) {
                 <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">Avg: ${parseFloat(r[2] || 0).toFixed(0)} pts</div>
             </div>`).join('')}
         </div>`;
+}
+
+function renderRptCcap(rows) {
+    const card = document.getElementById('rptCcap');
+    if (!rows || !rows.length) { card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible (Not Currently on CCAP)</div><div style="color:var(--success);font-weight:600;font-size:0.85rem;">✓ All eligible families are already on CCAP</div>`; return; }
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible — Not Currently on CCAP <span style="background:#fef2f2;color:var(--danger);padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:8px;">${rows.length} families</span></div>
+        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+            <thead><tr style="border-bottom:2px solid var(--border);">
+                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
+                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+            </tr></thead>
+            <tbody>${rows.map(r => `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:8px 12px;font-weight:600;">${r[0]} ${r[1]}</td>
+                <td style="padding:8px 12px;">${r[2] || '—'}</td>
+                <td style="padding:8px 12px;">$${parseInt(r[3] || 0).toLocaleString()}</td>
+                <td style="padding:8px 12px;">${r[4] || '—'}</td>
+            </tr>`).join('')}</tbody>
+        </table>`;
 }
 
 // ══════════════════════════════════════════
