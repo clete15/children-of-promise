@@ -913,7 +913,6 @@ function renderRosterRoom() {
                     ${dayLabels.map(d => `<th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:38px;">${d}</th>`).join('')}
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:52px;">Active</th>
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:90px;">Pay</th>
-                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:52px;">Food</th>
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:80px;">Program</th>
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:160px;">Room</th>
                     <th style="padding:8px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:44px;">Save</th>
@@ -921,16 +920,6 @@ function renderRosterRoom() {
             </thead>
             <tbody>
                 ${rosterStudents.map((s, i) => {
-                    // Calculate F/R/P for display
-                    const _freeT  = [19578,26572,33566,40560,47554,54548,61542,68536];
-                    const _redT   = [27861,37814,47767,57720,67673,77626,87579,97532];
-                    const _inc    = parseInt(s.HouseholdIncome) || 100000;
-                    const _hh     = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
-                    const _ben    = s.PublicBenefits || '';
-                    let _frp = 'Paid';
-                    if (_ben || _inc <= _freeT[_hh]) _frp = 'Free';
-                    else if (_inc <= _redT[_hh]) _frp = 'Reduced';
-                    const _frpColor = _frp === 'Free' ? '#16a34a' : _frp === 'Reduced' ? '#d97706' : '#64748b';
                     // Normalize pay type
                     const _cat = (s.Category||'').trim();
                     const _catUp = _cat.toUpperCase();
@@ -947,12 +936,21 @@ function renderRosterRoom() {
                             <input type="checkbox" id="rDay${i}_${di}" ${isTruthy(s[k])?'checked':''} onchange="markRosterChanged(${i})" style="width:auto;accent-color:var(--primary);">
                         </td>`
                     ).join('');
+                    // Calculate age in months and days
+                    let _ageStr = '';
+                    if (s.Birth_date) {
+                        const bd = new Date(s.Birth_date);
+                        const now = new Date();
+                        let months = (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+                        let days = now.getDate() - bd.getDate();
+                        if (days < 0) { months--; const prev = new Date(now.getFullYear(), now.getMonth(), 0); days += prev.getDate(); }
+                        _ageStr = `${months}m ${days}d`;
+                    }
                     return `<tr id="rosterCard${i}" style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
-                        <td style="padding:7px 12px;font-weight:600;color:var(--text);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;">${s.Last_Name}, ${s.First_Name}</td>
+                        <td style="padding:7px 12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;"><div style="font-weight:600;color:var(--text);white-space:nowrap;">${s.Last_Name}, ${s.First_Name}</div><div style="font-size:0.68rem;color:var(--text-muted);">${_ageStr}</div></td>
                         ${dayChecks}
                         <td style="padding:5px 6px;">${dd('rosterActive'+i, '<option '+(isTruthy(s.Active)?'selected':'')+' value="Yes">Yes</option><option '+(!isTruthy(s.Active)?'selected':'')+' value="No">No</option>')}</td>
                         <td style="padding:5px 6px;">${dd('rosterPayType'+i, payOptions)}</td>
-                        <td style="padding:5px 6px;text-align:center;font-size:0.72rem;font-weight:700;color:${_frpColor};">${_frp}</td>
                         <td style="padding:5px 6px;">${dd('rosterPfaPiNa'+i, '<option value="">--</option><option '+(s.PFA_PI_na==='PFA'?'selected':'')+' value="PFA">PFA</option><option '+(s.PFA_PI_na==='PI'?'selected':'')+' value="PI">PI</option><option '+(s.PFA_PI_na==='INCCRA'?'selected':'')+' value="INCCRA">INCCRA</option>')}</td>
                         <td style="padding:5px 6px;">${dd('rosterRoom'+i, roomOpts)}</td>
                         <td style="padding:5px 6px;text-align:center;">
@@ -969,7 +967,7 @@ function renderRosterRoom() {
                         const total = rosterStudents.filter(s => isTruthy(s[k])).length;
                         return `<td id="dayTotal${di}" style="padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--primary);">${total}</td>`;
                     }).join('')}
-                    <td colspan="6"></td>
+                    <td colspan="5"></td>
                 </tr>
             </tfoot>
         </table>`;
