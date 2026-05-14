@@ -127,7 +127,6 @@
                     <button class="student-nav-arrow" id="btnNext" onclick="navigate(1)" disabled style="width:36px;height:36px;min-height:36px;border-radius:6px;font-size:0.85rem;">
                         <span class="arrow-icon">▶</span>
                     </button>
-                    <button class="btn btn-save" id="btnNewStudent" onclick="startNewStudent()" style="margin-left:12px;padding:8px 14px;font-size:0.78rem;white-space:nowrap;">➕ New</button>
                     <div id="todayAttendance" style="margin-left:8px;padding:6px 12px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;font-size:0.72rem;font-weight:700;color:#166534;white-space:nowrap;display:none;"></div>
                 </div>
 
@@ -261,6 +260,7 @@
 
                 <!-- Actions -->
                 <div class="actions">
+                    <button class="btn btn-save" id="btnNewStudent" onclick="startNewStudent()" style="padding:8px 14px;font-size:0.78rem;">➕ New Student</button>
                     <button class="btn btn-secondary" id="btnCancel" onclick="cancelNew()" style="display:none;">Cancel</button>
                     <button class="btn btn-update" id="btnUpdate" onclick="updateStudent()">Update Student</button>
                     <button class="btn btn-save" id="btnSaveNew" onclick="saveStudent()" style="display:none;">Save New Student</button>
@@ -514,11 +514,11 @@ function startNewStudent() {
     document.getElementById('viewStudentName').textContent = 'New Student';
     document.getElementById('viewRecordCounter').textContent = '';
     document.getElementById('btnUpdate').style.display = 'none';
+    document.getElementById('btnNewStudent').style.display = 'none';
     document.getElementById('btnSaveNew').style.display = '';
     document.getElementById('btnCancel').style.display = '';
     document.getElementById('btnPrev').disabled = true;
     document.getElementById('btnNext').disabled = true;
-    document.getElementById('btnNewStudent').disabled = true;
 }
 
 function cancelNew() {
@@ -527,9 +527,9 @@ function cancelNew() {
     // Clear any yellow highlights
     document.querySelectorAll('[style*="fffbeb"]').forEach(el => { el.style.background = ''; el.style.borderColor = ''; });
     document.getElementById('btnUpdate').style.display = '';
+    document.getElementById('btnNewStudent').style.display = '';
     document.getElementById('btnSaveNew').style.display = 'none';
     document.getElementById('btnCancel').style.display = 'none';
-    document.getElementById('btnNewStudent').disabled = false;
     // Remove enroll query param
     if (window.location.search) history.replaceState(null, '', window.location.pathname);
     sessionStorage.removeItem('enrollFromWaitlist');
@@ -596,7 +596,7 @@ let activeRoomIndex = 0;
 let rosterStudents = [];
 
 function buildRoomNav() {
-    roomList = ['All', ...classrooms.map(r => r.RoomNumber)];
+    roomList = classrooms.map(r => r.RoomNumber);
     buildViewSidebar();
     updateRoomNavDisplay();
 }
@@ -604,11 +604,12 @@ function buildRoomNav() {
 function buildViewSidebar() {
     const sidebar = document.getElementById('viewSidebar');
     if (!sidebar) return;
-    const sidebarRooms = ['All', ...classrooms.map(r => r.RoomNumber)];
+    const sidebarRooms = classrooms.map(r => r.RoomNumber);
+    if (activeRoom === 'All' && sidebarRooms.length) { activeRoom = sidebarRooms[0]; activeRoomIndex = 0; }
     sidebar.innerHTML = sidebarRooms.map(rn => {
-        const cr = rn === 'All' ? null : getClassroom(rn);
-        const label = rn === 'All' ? 'All Rooms' : (cr ? cr.Room : rn);
-        const count = rn === 'All' ? students.length : students.filter(s => String(s.RoomNumber) === String(rn)).length;
+        const cr = getClassroom(rn);
+        const label = cr ? cr.Room : rn;
+        const count = students.filter(s => String(s.RoomNumber) === String(rn)).length;
         const isActive = String(activeRoom) === String(rn);
         return `<button onclick="setRoomFilter('${rn}')"
             style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
@@ -657,9 +658,7 @@ function setRoomFilter(room) {
 }
 
 function applyFilter() {
-    filtered = activeRoom === 'All'
-        ? [...students]
-        : students.filter(s => String(s.RoomNumber) === String(activeRoom));
+    filtered = students.filter(s => String(s.RoomNumber) === String(activeRoom));
     currentIndex = 0;
     if (filtered.length > 0 && !isNewMode) loadRecord(0);
     else if (!isNewMode) clearForm();
