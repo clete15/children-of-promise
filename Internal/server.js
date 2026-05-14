@@ -552,6 +552,17 @@ function handleRequest(req, res) {
     }
 
     // Internal static files (protected) - served under /staff/
+    // Allow images/css without auth (needed for login page logo)
+    if (url.startsWith('/staff') && (url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.css'))) {
+        const subPath = url.replace('/staff', '');
+        const filePath = path.join(__dirname, subPath);
+        fs.readFile(filePath, (err, data) => {
+            if (err) { res.writeHead(404); return res.end('Not found'); }
+            res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' });
+            res.end(data);
+        });
+        return;
+    }
     if (url.startsWith('/staff')) {
         if (!checkAuth(req, res)) return;
         const subPath = url === '/staff' || url === '/staff/' ? '/index.html' : url.replace('/staff', '');
