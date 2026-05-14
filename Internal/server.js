@@ -228,6 +228,19 @@ function handleRequest(req, res) {
         return sendJSON(res, 200, rows);
     }
 
+    // POST new classroom (internal - protected)
+    if (req.method === 'POST' && url === '/api/classrooms') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const sql = `INSERT INTO dimClassrooms (RoomNumber,Room,TeacherDescription,DCFSCapacity,AgeRange) VALUES (${parseInt(d.roomNumber)},${esc(d.room)},${esc(d.teacher)},${parseInt(d.capacity)||10},${esc(d.ageRange)})`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     // PUT update classroom (internal - protected)
     if (req.method === 'PUT' && url.startsWith('/api/classrooms/')) {
         if (!checkAuth(req, res)) return;
