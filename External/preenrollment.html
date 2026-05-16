@@ -154,6 +154,10 @@
                     <input type="date" class="child-birthDate" required>
                 </div>
                 <div class="form-group">
+                    <label>Desired Start Date</label>
+                    <input type="date" class="child-startDate">
+                </div>
+                <div class="form-group">
                     <label>Program Applying For <span class="required">*</span></label>
                     <select class="child-ageGroup" required>
                         <option value="">-- Select Program --</option>
@@ -437,6 +441,10 @@ function addChild() {
                 <input type="date" class="child-birthDate child-highlight" required>
             </div>
             <div class="form-group">
+                <label>Desired Start Date</label>
+                <input type="date" class="child-startDate">
+            </div>
+            <div class="form-group">
                 <label>Program Applying For <span class="required">*</span></label>
                 <select class="child-ageGroup child-highlight" required>
                     <option value="">-- Select Program --</option>
@@ -552,6 +560,7 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
     const children = [...document.querySelectorAll('.child-block')].map(block => ({
         childName: `${block.querySelector('.child-firstName').value.trim()} ${block.querySelector('.child-lastName').value.trim()}`.trim(),
         childBirthDate: block.querySelector('.child-birthDate').value,
+        childStartDate: block.querySelector('.child-startDate')?.value || '',
         ageGroup: block.querySelector('.child-ageGroup').value,
         iep: block.querySelector('.child-iep').value,
     }));
@@ -564,6 +573,7 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
             ...household,
             childName:      child.childName,
             childBirthDate: child.childBirthDate,
+            childStartDate: child.childStartDate,
             ageGroup:       child.ageGroup,
             iep:            child.iep,
             childrenInfo:   child.childName,
