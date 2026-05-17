@@ -387,6 +387,33 @@ function handleRequest(req, res) {
         return;
     }
 
+    // POST summer program sign-up (public)
+    if (req.method === 'POST' && url === '/api/summer') {
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const sql = `
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'SummerProgram')
+                CREATE TABLE SummerProgram (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    SubmittedAt DATETIME DEFAULT GETDATE(),
+                    ParentFirstName NVARCHAR(100),
+                    ParentLastName NVARCHAR(100),
+                    ParentPhone NVARCHAR(30),
+                    ChildFirstName NVARCHAR(100),
+                    ChildLastName NVARCHAR(100),
+                    ChildAge INT,
+                    FoodProgram NVARCHAR(20),
+                    Days NVARCHAR(200)
+                );
+                INSERT INTO SummerProgram (ParentFirstName,ParentLastName,ParentPhone,ChildFirstName,ChildLastName,ChildAge,FoodProgram,Days)
+                VALUES (${esc(d.parentFirstName)},${esc(d.parentLastName)},${esc(d.parentPhone)},${esc(d.childFirstName)},${esc(d.childLastName)},${parseInt(d.childAge)||0},${esc(d.foodProgram)},${esc(d.days)});`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     // POST pre-enrollment form (public)
     if (req.method === 'POST' && url === '/api/preenrollment') {
         readBody(req, (err, d) => {
@@ -483,6 +510,7 @@ function handleRequest(req, res) {
             waitlistSummary: `SELECT AgeGroup, COUNT(*) AS Total, AVG(CAST(Score AS FLOAT)) AS AvgScore FROM PreEnrollment WHERE WaitlistStatus NOT IN ('Enrolled','Declined') GROUP BY AgeGroup`,
             ccapEligible:  `SELECT First_Name,Last_Name,r.Room,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber WHERE (e.Active='Yes' OR e.Active='YES') AND e.Category<>'CCAP' AND e.Category<>'Foster' AND ISNULL(e.HouseholdIncome,0)>0 AND ISNULL(e.HouseholdSize,0)>0 AND ((e.HouseholdSize=1 AND e.HouseholdIncome<=35888) OR (e.HouseholdSize=2 AND e.HouseholdIncome<=48668) OR (e.HouseholdSize=3 AND e.HouseholdIncome<=61448) OR (e.HouseholdSize=4 AND e.HouseholdIncome<=74228) OR (e.HouseholdSize=5 AND e.HouseholdIncome<=87008) OR (e.HouseholdSize=6 AND e.HouseholdIncome<=99788) OR (e.HouseholdSize=7 AND e.HouseholdIncome<=112568) OR (e.HouseholdSize>=8 AND e.HouseholdIncome<=125348)) ORDER BY e.Last_Name`,
             foodDetail:    `SELECT r.Room,e.Last_Name,e.First_Name,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.F_R_P_Food,'') AS FRP,ISNULL(e.PublicBenefits,'') AS Benefits FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber WHERE e.Active='Yes' OR e.Active='YES' ORDER BY r.Room,e.Last_Name`,
+            summerProgram: `IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='SummerProgram') SELECT ChildLastName,ChildFirstName,ChildAge,FoodProgram,Days,ParentLastName,ParentFirstName,ParentPhone FROM SummerProgram ORDER BY ChildLastName`,
         };
         const results = {};
         for (const [key, sql] of Object.entries(queries)) {

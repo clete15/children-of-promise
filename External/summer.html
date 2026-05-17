@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Children Of Promise - Summer Program Sign-Up</title>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/">
+        <img src="./images/logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Christian Dayschool &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <div class="header-contact">
+        <a href="tel:6185387527">📞 618-538-7527</a><br>
+        <a href="mailto:childrenofpromise.millstadt@outlook.com">✉️ childrenofpromise.millstadt@outlook.com</a>
+    </div>
+</header>
+
+<nav>
+    <a href="./index.html">Home</a>
+    <a href="./about.html">About Us</a>
+    <a href="./mission.html">Mission</a>
+    <a href="./preenrollment.html">Pre-Enrollment</a>
+    <a href="./summer.html" class="active">Summer Program</a>
+</nav>
+
+<div class="hero" style="padding:48px 24px;">
+    <h1>☀️ Summer Program Sign-Up</h1>
+    <p>For currently enrolled families — sign up your child for our summer program.</p>
+</div>
+
+<div class="container">
+    <div class="form-section">
+        <h2>Summer Program Registration</h2>
+        <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:20px;">This form is for families already enrolled at Children Of Promise. Fill out one form per child.</p>
+
+        <form id="summerForm" onsubmit="submitSummer(event)">
+            <div class="section-divider">Parent Information</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Parent First Name <span class="required">*</span></label>
+                    <input type="text" id="parentFirstName" required placeholder="First name">
+                </div>
+                <div class="form-group">
+                    <label>Parent Last Name <span class="required">*</span></label>
+                    <input type="text" id="parentLastName" required placeholder="Last name">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" id="parentPhone" placeholder="618-555-1234">
+            </div>
+
+            <div class="section-divider">Child Information</div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Child's First Name <span class="required">*</span></label>
+                    <input type="text" id="childFirstName" required placeholder="First name">
+                </div>
+                <div class="form-group">
+                    <label>Child's Last Name <span class="required">*</span></label>
+                    <input type="text" id="childLastName" required placeholder="Last name">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Child's Age <span class="required">*</span></label>
+                    <input type="number" id="childAge" required min="1" max="13" placeholder="Age in years">
+                </div>
+                <div class="form-group">
+                    <label>Food Program (F/R/P) <span class="required">*</span></label>
+                    <select id="foodProgram" required>
+                        <option value="">-- Select --</option>
+                        <option value="Free">Free</option>
+                        <option value="Reduced">Reduced</option>
+                        <option value="Paid">Paid</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="section-divider">Days Attending</div>
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:12px;">Select the days your child will attend the summer program.</p>
+            <div class="checkbox-group" style="margin-bottom:20px;">
+                <label><input type="checkbox" id="sumMon" value="Monday"> Monday</label>
+                <label><input type="checkbox" id="sumTue" value="Tuesday"> Tuesday</label>
+                <label><input type="checkbox" id="sumWed" value="Wednesday"> Wednesday</label>
+                <label><input type="checkbox" id="sumThu" value="Thursday"> Thursday</label>
+                <label><input type="checkbox" id="sumFri" value="Friday"> Friday</label>
+            </div>
+
+            <button type="submit" class="btn-submit" id="submitBtn">Submit Summer Sign-Up</button>
+        </form>
+    </div>
+</div>
+
+<footer>
+    <p class="footer-brand">Children Of Promise Christian Dayschool</p>
+    <p>Millstadt, IL &nbsp;|&nbsp; <a href="tel:6185387527">618-538-7527</a> &nbsp;|&nbsp; <a href="mailto:childrenofpromise.millstadt@outlook.com">childrenofpromise.millstadt@outlook.com</a></p>
+</footer>
+
+<script>
+async function submitSummer(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting...';
+
+    const days = [];
+    if (document.getElementById('sumMon').checked) days.push('Monday');
+    if (document.getElementById('sumTue').checked) days.push('Tuesday');
+    if (document.getElementById('sumWed').checked) days.push('Wednesday');
+    if (document.getElementById('sumThu').checked) days.push('Thursday');
+    if (document.getElementById('sumFri').checked) days.push('Friday');
+
+    if (!days.length) {
+        alert('Please select at least one day.');
+        btn.disabled = false;
+        btn.textContent = 'Submit Summer Sign-Up';
+        return;
+    }
+
+    const body = {
+        parentFirstName: document.getElementById('parentFirstName').value.trim(),
+        parentLastName: document.getElementById('parentLastName').value.trim(),
+        parentPhone: document.getElementById('parentPhone').value.trim(),
+        childFirstName: document.getElementById('childFirstName').value.trim(),
+        childLastName: document.getElementById('childLastName').value.trim(),
+        childAge: document.getElementById('childAge').value,
+        foodProgram: document.getElementById('foodProgram').value,
+        days: days.join(', ')
+    };
+
+    try {
+        const res = await fetch('/api/summer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('summerForm').innerHTML = `
+                <div style="text-align:center;padding:40px 20px;">
+                    <div style="font-size:3rem;margin-bottom:16px;">☀️</div>
+                    <h2 style="color:var(--success);border:none;margin-bottom:10px;">You're signed up!</h2>
+                    <p style="color:var(--text-muted);">${body.childFirstName} has been registered for the summer program on ${body.days}.</p>
+                    <p style="margin-top:16px;"><a href="./summer.html" style="color:var(--primary);font-weight:700;">Sign up another child →</a></p>
+                </div>`;
+        } else {
+            alert('Error: ' + (data.error || 'Something went wrong.'));
+            btn.disabled = false;
+            btn.textContent = 'Submit Summer Sign-Up';
+        }
+    } catch (err) {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Submit Summer Sign-Up';
+    }
+}
+</script>
+</body>
+</html>

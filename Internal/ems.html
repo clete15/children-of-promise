@@ -422,6 +422,10 @@
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible (Not Currently on CCAP)</div>
             <div>Loading…</div>
         </div>
+        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);grid-column:1/-1;" id="rptSummer">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program Sign-Ups</div>
+            <div>Loading…</div>
+        </div>
     </div>
 </div>
 
@@ -1309,6 +1313,7 @@ async function loadReports() {
         renderRptFlags(data.flags);
         renderRptWaitlist(data.waitlistSummary);
         renderRptCcap(data.ccapEligible);
+        renderRptSummer(data.summerProgram);
     } catch (e) {
         document.querySelectorAll('#reportsMode [id^=rpt]').forEach(el => {
             const loading = el.querySelector('div:last-child');
@@ -1502,6 +1507,32 @@ function renderRptCcap(rows) {
                 <td style="padding:8px 12px;">${r[4] || '—'}</td>
             </tr>`; }).join('')}</tbody>
         </table>`;
+}
+
+function renderRptSummer(rows) {
+    const card = document.getElementById('rptSummer');
+    if (!rows || !rows.length) { card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program Sign-Ups</div><div style="color:var(--text-muted);font-size:0.85rem;">No sign-ups yet.</div>`; return; }
+    const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program Sign-Ups <span style="background:#fffbeb;color:#92400e;padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:8px;">${rows.length} children</span></div>
+        <div style="max-height:300px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Child</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Age</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">F/R/P</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Days</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Parent</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Phone</th>
+            </tr></thead>
+            <tbody>${rows.map(r => `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:6px 10px;font-weight:600;">${r[0]}, ${r[1]}</td>
+                <td style="padding:6px 10px;">${r[2]}</td>
+                <td style="padding:6px 10px;font-weight:700;color:${frpColor(r[3])};">${r[3]}</td>
+                <td style="padding:6px 10px;font-size:0.72rem;">${r[4]}</td>
+                <td style="padding:6px 10px;">${r[5]}, ${r[6]}</td>
+                <td style="padding:6px 10px;font-size:0.72rem;">${r[7] || ''}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
 }
 
 // ══════════════════════════════════════════
