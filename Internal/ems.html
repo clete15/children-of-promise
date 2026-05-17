@@ -55,7 +55,7 @@
         .toggle-btn.active { background: white !important; color: var(--primary) !important; }
         .tab-count { font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
 
-        #emsMode, #rosterMode, #waitlistMode, #reportsMode {
+        #emsMode, #rosterMode, #waitlistMode, #reportsMode, #notificationsMode {
             background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);
             min-height: calc(100vh - 120px);
             padding-top: 0;
@@ -93,6 +93,9 @@
         </button>
         <button class="toggle-btn" id="btnReportsMode" onclick="setMode('reports')">
             <span class="toggle-icon">📊</span> Reports
+        </button>
+        <button class="toggle-btn" id="btnNotificationsMode" onclick="setMode('notifications')">
+            <span class="toggle-icon">🔔</span> Alerts <span id="alertBadge" style="display:none;background:#dc2626;color:white;font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;"></span>
         </button>
     </div>
 </div>
@@ -429,6 +432,18 @@
     </div>
 </div>
 
+<!-- ══════════════════════════════════════════
+     NOTIFICATIONS / ALERTS MODE
+══════════════════════════════════════════ -->
+<div id="notificationsMode" style="display:none;">
+    <div style="max-width:800px;margin:0 auto;padding:24px;">
+        <div style="background:white;border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">🔔 Alerts &amp; Notifications</div>
+            <div id="alertsList" style="color:var(--text-muted);">Loading...</div>
+        </div>
+    </div>
+</div>
+
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 
@@ -455,7 +470,9 @@ let waitlistId = null;
 
 async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
-    loadWlBadge();    // Check if redirected from waiting list
+    loadWlBadge();
+    renderAlerts();
+    // Check if redirected from waiting list
     if (new URLSearchParams(window.location.search).get('enroll') === '1') {
         const data = sessionStorage.getItem('enrollFromWaitlist');
         if (data) {
@@ -1089,14 +1106,17 @@ function setMode(mode) {
     document.getElementById('rosterMode').style.display   = mode === 'roster'   ? 'block' : 'none';
     document.getElementById('waitlistMode').style.display = mode === 'waitlist' ? 'block' : 'none';
     document.getElementById('reportsMode').style.display  = mode === 'reports'  ? 'block' : 'none';
+    document.getElementById('notificationsMode').style.display = mode === 'notifications' ? 'block' : 'none';
     document.getElementById('btnEmsMode').classList.toggle('active',      mode === 'ems');
     document.getElementById('btnRosterMode').classList.toggle('active',   mode === 'roster');
     document.getElementById('btnWaitlistMode').classList.toggle('active', mode === 'waitlist');
     document.getElementById('btnReportsMode').classList.toggle('active',  mode === 'reports');
+    document.getElementById('btnNotificationsMode').classList.toggle('active', mode === 'notifications');
     if (mode === 'roster') buildRoster();
     if (mode === 'ems') { buildViewSidebar(); updateRoomNavDisplay(); }
     if (mode === 'waitlist' && !wlLoaded) loadWaitlist();
     if (mode === 'reports' && !reportsLoaded) loadReports();
+    if (mode === 'notifications') renderAlerts();
 }
 
 function showNotification(msg, type = 'info') {
@@ -1314,6 +1334,7 @@ async function loadReports() {
         renderRptWaitlist(data.waitlistSummary);
         renderRptCcap(data.ccapEligible);
         renderRptSummer(data.summerProgram);
+        checkSummerUnmatched(data.summerProgram);
     } catch (e) {
         document.querySelectorAll('#reportsMode [id^=rpt]').forEach(el => {
             const loading = el.querySelector('div:last-child');
@@ -1503,7 +1524,7 @@ function renderRptCcap(rows) {
                 <td style="padding:8px 12px;font-weight:600;">${r[0]} ${r[1]}</td>
                 <td style="padding:8px 12px;">${r[2] || '—'}</td>
                 <td style="padding:8px 12px;color:var(--success);font-weight:600;">$${threshold.toLocaleString()}</td>
-                <td style="padding:8px 12px;">$$${parseInt(r[3] || 0).toLocaleString()}</td>
+                <td style="padding:8px 12px;">${"$" + parseInt(r[3] || 0).toLocaleString()}</td>
                 <td style="padding:8px 12px;">${r[4] || '—'}</td>
             </tr>`; }).join('')}</tbody>
         </table>`;
@@ -1533,6 +1554,85 @@ function renderRptSummer(rows) {
                 <td style="padding:6px 10px;font-size:0.72rem;">${r[7] || ''}</td>
             </tr>`).join('')}</tbody>
         </table></div>`;
+}
+
+// ══════════════════════════════════════════
+// ALERTS / NOTIFICATIONS
+// ══════════════════════════════════════════
+function renderAlerts() {
+    const alerts = [];
+
+    // Check for CCAP-eligible students
+    const ccapEligible = students.filter(s => {
+        if (!isTruthy(s.Active)) return false;
+        if (s.Category === 'CCAP' || s.Category === 'Foster') return false;
+        const income = parseInt(s.HouseholdIncome) || 0;
+        const hhSize = parseInt(s.HouseholdSize) || 0;
+        if (!income || !hhSize) return false;
+        const idx = Math.max(1, Math.min(hhSize, 8)) - 1;
+        return income <= CCAP_THRESHOLDS[idx];
+    });
+    if (ccapEligible.length) {
+        alerts.push({
+            type: 'warning',
+            icon: '💰',
+            title: `${ccapEligible.length} families may qualify for CCAP`,
+            detail: ccapEligible.map(s => `${s.First_Name} ${s.Last_Name}`).join(', '),
+            action: 'View in Reports → CCAP Eligible'
+        });
+    }
+
+    // Check for summer sign-ups not found in enrollment (loaded from reports if available)
+    // This will be populated after reports load
+    if (window._summerUnmatched && window._summerUnmatched.length) {
+        alerts.push({
+            type: 'error',
+            icon: '⚠️',
+            title: `${window._summerUnmatched.length} summer sign-ups not found in enrollment`,
+            detail: window._summerUnmatched.join(', '),
+            action: 'These children signed up for summer but are not in the enrollment database. Verify spelling or add them to EMS.'
+        });
+    }
+
+    // Check for PFA/PI students missing proof of income
+    const missingProof = students.filter(s => isTruthy(s.Active) && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') && s.ProofOfIncomeUploaded !== '1' && s.ProofOfIncomeUploaded !== 1);
+    if (missingProof.length) {
+        alerts.push({
+            type: 'info',
+            icon: '📄',
+            title: `${missingProof.length} PFA/PI students missing proof of income`,
+            detail: missingProof.slice(0, 10).map(s => `${s.First_Name} ${s.Last_Name}`).join(', ') + (missingProof.length > 10 ? '...' : ''),
+            action: 'Update via EMS → check Proof of Income box when received'
+        });
+    }
+
+    // Render
+    const el = document.getElementById('alertsList');
+    if (!alerts.length) {
+        el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--success);font-weight:600;">✓ No alerts — everything looks good!</div>';
+    } else {
+        el.innerHTML = alerts.map(a => {
+            const borderColor = a.type === 'error' ? 'var(--danger)' : a.type === 'warning' ? '#f59e0b' : 'var(--primary)';
+            return `<div style="border-left:4px solid ${borderColor};padding:14px 18px;margin-bottom:12px;background:#f8fafc;border-radius:0 8px 8px 0;">
+                <div style="font-weight:700;font-size:0.9rem;color:var(--text);margin-bottom:4px;">${a.icon} ${a.title}</div>
+                <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">${a.detail}</div>
+                <div style="font-size:0.72rem;color:var(--primary);font-weight:600;">${a.action}</div>
+            </div>`;
+        }).join('');
+    }
+
+    // Update badge
+    const badge = document.getElementById('alertBadge');
+    if (alerts.length) { badge.textContent = alerts.length; badge.style.display = 'inline'; }
+    else { badge.style.display = 'none'; }
+}
+
+// Check summer unmatched after reports load
+function checkSummerUnmatched(summerRows) {
+    if (!summerRows || !summerRows.length) { window._summerUnmatched = []; return; }
+    window._summerUnmatched = summerRows
+        .filter(r => r[3] === 'Unknown' || !r[3])
+        .map(r => `${r[1]} ${r[0]}`);
 }
 
 // ══════════════════════════════════════════
