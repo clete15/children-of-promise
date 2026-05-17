@@ -231,7 +231,7 @@
                             <div class="checkbox-item"><input type="checkbox" id="benMedicaid" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benMedicaid">Medicaid</label></div>
                             <div class="checkbox-item"><input type="checkbox" id="benSNAP" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benSNAP">SNAP</label></div>
                             <div class="checkbox-item"><input type="checkbox" id="benTANF" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benTANF">TANF</label></div>
-                            <div class="checkbox-item"><input type="checkbox" id="benCCAP" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benCCAP">CCAP</label></div>
+                            <div class="checkbox-item"><input type="checkbox" id="benCCAP" onchange="calcFRP('householdIncome','householdSize','frpFood','');autoPayType()"><label for="benCCAP">CCAP</label></div>
                         </div>
                     </div>
                 </div>
@@ -358,7 +358,7 @@
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Children</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Score</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Risk Factors</th>
-                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#92400e;background:#fffbeb;">Income</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#92400e;background:#fffbeb;">Income / HH</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Status</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Notes</th>
                             </tr>
@@ -423,6 +423,13 @@
 
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
+
+// USDA Income Eligibility Guidelines 2026-2027 (effective July 1, 2026)
+// Update these annually when new guidelines are published
+const USDA_FREE_THRESHOLDS    = [20748,28132,35516,42900,50284,57668,65052,72436];
+const USDA_REDUCED_THRESHOLDS = [29526,40034,50542,61050,71558,82066,92574,103082];
+// Illinois CCAP eligibility at 225% FPL (2026)
+const CCAP_THRESHOLDS = [35888,48668,61448,74228,87008,99788,112568,125348];
 
 function apiFetch(url, opts = {}) {
     opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
@@ -583,6 +590,9 @@ function buildViewSidebar() {
         const cr = getClassroom(rn);
         const label = cr ? cr.Room : rn;
         const count = students.filter(s => String(s.RoomNumber) === String(rn)).length;
+        const needsAttn = students.filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active) && (
+            (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') && (!s.HouseholdIncome || !s.HouseholdSize || (s.ProofOfIncomeUploaded !== '1' && s.ProofOfIncomeUploaded !== 1))
+        )).length;
         const isActive = String(activeRoom) === String(rn);
         return `<button onclick="setRoomFilter('${rn}')"
             style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
@@ -592,7 +602,7 @@ function buildViewSidebar() {
             onmouseover="if(!${isActive})this.style.background='rgba(255,255,255,0.1)'"
             onmouseout="if(!${isActive})this.style.background='transparent'">
             <div style="font-size:0.82rem;font-weight:700;color:white;">${label}</div>
-            <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;">${count} student${count!==1?'s':''}</div>
+            <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;">${count} student${count!==1?'s':''}${needsAttn ? ' <span style="color:#fca5a5;">⚠ '+needsAttn+'</span>' : ''}</div>
         </button>`;
     }).join('');
 }
@@ -755,13 +765,21 @@ async function saveStudent() {
             showNotification('Student saved successfully', 'success');
             // If from waiting list, mark enrolled and redirect back
             if (waitlistId) {
-                await apiFetch(`/api/waitinglist/${waitlistId}`, {
-                    method: 'PUT', body: JSON.stringify({ status: 'Enrolled' })
-                });
+                try {
+                    const wlRes = await apiFetch(`/api/waitinglist/${waitlistId}`, {
+                        method: 'PUT', body: JSON.stringify({ status: 'Enrolled' })
+                    });
+                    const wlData = await wlRes.json();
+                    if (!wlData.success) showNotification('Warning: waiting list status may not have updated', 'error');
+                } catch (e) { showNotification('Warning: could not update waiting list status', 'error'); }
                 sessionStorage.removeItem('enrollFromWaitlist');
                 showNotification('Student enrolled and waiting list updated.', 'success');
                 waitlistId = null;
-                setTimeout(() => window.location.href = 'waitinglist.html', 1500);
+                // Refresh waiting list data
+                wlLoaded = false;
+                loadWlBadge();
+                cancelNew();
+                await loadStudents();
                 return;
             }
             cancelNew();
@@ -790,10 +808,17 @@ function calcDaysOld() {
     el.value = diff > 0 ? diff : '';
 }
 
+function autoPayType() {
+    const ccapChecked = document.getElementById('benCCAP')?.checked;
+    const payType = document.getElementById('category');
+    if (ccapChecked && payType && (payType.value === '' || payType.value === 'Paid')) {
+        payType.value = 'CCAP';
+    } else if (!ccapChecked && payType && payType.value === 'CCAP') {
+        payType.value = '';
+    }
+}
+
 function calcFRP(incomeId, sizeId, outputId, benefitsPrefix) {
-    // USDA Income Eligibility Guidelines 2026-2027 (effective July 1, 2026)
-    const freeThresholds    = [20748,28132,35516,42900,50284,57668,65052,72436];
-    const reducedThresholds = [29526,40034,50542,61050,71558,82066,92574,103082];
     const income = parseInt(document.getElementById(incomeId)?.value) || 100000;
     const hhSize = Math.max(1, Math.min(parseInt(document.getElementById(sizeId)?.value) || 1, 8)) - 1;
     const benefits = collectBenefits(benefitsPrefix);
@@ -801,8 +826,8 @@ function calcFRP(incomeId, sizeId, outputId, benefitsPrefix) {
     const isFoster = document.getElementById((benefitsPrefix || '') + 'category')?.value === 'Foster';
     const isMilitary = document.getElementById((benefitsPrefix || '') + 'military')?.checked;
     let frp = 'Paid';
-    if (benefits || isFoster || isMilitary || income <= freeThresholds[hhSize]) frp = 'Free';
-    else if (income <= reducedThresholds[hhSize]) frp = 'Reduced';
+    if (benefits || isFoster || isMilitary || income <= USDA_FREE_THRESHOLDS[hhSize]) frp = 'Free';
+    else if (income <= USDA_REDUCED_THRESHOLDS[hhSize]) frp = 'Reduced';
     document.getElementById(outputId).value = frp;
 }
 
@@ -1004,17 +1029,15 @@ async function saveRosterRow(i) {
     const newActive  = document.getElementById(`rosterActive${i}`)?.value || s.Active || 'Yes';
     const btn = document.getElementById(`rosterSave${i}`);
     btn.disabled = true; btn.textContent = '…';
-    // Auto-calculate F_R_P_Food from income/size/benefits (USDA 2026-2027)
-    const freeThresholds    = [20748,28132,35516,42900,50284,57668,65052,72436];
-    const reducedThresholds = [29526,40034,50542,61050,71558,82066,92574,103082];
+    // Auto-calculate F_R_P_Food
     const income = parseInt(s.HouseholdIncome) || 100000;
     const hhSize = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
     const benefits = s.PublicBenefits || '';
     const isFoster = newPayType === 'Foster';
     const isMilitary = isTruthy(s.Military);
     let calcFrpFood = 'Paid';
-    if (benefits || isFoster || isMilitary || income <= freeThresholds[hhSize]) calcFrpFood = 'Free';
-    else if (income <= reducedThresholds[hhSize]) calcFrpFood = 'Reduced';
+    if (benefits || isFoster || isMilitary || income <= USDA_FREE_THRESHOLDS[hhSize]) calcFrpFood = 'Free';
+    else if (income <= USDA_REDUCED_THRESHOLDS[hhSize]) calcFrpFood = 'Reduced';
     const body = {
         firstName: s.First_Name, lastName: s.Last_Name,
         birthDate: s.Birth_date, startDate: s.Start_Date,
@@ -1151,7 +1174,7 @@ function renderWlTable() {
             <td style="padding:10px 12px;max-width:160px;">${r.ChildrenInfo || '—'}</td>
             <td style="padding:10px 12px;"><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:#f8fafc;${scoreClass}">${score} pts</span></td>
             <td style="padding:10px 12px;"><div style="display:flex;flex-wrap:wrap;gap:4px;">${flags}</div></td>
-            <td style="padding:10px 12px;background:#fffbeb;font-weight:600;font-size:0.78rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
+            <td style="padding:10px 12px;background:#fffbeb;font-weight:600;font-size:0.78rem;">${r.HouseholdIncome ? '$'+parseInt(r.HouseholdIncome).toLocaleString() : '<span style="color:#92400e;">—</span>'}<div style="font-size:0.68rem;font-weight:400;color:var(--text-muted);">${r.HouseholdSize ? 'HH: '+r.HouseholdSize : ''}</div></td>
             <td style="padding:10px 12px;">
                 <select style="padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.78rem;width:100%;min-width:110px;" onchange="handleWlStatus(${parseInt(r.Id)}, this)">
                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
