@@ -138,6 +138,12 @@
     <div id="childrenContainer">
         <div class="child-block" id="child-0">
             <div class="child-block-header">Child 1</div>
+            <div class="form-group" style="margin-bottom:12px;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:0.85rem;">
+                    <input type="checkbox" class="child-notBorn" onchange="toggleNotBorn(this)" style="width:auto;accent-color:var(--primary);">
+                    Child not yet born (expecting)
+                </label>
+            </div>
             <div class="form-row">
                 <div class="form-group">
                     <label>Child's First Name <span class="required">*</span></label>
@@ -149,15 +155,15 @@
                 </div>
             </div>
             <div class="form-row">
-                <div class="form-group">
-                    <label>Child's Date of Birth <span class="required">*</span></label>
+                <div class="form-group child-birthDateGroup">
+                    <label class="child-birthDateLabel">Child's Date of Birth <span class="required">*</span></label>
                     <input type="date" class="child-birthDate" required>
                 </div>
                 <div class="form-group">
-                    <label>Desired Start Date</label>
+                    <label class="child-startDateLabel">Desired Start Date</label>
                     <input type="date" class="child-startDate">
                 </div>
-                <div class="form-group">
+                <div class="form-group child-ageGroupGroup">
                     <label>Program Applying For <span class="required">*</span></label>
                     <select class="child-ageGroup" required>
                         <option value="">-- Select Program --</option>
@@ -167,7 +173,7 @@
                     </select>
                 </div>
             </div>
-            <div class="form-group">
+            <div class="form-group child-iepGroup">
                 <label>Does this child have an IEP or have they been referred for special education evaluation? <span class="required">*</span></label>
                 <select class="child-iep" required>
                     <option value="">Select</option>
@@ -411,6 +417,40 @@
 </footer>
 
 <script>
+function toggleNotBorn(checkbox) {
+    const block = checkbox.closest('.child-block');
+    const birthGroup = block.querySelector('.child-birthDateGroup');
+    const birthLabel = block.querySelector('.child-birthDateLabel');
+    const birthInput = block.querySelector('.child-birthDate');
+    const startLabel = block.querySelector('.child-startDateLabel');
+    const ageGroup = block.querySelector('.child-ageGroupGroup');
+    const ageSelect = block.querySelector('.child-ageGroup');
+    const iepGroup = block.querySelector('.child-iepGroup');
+    const iepSelect = block.querySelector('.child-iep');
+
+    if (checkbox.checked) {
+        // Not yet born
+        birthLabel.innerHTML = 'Expected Due Date';
+        birthInput.removeAttribute('required');
+        startLabel.textContent = 'Desired Start Date (after birth)';
+        ageSelect.value = '0-2';
+        ageGroup.style.display = 'none';
+        iepGroup.style.display = 'none';
+        iepSelect.removeAttribute('required');
+        iepSelect.value = 'No';
+    } else {
+        // Born
+        birthLabel.innerHTML = 'Child\'s Date of Birth <span class="required">*</span>';
+        birthInput.setAttribute('required', '');
+        startLabel.textContent = 'Desired Start Date';
+        ageGroup.style.display = '';
+        ageSelect.value = '';
+        iepGroup.style.display = '';
+        iepSelect.setAttribute('required', '');
+        iepSelect.value = '';
+    }
+}
+
 let childCount = 1;
 
 function addChild() {
@@ -425,6 +465,12 @@ function addChild() {
             Child ${childCount}
             <button type="button" class="btn-remove-child" onclick="removeChild(${idx})">Remove</button>
         </div>
+        <div class="form-group" style="margin-bottom:12px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:600;font-size:0.85rem;">
+                <input type="checkbox" class="child-notBorn" onchange="toggleNotBorn(this)" style="width:auto;accent-color:var(--primary);">
+                Child not yet born (expecting)
+            </label>
+        </div>
         <div class="form-row">
             <div class="form-group">
                 <label>Child's First Name <span class="required">*</span></label>
@@ -436,15 +482,15 @@ function addChild() {
             </div>
         </div>
         <div class="form-row">
-            <div class="form-group">
-                <label>Child's Date of Birth <span class="required">*</span></label>
+            <div class="form-group child-birthDateGroup">
+                <label class="child-birthDateLabel">Child's Date of Birth <span class="required">*</span></label>
                 <input type="date" class="child-birthDate child-highlight" required>
             </div>
             <div class="form-group">
-                <label>Desired Start Date</label>
+                <label class="child-startDateLabel">Desired Start Date</label>
                 <input type="date" class="child-startDate">
             </div>
-            <div class="form-group">
+            <div class="form-group child-ageGroupGroup">
                 <label>Program Applying For <span class="required">*</span></label>
                 <select class="child-ageGroup child-highlight" required>
                     <option value="">-- Select Program --</option>
@@ -454,7 +500,7 @@ function addChild() {
                 </select>
             </div>
         </div>
-        <div class="form-group">
+        <div class="form-group child-iepGroup">
             <label>Does this child have an IEP or have they been referred for special education evaluation? <span class="required">*</span></label>
             <select class="child-iep child-highlight" required>
                 <option value="">Select</option>
@@ -561,6 +607,7 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
         childName: `${block.querySelector('.child-firstName').value.trim()} ${block.querySelector('.child-lastName').value.trim()}`.trim(),
         childBirthDate: block.querySelector('.child-birthDate').value,
         childStartDate: block.querySelector('.child-startDate')?.value || '',
+        notYetBorn: block.querySelector('.child-notBorn')?.checked ? 'Yes' : 'No',
         ageGroup: block.querySelector('.child-ageGroup').value,
         iep: block.querySelector('.child-iep').value,
     }));
