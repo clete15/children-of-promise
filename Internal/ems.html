@@ -1684,32 +1684,63 @@ function renderBenefitsRoom() {
 
     const benefitKeys = ['WIC','Medicaid','SNAP','TANF','CCAP'];
     const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
-    const normCat = c => { const u=(c||'').toUpperCase(); if(u==='CHASI'||u==='CCAP')return'CCAP'; if(u==='DCFS'||u==='FOSTER')return'Foster'; if(u==='HALF PRICE'||c==='1/2 price')return'Half Price'; if(u==='STAFF')return'Free'; return c||''; };
+    const payOpts = '<option value="">--</option><option value="Paid">Paid</option><option value="CCAP">CCAP</option><option value="Half Price">Half Price</option><option value="Free">Free</option><option value="Foster">Foster</option>';
 
-    grid.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+    grid.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
         <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
-            <th style="padding:8px 12px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
-            <th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:70px;">Pay</th>
-            <th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:60px;">F/R/P</th>
-            ${benefitKeys.map(b => `<th style="padding:8px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:55px;">${b}</th>`).join('')}
-            <th style="padding:8px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:44px;">Save</th>
+            <th style="padding:8px 10px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
+            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:75px;">Pay</th>
+            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:45px;">F/R/P</th>
+            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:60px;">Income</th>
+            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:30px;">HH</th>
+            ${benefitKeys.map(b => `<th style="padding:8px 4px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:42px;">${b}</th>`).join('')}
+            <th style="padding:8px 4px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:36px;">Save</th>
+            <th style="padding:8px 6px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);min-width:140px;">Notes</th>
         </tr></thead>
         <tbody>${roomStudents.map((s, i) => {
             const ben = s.PublicBenefits || '';
             const frp = s.F_R_P_Food || '';
+            const income = parseInt(s.HouseholdIncome) || 0;
+            const hhSize = parseInt(s.HouseholdSize) || 0;
+            // Determine eligibility notes
+            let notes = [];
+            if (income && hhSize) {
+                const idx = Math.max(1, Math.min(hhSize, 8)) - 1;
+                if (s.Category !== 'CCAP' && s.Category !== 'Foster' && income <= CCAP_THRESHOLDS[idx]) notes.push('<span style="color:var(--danger);font-weight:700;">CCAP eligible</span>');
+                if (income <= USDA_FREE_THRESHOLDS[idx] && frp !== 'Free') notes.push('<span style="color:#16a34a;">Qualifies Free</span>');
+                else if (income <= USDA_REDUCED_THRESHOLDS[idx] && frp === 'Paid') notes.push('<span style="color:#d97706;">Qualifies Reduced</span>');
+            }
+            if (!income || !hhSize) notes.push('<span style="color:var(--text-muted);">Missing income/HH data</span>');
             return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
-                <td style="padding:7px 12px;font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
-                <td style="padding:5px 8px;text-align:center;font-size:0.72rem;font-weight:600;">${normCat(s.Category)}</td>
-                <td style="padding:5px 8px;text-align:center;font-weight:700;color:${frpColor(frp)};">${frp || '—'}</td>
-                ${benefitKeys.map(b => `<td style="padding:5px 6px;text-align:center;">
+                <td style="padding:6px 10px;font-weight:600;white-space:nowrap;">${s.Last_Name}, ${s.First_Name}</td>
+                <td style="padding:4px 4px;"><select id="benPay_${i}" onchange="markBenefitChanged(${i})" style="padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.7rem;width:100%;">${payOpts}</select></td>
+                <td style="padding:5px 6px;text-align:center;font-weight:700;font-size:0.7rem;color:${frpColor(frp)};">${frp || '—'}</td>
+                <td style="padding:5px 6px;text-align:center;font-size:0.7rem;">${income ? '$'+income.toLocaleString() : '—'}</td>
+                <td style="padding:5px 6px;text-align:center;font-size:0.7rem;">${hhSize || '—'}</td>
+                ${benefitKeys.map(b => `<td style="padding:4px 4px;text-align:center;">
                     <input type="checkbox" id="ben_${rn}_${i}_${b}" ${ben.includes(b)?'checked':''} onchange="markBenefitChanged(${i})" style="width:auto;accent-color:var(--primary);">
                 </td>`).join('')}
-                <td style="padding:5px 6px;text-align:center;">
-                    <button id="benSave_${i}" onclick="saveBenefitRow(${i})" disabled style="padding:3px 8px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.7rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button>
+                <td style="padding:4px 4px;text-align:center;">
+                    <button id="benSave_${i}" onclick="saveBenefitRow(${i})" disabled style="padding:3px 6px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.65rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button>
                 </td>
+                <td style="padding:5px 6px;font-size:0.68rem;">${notes.join(' · ')}</td>
             </tr>`;
         }).join('')}</tbody>
     </table>`;
+    // Set pay dropdowns after render
+    roomStudents.forEach((s, i) => {
+        const sel = document.getElementById(`benPay_${i}`);
+        if (sel) {
+            const u = (s.Category||'').toUpperCase();
+            let v = s.Category || '';
+            if (u==='CHASI'||u==='CCAP') v='CCAP';
+            else if (u==='DCFS'||u==='FOSTER') v='Foster';
+            else if (u==='HALF PRICE'||s.Category==='1/2 price') v='Half Price';
+            else if (u==='STAFF') v='Free';
+            else if (u==='PAID') v='Paid';
+            sel.value = v;
+        }
+    });
 }
 
 function markBenefitChanged(i) {
@@ -1724,16 +1755,18 @@ async function saveBenefitRow(i) {
     if (!s) return;
     const benefitKeys = ['WIC','Medicaid','SNAP','TANF','CCAP'];
     const benefits = benefitKeys.filter(b => document.getElementById(`ben_${rn}_${i}_${b}`)?.checked).join(', ');
+    const newCategory = document.getElementById(`benPay_${i}`)?.value || s.Category || '';
     const btn = document.getElementById(`benSave_${i}`);
     btn.disabled = true; btn.textContent = '…';
     try {
         const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
-            method: 'PUT', body: JSON.stringify({ publicBenefits: benefits })
+            method: 'PUT', body: JSON.stringify({ publicBenefits: benefits, category: newCategory })
         });
         const data = await res.json();
         if (data.success) {
             s.PublicBenefits = benefits;
-            showNotification(`${s.First_Name} ${s.Last_Name} benefits updated`, 'success');
+            s.Category = newCategory;
+            showNotification(`${s.First_Name} ${s.Last_Name} updated`, 'success');
             btn.style.opacity = '0.3';
         } else {
             showNotification('Update failed', 'error');
