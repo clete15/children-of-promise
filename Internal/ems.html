@@ -1486,15 +1486,17 @@ function renderRptCcap(rows) {
             <thead><tr style="border-bottom:2px solid var(--border);">
                 <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
                 <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">CCAP Threshold</th>
                 <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
                 <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
             </tr></thead>
-            <tbody>${rows.map(r => `<tr style="border-bottom:1px solid var(--border);">
+            <tbody>${rows.map(r => { const hhIdx = Math.max(1, Math.min(parseInt(r[4])||1, 8)) - 1; const threshold = CCAP_THRESHOLDS[hhIdx]; return `<tr style="border-bottom:1px solid var(--border);">
                 <td style="padding:8px 12px;font-weight:600;">${r[0]} ${r[1]}</td>
                 <td style="padding:8px 12px;">${r[2] || '—'}</td>
-                <td style="padding:8px 12px;">$${parseInt(r[3] || 0).toLocaleString()}</td>
+                <td style="padding:8px 12px;color:var(--success);font-weight:600;">$${threshold.toLocaleString()}</td>
+                <td style="padding:8px 12px;">$$${parseInt(r[3] || 0).toLocaleString()}</td>
                 <td style="padding:8px 12px;">${r[4] || '—'}</td>
-            </tr>`).join('')}</tbody>
+            </tr>`; }).join('')}</tbody>
         </table>`;
 }
 
