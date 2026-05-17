@@ -55,7 +55,7 @@
         .toggle-btn.active { background: white !important; color: var(--primary) !important; }
         .tab-count { font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
 
-        #emsMode, #rosterMode, #waitlistMode, #reportsMode, #notificationsMode {
+        #emsMode, #rosterMode, #benefitsMode, #waitlistMode, #reportsMode, #notificationsMode {
             background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);
             min-height: calc(100vh - 120px);
             padding-top: 0;
@@ -90,6 +90,9 @@
         </button>
         <button class="toggle-btn" id="btnRosterMode" onclick="setMode('roster')">
             <span class="toggle-icon">🏫</span> Room Roster
+        </button>
+        <button class="toggle-btn" id="btnBenefitsMode" onclick="setMode('benefits')">
+            <span class="toggle-icon">💳</span> Benefits
         </button>
         <button class="toggle-btn" id="btnReportsMode" onclick="setMode('reports')">
             <span class="toggle-icon">📊</span> Reports
@@ -316,6 +319,25 @@
                 <div id="rosterStudentGrid" style="overflow:auto;"></div>
             </div>
 
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     BENEFITS ROSTER MODE
+══════════════════════════════════════════ -->
+<div id="benefitsMode" style="display:none;">
+    <div style="display:flex;height:calc(100vh - 140px);background:linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);align-items:flex-start;justify-content:center;padding:20px;">
+        <div style="display:flex;max-height:calc(100vh - 180px);width:100%;max-width:1000px;">
+            <div id="benefitsSidebar" style="width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;margin-top:52px;border-radius:12px 0 0 12px;"></div>
+            <div style="background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);">
+                <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+                    <div id="benefitsRoomTitle" style="font-size:1rem;font-weight:800;color:var(--text);"></div>
+                    <div style="flex:1;"></div>
+                    <span style="font-size:0.72rem;color:var(--text-muted);" id="benefitsCount"></span>
+                </div>
+                <div id="benefitsGrid" style="overflow:auto;flex:1;"></div>
+            </div>
         </div>
     </div>
 </div>
@@ -941,7 +963,6 @@ function renderRosterRoom() {
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:160px;">Room</th>
                     <th style="padding:8px 12px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);min-width:140px;max-width:180px;">Student</th>
                     ${dayLabels.map(d => `<th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:38px;">${d}</th>`).join('')}
-                    <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:90px;">Pay</th>
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:80px;">Program</th>
                     <th style="padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:52px;">Active</th>
                     <th style="padding:8px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);width:44px;">Save</th>
@@ -979,7 +1000,6 @@ function renderRosterRoom() {
                         <td style="padding:5px 6px;">${dd('rosterRoom'+i, roomOpts)}</td>
                         <td style="padding:7px 12px;max-width:180px;overflow:hidden;text-overflow:ellipsis;"><div style="font-weight:600;color:var(--text);white-space:nowrap;">${s.Last_Name}, ${s.First_Name}</div><div style="font-size:0.68rem;color:var(--text-muted);">${_ageStr}</div></td>
                         ${dayChecks}
-                        <td style="padding:5px 6px;">${dd('rosterPayType'+i, payOptions)}</td>
                         <td style="padding:5px 6px;">${dd('rosterPfaPiNa'+i, '<option value="">--</option><option '+(s.PFA_PI_na==='PFA'?'selected':'')+' value="PFA">PFA</option><option '+(s.PFA_PI_na==='PI'?'selected':'')+' value="PI">PI</option><option '+(s.PFA_PI_na==='INCCRA'?'selected':'')+' value="INCCRA">INCCRA</option>')}</td>
                         <td style="padding:5px 6px;">${dd('rosterActive'+i, '<option '+(isTruthy(s.Active)?'selected':'')+' value="Yes">Yes</option><option '+(!isTruthy(s.Active)?'selected':'')+' value="No">No</option>')}</td>
                         <td style="padding:5px 6px;text-align:center;">
@@ -997,7 +1017,7 @@ function renderRosterRoom() {
                         const total = rosterStudents.filter(s => isTruthy(s[k])).length;
                         return `<td id="dayTotal${di}" style="padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--primary);">${total}</td>`;
                     }).join('')}
-                    <td colspan="4"></td>
+                    <td colspan="3"></td>
                 </tr>
             </tfoot>
         </table>`;
@@ -1006,20 +1026,6 @@ function renderRosterRoom() {
     rosterStudents.forEach((s, i) => {
         const sel = document.getElementById(`rosterRoom${i}`);
         if (sel) sel.value = s.RoomNumber || '';
-        // Normalize and set pay type
-        const paySel = document.getElementById(`rosterPayType${i}`);
-        if (paySel) {
-            const cat = (s.Category||'').trim();
-            const catUp = cat.toUpperCase();
-            let norm = '';
-            if (catUp === 'CHASI' || catUp === 'CCAP') norm = 'CCAP';
-            else if (catUp === 'DCFS' || catUp === 'FOSTER') norm = 'Foster';
-            else if (cat === '1/2 price' || catUp === 'HALF PRICE') norm = 'Half Price';
-            else if (catUp === 'STAFF' || catUp === 'FREE') norm = 'Free';
-            else if (catUp === 'PAID') norm = 'Paid';
-            else norm = cat;
-            paySel.value = norm;
-        }
     });}
 
 let rosterIndex = 0;
@@ -1049,7 +1055,7 @@ function markChanged(i) { markRosterChanged(i); }
 async function saveRosterRow(i) {
     const s = rosterStudents[i];
     const newRoom    = document.getElementById(`rosterRoom${i}`)?.value || s.RoomNumber || '';
-    const newPayType = document.getElementById(`rosterPayType${i}`)?.value || s.Category || '';
+    const newPayType = s.Category || '';
     const newPfaPiNa = document.getElementById(`rosterPfaPiNa${i}`)?.value || s.PFA_PI_na || '';
     const newActive  = document.getElementById(`rosterActive${i}`)?.value || s.Active || 'Yes';
     const btn = document.getElementById(`rosterSave${i}`);
@@ -1104,15 +1110,18 @@ function setMode(mode) {
     currentMode = mode;
     document.getElementById('emsMode').style.display      = mode === 'ems'      ? 'block' : 'none';
     document.getElementById('rosterMode').style.display   = mode === 'roster'   ? 'block' : 'none';
+    document.getElementById('benefitsMode').style.display = mode === 'benefits' ? 'block' : 'none';
     document.getElementById('waitlistMode').style.display = mode === 'waitlist' ? 'block' : 'none';
     document.getElementById('reportsMode').style.display  = mode === 'reports'  ? 'block' : 'none';
     document.getElementById('notificationsMode').style.display = mode === 'notifications' ? 'block' : 'none';
     document.getElementById('btnEmsMode').classList.toggle('active',      mode === 'ems');
     document.getElementById('btnRosterMode').classList.toggle('active',   mode === 'roster');
+    document.getElementById('btnBenefitsMode').classList.toggle('active', mode === 'benefits');
     document.getElementById('btnWaitlistMode').classList.toggle('active', mode === 'waitlist');
     document.getElementById('btnReportsMode').classList.toggle('active',  mode === 'reports');
     document.getElementById('btnNotificationsMode').classList.toggle('active', mode === 'notifications');
     if (mode === 'roster') buildRoster();
+    if (mode === 'benefits') buildBenefitsRoster();
     if (mode === 'ems') { buildViewSidebar(); updateRoomNavDisplay(); }
     if (mode === 'waitlist' && !wlLoaded) loadWaitlist();
     if (mode === 'reports' && !reportsLoaded) loadReports();
@@ -1633,6 +1642,105 @@ function checkSummerUnmatched(summerRows) {
     window._summerUnmatched = summerRows
         .filter(r => r[3] === 'Unknown' || !r[3])
         .map(r => `${r[1]} ${r[0]}`);
+}
+
+// ══════════════════════════════════════════
+// BENEFITS ROSTER
+// ══════════════════════════════════════════
+let activeBenefitsRoom = null;
+
+function buildBenefitsRoster() {
+    const sidebar = document.getElementById('benefitsSidebar');
+    const rooms = classrooms.map(r => r.RoomNumber);
+    if (!activeBenefitsRoom && rooms.length) activeBenefitsRoom = rooms[0];
+    sidebar.innerHTML = rooms.map(rn => {
+        const cr = getClassroom(rn);
+        const label = cr ? cr.Room : rn;
+        const isActive = String(activeBenefitsRoom) === String(rn);
+        return `<button onclick="selectBenefitsRoom('${rn}')"
+            style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
+            background:${isActive?'rgba(255,255,255,0.2)':'transparent'};border-left:none;transition:background 0.15s;"
+            onmouseover="if(!${isActive})this.style.background='rgba(255,255,255,0.1)'"
+            onmouseout="if(!${isActive})this.style.background='transparent'">
+            <div style="font-size:0.82rem;font-weight:700;color:white;">${label}</div>
+        </button>`;
+    }).join('');
+    renderBenefitsRoom();
+}
+
+function selectBenefitsRoom(rn) {
+    activeBenefitsRoom = rn;
+    buildBenefitsRoster();
+}
+
+function renderBenefitsRoom() {
+    const rn = activeBenefitsRoom;
+    const cr = getClassroom(rn);
+    document.getElementById('benefitsRoomTitle').textContent = cr ? cr.Room : rn;
+    const roomStudents = students.filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active));
+    document.getElementById('benefitsCount').textContent = `${roomStudents.length} students`;
+    const grid = document.getElementById('benefitsGrid');
+    if (!roomStudents.length) { grid.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted);">No active students.</div>'; return; }
+
+    const benefitKeys = ['WIC','Medicaid','SNAP','TANF','CCAP'];
+    const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
+    const normCat = c => { const u=(c||'').toUpperCase(); if(u==='CHASI'||u==='CCAP')return'CCAP'; if(u==='DCFS'||u==='FOSTER')return'Foster'; if(u==='HALF PRICE'||c==='1/2 price')return'Half Price'; if(u==='STAFF')return'Free'; return c||''; };
+
+    grid.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+            <th style="padding:8px 12px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
+            <th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:70px;">Pay</th>
+            <th style="padding:8px 8px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:60px;">F/R/P</th>
+            ${benefitKeys.map(b => `<th style="padding:8px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:55px;">${b}</th>`).join('')}
+            <th style="padding:8px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:44px;">Save</th>
+        </tr></thead>
+        <tbody>${roomStudents.map((s, i) => {
+            const ben = s.PublicBenefits || '';
+            const frp = s.F_R_P_Food || '';
+            return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                <td style="padding:7px 12px;font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
+                <td style="padding:5px 8px;text-align:center;font-size:0.72rem;font-weight:600;">${normCat(s.Category)}</td>
+                <td style="padding:5px 8px;text-align:center;font-weight:700;color:${frpColor(frp)};">${frp || '—'}</td>
+                ${benefitKeys.map(b => `<td style="padding:5px 6px;text-align:center;">
+                    <input type="checkbox" id="ben_${rn}_${i}_${b}" ${ben.includes(b)?'checked':''} onchange="markBenefitChanged(${i})" style="width:auto;accent-color:var(--primary);">
+                </td>`).join('')}
+                <td style="padding:5px 6px;text-align:center;">
+                    <button id="benSave_${i}" onclick="saveBenefitRow(${i})" disabled style="padding:3px 8px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.7rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button>
+                </td>
+            </tr>`;
+        }).join('')}</tbody>
+    </table>`;
+}
+
+function markBenefitChanged(i) {
+    const btn = document.getElementById(`benSave_${i}`);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+}
+
+async function saveBenefitRow(i) {
+    const rn = activeBenefitsRoom;
+    const roomStudents = students.filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active));
+    const s = roomStudents[i];
+    if (!s) return;
+    const benefitKeys = ['WIC','Medicaid','SNAP','TANF','CCAP'];
+    const benefits = benefitKeys.filter(b => document.getElementById(`ben_${rn}_${i}_${b}`)?.checked).join(', ');
+    const btn = document.getElementById(`benSave_${i}`);
+    btn.disabled = true; btn.textContent = '…';
+    try {
+        const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
+            method: 'PUT', body: JSON.stringify({ publicBenefits: benefits })
+        });
+        const data = await res.json();
+        if (data.success) {
+            s.PublicBenefits = benefits;
+            showNotification(`${s.First_Name} ${s.Last_Name} benefits updated`, 'success');
+            btn.style.opacity = '0.3';
+        } else {
+            showNotification('Update failed', 'error');
+            btn.disabled = false; btn.style.opacity = '1';
+        }
+    } catch (e) { showNotification('Network error', 'error'); btn.disabled = false; btn.style.opacity = '1'; }
+    finally { btn.textContent = 'Save'; }
 }
 
 // ══════════════════════════════════════════
