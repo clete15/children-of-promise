@@ -1676,12 +1676,25 @@ function buildBenefitsRoster() {
         const cr = getClassroom(rn);
         const label = cr ? cr.Room : rn;
         const isActive = String(activeBenefitsRoom) === String(rn);
+        // Count students with notes (missing data or CCAP eligible)
+        const roomStudents = students.filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active));
+        const needsAttn = roomStudents.filter(s => {
+            const income = parseInt(s.HouseholdIncome) || 0;
+            const hhSize = parseInt(s.HouseholdSize) || 0;
+            if (!income || !hhSize) return true;
+            if (s.Category !== 'CCAP' && s.Category !== 'Foster') {
+                const idx = Math.max(1, Math.min(hhSize, 8)) - 1;
+                if (income <= CCAP_THRESHOLDS[idx]) return true;
+            }
+            return false;
+        }).length;
         return `<button onclick="selectBenefitsRoom('${rn}')"
             style="display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
             background:${isActive?'rgba(255,255,255,0.2)':'transparent'};border-left:none;transition:background 0.15s;"
             onmouseover="if(!${isActive})this.style.background='rgba(255,255,255,0.1)'"
             onmouseout="if(!${isActive})this.style.background='transparent'">
-            <div style="font-size:0.82rem;font-weight:700;color:white;">${label}</div>
+            <div style="font-size:0.82rem;font-weight:700;color:white;">${label}${needsAttn ? ' <span style="color:#fca5a5;">*</span>' : ''}</div>
+            ${needsAttn ? '<div style="font-size:0.65rem;color:#fca5a5;">'+needsAttn+' need attention</div>' : ''}
         </button>`;
     }).join('');
     renderBenefitsRoom();
@@ -1734,8 +1747,8 @@ function renderBenefitsRoom() {
                 <td style="padding:6px 10px;font-weight:600;white-space:nowrap;">${s.Last_Name}, ${s.First_Name}</td>
                 <td style="padding:4px 4px;"><select id="benPay_${i}" onchange="markBenefitChanged(${i})" style="padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.7rem;width:100%;">${payOpts}</select></td>
                 <td style="padding:5px 6px;text-align:center;font-weight:700;font-size:0.7rem;color:${frpColor(frp)};">${frp || '—'}</td>
-                <td style="padding:5px 6px;text-align:center;font-size:0.7rem;">${income ? '$'+income.toLocaleString() : '—'}</td>
-                <td style="padding:5px 6px;text-align:center;font-size:0.7rem;">${hhSize || '—'}</td>
+                <td style="padding:4px 4px;"><input type="number" id="benIncome_${i}" value="${income || ''}" onchange="markBenefitChanged(${i})" style="width:60px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:0.68rem;text-align:center;"></td>
+                <td style="padding:4px 4px;"><input type="number" id="benHH_${i}" value="${hhSize || ''}" min="1" max="15" onchange="markBenefitChanged(${i})" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:0.68rem;text-align:center;"></td>
                 ${benefitKeys.map(b => `<td style="padding:4px 4px;text-align:center;">
                     <input type="checkbox" id="ben_${rn}_${i}_${b}" ${ben.includes(b)?'checked':''} onchange="markBenefitChanged(${i})" style="width:auto;accent-color:var(--primary);">
                 </td>`).join('')}
@@ -1775,16 +1788,20 @@ async function saveBenefitRow(i) {
     const benefitKeys = ['WIC','Medicaid','SNAP','TANF','CCAP'];
     const benefits = benefitKeys.filter(b => document.getElementById(`ben_${rn}_${i}_${b}`)?.checked).join(', ');
     const newCategory = document.getElementById(`benPay_${i}`)?.value || s.Category || '';
+    const newIncome = document.getElementById(`benIncome_${i}`)?.value || '';
+    const newHHSize = document.getElementById(`benHH_${i}`)?.value || '';
     const btn = document.getElementById(`benSave_${i}`);
     btn.disabled = true; btn.textContent = '…';
     try {
         const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
-            method: 'PUT', body: JSON.stringify({ publicBenefits: benefits, category: newCategory })
+            method: 'PUT', body: JSON.stringify({ publicBenefits: benefits, category: newCategory, householdIncome: newIncome, householdSize: newHHSize })
         });
         const data = await res.json();
         if (data.success) {
             s.PublicBenefits = benefits;
             s.Category = newCategory;
+            s.HouseholdIncome = newIncome;
+            s.HouseholdSize = newHHSize;
             showNotification(`${s.First_Name} ${s.Last_Name} updated`, 'success');
             btn.style.opacity = '0.3';
         } else {
