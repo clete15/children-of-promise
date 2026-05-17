@@ -165,11 +165,12 @@
                 </div>
                 <div class="form-group child-ageGroupGroup">
                     <label>Program Applying For <span class="required">*</span></label>
-                    <select class="child-ageGroup" required>
+                    <select class="child-ageGroup" required onchange="toggleAgeGroup(this)">
                         <option value="">-- Select Program --</option>
                         <option value="0-2">Infant &amp; Toddler (Birth – 2 years)</option>
                         <option value="2-3">2-Year Old Program (2 – 3 years)</option>
                         <option value="3-5">Pre-School (3 – 5 years)</option>
+                        <option value="ba">Before &amp; Afterschool (School Age)</option>
                     </select>
                 </div>
             </div>
@@ -219,65 +220,8 @@
 
     <div class="form-row">
         <div class="form-group">
-            <label>Is your family experiencing homelessness? <span class="required">*</span></label>
-            <select id="homeless" required>
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Does the child have an IEP or have they been referred for special education evaluation? <span class="required">*</span></label>
-            <select id="iep" required>
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="form-row">
-        <div class="form-group">
-            <label>Has the primary caregiver completed high school / No GED? <span class="required">*</span></label>
-            <select id="noHSDiploma" required>
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Was the parent a teen at birth or are they currently under 21? <span class="required">*</span></label>
-            <select id="teenParent" required>
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="form-row">
-        <div class="form-group">
-            <label>Child was born outside the US or has one or more parent/caregiver born outside the US? <span class="required">*</span></label>
-            <select id="bornOutsideUS" required>
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-            </select>
-        </div>
-        <div class="form-group">
             <label>Is the child a foster child or adopted? <span class="required">*</span></label>
             <select id="fosterAdopted" required>
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="form-row">
-        <div class="form-group">
-            <label>Does the parent/caregiver primarily speak a language other than English at home? <span class="required">*</span></label>
-            <select id="nonEnglishHome" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
@@ -295,16 +239,38 @@
 
     <div class="form-row">
         <div class="form-group">
-            <label>Has the child previously participated in a formal early learning program? <span class="required">*</span></label>
-            <select id="priorEarlyLearning" required>
+            <label>Is the child currently living with both parents or a single parent? <span class="required">*</span></label>
+            <select id="livingSituation" required>
+                <option value="">Select</option>
+                <option value="Both Parents">Both Parents</option>
+                <option value="Single Parent">Single Parent</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Does the child have an IEP or have they been referred for special education evaluation? <span class="required">*</span></label>
+            <select id="iep" required>
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="scoredQuestionsSection">
+    <div class="section-divider">Additional Eligibility Questions</div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Is your family experiencing homelessness? <span class="required">*</span></label>
+            <select id="homeless" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
             </select>
         </div>
         <div class="form-group">
-            <label>Is the family currently receiving Brightpoint childcare subsidies? <span class="required">*</span></label>
-            <select id="brightpointSubsidy" required>
+            <label>Has the primary caregiver completed high school / No GED? <span class="required">*</span></label>
+            <select id="noHSDiploma" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
@@ -314,11 +280,49 @@
 
     <div class="form-row">
         <div class="form-group">
-            <label>Is the child currently living with both parents or a single parent? <span class="required">*</span></label>
-            <select id="livingSituation" required>
+            <label>Was the parent a teen at birth or are they currently under 21? <span class="required">*</span></label>
+            <select id="teenParent" required>
                 <option value="">Select</option>
-                <option value="Both Parents">Both Parents</option>
-                <option value="Single Parent">Single Parent</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Child was born outside the US or has one or more parent/caregiver born outside the US? <span class="required">*</span></label>
+            <select id="bornOutsideUS" required>
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Does the parent/caregiver primarily speak a language other than English at home? <span class="required">*</span></label>
+            <select id="nonEnglishHome" required>
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Has the child previously participated in a formal early learning program? <span class="required">*</span></label>
+            <select id="priorEarlyLearning" required>
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Is the family currently receiving Brightpoint childcare subsidies? <span class="required">*</span></label>
+            <select id="brightpointSubsidy" required>
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
             </select>
         </div>
         <div class="form-group">
@@ -406,6 +410,7 @@
             </select>
         </div>
     </div>
+    </div><!-- end scoredQuestionsSection -->
 
     <button type="submit" class="btn-submit" id="submitBtn">Submit Pre-Enrollment</button>
 </form>
@@ -417,6 +422,23 @@
 </footer>
 
 <script>
+function toggleAgeGroup(select) {
+    const scoredSection = document.getElementById('scoredQuestionsSection');
+    if (!scoredSection) return;
+    // Check if ANY child has a non-BA program selected
+    const allSelects = document.querySelectorAll('.child-ageGroup');
+    const hasEarlyChildhood = [...allSelects].some(s => s.value && s.value !== 'ba');
+    if (hasEarlyChildhood) {
+        scoredSection.style.display = '';
+        // Re-enable required on scored fields
+        scoredSection.querySelectorAll('select[required]').forEach(s => s.setAttribute('required',''));
+    } else if ([...allSelects].every(s => s.value === 'ba')) {
+        scoredSection.style.display = 'none';
+        // Remove required from hidden scored fields
+        scoredSection.querySelectorAll('select').forEach(s => { s.removeAttribute('required'); s.value = 'No'; });
+    }
+}
+
 function toggleNotBorn(checkbox) {
     const block = checkbox.closest('.child-block');
     const birthGroup = block.querySelector('.child-birthDateGroup');
@@ -492,11 +514,12 @@ function addChild() {
             </div>
             <div class="form-group child-ageGroupGroup">
                 <label>Program Applying For <span class="required">*</span></label>
-                <select class="child-ageGroup child-highlight" required>
+                <select class="child-ageGroup child-highlight" required onchange="toggleAgeGroup(this)">
                     <option value="">-- Select Program --</option>
                     <option value="0-2">Infant &amp; Toddler (Birth – 2 years)</option>
                     <option value="2-3">2-Year Old Program (2 – 3 years)</option>
                     <option value="3-5">Pre-School (3 – 5 years)</option>
+                    <option value="ba">Before &amp; Afterschool (School Age)</option>
                 </select>
             </div>
         </div>

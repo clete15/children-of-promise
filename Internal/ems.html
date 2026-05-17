@@ -340,6 +340,10 @@
                     <div style="font-size:0.82rem;font-weight:700;color:white;">🎨 Pre-School</div>
                     <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;" id="wl-count-3-5"></div>
                 </button>
+                <button onclick="setWlTab('ba')" id="wl-tab-ba" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">🎒 Before & After</div>
+                    <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;" id="wl-count-ba"></div>
+                </button>
             </div>
 
             <!-- RIGHT: TABLE -->
@@ -1129,7 +1133,7 @@ async function loadWaitlist() {
 }
 
 function updateWlTabCounts() {
-    ['0-2','2-3','3-5'].forEach(tab => {
+    ['0-2','2-3','3-5','ba'].forEach(tab => {
         const count = wlRows.filter(r => r.AgeGroup === tab && r.WaitlistStatus !== 'Declined' && r.WaitlistStatus !== 'Enrolled').length;
         const el = document.getElementById(`wl-count-${tab}`);
         if (el) el.textContent = count ? `${count} pending` : 'None';
@@ -1138,10 +1142,10 @@ function updateWlTabCounts() {
 
 function setWlTab(tab) {
     wlActiveTab = tab;
-    const labels = { '0-2': '🍼 Infant & Toddler', '2-3': '🧒 2-Year Olds', '3-5': '🎨 Pre-School' };
+    const labels = { '0-2': '🍼 Infant & Toddler', '2-3': '🧒 2-Year Olds', '3-5': '🎨 Pre-School', 'ba': '🎒 Before & Afterschool' };
     document.getElementById('wlTitle').textContent = labels[tab] || tab;
     // Update sidebar active state
-    ['0-2','2-3','3-5'].forEach(t => {
+    ['0-2','2-3','3-5','ba'].forEach(t => {
         const btn = document.getElementById(`wl-tab-${t}`);
         if (btn) {
             btn.style.background = t === tab ? 'rgba(255,255,255,0.2)' : 'transparent';
