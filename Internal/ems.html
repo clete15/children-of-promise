@@ -1587,19 +1587,20 @@ function renderAlerts() {
             icon: '💰',
             title: `${ccapEligible.length} families may qualify for CCAP`,
             detail: ccapEligible.map(s => `${s.First_Name} ${s.Last_Name}`).join(', '),
-            action: 'View in Reports → CCAP Eligible'
+            actionText: 'Open Benefits Roster →',
+            onclick: "setMode('benefits')"
         });
     }
 
-    // Check for summer sign-ups not found in enrollment (loaded from reports if available)
-    // This will be populated after reports load
+    // Check for summer sign-ups not found in enrollment
     if (window._summerUnmatched && window._summerUnmatched.length) {
         alerts.push({
             type: 'error',
             icon: '⚠️',
             title: `${window._summerUnmatched.length} summer sign-ups not found in enrollment`,
             detail: window._summerUnmatched.join(', '),
-            action: 'These children signed up for summer but are not in the enrollment database. Verify spelling or add them to EMS.'
+            actionText: 'Open EMS to add student →',
+            onclick: "setMode('ems'); startNewStudent()"
         });
     }
 
@@ -1611,7 +1612,8 @@ function renderAlerts() {
             icon: '📄',
             title: `${missingProof.length} PFA/PI students missing proof of income`,
             detail: missingProof.slice(0, 10).map(s => `${s.First_Name} ${s.Last_Name}`).join(', ') + (missingProof.length > 10 ? '...' : ''),
-            action: 'Update via EMS → check Proof of Income box when received'
+            actionText: 'Open EMS to update →',
+            onclick: "setMode('ems')"
         });
     }
 
@@ -1622,10 +1624,10 @@ function renderAlerts() {
     } else {
         el.innerHTML = alerts.map(a => {
             const borderColor = a.type === 'error' ? 'var(--danger)' : a.type === 'warning' ? '#f59e0b' : 'var(--primary)';
-            return `<div style="border-left:4px solid ${borderColor};padding:14px 18px;margin-bottom:12px;background:#f8fafc;border-radius:0 8px 8px 0;">
+            return `<div style="border-left:4px solid ${borderColor};padding:14px 18px;margin-bottom:12px;background:#f8fafc;border-radius:0 8px 8px 0;cursor:pointer;transition:background 0.15s;" onclick="${a.onclick}" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='#f8fafc'">
                 <div style="font-weight:700;font-size:0.9rem;color:var(--text);margin-bottom:4px;">${a.icon} ${a.title}</div>
                 <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">${a.detail}</div>
-                <div style="font-size:0.72rem;color:var(--primary);font-weight:600;">${a.action}</div>
+                <div style="font-size:0.72rem;color:var(--primary);font-weight:600;">${a.actionText}</div>
             </div>`;
         }).join('');
     }
