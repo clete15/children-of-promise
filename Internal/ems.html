@@ -485,7 +485,7 @@ let students = [];
 let classrooms = [];
 let filtered = [];
 let currentIndex = 0;
-let activeRoom = 'All';
+let activeRoom = null;
 let currentMode = 'ems';
 let isNewMode = false;
 let waitlistId = null;
@@ -649,7 +649,7 @@ function buildViewSidebar() {
     const sidebar = document.getElementById('viewSidebar');
     if (!sidebar) return;
     const sidebarRooms = classrooms.map(r => r.RoomNumber);
-    if (activeRoom === 'All' && sidebarRooms.length) { activeRoom = sidebarRooms[0]; activeRoomIndex = 0; }
+    if ((!activeRoom || activeRoom === 'All') && sidebarRooms.length) { activeRoom = sidebarRooms[0]; activeRoomIndex = 0; }
     sidebar.innerHTML = sidebarRooms.map(rn => {
         const cr = getClassroom(rn);
         const label = cr ? cr.Room : rn;
