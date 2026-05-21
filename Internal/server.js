@@ -4,6 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
+// Prevent crashes from unhandled errors
+process.on('uncaughtException', (err) => {
+    console.error('[CRASH PREVENTED]', err.message);
+});
+process.on('unhandledRejection', (err) => {
+    console.error('[UNHANDLED REJECTION]', err);
+});
+
 const PORT = process.env.PORT || 80;
 const HTTPS_PORT = 443;
 const DB_SERVER = 'localhost\\SQLEXPRESS';
