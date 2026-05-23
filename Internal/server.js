@@ -507,20 +507,32 @@ function handleRequest(req, res) {
     // POST recalculate all F/R/P values (internal - protected)
     if (req.method === 'POST' && url === '/api/recalculate-frp') {
         if (!checkAuth(req, res)) return;
+        // Auto-select thresholds based on current date (effective July 1 each year)
+        const now = new Date();
+        const usdaYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+        const guidelines = {
+            2025: { free: [20163,27339,34515,41691,48867,56043,63219,70395], reduced: [28694,38907,49120,59333,69546,79759,89972,100185] },
+            2026: { free: [20748,28132,35516,42900,50284,57668,65052,72436], reduced: [29526,40034,50542,61050,71558,82066,92574,103082] },
+            2027: { free: [21372,28978,36584,44190,51796,59402,67008,74614], reduced: [30414,41239,52064,62889,73714,84539,95364,106189] },
+        };
+        const g = guidelines[usdaYear] || guidelines[2026];
+        const f = g.free;
+        const r2 = g.reduced;
+        console.log(`[FRP] Using ${usdaYear}-${usdaYear+1} thresholds`);
         const sql = `UPDATE rptMasterEnrollment SET F_R_P_Food = 
             CASE 
                 WHEN ISNULL(PublicBenefits,'') <> '' THEN 'Free'
                 WHEN Category = 'Foster' THEN 'Free'
                 WHEN Military = 'Yes' OR Military = 'YES' THEN 'Free'
                 WHEN PFA_PI_na = 'PFA' THEN 'Free'
-                WHEN ISNULL(HouseholdIncome,100000) <= CASE ISNULL(HouseholdSize,1) WHEN 1 THEN 20748 WHEN 2 THEN 28132 WHEN 3 THEN 35516 WHEN 4 THEN 42900 WHEN 5 THEN 50284 WHEN 6 THEN 57668 WHEN 7 THEN 65052 ELSE 72436 END THEN 'Free'
-                WHEN ISNULL(HouseholdIncome,100000) <= CASE ISNULL(HouseholdSize,1) WHEN 1 THEN 29526 WHEN 2 THEN 40034 WHEN 3 THEN 50542 WHEN 4 THEN 61050 WHEN 5 THEN 71558 WHEN 6 THEN 82066 WHEN 7 THEN 92574 ELSE 103082 END THEN 'Reduced'
+                WHEN ISNULL(HouseholdIncome,100000) <= CASE ISNULL(HouseholdSize,1) WHEN 1 THEN ${f[0]} WHEN 2 THEN ${f[1]} WHEN 3 THEN ${f[2]} WHEN 4 THEN ${f[3]} WHEN 5 THEN ${f[4]} WHEN 6 THEN ${f[5]} WHEN 7 THEN ${f[6]} ELSE ${f[7]} END THEN 'Free'
+                WHEN ISNULL(HouseholdIncome,100000) <= CASE ISNULL(HouseholdSize,1) WHEN 1 THEN ${r2[0]} WHEN 2 THEN ${r2[1]} WHEN 3 THEN ${r2[2]} WHEN 4 THEN ${r2[3]} WHEN 5 THEN ${r2[4]} WHEN 6 THEN ${r2[5]} WHEN 7 THEN ${r2[6]} ELSE ${r2[7]} END THEN 'Reduced'
                 ELSE 'Paid'
             END
             WHERE Active = 'Yes' OR Active = 'YES'`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        sendJSON(res, 200, { success: true, message: 'All F/R/P values recalculated' });
+        sendJSON(res, 200, { success: true, message: `All F/R/P values recalculated using ${usdaYear}-${usdaYear+1} thresholds` });
         return;
     }
 

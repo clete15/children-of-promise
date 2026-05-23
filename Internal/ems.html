@@ -472,11 +472,20 @@
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 
-// USDA Income Eligibility Guidelines 2026-2027 (effective July 1, 2026)
-// Update these annually when new guidelines are published
-const USDA_FREE_THRESHOLDS    = [20748,28132,35516,42900,50284,57668,65052,72436];
-const USDA_REDUCED_THRESHOLDS = [29526,40034,50542,61050,71558,82066,92574,103082];
-// Illinois CCAP eligibility at 225% FPL (2026)
+// USDA Income Eligibility Guidelines - auto-selects based on current date
+// Each entry: effective July 1 of that year through June 30 of next year
+const USDA_GUIDELINES = {
+    2025: { free: [20163,27339,34515,41691,48867,56043,63219,70395], reduced: [28694,38907,49120,59333,69546,79759,89972,100185] },
+    2026: { free: [20748,28132,35516,42900,50284,57668,65052,72436], reduced: [29526,40034,50542,61050,71558,82066,92574,103082] },
+    2027: { free: [21372,28978,36584,44190,51796,59402,67008,74614], reduced: [30414,41239,52064,62889,73714,84539,95364,106189] },
+};
+// Determine which year's thresholds to use (effective July 1)
+const _now = new Date();
+const _usdaYear = _now.getMonth() >= 6 ? _now.getFullYear() : _now.getFullYear() - 1;
+const _guidelines = USDA_GUIDELINES[_usdaYear] || USDA_GUIDELINES[2026];
+const USDA_FREE_THRESHOLDS = _guidelines.free;
+const USDA_REDUCED_THRESHOLDS = _guidelines.reduced;
+// Illinois CCAP eligibility at 225% FPL
 const CCAP_THRESHOLDS = [35888,48668,61448,74228,87008,99788,112568,125348];
 
 function apiFetch(url, opts = {}) {
@@ -1646,10 +1655,10 @@ function renderAlerts() {
         alerts.push({
             type: 'warning',
             icon: '📅',
-            title: 'USDA income thresholds update July 1',
-            detail: month === 5 ? 'New USDA income eligibility guidelines take effect July 1. Check for updated numbers at fns.usda.gov and click "Recalculate All F/R/P" after updating.' : 'New USDA thresholds are now in effect. If you haven\'t updated yet, do so now and click "Recalculate All F/R/P".',
-            actionText: 'View USDA Guidelines →',
-            onclick: "window.open('https://www.fns.usda.gov/cn/income-eligibility-guidelines','_blank')"
+            title: 'Annual F/R/P recalculation due',
+            detail: month === 5 ? 'New USDA thresholds take effect July 1. Click "Recalculate All F/R/P" after July 1 to update all students automatically.' : 'New USDA thresholds are now active. Click "Recalculate All F/R/P" above to update all students with the new numbers.',
+            actionText: 'Recalculate All F/R/P →',
+            onclick: "recalculateAllFRP()"
         });
     }
 
