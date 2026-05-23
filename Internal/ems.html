@@ -1654,12 +1654,17 @@ function renderAlerts() {
 
     // Threshold update alerts
     if (_thresholdsExpired) {
+        const missingUSDA = !USDA_GUIDELINES[_usdaYear];
+        const missingCCAP = !CCAP_GUIDELINES[_usdaYear];
+        let what = [];
+        if (missingUSDA) what.push('USDA Free/Reduced');
+        if (missingCCAP) what.push('IL CCAP');
         alerts.push({
             type: 'error',
             icon: '🚨',
-            title: 'Income thresholds need updating',
-            detail: 'The current USDA and/or CCAP thresholds have expired. New official numbers must be entered before F/R/P calculations will be accurate. Contact your developer or update via the portal SQL.',
-            actionText: 'This requires a code update with new published numbers',
+            title: `${what.join(' and ')} thresholds need updating`,
+            detail: `The current period requires ${_usdaYear}-${_usdaYear+1} thresholds which have not been entered. F/R/P and CCAP eligibility calculations may be inaccurate. Contact your developer with the new official numbers.`,
+            actionText: 'View USDA Guidelines →',
             onclick: "window.open('https://www.fns.usda.gov/cn/income-eligibility-guidelines','_blank')"
         });
     } else {
@@ -1667,22 +1672,29 @@ function renderAlerts() {
         const now = new Date();
         const month = now.getMonth();
         const nextYear = _usdaYear + 1;
-        if (month === 5 && !USDA_GUIDELINES[nextYear]) {
-            alerts.push({
-                type: 'warning',
-                icon: '📅',
-                title: 'New USDA/CCAP thresholds needed by July 1',
-                detail: `The ${nextYear}-${nextYear+1} thresholds have not been entered yet. New numbers are typically published in March. Contact your developer to add them before July 1.`,
-                actionText: 'View USDA Guidelines →',
-                onclick: "window.open('https://www.fns.usda.gov/cn/income-eligibility-guidelines','_blank')"
-            });
+        if (month === 5) {
+            const missingNextUSDA = !USDA_GUIDELINES[nextYear];
+            const missingNextCCAP = !CCAP_GUIDELINES[nextYear];
+            if (missingNextUSDA || missingNextCCAP) {
+                let what = [];
+                if (missingNextUSDA) what.push('USDA');
+                if (missingNextCCAP) what.push('IL CCAP');
+                alerts.push({
+                    type: 'warning',
+                    icon: '📅',
+                    title: `New ${what.join(' and ')} thresholds needed by July 1`,
+                    detail: `The ${nextYear}-${nextYear+1} thresholds have not been entered yet. New numbers are typically published in March. Contact your developer to add them before July 1.`,
+                    actionText: 'View USDA Guidelines →',
+                    onclick: "window.open('https://www.fns.usda.gov/cn/income-eligibility-guidelines','_blank')"
+                });
+            }
         }
-        if (month === 6 && !USDA_GUIDELINES[nextYear]) {
+        if (month === 6) {
             alerts.push({
-                type: 'warning',
+                type: 'info',
                 icon: '📅',
                 title: 'Annual F/R/P recalculation due',
-                detail: 'New thresholds are active. Click "Recalculate All F/R/P" to update all students.',
+                detail: 'New thresholds are active for this period. Click to recalculate all students.',
                 actionText: 'Recalculate All F/R/P →',
                 onclick: "recalculateAllFRP()"
             });
