@@ -474,19 +474,23 @@ const AUTH = 'Basic ' + btoa(':cofpadmin');
 
 // USDA Income Eligibility Guidelines - auto-selects based on current date
 // Each entry: effective July 1 of that year through June 30 of next year
+// Only include OFFICIAL published numbers - no estimates
 const USDA_GUIDELINES = {
     2025: { free: [20163,27339,34515,41691,48867,56043,63219,70395], reduced: [28694,38907,49120,59333,69546,79759,89972,100185] },
     2026: { free: [20748,28132,35516,42900,50284,57668,65052,72436], reduced: [29526,40034,50542,61050,71558,82066,92574,103082] },
-    2027: { free: [21372,28978,36584,44190,51796,59402,67008,74614], reduced: [30414,41239,52064,62889,73714,84539,95364,106189] },
+};
+// Illinois CCAP eligibility (225% FPL) - update annually when IL DHS publishes
+const CCAP_GUIDELINES = {
+    2025: [35888,48668,61448,74228,87008,99788,112568,125348],
 };
 // Determine which year's thresholds to use (effective July 1)
 const _now = new Date();
 const _usdaYear = _now.getMonth() >= 6 ? _now.getFullYear() : _now.getFullYear() - 1;
-const _guidelines = USDA_GUIDELINES[_usdaYear] || USDA_GUIDELINES[2026];
+const _guidelines = USDA_GUIDELINES[_usdaYear] || USDA_GUIDELINES[Object.keys(USDA_GUIDELINES).pop()];
 const USDA_FREE_THRESHOLDS = _guidelines.free;
 const USDA_REDUCED_THRESHOLDS = _guidelines.reduced;
-// Illinois CCAP eligibility at 225% FPL
-const CCAP_THRESHOLDS = [35888,48668,61448,74228,87008,99788,112568,125348];
+const CCAP_THRESHOLDS = CCAP_GUIDELINES[_usdaYear] || CCAP_GUIDELINES[Object.keys(CCAP_GUIDELINES).pop()];
+const _thresholdsExpired = !USDA_GUIDELINES[_usdaYear] || !CCAP_GUIDELINES[_usdaYear];
 
 function apiFetch(url, opts = {}) {
     opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
@@ -1648,18 +1652,41 @@ function renderAlerts() {
         });
     }
 
-    // Annual threshold update reminder (shows June 1 - July 31)
-    const now = new Date();
-    const month = now.getMonth(); // 0-indexed: 5=June, 6=July
-    if (month === 5 || month === 6) {
+    // Threshold update alerts
+    if (_thresholdsExpired) {
         alerts.push({
-            type: 'warning',
-            icon: '📅',
-            title: 'Annual F/R/P recalculation due',
-            detail: month === 5 ? 'New USDA thresholds take effect July 1. Click "Recalculate All F/R/P" after July 1 to update all students automatically.' : 'New USDA thresholds are now active. Click "Recalculate All F/R/P" above to update all students with the new numbers.',
-            actionText: 'Recalculate All F/R/P →',
-            onclick: "recalculateAllFRP()"
+            type: 'error',
+            icon: '🚨',
+            title: 'Income thresholds need updating',
+            detail: 'The current USDA and/or CCAP thresholds have expired. New official numbers must be entered before F/R/P calculations will be accurate. Contact your developer or update via the portal SQL.',
+            actionText: 'This requires a code update with new published numbers',
+            onclick: "window.open('https://www.fns.usda.gov/cn/income-eligibility-guidelines','_blank')"
         });
+    } else {
+        // Reminder in June to prepare for July 1 changeover
+        const now = new Date();
+        const month = now.getMonth();
+        const nextYear = _usdaYear + 1;
+        if (month === 5 && !USDA_GUIDELINES[nextYear]) {
+            alerts.push({
+                type: 'warning',
+                icon: '📅',
+                title: 'New USDA/CCAP thresholds needed by July 1',
+                detail: `The ${nextYear}-${nextYear+1} thresholds have not been entered yet. New numbers are typically published in March. Contact your developer to add them before July 1.`,
+                actionText: 'View USDA Guidelines →',
+                onclick: "window.open('https://www.fns.usda.gov/cn/income-eligibility-guidelines','_blank')"
+            });
+        }
+        if (month === 6 && !USDA_GUIDELINES[nextYear]) {
+            alerts.push({
+                type: 'warning',
+                icon: '📅',
+                title: 'Annual F/R/P recalculation due',
+                detail: 'New thresholds are active. Click "Recalculate All F/R/P" to update all students.',
+                actionText: 'Recalculate All F/R/P →',
+                onclick: "recalculateAllFRP()"
+            });
+        }
     }
 
     // Render
