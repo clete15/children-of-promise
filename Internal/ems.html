@@ -1455,28 +1455,47 @@ function toggleFoodDetail() {
     const existing = document.getElementById('foodDetailTable');
     if (existing) { existing.remove(); return; }
     if (!foodDetailData.length) return;
+    // Get unique rooms for filter
+    const rooms = [...new Set(foodDetailData.map(r => r[0] || 'Unknown'))];
+    window._foodFilterRoom = 'All';
+    renderFoodDetailTable(card, rooms);
+}
+
+function renderFoodDetailTable(card, rooms) {
+    const existing = document.getElementById('foodDetailTable');
+    if (existing) existing.remove();
+    const filterRoom = window._foodFilterRoom || 'All';
+    const filtered = filterRoom === 'All' ? foodDetailData : foodDetailData.filter(r => (r[0] || 'Unknown') === filterRoom);
     const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
     const table = document.createElement('div');
     table.id = 'foodDetailTable';
-    table.style.cssText = 'margin-top:14px;max-height:300px;overflow:auto;border:1px solid var(--border);border-radius:6px;';
-    table.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
-        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
-            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
-            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Name</th>
-            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
-            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
-            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Food Program</th>
-            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Benefits</th>
-        </tr></thead>
-        <tbody>${foodDetailData.map(r => `<tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px 10px;">${r[0] || '—'}</td>
-            <td style="padding:6px 10px;font-weight:600;">${r[1]}, ${r[2]}</td>
-            <td style="padding:6px 10px;">${r[3] ? '$'+parseInt(r[3]).toLocaleString() : '—'}</td>
-            <td style="padding:6px 10px;">${r[4] || '—'}</td>
-            <td style="padding:6px 10px;font-weight:700;color:${frpColor(r[5])};">${r[5] || '—'}</td>
-            <td style="padding:6px 10px;font-size:0.7rem;">${r[6] || '—'}</td>
-        </tr>`).join('')}</tbody>
-    </table>`;
+    table.style.cssText = 'margin-top:14px;border:1px solid var(--border);border-radius:6px;';
+    table.innerHTML = `
+        <div style="padding:8px 10px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <span style="font-size:0.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;">Filter:</span>
+            <button onclick="window._foodFilterRoom='All';renderFoodDetailTable(document.getElementById('rptFood'),[${rooms.map(r=>`'${r}'`).join(',')}])" style="padding:3px 8px;border-radius:4px;border:1px solid var(--border);font-size:0.7rem;cursor:pointer;background:${filterRoom==='All'?'var(--primary)':'white'};color:${filterRoom==='All'?'white':'var(--text)'};font-weight:600;">All</button>
+            ${rooms.map(rm => `<button onclick="window._foodFilterRoom='${rm}';renderFoodDetailTable(document.getElementById('rptFood'),[${rooms.map(r=>`'${r}'`).join(',')}])" style="padding:3px 8px;border-radius:4px;border:1px solid var(--border);font-size:0.7rem;cursor:pointer;background:${filterRoom===rm?'var(--primary)':'white'};color:${filterRoom===rm?'white':'var(--text)'};font-weight:600;">${rm}</button>`).join('')}
+            <span style="font-size:0.68rem;color:var(--text-muted);margin-left:auto;">${filtered.length} students</span>
+        </div>
+        <div style="max-height:280px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Name</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Food Program</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Benefits</th>
+            </tr></thead>
+            <tbody>${filtered.map(r => `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:6px 10px;">${r[0] || '—'}</td>
+                <td style="padding:6px 10px;font-weight:600;">${r[1]}, ${r[2]}</td>
+                <td style="padding:6px 10px;">${r[3] ? '$'+parseInt(r[3]).toLocaleString() : '—'}</td>
+                <td style="padding:6px 10px;">${r[4] || '—'}</td>
+                <td style="padding:6px 10px;font-weight:700;color:${frpColor(r[5])};">${r[5] || '—'}</td>
+                <td style="padding:6px 10px;font-size:0.7rem;">${r[6] || '—'}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
     card.appendChild(table);
 }
 
