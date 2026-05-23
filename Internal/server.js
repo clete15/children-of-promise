@@ -286,8 +286,9 @@ function handleRequest(req, res) {
             const benefits = d.publicBenefits || '';
             const isFoster = d.category === 'Foster';
             const isMilitary = d.military === true || d.military === 'Yes';
+            const isPFA = d.pfaPiNa === 'PFA';
             let frpFood = 'Paid';
-            if (benefits || isFoster || isMilitary || income <= freeThresholds[hhSize]) frpFood = 'Free';
+            if (benefits || isFoster || isMilitary || isPFA || income <= freeThresholds[hhSize]) frpFood = 'Free';
             else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
             const sql = `INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,HouseholdSize,PublicBenefits,ProofOfIncomeUploaded) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${parseInt(d.householdSize)||0},${esc(d.publicBenefits)},0)`;
             const r = runSQL(sql);
@@ -318,8 +319,9 @@ function handleRequest(req, res) {
                 const benefits = d.publicBenefits || '';
                 const isFoster = d.category === 'Foster';
                 const isMilitary = d.military === true || d.military === 'Yes';
+                const isPFA = d.pfaPiNa === 'PFA';
                 let frpFood = 'Paid';
-                if (benefits || isFoster || isMilitary || income <= freeThresholds[hhSize]) frpFood = 'Free';
+                if (benefits || isFoster || isMilitary || isPFA || income <= freeThresholds[hhSize]) frpFood = 'Free';
                 else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
                 d.frpFood = frpFood;
             }
@@ -499,6 +501,26 @@ function handleRequest(req, res) {
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
         });
+        return;
+    }
+
+    // POST recalculate all F/R/P values (internal - protected)
+    if (req.method === 'POST' && url === '/api/recalculate-frp') {
+        if (!checkAuth(req, res)) return;
+        const sql = `UPDATE rptMasterEnrollment SET F_R_P_Food = 
+            CASE 
+                WHEN ISNULL(PublicBenefits,'') <> '' THEN 'Free'
+                WHEN Category = 'Foster' THEN 'Free'
+                WHEN Military = 'Yes' OR Military = 'YES' THEN 'Free'
+                WHEN PFA_PI_na = 'PFA' THEN 'Free'
+                WHEN ISNULL(HouseholdIncome,100000) <= CASE ISNULL(HouseholdSize,1) WHEN 1 THEN 20748 WHEN 2 THEN 28132 WHEN 3 THEN 35516 WHEN 4 THEN 42900 WHEN 5 THEN 50284 WHEN 6 THEN 57668 WHEN 7 THEN 65052 ELSE 72436 END THEN 'Free'
+                WHEN ISNULL(HouseholdIncome,100000) <= CASE ISNULL(HouseholdSize,1) WHEN 1 THEN 29526 WHEN 2 THEN 40034 WHEN 3 THEN 50542 WHEN 4 THEN 61050 WHEN 5 THEN 71558 WHEN 6 THEN 82066 WHEN 7 THEN 92574 ELSE 103082 END THEN 'Reduced'
+                ELSE 'Paid'
+            END
+            WHERE Active = 'Yes' OR Active = 'YES'`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        sendJSON(res, 200, { success: true, message: 'All F/R/P values recalculated' });
         return;
     }
 

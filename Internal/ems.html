@@ -460,7 +460,10 @@
 <div id="notificationsMode" style="display:none;">
     <div style="max-width:800px;margin:0 auto;padding:24px;">
         <div style="background:white;border-radius:var(--radius);padding:24px;box-shadow:var(--shadow);">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">🔔 Alerts &amp; Notifications</div>
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+                <span>🔔 Alerts &amp; Notifications</span>
+                <button onclick="recalculateAllFRP()" style="padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.7rem;font-weight:700;cursor:pointer;">🔄 Recalculate All F/R/P</button>
+            </div>
             <div id="alertsList" style="color:var(--text-muted);">Loading...</div>
         </div>
     </div>
@@ -886,11 +889,12 @@ function calcFRP(incomeId, sizeId, outputId, benefitsPrefix) {
     const income = parseInt(document.getElementById(incomeId)?.value) || 100000;
     const hhSize = Math.max(1, Math.min(parseInt(document.getElementById(sizeId)?.value) || 1, 8)) - 1;
     const benefits = collectBenefits(benefitsPrefix);
-    // Foster and Military also qualify for Free
+    // Categorical eligibility for Free: Foster, Military, any public benefit, PFA program, or Homeless
     const isFoster = document.getElementById((benefitsPrefix || '') + 'category')?.value === 'Foster';
     const isMilitary = document.getElementById((benefitsPrefix || '') + 'military')?.checked;
+    const isPFA = document.getElementById('pfaPiNa')?.value === 'PFA';
     let frp = 'Paid';
-    if (benefits || isFoster || isMilitary || income <= USDA_FREE_THRESHOLDS[hhSize]) frp = 'Free';
+    if (benefits || isFoster || isMilitary || isPFA || income <= USDA_FREE_THRESHOLDS[hhSize]) frp = 'Free';
     else if (income <= USDA_REDUCED_THRESHOLDS[hhSize]) frp = 'Reduced';
     document.getElementById(outputId).value = frp;
 }
@@ -1083,8 +1087,9 @@ async function saveRosterRow(i) {
     const benefits = s.PublicBenefits || '';
     const isFoster = newPayType === 'Foster';
     const isMilitary = isTruthy(s.Military);
+    const isPFA = newPfaPiNa === 'PFA';
     let calcFrpFood = 'Paid';
-    if (benefits || isFoster || isMilitary || income <= USDA_FREE_THRESHOLDS[hhSize]) calcFrpFood = 'Free';
+    if (benefits || isFoster || isMilitary || isPFA || income <= USDA_FREE_THRESHOLDS[hhSize]) calcFrpFood = 'Free';
     else if (income <= USDA_REDUCED_THRESHOLDS[hhSize]) calcFrpFood = 'Reduced';
     const body = {
         firstName: s.First_Name, lastName: s.Last_Name,
@@ -1653,6 +1658,21 @@ function renderAlerts() {
     const badge = document.getElementById('alertBadge');
     if (alerts.length) { badge.textContent = alerts.length; badge.style.display = 'inline'; }
     else { badge.style.display = 'none'; }
+}
+
+async function recalculateAllFRP() {
+    if (!confirm('Recalculate Free/Reduced/Paid for all active students based on current thresholds?')) return;
+    try {
+        const res = await apiFetch('/api/recalculate-frp', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('All F/R/P values recalculated successfully', 'success');
+            await loadStudents();
+            renderAlerts();
+        } else {
+            showNotification('Error: ' + (data.error || ''), 'error');
+        }
+    } catch (e) { showNotification('Network error', 'error'); }
 }
 
 // Check summer unmatched after reports load
