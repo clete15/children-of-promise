@@ -1639,6 +1639,20 @@ function renderAlerts() {
         });
     }
 
+    // Annual threshold update reminder (shows June 1 - July 31)
+    const now = new Date();
+    const month = now.getMonth(); // 0-indexed: 5=June, 6=July
+    if (month === 5 || month === 6) {
+        alerts.push({
+            type: 'warning',
+            icon: '📅',
+            title: 'USDA income thresholds update July 1',
+            detail: month === 5 ? 'New USDA income eligibility guidelines take effect July 1. Check for updated numbers at fns.usda.gov and click "Recalculate All F/R/P" after updating.' : 'New USDA thresholds are now in effect. If you haven\'t updated yet, do so now and click "Recalculate All F/R/P".',
+            actionText: 'View USDA Guidelines →',
+            onclick: "window.open('https://www.fns.usda.gov/cn/income-eligibility-guidelines','_blank')"
+        });
+    }
+
     // Render
     const el = document.getElementById('alertsList');
     if (!alerts.length) {
