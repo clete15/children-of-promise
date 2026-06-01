@@ -298,7 +298,6 @@
                         Active only
                     </label>
                     <button onclick="toggleRoomSettings()" style="background:none;border:none;cursor:pointer;font-size:1.2rem;padding:4px 8px;border-radius:6px;transition:background 0.15s;" onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='none'" title="Room Settings">⚙️</button>
-                    <button onclick="recalculateAllFRP()" style="padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.7rem;font-weight:700;cursor:pointer;" title="Recalculate Free/Reduced/Paid for all students">🔄 Recalculate F/R/P</button>
                 </div>
                 <div id="rosterSettingsPanel" style="display:none;padding:16px 20px;border-bottom:1px solid var(--border);background:#f8fafc;">
                     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -335,6 +334,7 @@
                 <div style="padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
                     <div id="benefitsRoomTitle" style="font-size:1rem;font-weight:800;color:var(--text);"></div>
                     <div style="flex:1;"></div>
+                    <button onclick="recalculateAllFRP()" style="padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.7rem;font-weight:700;cursor:pointer;" title="Recalculate Free/Reduced/Paid for all students">🔄 Recalculate F/R/P</button>
                     <span style="font-size:0.72rem;color:var(--text-muted);" id="benefitsCount"></span>
                 </div>
                 <div id="benefitsGrid" style="overflow:auto;flex:1;"></div>
