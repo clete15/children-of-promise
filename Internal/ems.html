@@ -1771,6 +1771,8 @@ async function recalculateAllFRP() {
             showNotification('All F/R/P values recalculated successfully', 'success');
             await loadStudents();
             renderAlerts();
+            if (currentMode === 'benefits') buildBenefitsRoster();
+            if (currentMode === 'reports') { reportsLoaded = false; loadReports(); }
         } else {
             showNotification('Error: ' + (data.error || ''), 'error');
         }
