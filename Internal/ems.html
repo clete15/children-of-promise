@@ -384,6 +384,7 @@
                             <tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">#</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Name</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Start Date</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Contact</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Children</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Score</th>
@@ -1234,6 +1235,7 @@ function renderWlTable() {
         return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
             <td style="padding:10px 12px;">${i + 1}</td>
             <td style="padding:10px 12px;font-weight:700;">${r.LastName}, ${r.FirstName}</td>
+            <td style="padding:10px 12px;font-size:0.78rem;">${r.ChildStartDate || r.ChildBirthDate || '—'}</td>
             <td style="padding:10px 12px;"><div>${r.Phone || '—'}</div><div style="font-size:0.72rem;color:var(--text-muted);">${r.Email || ''}</div></td>
             <td style="padding:10px 12px;max-width:160px;">${r.ChildrenInfo || '—'}</td>
             <td style="padding:10px 12px;"><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:#f8fafc;${scoreClass}">${score} pts</span></td>

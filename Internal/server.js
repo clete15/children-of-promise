@@ -576,13 +576,13 @@ function handleRequest(req, res) {
     // GET waiting list (internal - protected)
     if (req.method === 'GET' && url === '/api/waitinglist') {
         if (!checkAuth(req, res)) return;
-        const r = runSQL(`SELECT Id,SubmittedAt,FirstName,LastName,Phone,Email,ChildrenInfo,ChildName,ChildBirthDate,AgeGroup,Homeless,FosterAdopted,IEP,EarlyIntervention,AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,TeenParent,NoHSDiploma,BornOutsideUS,NonEnglishHome,ActiveMilitary,PublicBenefits,LivingSituation,City,HouseholdIncome,ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,Score,ISNULL(WaitlistStatus,'Pending') AS WaitlistStatus,ISNULL(Notes,'') AS Notes FROM PreEnrollment ORDER BY Score DESC,SubmittedAt ASC`);
+        const r = runSQL(`SELECT Id,SubmittedAt,FirstName,LastName,Phone,Email,ChildrenInfo,ChildName,ChildBirthDate,ISNULL(ChildStartDate,'') AS ChildStartDate,AgeGroup,Homeless,FosterAdopted,IEP,EarlyIntervention,AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,TeenParent,NoHSDiploma,BornOutsideUS,NonEnglishHome,ActiveMilitary,PublicBenefits,LivingSituation,City,HouseholdIncome,ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,Score,ISNULL(WaitlistStatus,'Pending') AS WaitlistStatus,ISNULL(Notes,'') AS Notes FROM PreEnrollment ORDER BY Score DESC,SubmittedAt ASC`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
-                return { Id:v[0],SubmittedAt:v[1],FirstName:v[2],LastName:v[3],Phone:v[4],Email:v[5],ChildrenInfo:v[6],ChildName:v[7],ChildBirthDate:v[8],AgeGroup:v[9],Homeless:v[10],FosterAdopted:v[11],IEP:v[12],EarlyIntervention:v[13],AbuseHistory:v[14],MentalIllness:v[15],DcfsInvolvement:v[16],SubstanceAbuse:v[17],CaregiverOther:v[18],FamilyDeath:v[19],LowBirthWeight:v[20],ParentIncarcerated:v[21],TeenParent:v[22],NoHSDiploma:v[23],BornOutsideUS:v[24],NonEnglishHome:v[25],ActiveMilitary:v[26],PublicBenefits:v[27],LivingSituation:v[28],City:v[29],HouseholdIncome:v[30],HouseholdSize:v[31],Score:v[32],WaitlistStatus:v[33],Notes:v[34] };
+                return { Id:v[0],SubmittedAt:v[1],FirstName:v[2],LastName:v[3],Phone:v[4],Email:v[5],ChildrenInfo:v[6],ChildName:v[7],ChildBirthDate:v[8],ChildStartDate:v[9],AgeGroup:v[10],Homeless:v[11],FosterAdopted:v[12],IEP:v[13],EarlyIntervention:v[14],AbuseHistory:v[15],MentalIllness:v[16],DcfsInvolvement:v[17],SubstanceAbuse:v[18],CaregiverOther:v[19],FamilyDeath:v[20],LowBirthWeight:v[21],ParentIncarcerated:v[22],TeenParent:v[23],NoHSDiploma:v[24],BornOutsideUS:v[25],NonEnglishHome:v[26],ActiveMilitary:v[27],PublicBenefits:v[28],LivingSituation:v[29],City:v[30],HouseholdIncome:v[31],HouseholdSize:v[32],Score:v[33],WaitlistStatus:v[34],Notes:v[35] };
             });
         return sendJSON(res, 200, rows);
     }
