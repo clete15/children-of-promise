@@ -1840,7 +1840,7 @@ function renderBenefitsRoom() {
     const grid = document.getElementById('benefitsGrid');
     if (!roomStudents.length) { grid.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text-muted);">No active students.</div>'; return; }
 
-    const benefitKeys = ['WIC','Medicaid','SNAP','TANF','CCAP'];
+    const benefitKeys = ['WIC','Medicaid','SNAP','TANF'];
     const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
     const payOpts = '<option value="">--</option><option value="Paid">Paid</option><option value="CCAP">CCAP</option><option value="Half Price">Half Price</option><option value="Free">Free</option><option value="Foster">Foster</option>';
 
@@ -1911,7 +1911,7 @@ async function saveBenefitRow(i) {
     const roomStudents = students.filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active));
     const s = roomStudents[i];
     if (!s) return;
-    const benefitKeys = ['WIC','Medicaid','SNAP','TANF','CCAP'];
+    const benefitKeys = ['WIC','Medicaid','SNAP','TANF'];
     const benefits = benefitKeys.filter(b => document.getElementById(`ben_${rn}_${i}_${b}`)?.checked).join(', ');
     const newCategory = document.getElementById(`benPay_${i}`)?.value || s.Category || '';
     const newIncome = document.getElementById(`benIncome_${i}`)?.value || '';
