@@ -390,6 +390,7 @@
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Score</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Risk Factors</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#92400e;background:#fffbeb;">Income / HH</th>
+                                <th style="padding:10px 12px;text-align:center;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">CCAP</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Status</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Notes</th>
                             </tr>
@@ -1241,6 +1242,7 @@ function renderWlTable() {
             <td style="padding:10px 12px;"><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:#f8fafc;${scoreClass}">${score} pts</span></td>
             <td style="padding:10px 12px;"><div style="display:flex;flex-wrap:wrap;gap:4px;">${flags}</div></td>
             <td style="padding:10px 12px;background:#fffbeb;font-weight:600;font-size:0.78rem;">${r.HouseholdIncome ? '$'+parseInt(r.HouseholdIncome).toLocaleString() : '<span style="color:#92400e;">—</span>'}<div style="font-size:0.68rem;font-weight:400;color:var(--text-muted);">${r.HouseholdSize ? 'HH: '+r.HouseholdSize : ''}</div></td>
+            <td style="padding:10px 12px;text-align:center;">${(()=>{ const inc=parseInt(r.HouseholdIncome)||0; const hh=parseInt(r.HouseholdSize)||0; if(!inc||!hh) return '<span style="color:var(--text-muted);">—</span>'; const idx=Math.max(1,Math.min(hh,8))-1; return inc<=CCAP_THRESHOLDS[idx] ? '<span style="color:var(--success);font-weight:700;">✓</span>' : '<span style="color:var(--text-muted);">✗</span>'; })()}</td>
             <td style="padding:10px 12px;">
                 <select style="padding:6px 8px;border:1px solid var(--border);border-radius:5px;font-size:0.78rem;width:100%;min-width:110px;" onchange="handleWlStatus(${parseInt(r.Id)}, this)">
                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
