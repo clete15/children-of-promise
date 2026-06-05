@@ -28,6 +28,45 @@
         td.left { text-align:left;padding-left:14px; }
         tr:hover { background:#f8fafc; }
         input[type=checkbox] { width:auto;accent-color:var(--primary);cursor:pointer; }
+
+        /* Parent Interview Modal */
+        .pi-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center; }
+        .pi-overlay.open { display:flex; }
+        .pi-modal { background:white;border-radius:12px;width:95%;max-width:800px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.3); }
+        .pi-modal-header { display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid #e5e7eb;position:sticky;top:0;background:white;z-index:2;border-radius:12px 12px 0 0; }
+        .pi-modal-header h3 { margin:0;font-size:1.1rem;font-weight:700;color:#1e3a8a; }
+        .pi-modal-header .pi-close { background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;padding:4px 8px;border-radius:4px; }
+        .pi-modal-header .pi-close:hover { background:#f3f4f6;color:#111; }
+        .pi-modal-body { padding:24px; }
+        .pi-section { margin-bottom:20px; }
+        .pi-section h4 { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin:0 0 10px 0;padding-bottom:6px;border-bottom:1px solid #f3f4f6; }
+        .pi-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px 16px; }
+        .pi-grid.three { grid-template-columns:1fr 1fr 1fr; }
+        .pi-field { display:flex;flex-direction:column;gap:3px; }
+        .pi-field label { font-size:0.7rem;font-weight:600;color:#6b7280; }
+        .pi-field .pi-value { font-size:0.82rem;font-weight:500;color:#111;padding:6px 10px;background:#f8fafc;border-radius:6px;min-height:28px;display:flex;align-items:center; }
+        .pi-field textarea, .pi-field input[type=text], .pi-field input[type=date] { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;resize:vertical; }
+        .pi-field textarea { min-height:60px; }
+        .pi-field textarea:focus, .pi-field input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .pi-full { grid-column:1/-1; }
+        .pi-modal-footer { padding:16px 24px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:white;border-radius:0 0 12px 12px; }
+        .pi-btn { padding:8px 18px;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.15s; }
+        .pi-btn-primary { background:#2563eb;color:white; }
+        .pi-btn-primary:hover { background:#1d4ed8; }
+        .pi-btn-secondary { background:white;color:#374151;border-color:#d1d5db; }
+        .pi-btn-secondary:hover { background:#f9fafb; }
+        .pi-btn:disabled { opacity:0.5;cursor:not-allowed; }
+        .pi-saved-badge { display:inline-flex;align-items:center;gap:4px;font-size:0.72rem;color:#059669;font-weight:600; }
+
+        /* Print styles for the form */
+        @media print {
+            body * { visibility:hidden; }
+            .pi-modal, .pi-modal * { visibility:visible; }
+            .pi-modal { position:fixed;left:0;top:0;width:100%;max-width:100%;max-height:none;overflow:visible;box-shadow:none;border-radius:0; }
+            .pi-modal-footer { display:none; }
+            .pi-modal-header .pi-close { display:none; }
+            .pi-overlay { display:flex !important;position:fixed; }
+        }
     </style>
 </head>
 <body>
@@ -91,6 +130,85 @@
     </div>
 </div>
 
+<!-- Parent Interview Modal -->
+<div class="pi-overlay" id="piOverlay">
+    <div class="pi-modal">
+        <div class="pi-modal-header">
+            <h3 id="piModalTitle">Parent Interview Form</h3>
+            <button class="pi-close" onclick="closeInterview()" aria-label="Close">&times;</button>
+        </div>
+        <div class="pi-modal-body">
+            <!-- Pre-filled child/enrollment info -->
+            <div class="pi-section">
+                <h4>Child Information</h4>
+                <div class="pi-grid three">
+                    <div class="pi-field"><label>Child Name</label><div class="pi-value" id="piChildName"></div></div>
+                    <div class="pi-field"><label>Date of Birth</label><div class="pi-value" id="piDOB"></div></div>
+                    <div class="pi-field"><label>Classroom</label><div class="pi-value" id="piRoom"></div></div>
+                </div>
+            </div>
+            <div class="pi-section">
+                <h4>Household Information</h4>
+                <div class="pi-grid">
+                    <div class="pi-field"><label>Household Income</label><div class="pi-value" id="piIncome"></div></div>
+                    <div class="pi-field"><label>Household Size</label><div class="pi-value" id="piHHSize"></div></div>
+                    <div class="pi-field"><label>Public Benefits</label><div class="pi-value" id="piBenefits"></div></div>
+                    <div class="pi-field"><label>F/R/P Status</label><div class="pi-value" id="piFRP"></div></div>
+                    <div class="pi-field"><label>IEP</label><div class="pi-value" id="piIEP"></div></div>
+                    <div class="pi-field"><label>Foster Care</label><div class="pi-value" id="piFoster"></div></div>
+                    <div class="pi-field"><label>Military</label><div class="pi-value" id="piMilitary"></div></div>
+                    <div class="pi-field"><label>Category</label><div class="pi-value" id="piCategory"></div></div>
+                </div>
+            </div>
+            <!-- Manual fields -->
+            <div class="pi-section">
+                <h4>Interview Details</h4>
+                <div class="pi-grid">
+                    <div class="pi-field">
+                        <label>Interview Date</label>
+                        <input type="date" id="piDate">
+                    </div>
+                    <div class="pi-field"></div>
+                    <div class="pi-field pi-full">
+                        <label>Parent Goals for Child</label>
+                        <textarea id="piGoals" placeholder="What goals do the parents have for their child this year?"></textarea>
+                    </div>
+                    <div class="pi-field pi-full">
+                        <label>Parent Concerns</label>
+                        <textarea id="piConcerns" placeholder="Are there any concerns the parents would like to discuss?"></textarea>
+                    </div>
+                    <div class="pi-field pi-full">
+                        <label>Child Strengths</label>
+                        <textarea id="piStrengths" placeholder="What strengths does the child demonstrate at home?"></textarea>
+                    </div>
+                    <div class="pi-field pi-full">
+                        <label>Additional Notes</label>
+                        <textarea id="piNotes" placeholder="Any additional notes from the interview..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="pi-section">
+                <h4>Signatures</h4>
+                <div class="pi-grid">
+                    <div class="pi-field">
+                        <label>Parent/Guardian Signature</label>
+                        <input type="text" id="piParentSig" placeholder="Type full name as signature">
+                    </div>
+                    <div class="pi-field">
+                        <label>Staff Signature</label>
+                        <input type="text" id="piStaffSig" placeholder="Type full name as signature">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="pi-modal-footer">
+            <span class="pi-saved-badge" id="piSavedBadge" style="display:none;">&#10003; Saved</span>
+            <button class="pi-btn pi-btn-secondary" onclick="printInterview()">🖨️ Print</button>
+            <button class="pi-btn pi-btn-primary" id="piSaveBtn" onclick="saveInterview()">Save Interview</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 function apiFetch(url, opts = {}) {
@@ -102,23 +220,29 @@ let students = [];
 let classrooms = [];
 let trackingData = {};
 let activeProgram = 'PFA';
+let currentInterviewStudentId = null;
 
 async function init() {
-    const [sRes, cRes, tRes] = await Promise.all([
-        apiFetch('/api/students'),
-        apiFetch('/api/classrooms'),
-        apiFetch('/api/isbe-tracking')
-    ]);
-    students = await sRes.json();
-    classrooms = await cRes.json();
-    const tData = await tRes.json();
-    tData.forEach(t => { trackingData[t.StudentId] = t; });
-    // Update counts
-    const pfaCount = students.filter(s => s.PFA_PI_na === 'PFA' && (s.Active === 'Yes' || s.Active === 'YES')).length;
-    const piCount = students.filter(s => s.PFA_PI_na === 'PI' && (s.Active === 'Yes' || s.Active === 'YES')).length;
-    document.getElementById('pfaCount').textContent = pfaCount + ' students';
-    document.getElementById('piCount').textContent = piCount + ' students';
-    renderRoster();
+    try {
+        const [sRes, cRes, tRes] = await Promise.all([
+            apiFetch('/api/students'),
+            apiFetch('/api/classrooms'),
+            apiFetch('/api/isbe-tracking')
+        ]);
+        students = await sRes.json();
+        classrooms = await cRes.json();
+        const tData = await tRes.json();
+        tData.forEach(t => { trackingData[t.StudentId] = t; });
+        // Update counts
+        const pfaCount = students.filter(s => s.PFA_PI_na === 'PFA' && (s.Active === 'Yes' || s.Active === 'YES')).length;
+        const piCount = students.filter(s => s.PFA_PI_na === 'PI' && (s.Active === 'Yes' || s.Active === 'YES')).length;
+        document.getElementById('pfaCount').textContent = pfaCount + ' students';
+        document.getElementById('piCount').textContent = piCount + ' students';
+        renderRoster();
+    } catch(e) {
+        console.error('[INIT ERROR]', e);
+        document.getElementById('isbeBody').innerHTML = '<tr><td colspan="11" style="color:red;padding:20px;">Error loading data: ' + e.message + '</td></tr>';
+    }
 }
 
 function getRoom(roomNum) {
@@ -144,11 +268,14 @@ function renderRoster() {
 
     tbody.innerHTML = roster.map(s => {
         const t = trackingData[s.Id] || {};
-        return `<tr>
-            <td class="left" style="font-weight:600;font-size:0.73rem;">${s.Last_Name}, ${s.First_Name}</td>
-            <td style="font-size:0.7rem;color:var(--text-muted);">${getRoom(s.RoomNumber)}</td>
-            ${FIELDS.map(f => `<td><input type="checkbox" ${t[f]?'checked':''} onchange="saveField(${s.Id},'${f}',this.checked)"></td>`).join('')}
-        </tr>`;
+        const cells = FIELDS.map(f => {
+            const checked = t[f] ? 'checked' : '';
+            if (f === 'ParentInterview') {
+                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openInterview(' + s.Id + ')" title="Open Parent Interview Form">[form]</a></td>';
+            }
+            return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)"></td>';
+        }).join('');
+        return '<tr><td class="left" style="font-weight:600;font-size:0.73rem;">' + s.Last_Name + ', ' + s.First_Name + '</td><td style="font-size:0.7rem;color:var(--text-muted);">' + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
     }).join('');
 }
 
@@ -165,6 +292,116 @@ async function saveField(studentId, field, value) {
         }
     } catch (e) { console.error('Save failed', e); }
 }
+
+// ── Parent Interview Modal ──
+
+async function openInterview(studentId) {
+    currentInterviewStudentId = studentId;
+    const student = students.find(s => String(s.Id) === String(studentId));
+    if (!student) return;
+
+    // Fill pre-populated fields
+    document.getElementById('piModalTitle').textContent = `Parent Interview – ${student.First_Name} ${student.Last_Name}`;
+    document.getElementById('piChildName').textContent = `${student.First_Name} ${student.Last_Name}`;
+    document.getElementById('piDOB').textContent = student.Birth_date || '—';
+    document.getElementById('piRoom').textContent = getRoom(student.RoomNumber) || '—';
+    document.getElementById('piIncome').textContent = student.HouseholdIncome ? `$${Number(student.HouseholdIncome).toLocaleString()}` : '—';
+    document.getElementById('piHHSize').textContent = student.HouseholdSize || '—';
+    document.getElementById('piBenefits').textContent = student.PublicBenefits || 'None';
+    document.getElementById('piFRP').textContent = student.F_R_P_Food || '—';
+    document.getElementById('piIEP').textContent = student.IEP || 'No';
+    document.getElementById('piFoster').textContent = student.Category === 'Foster' ? 'Yes' : 'No';
+    document.getElementById('piMilitary').textContent = (student.Military === 'Yes' || student.Military === 'YES') ? 'Yes' : 'No';
+    document.getElementById('piCategory').textContent = student.Category || '—';
+
+    // Clear manual fields
+    document.getElementById('piDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('piGoals').value = '';
+    document.getElementById('piConcerns').value = '';
+    document.getElementById('piStrengths').value = '';
+    document.getElementById('piNotes').value = '';
+    document.getElementById('piParentSig').value = '';
+    document.getElementById('piStaffSig').value = '';
+    document.getElementById('piSavedBadge').style.display = 'none';
+
+    // Load existing interview data if available
+    try {
+        const res = await apiFetch(`/api/parent-interview/${studentId}`);
+        const data = await res.json();
+        if (data && data.Id) {
+            document.getElementById('piDate').value = data.InterviewDate || '';
+            document.getElementById('piGoals').value = data.ParentGoals || '';
+            document.getElementById('piConcerns').value = data.ParentConcerns || '';
+            document.getElementById('piStrengths').value = data.ChildStrengths || '';
+            document.getElementById('piNotes').value = data.Notes || '';
+            document.getElementById('piParentSig').value = data.ParentSignature || '';
+            document.getElementById('piStaffSig').value = data.StaffSignature || '';
+        }
+    } catch (e) { console.error('Failed to load interview', e); }
+
+    document.getElementById('piOverlay').classList.add('open');
+}
+
+function closeInterview() {
+    document.getElementById('piOverlay').classList.remove('open');
+    currentInterviewStudentId = null;
+}
+
+async function saveInterview() {
+    if (!currentInterviewStudentId) return;
+    const btn = document.getElementById('piSaveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const body = {
+        interviewDate: document.getElementById('piDate').value,
+        parentGoals: document.getElementById('piGoals').value,
+        parentConcerns: document.getElementById('piConcerns').value,
+        childStrengths: document.getElementById('piStrengths').value,
+        notes: document.getElementById('piNotes').value,
+        parentSignature: document.getElementById('piParentSig').value,
+        staffSignature: document.getElementById('piStaffSig').value
+    };
+
+    try {
+        const res = await apiFetch(`/api/parent-interview/${currentInterviewStudentId}`, {
+            method: 'POST',
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            // Update local tracking data (auto-checks ParentInterview)
+            if (!trackingData[currentInterviewStudentId]) trackingData[currentInterviewStudentId] = {};
+            trackingData[currentInterviewStudentId].ParentInterview = 1;
+            renderRoster();
+            document.getElementById('piSavedBadge').style.display = 'inline-flex';
+            setTimeout(() => { document.getElementById('piSavedBadge').style.display = 'none'; }, 3000);
+        } else {
+            alert('Save failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Save failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Interview';
+    }
+}
+
+function printInterview() {
+    window.print();
+}
+
+// Close modal on overlay click
+document.getElementById('piOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeInterview();
+});
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && document.getElementById('piOverlay').classList.contains('open')) {
+        closeInterview();
+    }
+});
 
 init();
 </script>

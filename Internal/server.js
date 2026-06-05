@@ -533,6 +533,71 @@ function handleRequest(req, res) {
         return sendJSON(res, 200, rows);
     }
 
+    // GET parent interview for a student (internal - protected)
+    if (req.method === 'GET' && url.startsWith('/api/parent-interview/')) {
+        if (!checkAuth(req, res)) return;
+        const studentId = parseInt(url.split('/')[3]);
+        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
+            CREATE TABLE ParentInterviews (
+                Id INT IDENTITY(1,1) PRIMARY KEY,
+                StudentId INT NOT NULL,
+                InterviewDate NVARCHAR(20),
+                ParentGoals NVARCHAR(MAX),
+                ParentConcerns NVARCHAR(MAX),
+                ChildStrengths NVARCHAR(MAX),
+                ParentSignature NVARCHAR(200),
+                StaffSignature NVARCHAR(200),
+                Notes NVARCHAR(MAX),
+                CreatedAt DATETIME DEFAULT GETDATE(),
+                UpdatedAt DATETIME DEFAULT GETDATE()
+            );
+            SELECT Id,StudentId,InterviewDate,ISNULL(ParentGoals,'') AS ParentGoals,ISNULL(ParentConcerns,'') AS ParentConcerns,ISNULL(ChildStrengths,'') AS ChildStrengths,ISNULL(ParentSignature,'') AS ParentSignature,ISNULL(StaffSignature,'') AS StaffSignature,ISNULL(Notes,'') AS Notes,CreatedAt,UpdatedAt FROM ParentInterviews WHERE StudentId=${studentId}`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                return { Id:v[0], StudentId:v[1], InterviewDate:v[2], ParentGoals:v[3], ParentConcerns:v[4], ChildStrengths:v[5], ParentSignature:v[6], StaffSignature:v[7], Notes:v[8], CreatedAt:v[9], UpdatedAt:v[10] };
+            });
+        return sendJSON(res, 200, rows.length ? rows[0] : null);
+    }
+
+    // POST save parent interview (internal - protected)
+    if (req.method === 'POST' && url.startsWith('/api/parent-interview/')) {
+        if (!checkAuth(req, res)) return;
+        const studentId = parseInt(url.split('/')[3]);
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
+                CREATE TABLE ParentInterviews (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    StudentId INT NOT NULL,
+                    InterviewDate NVARCHAR(20),
+                    ParentGoals NVARCHAR(MAX),
+                    ParentConcerns NVARCHAR(MAX),
+                    ChildStrengths NVARCHAR(MAX),
+                    ParentSignature NVARCHAR(200),
+                    StaffSignature NVARCHAR(200),
+                    Notes NVARCHAR(MAX),
+                    CreatedAt DATETIME DEFAULT GETDATE(),
+                    UpdatedAt DATETIME DEFAULT GETDATE()
+                );
+                IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId})
+                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                ELSE
+                    INSERT INTO ParentInterviews (StudentId,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,StaffSignature,Notes) VALUES (${studentId},${esc(d.interviewDate)},${esc(d.parentGoals)},${esc(d.parentConcerns)},${esc(d.childStrengths)},${esc(d.parentSignature)},${esc(d.staffSignature)},${esc(d.notes)});
+                IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
+                    UPDATE ISBETracking SET ParentInterview=1 WHERE StudentId=${studentId}
+                ELSE
+                    INSERT INTO ISBETracking (StudentId,ParentInterview) VALUES (${studentId},1)`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     // PUT ISBE tracking field (internal - protected)
     if (req.method === 'PUT' && url === '/api/isbe-tracking') {
         if (!checkAuth(req, res)) return;
