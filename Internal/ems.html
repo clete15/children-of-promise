@@ -410,33 +410,43 @@
      REPORTS MODE
 ══════════════════════════════════════════ -->
 <div id="reportsMode" style="display:none;">
-    <div style="max-width:1100px;margin:0 auto;padding:24px;display:grid;grid-template-columns:1fr 1fr;gap:20px;">
-        <div class="report-card" style="grid-column:1/-1;background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptEnrollment">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Projected Attendance by Room</div>
-            <div style="display:flex;gap:0;min-height:320px;">
-                <div id="rptRoomSidebar" style="width:180px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;"></div>
-                <div id="rptRoomChartArea" style="flex:1;padding:16px 20px;"><div>Loading…</div></div>
+    <div style="display:flex;height:calc(100vh - 140px);background:linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);align-items:flex-start;justify-content:center;padding:20px;">
+        <div style="display:flex;max-height:calc(100vh - 180px);width:100%;max-width:1100px;">
+
+            <!-- LEFT SIDEBAR (report names) -->
+            <div id="reportsSidebar" style="width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;margin-top:0;border-radius:12px 0 0 12px;">
+                <button onclick="selectReport('attendance')" id="rptBtn-attendance" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:rgba(255,255,255,0.2);border-left:none;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">📊 Attendance</div>
+                </button>
+                <button onclick="selectReport('food')" id="rptBtn-food" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">🍽️ Food Program</div>
+                </button>
+                <button onclick="selectReport('program')" id="rptBtn-program" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">📋 Program Type</div>
+                </button>
+                <button onclick="selectReport('paytype')" id="rptBtn-paytype" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">💳 Pay Type</div>
+                </button>
+                <button onclick="selectReport('ccap')" id="rptBtn-ccap" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">💰 CCAP Eligible</div>
+                </button>
+                <button onclick="selectReport('summer')" id="rptBtn-summer" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">☀️ Summer Program</div>
+                </button>
             </div>
-        </div>
-        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptFood">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Food Program</div>
-            <div>Loading…</div>
-        </div>
-        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptProgram">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Program Type</div>
-            <div>Loading…</div>
-        </div>
-        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptPayType">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Pay Type</div>
-            <div>Loading…</div>
-        </div>
-        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);grid-column:1/-1;" id="rptCcap">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible (Not Currently on CCAP)</div>
-            <div>Loading…</div>
-        </div>
-        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);grid-column:1/-1;" id="rptSummer">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program Sign-Ups</div>
-            <div>Loading…</div>
+
+            <!-- RIGHT: REPORT CONTENT -->
+            <div style="background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);">
+                <div style="overflow-y:auto;flex:1;padding:20px 24px;">
+                    <div id="rptEnrollment" style="display:block;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Projected Attendance by Room</div><div style="display:flex;gap:0;min-height:320px;"><div id="rptRoomSidebar" style="width:180px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;"></div><div id="rptRoomChartArea" style="flex:1;padding:16px 20px;"><div>Loading…</div></div></div></div>
+                    <div id="rptFood" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Food Program</div><div>Loading…</div></div>
+                    <div id="rptProgram" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Program Type</div><div>Loading…</div></div>
+                    <div id="rptPayType" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Pay Type</div><div>Loading…</div></div>
+                    <div id="rptCcap" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible (Not Currently on CCAP)</div><div>Loading…</div></div>
+                    <div id="rptSummer" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program Sign-Ups</div><div>Loading…</div></div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -1349,6 +1359,19 @@ function enrollFromWaitlist(id) {
 let reportsLoaded = false;
 let rptDailyData = [];
 let rptActiveRoom = 0;
+let activeReport = 'attendance';
+
+function selectReport(name) {
+    activeReport = name;
+    const reports = ['attendance','food','program','paytype','ccap','summer'];
+    const ids = { attendance:'rptEnrollment', food:'rptFood', program:'rptProgram', paytype:'rptPayType', ccap:'rptCcap', summer:'rptSummer' };
+    reports.forEach(r => {
+        const el = document.getElementById(ids[r]);
+        if (el) el.style.display = r === name ? 'block' : 'none';
+        const btn = document.getElementById('rptBtn-' + r);
+        if (btn) btn.style.background = r === name ? 'rgba(255,255,255,0.2)' : 'transparent';
+    });
+}
 
 async function loadReports() {
     try {
