@@ -61,11 +61,12 @@
         /* Print styles for the form */
         @media print {
             body * { visibility:hidden; }
-            .pi-modal, .pi-modal * { visibility:visible; }
+            .pi-overlay[data-printing] .pi-modal, .pi-overlay[data-printing] .pi-modal * { visibility:visible; }
+            .pi-overlay.open .pi-modal, .pi-overlay.open .pi-modal * { visibility:visible; }
             .pi-modal { position:fixed;left:0;top:0;width:100%;max-width:100%;max-height:none;overflow:visible;box-shadow:none;border-radius:0; }
             .pi-modal-footer { display:none; }
             .pi-modal-header .pi-close { display:none; }
-            .pi-overlay { display:flex !important;position:fixed; }
+            .pi-overlay.open { display:flex !important;position:fixed; }
         }
     </style>
 </head>
@@ -203,8 +204,86 @@
         </div>
         <div class="pi-modal-footer">
             <span class="pi-saved-badge" id="piSavedBadge" style="display:none;">&#10003; Saved</span>
-            <button class="pi-btn pi-btn-secondary" onclick="printInterview()">🖨️ Print</button>
+            <button class="pi-btn pi-btn-secondary" onclick="printInterview()">&#x1F5A8;&#xFE0F; Print</button>
             <button class="pi-btn pi-btn-primary" id="piSaveBtn" onclick="saveInterview()">Save Interview</button>
+        </div>
+    </div>
+</div>
+
+<!-- Permission Slip Modal -->
+<div class="pi-overlay" id="psOverlay">
+    <div class="pi-modal">
+        <div class="pi-modal-header">
+            <h3 id="psModalTitle">Permission Slip</h3>
+            <button class="pi-close" onclick="closePermissionSlip()" aria-label="Close">&times;</button>
+        </div>
+        <div class="pi-modal-body">
+            <div class="pi-section" style="text-align:center;padding:10px 0 20px;">
+                <h4 style="font-size:1.1rem;font-weight:800;color:#1e3a8a;text-transform:none;letter-spacing:0;border:none;padding:0;margin:0 0 4px;">Children of Promise PFA</h4>
+                <div style="font-size:0.95rem;font-weight:700;color:#374151;">Permission to perform screenings</div>
+            </div>
+            <div class="pi-section">
+                <div style="font-size:0.88rem;line-height:1.8;color:#374151;">
+                    I, <span style="display:inline-block;min-width:180px;border-bottom:1px solid #9ca3af;font-weight:600;text-align:center;" id="psParentNameDisplay">&nbsp;</span>
+                    consent to <span style="display:inline-block;min-width:180px;border-bottom:1px solid #9ca3af;font-style:italic;text-align:center;" id="psTeacherDisplay">&nbsp;</span>
+                    conducting screenings on my child for the
+                    <span style="display:inline-block;min-width:100px;border-bottom:1px solid #9ca3af;text-align:center;" id="psSchoolYearDisplay">&nbsp;</span>
+                    school year using Ages and Stages ASQ and ASE screening instruments.
+                </div>
+                <p style="font-size:0.88rem;line-height:1.8;color:#374151;margin-top:16px;">
+                    Screenings will be performed at the beginning, middle, and end of the school year.
+                </p>
+                <p style="font-size:0.88rem;line-height:1.8;color:#374151;margin-top:16px;">
+                    Results of the screenings will be shared with the parents along with Teaching Strategies report cards at the middle and end of the school year.
+                </p>
+            </div>
+            <div class="pi-section" style="margin-top:24px;">
+                <h4>Form Details</h4>
+                <div class="pi-grid">
+                    <div class="pi-field">
+                        <label>Parent/Guardian Name</label>
+                        <input type="text" id="psParentName" placeholder="Parent full name" oninput="document.getElementById('psParentNameDisplay').textContent=this.value||'\u00a0'">
+                    </div>
+                    <div class="pi-field">
+                        <label>School Year</label>
+                        <input type="text" id="psSchoolYear" placeholder="e.g. 2025-2026" oninput="document.getElementById('psSchoolYearDisplay').textContent=this.value||'\u00a0'">
+                    </div>
+                    <div class="pi-field">
+                        <label>Date Signed</label>
+                        <input type="date" id="psDate">
+                    </div>
+                    <div class="pi-field">
+                        <label>Teacher</label>
+                        <input type="text" id="psTeacher" placeholder="Teacher name" oninput="document.getElementById('psTeacherDisplay').textContent=this.value||'\u00a0'">
+                    </div>
+                </div>
+            </div>
+            <div class="pi-section" style="margin-top:20px;">
+                <h4>Signatures</h4>
+                <div class="pi-grid">
+                    <div class="pi-field">
+                        <label>Parent/Guardian Signature</label>
+                        <input type="text" id="psParentSig" placeholder="Type full name as signature">
+                    </div>
+                    <div class="pi-field">
+                        <label>Date</label>
+                        <input type="date" id="psParentSigDate">
+                    </div>
+                    <div class="pi-field">
+                        <label>Teacher Signature</label>
+                        <input type="text" id="psTeacherSig" placeholder="Type full name as signature">
+                    </div>
+                    <div class="pi-field">
+                        <label>Date</label>
+                        <input type="date" id="psTeacherSigDate">
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="pi-modal-footer">
+            <span class="pi-saved-badge" id="psSavedBadge" style="display:none;">&#10003; Saved</span>
+            <button class="pi-btn pi-btn-secondary" onclick="printPermissionSlip()">&#x1F5A8;&#xFE0F; Print</button>
+            <button class="pi-btn pi-btn-primary" id="psSaveBtn" onclick="savePermissionSlip()">Save Permission Slip</button>
         </div>
     </div>
 </div>
@@ -272,6 +351,9 @@ function renderRoster() {
             const checked = t[f] ? 'checked' : '';
             if (f === 'ParentInterview') {
                 return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openInterview(' + s.Id + ')" title="Open Parent Interview Form">[form]</a></td>';
+            }
+            if (f === 'PermissionSlip') {
+                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openPermissionSlip(' + s.Id + ')" title="Open Permission Slip Form">[form]</a></td>';
             }
             return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)"></td>';
         }).join('');
@@ -388,18 +470,135 @@ async function saveInterview() {
 }
 
 function printInterview() {
+    document.getElementById('piOverlay').setAttribute('data-printing', '1');
     window.print();
+    document.getElementById('piOverlay').removeAttribute('data-printing');
 }
 
-// Close modal on overlay click
+// ── Permission Slip Modal ──
+let currentPSStudentId = null;
+
+function getSchoolYear() {
+    const now = new Date();
+    const year = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return year + '-' + (year + 1);
+}
+
+function getTeacher(roomNum) {
+    const r = classrooms.find(c => String(c.RoomNumber) === String(roomNum));
+    return r ? r.TeacherDescription : '';
+}
+
+async function openPermissionSlip(studentId) {
+    currentPSStudentId = studentId;
+    const student = students.find(s => String(s.Id) === String(studentId));
+    if (!student) return;
+
+    const teacher = getTeacher(student.RoomNumber);
+    const schoolYear = getSchoolYear();
+
+    document.getElementById('psModalTitle').textContent = 'Permission Slip \u2013 ' + student.First_Name + ' ' + student.Last_Name;
+    document.getElementById('psParentNameDisplay').innerHTML = '&nbsp;';
+    document.getElementById('psTeacherDisplay').textContent = teacher || '\u00a0';
+    document.getElementById('psSchoolYearDisplay').textContent = schoolYear;
+
+    // Clear form fields
+    document.getElementById('psParentName').value = '';
+    document.getElementById('psSchoolYear').value = schoolYear;
+    document.getElementById('psDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('psTeacher').value = teacher;
+    document.getElementById('psParentSig').value = '';
+    document.getElementById('psParentSigDate').value = '';
+    document.getElementById('psTeacherSig').value = '';
+    document.getElementById('psTeacherSigDate').value = '';
+    document.getElementById('psSavedBadge').style.display = 'none';
+
+    // Load existing data if saved
+    try {
+        const res = await apiFetch('/api/permission-slip/' + studentId);
+        const data = await res.json();
+        if (data && data.Id) {
+            document.getElementById('psParentName').value = data.ParentName || '';
+            document.getElementById('psParentNameDisplay').textContent = data.ParentName || '\u00a0';
+            document.getElementById('psSchoolYear').value = data.SchoolYear || schoolYear;
+            document.getElementById('psSchoolYearDisplay').textContent = data.SchoolYear || schoolYear;
+            document.getElementById('psDate').value = data.SignedDate || '';
+            document.getElementById('psTeacher').value = data.Teacher || teacher;
+            document.getElementById('psTeacherDisplay').textContent = data.Teacher || teacher || '\u00a0';
+            document.getElementById('psParentSig').value = data.ParentSignature || '';
+            document.getElementById('psParentSigDate').value = data.ParentSigDate || '';
+            document.getElementById('psTeacherSig').value = data.TeacherSignature || '';
+            document.getElementById('psTeacherSigDate').value = data.TeacherSigDate || '';
+        }
+    } catch (e) { console.error('Failed to load permission slip', e); }
+
+    document.getElementById('psOverlay').classList.add('open');
+}
+
+function closePermissionSlip() {
+    document.getElementById('psOverlay').classList.remove('open');
+    currentPSStudentId = null;
+}
+
+async function savePermissionSlip() {
+    if (!currentPSStudentId) return;
+    const btn = document.getElementById('psSaveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const body = {
+        parentName: document.getElementById('psParentName').value,
+        schoolYear: document.getElementById('psSchoolYear').value,
+        signedDate: document.getElementById('psDate').value,
+        teacher: document.getElementById('psTeacher').value,
+        parentSignature: document.getElementById('psParentSig').value,
+        parentSigDate: document.getElementById('psParentSigDate').value,
+        teacherSignature: document.getElementById('psTeacherSig').value,
+        teacherSigDate: document.getElementById('psTeacherSigDate').value
+    };
+
+    try {
+        const res = await apiFetch('/api/permission-slip/' + currentPSStudentId, {
+            method: 'POST',
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            if (!trackingData[currentPSStudentId]) trackingData[currentPSStudentId] = {};
+            trackingData[currentPSStudentId].PermissionSlip = 1;
+            renderRoster();
+            document.getElementById('psSavedBadge').style.display = 'inline-flex';
+            setTimeout(function() { document.getElementById('psSavedBadge').style.display = 'none'; }, 3000);
+        } else {
+            alert('Save failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Save failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Permission Slip';
+    }
+}
+
+function printPermissionSlip() {
+    document.getElementById('psOverlay').setAttribute('data-printing', '1');
+    window.print();
+    document.getElementById('psOverlay').removeAttribute('data-printing');
+}
+
+// Close modals on overlay click
 document.getElementById('piOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeInterview();
 });
+document.getElementById('psOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closePermissionSlip();
+});
 
-// Close modal on Escape key
+// Close modals on Escape key
 document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && document.getElementById('piOverlay').classList.contains('open')) {
-        closeInterview();
+    if (e.key === 'Escape') {
+        if (document.getElementById('psOverlay').classList.contains('open')) closePermissionSlip();
+        else if (document.getElementById('piOverlay').classList.contains('open')) closeInterview();
     }
 });
 

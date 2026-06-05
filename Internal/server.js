@@ -598,6 +598,73 @@ function handleRequest(req, res) {
         return;
     }
 
+    // GET permission slip for a student (internal - protected)
+    if (req.method === 'GET' && url.startsWith('/api/permission-slip/')) {
+        if (!checkAuth(req, res)) return;
+        const studentId = parseInt(url.split('/')[3]);
+        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='PermissionSlips')
+            CREATE TABLE PermissionSlips (
+                Id INT IDENTITY(1,1) PRIMARY KEY,
+                StudentId INT NOT NULL,
+                ParentName NVARCHAR(200),
+                SchoolYear NVARCHAR(20),
+                SignedDate NVARCHAR(20),
+                Teacher NVARCHAR(200),
+                ParentSignature NVARCHAR(200),
+                ParentSigDate NVARCHAR(20),
+                TeacherSignature NVARCHAR(200),
+                TeacherSigDate NVARCHAR(20),
+                CreatedAt DATETIME DEFAULT GETDATE(),
+                UpdatedAt DATETIME DEFAULT GETDATE()
+            );
+            SELECT Id,StudentId,ISNULL(ParentName,'') AS ParentName,ISNULL(SchoolYear,'') AS SchoolYear,ISNULL(SignedDate,'') AS SignedDate,ISNULL(Teacher,'') AS Teacher,ISNULL(ParentSignature,'') AS ParentSignature,ISNULL(ParentSigDate,'') AS ParentSigDate,ISNULL(TeacherSignature,'') AS TeacherSignature,ISNULL(TeacherSigDate,'') AS TeacherSigDate,CreatedAt,UpdatedAt FROM PermissionSlips WHERE StudentId=${studentId}`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                return { Id:v[0], StudentId:v[1], ParentName:v[2], SchoolYear:v[3], SignedDate:v[4], Teacher:v[5], ParentSignature:v[6], ParentSigDate:v[7], TeacherSignature:v[8], TeacherSigDate:v[9], CreatedAt:v[10], UpdatedAt:v[11] };
+            });
+        return sendJSON(res, 200, rows.length ? rows[0] : null);
+    }
+
+    // POST save permission slip (internal - protected)
+    if (req.method === 'POST' && url.startsWith('/api/permission-slip/')) {
+        if (!checkAuth(req, res)) return;
+        const studentId = parseInt(url.split('/')[3]);
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='PermissionSlips')
+                CREATE TABLE PermissionSlips (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    StudentId INT NOT NULL,
+                    ParentName NVARCHAR(200),
+                    SchoolYear NVARCHAR(20),
+                    SignedDate NVARCHAR(20),
+                    Teacher NVARCHAR(200),
+                    ParentSignature NVARCHAR(200),
+                    ParentSigDate NVARCHAR(20),
+                    TeacherSignature NVARCHAR(200),
+                    TeacherSigDate NVARCHAR(20),
+                    CreatedAt DATETIME DEFAULT GETDATE(),
+                    UpdatedAt DATETIME DEFAULT GETDATE()
+                );
+                IF EXISTS (SELECT 1 FROM PermissionSlips WHERE StudentId=${studentId})
+                    UPDATE PermissionSlips SET ParentName=${esc(d.parentName)},SchoolYear=${esc(d.schoolYear)},SignedDate=${esc(d.signedDate)},Teacher=${esc(d.teacher)},ParentSignature=${esc(d.parentSignature)},ParentSigDate=${esc(d.parentSigDate)},TeacherSignature=${esc(d.teacherSignature)},TeacherSigDate=${esc(d.teacherSigDate)},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                ELSE
+                    INSERT INTO PermissionSlips (StudentId,ParentName,SchoolYear,SignedDate,Teacher,ParentSignature,ParentSigDate,TeacherSignature,TeacherSigDate) VALUES (${studentId},${esc(d.parentName)},${esc(d.schoolYear)},${esc(d.signedDate)},${esc(d.teacher)},${esc(d.parentSignature)},${esc(d.parentSigDate)},${esc(d.teacherSignature)},${esc(d.teacherSigDate)});
+                IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
+                    UPDATE ISBETracking SET PermissionSlip=1 WHERE StudentId=${studentId}
+                ELSE
+                    INSERT INTO ISBETracking (StudentId,PermissionSlip) VALUES (${studentId},1)`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     // PUT ISBE tracking field (internal - protected)
     if (req.method === 'PUT' && url === '/api/isbe-tracking') {
         if (!checkAuth(req, res)) return;
