@@ -430,14 +430,6 @@
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Pay Type</div>
             <div>Loading…</div>
         </div>
-        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptBenefits">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Public Benefits (Active)</div>
-            <div>Loading…</div>
-        </div>
-        <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);" id="rptIncome">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Proof of Income</div>
-            <div>Loading…</div>
-        </div>
         <div style="background:white;border-radius:var(--radius);padding:20px 24px;box-shadow:var(--shadow);grid-column:1/-1;" id="rptCcap">
             <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible (Not Currently on CCAP)</div>
             <div>Loading…</div>
@@ -1368,8 +1360,6 @@ async function loadReports() {
         renderRptFoodDetail(data.foodDetail);
         renderRptBars('rptProgram', 'Program Type', data.byProgram, null);
         renderRptBars('rptPayType', 'Pay Type', data.byPayType, null);
-        renderRptBenefits(data.benefits);
-        renderRptIncome(data.incomeProof);
         renderRptCcap(data.ccapEligible);
         renderRptSummer(data.summerProgram);
         checkSummerUnmatched(data.summerProgram);
