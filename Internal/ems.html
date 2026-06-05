@@ -1448,7 +1448,7 @@ function renderRptBars(cardId, title, rows, order) {
     if (!rows || !rows.length) { card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">${title}</div><div style="color:var(--text-muted);font-size:0.85rem;">No data.</div>`; return; }
     const sorted = order ? order.map(o => rows.find(r => r[0] === o) || [o, 0]) : rows;
     const max = Math.max(...sorted.map(r => parseInt(r[1] || 0)));
-    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">${title}${cardId==='rptFood'?'<a href="#" onclick="toggleFoodDetail();return false;" style="float:right;font-size:0.7rem;font-weight:600;color:var(--primary);text-decoration:none;">View Detail →</a>':''}</div>` +
+    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">${title}</div>` +
         sorted.map(r => {
             const label = r[0] || 'Unknown';
             const val = parseInt(r[1] || 0);
