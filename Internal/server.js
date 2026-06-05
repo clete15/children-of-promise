@@ -513,6 +513,7 @@ function handleRequest(req, res) {
                 StudentId INT NOT NULL,
                 PermissionSlip BIT DEFAULT 0,
                 ParentInterview BIT DEFAULT 0,
+                ProofOfIncome BIT DEFAULT 0,
                 BegASQ BIT DEFAULT 0,
                 BegASE BIT DEFAULT 0,
                 MidYearReport BIT DEFAULT 0,
@@ -520,14 +521,14 @@ function handleRequest(req, res) {
                 EndASE BIT DEFAULT 0,
                 EndYearReport BIT DEFAULT 0
             );
-            SELECT StudentId,PermissionSlip,ParentInterview,BegASQ,BegASE,MidYearReport,EndASQ,EndASE,EndYearReport FROM ISBETracking`;
+            SELECT StudentId,PermissionSlip,ParentInterview,ProofOfIncome,BegASQ,BegASE,MidYearReport,EndASQ,EndASE,EndYearReport FROM ISBETracking`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
-                return { StudentId: v[0], PermissionSlip: v[1]==='1', ParentInterview: v[2]==='1', BegASQ: v[3]==='1', BegASE: v[4]==='1', MidYearReport: v[5]==='1', EndASQ: v[6]==='1', EndASE: v[7]==='1', EndYearReport: v[8]==='1' };
+                return { StudentId: v[0], PermissionSlip: v[1]==='1', ParentInterview: v[2]==='1', ProofOfIncome: v[3]==='1', BegASQ: v[4]==='1', BegASE: v[5]==='1', MidYearReport: v[6]==='1', EndASQ: v[7]==='1', EndASE: v[8]==='1', EndYearReport: v[9]==='1' };
             });
         return sendJSON(res, 200, rows);
     }
@@ -538,7 +539,7 @@ function handleRequest(req, res) {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const { studentId, field, value } = d;
-            const validFields = ['PermissionSlip','ParentInterview','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport'];
+            const validFields = ['PermissionSlip','ParentInterview','ProofOfIncome','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport'];
             if (!validFields.includes(field)) return sendJSON(res, 400, { error: 'Invalid field' });
             const sql = `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${parseInt(studentId)})
                 UPDATE ISBETracking SET ${field}=${value?1:0} WHERE StudentId=${parseInt(studentId)}

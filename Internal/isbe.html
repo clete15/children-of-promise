@@ -22,7 +22,7 @@
         .isbe-grid { overflow:auto;flex:1; }
         table { width:100%;border-collapse:collapse;font-size:0.75rem; }
         thead tr { background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1; }
-        th { padding:7px 6px;text-align:center;font-size:0.58rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--text-muted);white-space:nowrap; }
+        th { padding:7px 6px;text-align:center;font-size:0.6rem;font-weight:700;letter-spacing:0.04em;color:var(--text-muted);white-space:nowrap; }
         th.left { text-align:left;padding-left:14px; }
         td { padding:5px 6px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:14px; }
@@ -72,6 +72,7 @@
                             <th style="width:80px;">Room</th>
                             <th>Permission Slip</th>
                             <th>Parent Interview</th>
+                            <th>Proof of Income</th>
                             <th>Beg ASQ</th>
                             <th>Beg ASE</th>
                             <th>Mid Year Report</th>
@@ -81,7 +82,7 @@
                         </tr>
                     </thead>
                     <tbody id="isbeBody">
-                        <tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
+                        <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -133,13 +134,13 @@ function setProgram(prog) {
     renderRoster();
 }
 
-const FIELDS = ['PermissionSlip','ParentInterview','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport'];
+const FIELDS = ['PermissionSlip','ParentInterview','ProofOfIncome','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport'];
 
 function renderRoster() {
     const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'));
     document.getElementById('isbeCount').textContent = roster.length + ' students';
     const tbody = document.getElementById('isbeBody');
-    if (!roster.length) { tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
+    if (!roster.length) { tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
 
     tbody.innerHTML = roster.map(s => {
         const t = trackingData[s.Id] || {};
