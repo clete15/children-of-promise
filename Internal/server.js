@@ -203,20 +203,20 @@ function handleRequest(req, res) {
     // GET students (internal - protected)
     if (req.method === 'GET' && url === '/api/students') {
         if (!checkAuth(req, res)) return;
-        const r = runSQL(`SELECT e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
+        const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
                 return {
-                    Last_Name: v[0], First_Name: v[1], Birth_date: v[2], Start_Date: v[3],
-                    City_Town: v[4], Days_Old: v[5], RoomNumber: v[6], Room: v[7],
-                    TeacherDescription: v[8], Type: v[9], Room_Capacity: v[10],
-                    Monday: v[11], Tuesday: v[12], Wednesday: v[13], Thursday: v[14], Friday: v[15],
-                    Active: v[16], Category: v[17], PFA_PI_na: v[18], F_R_P_Food: v[19],
-                    IEP: v[20], Military: v[21], HouseholdIncome: v[22],
-                    ProofOfIncomeFile: v[23], ProofOfIncomeUploaded: v[24], PublicBenefits: v[25], HouseholdSize: v[26]
+                    Id: v[0], Last_Name: v[1], First_Name: v[2], Birth_date: v[3], Start_Date: v[4],
+                    City_Town: v[5], Days_Old: v[6], RoomNumber: v[7], Room: v[8],
+                    TeacherDescription: v[9], Type: v[10], Room_Capacity: v[11],
+                    Monday: v[12], Tuesday: v[13], Wednesday: v[14], Thursday: v[15], Friday: v[16],
+                    Active: v[17], Category: v[18], PFA_PI_na: v[19], F_R_P_Food: v[20],
+                    IEP: v[21], Military: v[22], HouseholdIncome: v[23],
+                    ProofOfIncomeFile: v[24], ProofOfIncomeUploaded: v[25], PublicBenefits: v[26], HouseholdSize: v[27]
                 };
             });
         return sendJSON(res, 200, rows);
@@ -497,6 +497,53 @@ function handleRequest(req, res) {
                     ${esc(d.lowBirthWeight)},${esc(d.parentIncarcerated)},
                     ${parseInt(d.score)||0}
                 );`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
+    // GET ISBE tracking data (internal - protected)
+    if (req.method === 'GET' && url === '/api/isbe-tracking') {
+        if (!checkAuth(req, res)) return;
+        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ISBETracking')
+            CREATE TABLE ISBETracking (
+                Id INT IDENTITY(1,1) PRIMARY KEY,
+                StudentId INT NOT NULL,
+                PermissionSlip BIT DEFAULT 0,
+                ParentInterview BIT DEFAULT 0,
+                BegASQ BIT DEFAULT 0,
+                BegASE BIT DEFAULT 0,
+                MidYearReport BIT DEFAULT 0,
+                EndASQ BIT DEFAULT 0,
+                EndASE BIT DEFAULT 0,
+                EndYearReport BIT DEFAULT 0
+            );
+            SELECT StudentId,PermissionSlip,ParentInterview,BegASQ,BegASE,MidYearReport,EndASQ,EndASE,EndYearReport FROM ISBETracking`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                return { StudentId: v[0], PermissionSlip: v[1]==='1', ParentInterview: v[2]==='1', BegASQ: v[3]==='1', BegASE: v[4]==='1', MidYearReport: v[5]==='1', EndASQ: v[6]==='1', EndASE: v[7]==='1', EndYearReport: v[8]==='1' };
+            });
+        return sendJSON(res, 200, rows);
+    }
+
+    // PUT ISBE tracking field (internal - protected)
+    if (req.method === 'PUT' && url === '/api/isbe-tracking') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const { studentId, field, value } = d;
+            const validFields = ['PermissionSlip','ParentInterview','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport'];
+            if (!validFields.includes(field)) return sendJSON(res, 400, { error: 'Invalid field' });
+            const sql = `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${parseInt(studentId)})
+                UPDATE ISBETracking SET ${field}=${value?1:0} WHERE StudentId=${parseInt(studentId)}
+            ELSE
+                INSERT INTO ISBETracking (StudentId,${field}) VALUES (${parseInt(studentId)},${value?1:0})`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
