@@ -665,6 +665,94 @@ function handleRequest(req, res) {
         return;
     }
 
+    // GET screening score for a student (internal - protected)
+    if (req.method === 'GET' && url.startsWith('/api/screening/')) {
+        if (!checkAuth(req, res)) return;
+        const studentId = parseInt(url.split('/')[3]);
+        const query = req.url.split('?')[1] || '';
+        const params = new URLSearchParams(query);
+        const type = params.get('type') || '';
+        const period = params.get('period') || '';
+        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ScreeningScores')
+            CREATE TABLE ScreeningScores (
+                Id INT IDENTITY(1,1) PRIMARY KEY,
+                StudentId INT NOT NULL,
+                ScreeningType NVARCHAR(20),
+                Period NVARCHAR(20),
+                ScreeningDate NVARCHAR(20),
+                CompletedBy NVARCHAR(20),
+                Interval NVARCHAR(30),
+                ReferralMade NVARCHAR(10),
+                CommScore NVARCHAR(10),CommStatus NVARCHAR(20),
+                GrossScore NVARCHAR(10),GrossStatus NVARCHAR(20),
+                FineScore NVARCHAR(10),FineStatus NVARCHAR(20),
+                ProblemScore NVARCHAR(10),ProblemStatus NVARCHAR(20),
+                PersonalScore NVARCHAR(10),PersonalStatus NVARCHAR(20),
+                SETotal NVARCHAR(10),SECutoff NVARCHAR(10),SEResult NVARCHAR(20),
+                Notes NVARCHAR(MAX),
+                CreatedAt DATETIME DEFAULT GETDATE(),
+                UpdatedAt DATETIME DEFAULT GETDATE()
+            );
+            SELECT Id,StudentId,ScreeningType,Period,ISNULL(ScreeningDate,'') AS ScreeningDate,ISNULL(CompletedBy,'') AS CompletedBy,ISNULL([Interval],'') AS [Interval],ISNULL(ReferralMade,'') AS ReferralMade,ISNULL(CommScore,'') AS CommScore,ISNULL(CommStatus,'') AS CommStatus,ISNULL(GrossScore,'') AS GrossScore,ISNULL(GrossStatus,'') AS GrossStatus,ISNULL(FineScore,'') AS FineScore,ISNULL(FineStatus,'') AS FineStatus,ISNULL(ProblemScore,'') AS ProblemScore,ISNULL(ProblemStatus,'') AS ProblemStatus,ISNULL(PersonalScore,'') AS PersonalScore,ISNULL(PersonalStatus,'') AS PersonalStatus,ISNULL(SETotal,'') AS SETotal,ISNULL(SECutoff,'') AS SECutoff,ISNULL(SEResult,'') AS SEResult,ISNULL(Notes,'') AS Notes FROM ScreeningScores WHERE StudentId=${studentId} AND ScreeningType=${esc(type)} AND Period=${esc(period)}`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                return { Id:v[0],StudentId:v[1],ScreeningType:v[2],Period:v[3],ScreeningDate:v[4],CompletedBy:v[5],Interval:v[6],ReferralMade:v[7],CommScore:v[8],CommStatus:v[9],GrossScore:v[10],GrossStatus:v[11],FineScore:v[12],FineStatus:v[13],ProblemScore:v[14],ProblemStatus:v[15],PersonalScore:v[16],PersonalStatus:v[17],SETotal:v[18],SECutoff:v[19],SEResult:v[20],Notes:v[21] };
+            });
+        return sendJSON(res, 200, rows.length ? rows[0] : null);
+    }
+
+    // POST save screening score (internal - protected)
+    if (req.method === 'POST' && url.startsWith('/api/screening/')) {
+        if (!checkAuth(req, res)) return;
+        const studentId = parseInt(url.split('/')[3]);
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            // Map period to ISBE tracking field
+            let isbeField = '';
+            if (d.type === 'ASQ-3' && d.period === 'Beginning') isbeField = 'BegASQ';
+            else if (d.type === 'ASQ-3' && d.period === 'End') isbeField = 'EndASQ';
+            else if (d.type === 'ASQ:SE-2' && d.period === 'Beginning') isbeField = 'BegASE';
+            else if (d.type === 'ASQ:SE-2' && d.period === 'End') isbeField = 'EndASE';
+
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ScreeningScores')
+                CREATE TABLE ScreeningScores (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    StudentId INT NOT NULL,
+                    ScreeningType NVARCHAR(20),
+                    Period NVARCHAR(20),
+                    ScreeningDate NVARCHAR(20),
+                    CompletedBy NVARCHAR(20),
+                    [Interval] NVARCHAR(30),
+                    ReferralMade NVARCHAR(10),
+                    CommScore NVARCHAR(10),CommStatus NVARCHAR(20),
+                    GrossScore NVARCHAR(10),GrossStatus NVARCHAR(20),
+                    FineScore NVARCHAR(10),FineStatus NVARCHAR(20),
+                    ProblemScore NVARCHAR(10),ProblemStatus NVARCHAR(20),
+                    PersonalScore NVARCHAR(10),PersonalStatus NVARCHAR(20),
+                    SETotal NVARCHAR(10),SECutoff NVARCHAR(10),SEResult NVARCHAR(20),
+                    Notes NVARCHAR(MAX),
+                    CreatedAt DATETIME DEFAULT GETDATE(),
+                    UpdatedAt DATETIME DEFAULT GETDATE()
+                );
+                IF EXISTS (SELECT 1 FROM ScreeningScores WHERE StudentId=${studentId} AND ScreeningType=${esc(d.type)} AND Period=${esc(d.period)})
+                    UPDATE ScreeningScores SET ScreeningDate=${esc(d.screeningDate)},CompletedBy=${esc(d.completedBy)},[Interval]=${esc(d.interval)},ReferralMade=${esc(d.referralMade)},CommScore=${esc(d.commScore||'')},CommStatus=${esc(d.commStatus||'')},GrossScore=${esc(d.grossScore||'')},GrossStatus=${esc(d.grossStatus||'')},FineScore=${esc(d.fineScore||'')},FineStatus=${esc(d.fineStatus||'')},ProblemScore=${esc(d.problemScore||'')},ProblemStatus=${esc(d.problemStatus||'')},PersonalScore=${esc(d.personalScore||'')},PersonalStatus=${esc(d.personalStatus||'')},SETotal=${esc(d.seTotal||'')},SECutoff=${esc(d.seCutoff||'')},SEResult=${esc(d.seResult||'')},Notes=${esc(d.notes)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND ScreeningType=${esc(d.type)} AND Period=${esc(d.period)}
+                ELSE
+                    INSERT INTO ScreeningScores (StudentId,ScreeningType,Period,ScreeningDate,CompletedBy,[Interval],ReferralMade,CommScore,CommStatus,GrossScore,GrossStatus,FineScore,FineStatus,ProblemScore,ProblemStatus,PersonalScore,PersonalStatus,SETotal,SECutoff,SEResult,Notes) VALUES (${studentId},${esc(d.type)},${esc(d.period)},${esc(d.screeningDate)},${esc(d.completedBy)},${esc(d.interval)},${esc(d.referralMade)},${esc(d.commScore||'')},${esc(d.commStatus||'')},${esc(d.grossScore||'')},${esc(d.grossStatus||'')},${esc(d.fineScore||'')},${esc(d.fineStatus||'')},${esc(d.problemScore||'')},${esc(d.problemStatus||'')},${esc(d.personalScore||'')},${esc(d.personalStatus||'')},${esc(d.seTotal||'')},${esc(d.seCutoff||'')},${esc(d.seResult||'')},${esc(d.notes)});
+                ${isbeField ? `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
+                    UPDATE ISBETracking SET ${isbeField}=1 WHERE StudentId=${studentId}
+                ELSE
+                    INSERT INTO ISBETracking (StudentId,${isbeField}) VALUES (${studentId},1)` : ''}`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     // PUT ISBE tracking field (internal - protected)
     if (req.method === 'PUT' && url === '/api/isbe-tracking') {
         if (!checkAuth(req, res)) return;

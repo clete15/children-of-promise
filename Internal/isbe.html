@@ -288,6 +288,130 @@
     </div>
 </div>
 
+<!-- Screening Score Entry Modal (ASQ-3 / ASQ:SE-2) -->
+<div class="pi-overlay" id="scrOverlay">
+    <div class="pi-modal">
+        <div class="pi-modal-header">
+            <h3 id="scrModalTitle">Screening Score Entry</h3>
+            <button class="pi-close" onclick="closeScreening()" aria-label="Close">&times;</button>
+        </div>
+        <div class="pi-modal-body">
+            <div class="pi-section">
+                <h4>Student &amp; Screening Info</h4>
+                <div class="pi-grid three">
+                    <div class="pi-field"><label>Child Name</label><div class="pi-value" id="scrChildName"></div></div>
+                    <div class="pi-field"><label>Date of Birth</label><div class="pi-value" id="scrDOB"></div></div>
+                    <div class="pi-field"><label>Age at Screening</label><div class="pi-value" id="scrAge"></div></div>
+                </div>
+                <div class="pi-grid" style="margin-top:10px;">
+                    <div class="pi-field"><label>Screening Type</label><div class="pi-value" id="scrType"></div></div>
+                    <div class="pi-field"><label>Period</label><div class="pi-value" id="scrPeriod"></div></div>
+                </div>
+            </div>
+
+            <!-- ASQ-3 Domain Scores -->
+            <div class="pi-section" id="scrASQDomains">
+                <h4>ASQ-3 Domain Scores</h4>
+                <p style="font-size:0.72rem;color:#6b7280;margin-bottom:10px;">Enter the score for each domain (0-60). Mark cutoff status based on the scoring guide for the child's age interval.</p>
+                <div class="pi-grid">
+                    <div class="pi-field">
+                        <label>Communication</label>
+                        <input type="number" id="scrComm" min="0" max="60" placeholder="0-60">
+                    </div>
+                    <div class="pi-field">
+                        <label>Comm. Status</label>
+                        <select id="scrCommStatus"><option value="Above">Above Cutoff</option><option value="Monitor">Monitoring Zone</option><option value="Below">Below Cutoff</option></select>
+                    </div>
+                    <div class="pi-field">
+                        <label>Gross Motor</label>
+                        <input type="number" id="scrGross" min="0" max="60" placeholder="0-60">
+                    </div>
+                    <div class="pi-field">
+                        <label>Gross Motor Status</label>
+                        <select id="scrGrossStatus"><option value="Above">Above Cutoff</option><option value="Monitor">Monitoring Zone</option><option value="Below">Below Cutoff</option></select>
+                    </div>
+                    <div class="pi-field">
+                        <label>Fine Motor</label>
+                        <input type="number" id="scrFine" min="0" max="60" placeholder="0-60">
+                    </div>
+                    <div class="pi-field">
+                        <label>Fine Motor Status</label>
+                        <select id="scrFineStatus"><option value="Above">Above Cutoff</option><option value="Monitor">Monitoring Zone</option><option value="Below">Below Cutoff</option></select>
+                    </div>
+                    <div class="pi-field">
+                        <label>Problem Solving</label>
+                        <input type="number" id="scrProblem" min="0" max="60" placeholder="0-60">
+                    </div>
+                    <div class="pi-field">
+                        <label>Problem Solving Status</label>
+                        <select id="scrProblemStatus"><option value="Above">Above Cutoff</option><option value="Monitor">Monitoring Zone</option><option value="Below">Below Cutoff</option></select>
+                    </div>
+                    <div class="pi-field">
+                        <label>Personal-Social</label>
+                        <input type="number" id="scrPersonal" min="0" max="60" placeholder="0-60">
+                    </div>
+                    <div class="pi-field">
+                        <label>Personal-Social Status</label>
+                        <select id="scrPersonalStatus"><option value="Above">Above Cutoff</option><option value="Monitor">Monitoring Zone</option><option value="Below">Below Cutoff</option></select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ASQ:SE-2 Score -->
+            <div class="pi-section" id="scrASEDomains" style="display:none;">
+                <h4>ASQ:SE-2 Score</h4>
+                <p style="font-size:0.72rem;color:#6b7280;margin-bottom:10px;">Enter the total score and cutoff comparison for the child's age interval.</p>
+                <div class="pi-grid">
+                    <div class="pi-field">
+                        <label>Total Score</label>
+                        <input type="number" id="scrSETotal" min="0" max="999" placeholder="Total score">
+                    </div>
+                    <div class="pi-field">
+                        <label>Cutoff for Age Interval</label>
+                        <input type="number" id="scrSECutoff" min="0" max="999" placeholder="Cutoff value">
+                    </div>
+                    <div class="pi-field">
+                        <label>Result</label>
+                        <select id="scrSEResult"><option value="Below">Below Cutoff (typical)</option><option value="Monitor">Monitoring Zone</option><option value="Above">Above Cutoff (concern)</option></select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Common fields -->
+            <div class="pi-section">
+                <h4>Details</h4>
+                <div class="pi-grid">
+                    <div class="pi-field">
+                        <label>Date Administered</label>
+                        <input type="date" id="scrDate">
+                    </div>
+                    <div class="pi-field">
+                        <label>Completed By</label>
+                        <select id="scrCompletedBy"><option value="Parent">Parent</option><option value="Teacher">Teacher</option><option value="Both">Parent + Teacher</option></select>
+                    </div>
+                    <div class="pi-field">
+                        <label>Questionnaire Interval</label>
+                        <input type="text" id="scrInterval" placeholder="e.g. 36 month, 48 month">
+                    </div>
+                    <div class="pi-field">
+                        <label>Referral Made?</label>
+                        <select id="scrReferral"><option value="No">No</option><option value="Yes">Yes</option></select>
+                    </div>
+                    <div class="pi-field pi-full">
+                        <label>Notes / Follow-up</label>
+                        <textarea id="scrNotes" placeholder="Any concerns, referral details, follow-up actions..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="pi-modal-footer">
+            <span class="pi-saved-badge" id="scrSavedBadge" style="display:none;">&#10003; Saved</span>
+            <button class="pi-btn pi-btn-secondary" onclick="printScreening()">&#x1F5A8;&#xFE0F; Print</button>
+            <button class="pi-btn pi-btn-primary" id="scrSaveBtn" onclick="saveScreening()">Save Screening</button>
+        </div>
+    </div>
+</div>
+
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 function apiFetch(url, opts = {}) {
@@ -354,6 +478,14 @@ function renderRoster() {
             }
             if (f === 'PermissionSlip') {
                 return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openPermissionSlip(' + s.Id + ')" title="Open Permission Slip Form">[form]</a></td>';
+            }
+            if (f === 'BegASQ' || f === 'EndASQ') {
+                var period = f === 'BegASQ' ? 'Beginning' : 'End';
+                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openScreening(' + s.Id + ',\'ASQ-3\',\'' + period + '\')" title="Open ASQ-3 Score Entry">[form]</a></td>';
+            }
+            if (f === 'BegASE' || f === 'EndASE') {
+                var period2 = f === 'BegASE' ? 'Beginning' : 'End';
+                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openScreening(' + s.Id + ',\'ASQ:SE-2\',\'' + period2 + '\')" title="Open ASQ:SE-2 Score Entry">[form]</a></td>';
             }
             return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)"></td>';
         }).join('');
@@ -586,6 +718,165 @@ function printPermissionSlip() {
     document.getElementById('psOverlay').removeAttribute('data-printing');
 }
 
+// ── Screening Score Entry Modal (ASQ-3 / ASQ:SE-2) ──
+let currentScrStudentId = null;
+let currentScrType = '';
+let currentScrPeriod = '';
+
+function calcAgeMonths(birthDate) {
+    if (!birthDate) return '';
+    var bd = new Date(birthDate);
+    var now = new Date();
+    var months = (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+    return months + ' months';
+}
+
+async function openScreening(studentId, type, period) {
+    currentScrStudentId = studentId;
+    currentScrType = type;
+    currentScrPeriod = period;
+    var student = students.find(function(s) { return String(s.Id) === String(studentId); });
+    if (!student) return;
+
+    document.getElementById('scrModalTitle').textContent = type + ' Score Entry \u2013 ' + period + ' of Year';
+    document.getElementById('scrChildName').textContent = student.First_Name + ' ' + student.Last_Name;
+    document.getElementById('scrDOB').textContent = student.Birth_date || '\u2014';
+    document.getElementById('scrAge').textContent = calcAgeMonths(student.Birth_date) || '\u2014';
+    document.getElementById('scrType').textContent = type;
+    document.getElementById('scrPeriod').textContent = period + ' of Year';
+
+    // Show/hide appropriate domain section
+    document.getElementById('scrASQDomains').style.display = type === 'ASQ-3' ? 'block' : 'none';
+    document.getElementById('scrASEDomains').style.display = type === 'ASQ:SE-2' ? 'block' : 'none';
+
+    // Clear fields
+    document.getElementById('scrComm').value = '';
+    document.getElementById('scrCommStatus').value = 'Above';
+    document.getElementById('scrGross').value = '';
+    document.getElementById('scrGrossStatus').value = 'Above';
+    document.getElementById('scrFine').value = '';
+    document.getElementById('scrFineStatus').value = 'Above';
+    document.getElementById('scrProblem').value = '';
+    document.getElementById('scrProblemStatus').value = 'Above';
+    document.getElementById('scrPersonal').value = '';
+    document.getElementById('scrPersonalStatus').value = 'Above';
+    document.getElementById('scrSETotal').value = '';
+    document.getElementById('scrSECutoff').value = '';
+    document.getElementById('scrSEResult').value = 'Below';
+    document.getElementById('scrDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('scrCompletedBy').value = 'Parent';
+    document.getElementById('scrInterval').value = '';
+    document.getElementById('scrReferral').value = 'No';
+    document.getElementById('scrNotes').value = '';
+    document.getElementById('scrSavedBadge').style.display = 'none';
+
+    // Load existing data
+    try {
+        var res = await apiFetch('/api/screening/' + studentId + '?type=' + encodeURIComponent(type) + '&period=' + encodeURIComponent(period));
+        var data = await res.json();
+        if (data && data.Id) {
+            if (type === 'ASQ-3') {
+                document.getElementById('scrComm').value = data.CommScore || '';
+                document.getElementById('scrCommStatus').value = data.CommStatus || 'Above';
+                document.getElementById('scrGross').value = data.GrossScore || '';
+                document.getElementById('scrGrossStatus').value = data.GrossStatus || 'Above';
+                document.getElementById('scrFine').value = data.FineScore || '';
+                document.getElementById('scrFineStatus').value = data.FineStatus || 'Above';
+                document.getElementById('scrProblem').value = data.ProblemScore || '';
+                document.getElementById('scrProblemStatus').value = data.ProblemStatus || 'Above';
+                document.getElementById('scrPersonal').value = data.PersonalScore || '';
+                document.getElementById('scrPersonalStatus').value = data.PersonalStatus || 'Above';
+            } else {
+                document.getElementById('scrSETotal').value = data.SETotal || '';
+                document.getElementById('scrSECutoff').value = data.SECutoff || '';
+                document.getElementById('scrSEResult').value = data.SEResult || 'Below';
+            }
+            document.getElementById('scrDate').value = data.ScreeningDate || '';
+            document.getElementById('scrCompletedBy').value = data.CompletedBy || 'Parent';
+            document.getElementById('scrInterval').value = data.Interval || '';
+            document.getElementById('scrReferral').value = data.ReferralMade || 'No';
+            document.getElementById('scrNotes').value = data.Notes || '';
+        }
+    } catch (e) { console.error('Failed to load screening', e); }
+
+    document.getElementById('scrOverlay').classList.add('open');
+}
+
+function closeScreening() {
+    document.getElementById('scrOverlay').classList.remove('open');
+    currentScrStudentId = null;
+}
+
+async function saveScreening() {
+    if (!currentScrStudentId) return;
+    var btn = document.getElementById('scrSaveBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    var body = {
+        type: currentScrType,
+        period: currentScrPeriod,
+        screeningDate: document.getElementById('scrDate').value,
+        completedBy: document.getElementById('scrCompletedBy').value,
+        interval: document.getElementById('scrInterval').value,
+        referralMade: document.getElementById('scrReferral').value,
+        notes: document.getElementById('scrNotes').value
+    };
+
+    if (currentScrType === 'ASQ-3') {
+        body.commScore = document.getElementById('scrComm').value;
+        body.commStatus = document.getElementById('scrCommStatus').value;
+        body.grossScore = document.getElementById('scrGross').value;
+        body.grossStatus = document.getElementById('scrGrossStatus').value;
+        body.fineScore = document.getElementById('scrFine').value;
+        body.fineStatus = document.getElementById('scrFineStatus').value;
+        body.problemScore = document.getElementById('scrProblem').value;
+        body.problemStatus = document.getElementById('scrProblemStatus').value;
+        body.personalScore = document.getElementById('scrPersonal').value;
+        body.personalStatus = document.getElementById('scrPersonalStatus').value;
+    } else {
+        body.seTotal = document.getElementById('scrSETotal').value;
+        body.seCutoff = document.getElementById('scrSECutoff').value;
+        body.seResult = document.getElementById('scrSEResult').value;
+    }
+
+    try {
+        var res = await apiFetch('/api/screening/' + currentScrStudentId, {
+            method: 'POST',
+            body: JSON.stringify(body)
+        });
+        var data = await res.json();
+        if (data.success) {
+            // Auto-check the appropriate ISBE field
+            var fieldName = '';
+            if (currentScrType === 'ASQ-3' && currentScrPeriod === 'Beginning') fieldName = 'BegASQ';
+            else if (currentScrType === 'ASQ-3' && currentScrPeriod === 'End') fieldName = 'EndASQ';
+            else if (currentScrType === 'ASQ:SE-2' && currentScrPeriod === 'Beginning') fieldName = 'BegASE';
+            else if (currentScrType === 'ASQ:SE-2' && currentScrPeriod === 'End') fieldName = 'EndASE';
+            if (fieldName) {
+                if (!trackingData[currentScrStudentId]) trackingData[currentScrStudentId] = {};
+                trackingData[currentScrStudentId][fieldName] = 1;
+            }
+            renderRoster();
+            document.getElementById('scrSavedBadge').style.display = 'inline-flex';
+            setTimeout(function() { document.getElementById('scrSavedBadge').style.display = 'none'; }, 3000);
+        } else {
+            alert('Save failed: ' + (data.error || 'Unknown error'));
+        }
+    } catch (e) {
+        alert('Save failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Screening';
+    }
+}
+
+function printScreening() {
+    document.getElementById('scrOverlay').setAttribute('data-printing', '1');
+    window.print();
+    document.getElementById('scrOverlay').removeAttribute('data-printing');
+}
+
 // Close modals on overlay click
 document.getElementById('piOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeInterview();
@@ -593,11 +884,15 @@ document.getElementById('piOverlay').addEventListener('click', function(e) {
 document.getElementById('psOverlay').addEventListener('click', function(e) {
     if (e.target === this) closePermissionSlip();
 });
+document.getElementById('scrOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeScreening();
+});
 
 // Close modals on Escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        if (document.getElementById('psOverlay').classList.contains('open')) closePermissionSlip();
+        if (document.getElementById('scrOverlay').classList.contains('open')) closeScreening();
+        else if (document.getElementById('psOverlay').classList.contains('open')) closePermissionSlip();
         else if (document.getElementById('piOverlay').classList.contains('open')) closeInterview();
     }
 });
