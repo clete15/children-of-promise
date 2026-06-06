@@ -1709,16 +1709,6 @@ function renderAlerts() {
         });
     }
 
-    // Action item: Get report card format from director
-    alerts.push({
-        type: 'info',
-        icon: '📝',
-        title: 'Action needed: Mid/End Year Report Card form',
-        detail: 'Ask the director for the Teaching Strategies report card template/format so we can build the digital Mid Year and End Year Report Card forms on the ISBE page.',
-        actionText: 'Open ISBE Page →',
-        onclick: "window.location.href='/staff/isbe.html'"
-    });
-
     // Threshold update alerts
     if (_thresholdsExpired) {
         const missingUSDA = !USDA_GUIDELINES[_usdaYear];
