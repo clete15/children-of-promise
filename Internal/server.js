@@ -921,7 +921,7 @@ function handleRequest(req, res) {
         return;
     }
     if (url.startsWith('/staff')) {
-        if (!checkAuth(req, res)) return;
+        // Serve staff HTML files without Basic Auth popup - the portal has its own password gate
         const subPath = url === '/staff' || url === '/staff/' ? '/index.html' : url.replace('/staff', '');
         const filePath = path.join(__dirname, subPath);
         fs.readFile(filePath, (err, data) => {
