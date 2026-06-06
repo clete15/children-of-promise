@@ -294,6 +294,10 @@
             <button type="button" class="pw-toggle" id="pwToggle" title="Show/hide password">👁</button>
         </div>
         <div class="pw-error" id="pwError">Incorrect password. Please try again.</div>
+        <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--text-muted);cursor:pointer;font-weight:500;">
+            <input type="checkbox" id="pwRemember" checked style="width:auto;accent-color:var(--primary);cursor:pointer;">
+            Remember me on this device
+        </label>
         <button type="submit">Sign In</button>
     </form>
 </div>
@@ -351,7 +355,7 @@ const CORRECT_PASSWORD = 'cofpadmin';
 
 // ── PASSWORD GATE ──
 function checkAuth() {
-    if (sessionStorage.getItem('copStaffAuth') === '1') {
+    if (localStorage.getItem('copStaffAuth') === '1' || sessionStorage.getItem('copStaffAuth') === '1') {
         showPortal();
     }
 }
@@ -368,7 +372,11 @@ document.getElementById('pwForm').addEventListener('submit', e => {
     const val = document.getElementById('pwInput').value;
     const err = document.getElementById('pwError');
     if (val === CORRECT_PASSWORD) {
-        sessionStorage.setItem('copStaffAuth', '1');
+        if (document.getElementById('pwRemember').checked) {
+            localStorage.setItem('copStaffAuth', '1');
+        } else {
+            sessionStorage.setItem('copStaffAuth', '1');
+        }
         err.style.display = 'none';
         showPortal();
     } else {
