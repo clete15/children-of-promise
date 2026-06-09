@@ -753,6 +753,61 @@ function handleRequest(req, res) {
         return;
     }
 
+    // GET program compliance data (internal - protected)
+    if (req.method === 'GET' && url === '/api/compliance') {
+        if (!checkAuth(req, res)) return;
+        const query = req.url.split('?')[1] || '';
+        const params = new URLSearchParams(query);
+        const year = params.get('year') || '';
+        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ProgramCompliance')
+            CREATE TABLE ProgramCompliance (
+                Id INT IDENTITY(1,1) PRIMARY KEY,
+                SchoolYear NVARCHAR(20) NOT NULL,
+                FieldName NVARCHAR(50) NOT NULL,
+                FieldValue NVARCHAR(200),
+                UpdatedAt DATETIME DEFAULT GETDATE(),
+                CONSTRAINT UQ_Compliance UNIQUE(SchoolYear, FieldName)
+            );
+            SELECT FieldName,FieldValue FROM ProgramCompliance WHERE SchoolYear=${esc(year)}`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const data = {};
+        r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+            .forEach(l => {
+                const v = l.split('|').map(x => x.trim());
+                if (v[0]) data[v[0]] = v[1] === '1' ? true : v[1] === '0' ? false : v[1];
+            });
+        return sendJSON(res, 200, data);
+    }
+
+    // POST save program compliance field (internal - protected)
+    if (req.method === 'POST' && url === '/api/compliance') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const { year, field, value } = d;
+            if (!year || !field) return sendJSON(res, 400, { error: 'Year and field required' });
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ProgramCompliance')
+                CREATE TABLE ProgramCompliance (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    SchoolYear NVARCHAR(20) NOT NULL,
+                    FieldName NVARCHAR(50) NOT NULL,
+                    FieldValue NVARCHAR(200),
+                    UpdatedAt DATETIME DEFAULT GETDATE(),
+                    CONSTRAINT UQ_Compliance UNIQUE(SchoolYear, FieldName)
+                );
+                IF EXISTS (SELECT 1 FROM ProgramCompliance WHERE SchoolYear=${esc(year)} AND FieldName=${esc(field)})
+                    UPDATE ProgramCompliance SET FieldValue=${esc(String(value))},UpdatedAt=GETDATE() WHERE SchoolYear=${esc(year)} AND FieldName=${esc(field)}
+                ELSE
+                    INSERT INTO ProgramCompliance (SchoolYear,FieldName,FieldValue) VALUES (${esc(year)},${esc(field)},${esc(String(value))})`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     // PUT ISBE tracking field (internal - protected)
     if (req.method === 'PUT' && url === '/api/isbe-tracking') {
         if (!checkAuth(req, res)) return;

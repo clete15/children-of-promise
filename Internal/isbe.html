@@ -22,7 +22,7 @@
         .isbe-grid { overflow:auto;flex:1; }
         table { width:100%;border-collapse:collapse;font-size:0.75rem; }
         thead tr { background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1; }
-        th { padding:7px 6px;text-align:center;font-size:0.6rem;font-weight:700;letter-spacing:0.04em;color:var(--text-muted);white-space:nowrap; }
+        th { padding:7px 6px;text-align:center;font-size:0.6rem;font-weight:700;letter-spacing:0.04em;color:var(--text-muted);white-space:nowrap;cursor:help; }
         th.left { text-align:left;padding-left:14px; }
         td { padding:5px 6px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:14px; }
@@ -96,6 +96,10 @@
                 <div>📋 PI Roster</div>
                 <span id="piCount"></span>
             </button>
+            <button id="btnCompliance" onclick="setProgram('compliance')">
+                <div>✅ Program<br>Compliance</div>
+                <span style="font-size:0.62rem;color:rgba(255,255,255,0.5);">Site-level</span>
+            </button>
         </div>
 
         <!-- RIGHT CARD -->
@@ -104,27 +108,39 @@
                 <h2 id="isbeTitle">PFA Roster</h2>
                 <span id="isbeCount"></span>
             </div>
-            <div class="isbe-grid">
+            <!-- Student roster grid -->
+            <div class="isbe-grid" id="isbeRosterGrid">
                 <table>
                     <thead>
                         <tr>
                             <th class="left" style="min-width:120px;">Student</th>
                             <th style="width:80px;">Room</th>
-                            <th>Permission<br>Slip</th>
-                            <th>Parent<br>Interview</th>
-                            <th>Proof of<br>Income</th>
-                            <th>Beg ASQ</th>
-                            <th>Beg ASE</th>
-                            <th>Mid Year<br>Report Card</th>
-                            <th>End ASQ</th>
-                            <th>End ASE</th>
-                            <th>End Year<br>Report Card</th>
+                            <th title="Parent signs consent form allowing ASQ and ASE developmental screenings to be performed on their child for the school year.">Permission<br>Slip</th>
+                            <th title="Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Complete at enrollment or beginning of year.">Parent<br>Interview</th>
+                            <th title="Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.">Proof of<br>Income</th>
+                            <th title="Administer the ASQ-3 developmental screening at the beginning of the school year. Parent completes the questionnaire; teacher scores it.">Beg ASQ</th>
+                            <th title="Administer the ASQ:SE-2 social-emotional screening at the beginning of the school year. Parent completes; teacher scores and reviews results.">Beg ASE</th>
+                            <th title="Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.">Mid Year<br>Report Card</th>
+                            <th title="Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.">End ASQ</th>
+                            <th title="Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.">End ASE</th>
+                            <th title="Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.">End Year<br>Report Card</th>
                         </tr>
                     </thead>
                     <tbody id="isbeBody">
                         <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
                     </tbody>
                 </table>
+            </div>
+            <!-- Program Compliance Panel -->
+            <div id="compliancePanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
+                <div style="max-width:600px;margin:0 auto;">
+                    <p style="font-size:0.78rem;color:#6b7280;margin-bottom:20px;">These are program-level compliance items tracked once per school year for the entire site.</p>
+                    <div id="complianceList" style="display:flex;flex-direction:column;gap:12px;"></div>
+                    <div style="margin-top:20px;display:flex;gap:10px;align-items:center;">
+                        <label style="font-size:0.75rem;font-weight:600;color:#6b7280;">School Year:</label>
+                        <select id="complianceYear" onchange="loadCompliance()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;"></select>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -457,8 +473,20 @@ function setProgram(prog) {
     activeProgram = prog;
     document.getElementById('btnPFA').classList.toggle('active', prog === 'PFA');
     document.getElementById('btnPI').classList.toggle('active', prog === 'PI');
-    document.getElementById('isbeTitle').textContent = prog + ' Roster';
-    renderRoster();
+    document.getElementById('btnCompliance').classList.toggle('active', prog === 'compliance');
+
+    if (prog === 'compliance') {
+        document.getElementById('isbeTitle').textContent = 'Program Compliance';
+        document.getElementById('isbeCount').textContent = '';
+        document.getElementById('isbeRosterGrid').style.display = 'none';
+        document.getElementById('compliancePanel').style.display = 'block';
+        loadCompliance();
+    } else {
+        document.getElementById('isbeTitle').textContent = prog + ' Roster';
+        document.getElementById('isbeRosterGrid').style.display = 'block';
+        document.getElementById('compliancePanel').style.display = 'none';
+        renderRoster();
+    }
 }
 
 const FIELDS = ['PermissionSlip','ParentInterview','ProofOfIncome','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport'];
@@ -875,6 +903,76 @@ function printScreening() {
     document.getElementById('scrOverlay').setAttribute('data-printing', '1');
     window.print();
     document.getElementById('scrOverlay').removeAttribute('data-printing');
+}
+
+// ── Program Compliance Checklist ──
+const COMPLIANCE_ITEMS = [
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted' },
+    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 assessment and quality improvement plan' },
+    { key: 'StaffCredentials', label: 'Staff Credentials', description: 'All staff credentials current and on file' },
+    { key: 'ParentHandbook', label: 'Parent Handbook', description: 'Updated parent handbook distributed' },
+    { key: 'CurriculumPlan', label: 'Curriculum Plan', description: 'Approved curriculum plan on file' },
+    { key: 'FireDrill', label: 'Fire/Safety Drills', description: 'Monthly fire drills documented' },
+    { key: 'HealthScreenings', label: 'Health Screenings', description: 'Vision/hearing screenings completed for all students' },
+];
+
+function getComplianceYear() {
+    var sel = document.getElementById('complianceYear');
+    return sel ? sel.value : '';
+}
+
+async function loadCompliance() {
+    var sel = document.getElementById('complianceYear');
+    if (!sel.options.length) {
+        var now = new Date();
+        var startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+        for (var y = startYear; y >= startYear - 2; y--) {
+            var opt = document.createElement('option');
+            opt.value = y + '-' + (y + 1);
+            opt.textContent = y + '-' + (y + 1);
+            sel.appendChild(opt);
+        }
+    }
+    var year = getComplianceYear();
+    var data = {};
+    try {
+        var res = await apiFetch('/api/compliance?year=' + encodeURIComponent(year));
+        data = await res.json();
+    } catch (e) { console.error('Failed to load compliance', e); }
+
+    var list = document.getElementById('complianceList');
+    list.innerHTML = COMPLIANCE_ITEMS.map(function(item) {
+        var checked = data[item.key] ? 'checked' : '';
+        var dateVal = data[item.key + 'Date'] || '';
+        return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb;">' +
+            '<input type="checkbox" ' + checked + ' onchange="saveCompliance(\'' + item.key + '\',this.checked)" style="width:18px;height:18px;accent-color:#2563eb;cursor:pointer;flex-shrink:0;">' +
+            '<div style="flex:1;">' +
+                '<div style="font-size:0.85rem;font-weight:700;color:#1e293b;">' + item.label + '</div>' +
+                '<div style="font-size:0.72rem;color:#6b7280;">' + item.description + '</div>' +
+            '</div>' +
+            '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + item.key + '\',this.value)" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.75rem;width:130px;" title="Date completed">' +
+        '</div>';
+    }).join('');
+}
+
+async function saveCompliance(key, value) {
+    var year = getComplianceYear();
+    try {
+        await apiFetch('/api/compliance', {
+            method: 'POST',
+            body: JSON.stringify({ year: year, field: key, value: value ? 1 : 0 })
+        });
+    } catch (e) { console.error('Save compliance failed', e); }
+}
+
+async function saveComplianceDate(key, dateValue) {
+    var year = getComplianceYear();
+    try {
+        await apiFetch('/api/compliance', {
+            method: 'POST',
+            body: JSON.stringify({ year: year, field: key + 'Date', value: dateValue })
+        });
+    } catch (e) { console.error('Save compliance date failed', e); }
 }
 
 // Close modals on overlay click
