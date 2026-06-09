@@ -96,8 +96,12 @@
                 <div>📋 PI Roster</div>
                 <span id="piCount"></span>
             </button>
-            <button id="btnCompliance" onclick="setProgram('compliance')">
-                <div>✅ Program<br>Compliance</div>
+            <button id="btnPFACompliance" onclick="setProgram('pfaCompliance')">
+                <div>✅ PFA<br>Compliance</div>
+                <span style="font-size:0.62rem;color:rgba(255,255,255,0.5);">Site-level</span>
+            </button>
+            <button id="btnPICompliance" onclick="setProgram('piCompliance')">
+                <div>✅ PI<br>Compliance</div>
                 <span style="font-size:0.62rem;color:rgba(255,255,255,0.5);">Site-level</span>
             </button>
         </div>
@@ -473,14 +477,16 @@ function setProgram(prog) {
     activeProgram = prog;
     document.getElementById('btnPFA').classList.toggle('active', prog === 'PFA');
     document.getElementById('btnPI').classList.toggle('active', prog === 'PI');
-    document.getElementById('btnCompliance').classList.toggle('active', prog === 'compliance');
+    document.getElementById('btnPFACompliance').classList.toggle('active', prog === 'pfaCompliance');
+    document.getElementById('btnPICompliance').classList.toggle('active', prog === 'piCompliance');
 
-    if (prog === 'compliance') {
-        document.getElementById('isbeTitle').textContent = 'Program Compliance';
+    if (prog === 'pfaCompliance' || prog === 'piCompliance') {
+        var label = prog === 'pfaCompliance' ? 'PFA Compliance' : 'PI Compliance';
+        document.getElementById('isbeTitle').textContent = label;
         document.getElementById('isbeCount').textContent = '';
         document.getElementById('isbeRosterGrid').style.display = 'none';
         document.getElementById('compliancePanel').style.display = 'block';
-        loadCompliance();
+        loadCompliance(prog);
     } else {
         document.getElementById('isbeTitle').textContent = prog + ' Roster';
         document.getElementById('isbeRosterGrid').style.display = 'block';
@@ -906,22 +912,40 @@ function printScreening() {
 }
 
 // ── Program Compliance Checklist ──
-const COMPLIANCE_ITEMS = [
+const PFA_COMPLIANCE_ITEMS = [
     { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted' },
-    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 assessment and quality improvement plan' },
-    { key: 'StaffCredentials', label: 'Staff Credentials', description: 'All staff credentials current and on file' },
+    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 classroom assessment and quality improvement plan' },
+    { key: 'PEL_ECE5', label: 'PEL / ECE Level 5', description: 'Lead teacher holds Professional Educator License with ECE endorsement or Gateways ECE Credential Level 5' },
+    { key: 'Paraprofessional', label: 'Paraprofessional Credentials', description: 'Paraprofessional meets Gateways ECE Level 2+ or 60 college credit hours with 6 in ECE' },
+    { key: 'ParentHandbook', label: 'Parent Handbook', description: 'Updated parent handbook distributed' },
+    { key: 'CurriculumPlan', label: 'Curriculum Plan', description: 'Approved curriculum plan on file (Teaching Strategies Creative Curriculum or equivalent)' },
+    { key: 'FireDrill', label: 'Fire/Safety Drills', description: 'Monthly fire drills documented' },
+    { key: 'HealthScreenings', label: 'Health Screenings', description: 'Vision/hearing screenings completed for all PFA students' },
+];
+
+const PI_COMPLIANCE_ITEMS = [
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted' },
+    { key: 'ITERS3CQIP', label: 'ITERS-3 CQIP', description: 'ITERS-3 infant/toddler environment assessment and quality improvement plan' },
+    { key: 'PEL_ECE5', label: 'PEL / ECE Level 5', description: 'Lead teacher holds Professional Educator License with ECE endorsement or Gateways ECE Credential Level 5' },
+    { key: 'Paraprofessional', label: 'Paraprofessional Credentials', description: 'Paraprofessional meets Gateways ECE Level 2+ or 60 college credit hours with 6 in ECE' },
     { key: 'ParentHandbook', label: 'Parent Handbook', description: 'Updated parent handbook distributed' },
     { key: 'CurriculumPlan', label: 'Curriculum Plan', description: 'Approved curriculum plan on file' },
     { key: 'FireDrill', label: 'Fire/Safety Drills', description: 'Monthly fire drills documented' },
-    { key: 'HealthScreenings', label: 'Health Screenings', description: 'Vision/hearing screenings completed for all students' },
+    { key: 'HealthScreenings', label: 'Health Screenings', description: 'Developmental screenings completed for all PI children' },
 ];
+
+let activeComplianceProgram = 'pfaCompliance';
 
 function getComplianceYear() {
     var sel = document.getElementById('complianceYear');
     return sel ? sel.value : '';
 }
 
-async function loadCompliance() {
+async function loadCompliance(prog) {
+    if (prog) activeComplianceProgram = prog;
+    var items = activeComplianceProgram === 'pfaCompliance' ? PFA_COMPLIANCE_ITEMS : PI_COMPLIANCE_ITEMS;
+    var prefix = activeComplianceProgram === 'pfaCompliance' ? 'PFA_' : 'PI_';
+
     var sel = document.getElementById('complianceYear');
     if (!sel.options.length) {
         var now = new Date();
@@ -941,16 +965,17 @@ async function loadCompliance() {
     } catch (e) { console.error('Failed to load compliance', e); }
 
     var list = document.getElementById('complianceList');
-    list.innerHTML = COMPLIANCE_ITEMS.map(function(item) {
-        var checked = data[item.key] ? 'checked' : '';
-        var dateVal = data[item.key + 'Date'] || '';
+    list.innerHTML = items.map(function(item) {
+        var fullKey = prefix + item.key;
+        var checked = data[fullKey] ? 'checked' : '';
+        var dateVal = data[fullKey + 'Date'] || '';
         return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb;">' +
-            '<input type="checkbox" ' + checked + ' onchange="saveCompliance(\'' + item.key + '\',this.checked)" style="width:18px;height:18px;accent-color:#2563eb;cursor:pointer;flex-shrink:0;">' +
+            '<input type="checkbox" ' + checked + ' onchange="saveCompliance(\'' + fullKey + '\',this.checked)" style="width:18px;height:18px;accent-color:#2563eb;cursor:pointer;flex-shrink:0;">' +
             '<div style="flex:1;">' +
                 '<div style="font-size:0.85rem;font-weight:700;color:#1e293b;">' + item.label + '</div>' +
                 '<div style="font-size:0.72rem;color:#6b7280;">' + item.description + '</div>' +
             '</div>' +
-            '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + item.key + '\',this.value)" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.75rem;width:130px;" title="Date completed">' +
+            '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + fullKey + '\',this.value)" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.75rem;width:130px;" title="Date completed">' +
         '</div>';
     }).join('');
 }

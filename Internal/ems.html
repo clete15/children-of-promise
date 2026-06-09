@@ -266,6 +266,8 @@
                     <button class="btn btn-secondary" id="btnCancel" onclick="cancelNew()" style="display:none;">Cancel</button>
                     <button class="btn btn-update" id="btnUpdate" onclick="updateStudent()">Update Student</button>
                     <button class="btn btn-save" id="btnSaveNew" onclick="saveStudent()" style="display:none;">Save New Student</button>
+                    <button class="btn btn-secondary" id="btnParentCode" onclick="generateParentCode()" style="padding:8px 14px;font-size:0.72rem;" title="Generate or view parent portal access code">🔑 Parent Code</button>
+                    <button class="btn btn-secondary" id="btnConference" onclick="startConference()" style="padding:8px 14px;font-size:0.72rem;" title="Start a video conference with this student's parent">📹 Conference</button>
                 </div>
 
                     </div>
@@ -1658,6 +1660,80 @@ function renderRptSummer(rows) {
 }
 
 // ══════════════════════════════════════════
+// PARENT CODE & CONFERENCE
+// ══════════════════════════════════════════
+async function generateParentCode() {
+    if (!filtered.length) return;
+    const s = filtered[currentIndex];
+    if (!s || !s.Id) { showNotification('Select a student first', 'error'); return; }
+
+    try {
+        // Check if code already exists
+        const existRes = await apiFetch('/api/parent-codes');
+        const codes = await existRes.json();
+        const existing = codes.find(c => String(c.StudentId) === String(s.Id));
+
+        if (existing) {
+            const action = confirm(
+                'Parent code for ' + s.First_Name + ' ' + s.Last_Name + ':\n\n' +
+                '    ' + existing.Code + '\n\n' +
+                'Share this with the parent. They go to:\n' +
+                'childrenofpromisedaycare.com/parent\n\n' +
+                'Click OK to generate a NEW code (invalidates old one)\n' +
+                'Click Cancel to keep the current code.'
+            );
+            if (!action) return;
+        }
+
+        const res = await apiFetch('/api/parent-codes', {
+            method: 'POST',
+            body: JSON.stringify({ studentId: s.Id })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert(
+                'Parent code for ' + s.First_Name + ' ' + s.Last_Name + ':\n\n' +
+                '    ' + data.code + '\n\n' +
+                'Give this to the parent. They visit:\n' +
+                'childrenofpromisedaycare.com/parent\n' +
+                'and enter the code to sign forms.'
+            );
+        } else {
+            showNotification('Failed to generate code: ' + (data.error || ''), 'error');
+        }
+    } catch (e) {
+        showNotification('Error: ' + e.message, 'error');
+    }
+}
+
+function startConference() {
+    if (!filtered.length) return;
+    const s = filtered[currentIndex];
+    if (!s || !s.Id) { showNotification('Select a student first', 'error'); return; }
+
+    // Generate a unique room name
+    const roomName = 'CofP-' + s.Last_Name.replace(/[^a-zA-Z]/g, '') + '-' + s.Id + '-' + new Date().toISOString().split('T')[0];
+    const meetUrl = 'https://meet.jit.si/' + roomName;
+
+    // Save conference link to DB so parent can see it
+    apiFetch('/api/conference', {
+        method: 'POST',
+        body: JSON.stringify({ studentId: s.Id, meetUrl: meetUrl })
+    }).then(function(res) { return res.json(); }).then(function(data) {
+        if (data.success) {
+            // Open the meeting in a new tab
+            window.open(meetUrl, '_blank');
+            showNotification('Conference started! Parent can join from their portal.', 'success');
+        } else {
+            // Still open the meeting even if DB save fails
+            window.open(meetUrl, '_blank');
+        }
+    }).catch(function() {
+        window.open(meetUrl, '_blank');
+    });
+}
+
+// ══════════════════════════════════════════
 // ALERTS / NOTIFICATIONS
 // ══════════════════════════════════════════
 function renderAlerts() {
@@ -1678,9 +1754,58 @@ function renderAlerts() {
             type: 'warning',
             icon: '💰',
             title: `${ccapEligible.length} families may qualify for CCAP`,
-            detail: ccapEligible.map(s => `${s.First_Name} ${s.Last_Name}`).join(', '),
-            actionText: 'Open Benefits Roster →',
-            onclick: "setMode('benefits')"
+            detail: '',
+            custom: true,
+            render: function() {
+                return `<div style="border-left:4px solid #f59e0b;padding:14px 18px;margin-bottom:12px;background:#f8fafc;border-radius:0 8px 8px 0;">
+                    <div style="font-weight:700;font-size:0.9rem;color:var(--text);margin-bottom:8px;">💰 ${ccapEligible.length} families may qualify for CCAP</div>
+                    <div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:8px;">Based on 225% FPL thresholds. Verify income and household size below, then contact family about applying through their local CCR&R.</div>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:8px;">
+                        <thead><tr style="border-bottom:1px solid var(--border);">
+                            <th style="text-align:left;padding:6px;font-size:0.68rem;color:var(--text-muted);">Student</th>
+                            <th style="text-align:left;padding:6px;font-size:0.68rem;color:var(--text-muted);">Room</th>
+                            <th style="text-align:left;padding:6px;font-size:0.68rem;color:var(--text-muted);">Income</th>
+                            <th style="text-align:left;padding:6px;font-size:0.68rem;color:var(--text-muted);">HH Size</th>
+                            <th style="padding:6px;"></th>
+                        </tr></thead>
+                        <tbody>${ccapEligible.map(s => `<tr style="border-bottom:1px solid #f1f5f9;">
+                            <td style="padding:6px;font-weight:600;">${s.First_Name} ${s.Last_Name}</td>
+                            <td style="padding:6px;color:var(--text-muted);">${s.Room || s.RoomNumber}</td>
+                            <td style="padding:6px;"><input type="number" value="${s.HouseholdIncome||''}" style="width:80px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;" id="ccap_inc_${s.Id}"></td>
+                            <td style="padding:6px;"><input type="number" value="${s.HouseholdSize||''}" style="width:50px;padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;" id="ccap_hh_${s.Id}" min="1" max="15"></td>
+                            <td style="padding:6px;"><button onclick="saveCCAPIncome(${s.Id},'${s.First_Name}','${s.Last_Name}')" style="padding:3px 8px;background:var(--primary);color:white;border:none;border-radius:4px;font-size:0.68rem;font-weight:600;cursor:pointer;">Save</button></td>
+                        </tr>`).join('')}</tbody>
+                    </table>
+                </div>`;
+            }
+        });
+    }
+
+    // CCAP renewal tracking - check students with CCAP category
+    const ccapStudents = students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP');
+    const ccapDueSoon = ccapStudents.filter(s => {
+        if (!s.CCAPStartDate) return true; // No start date = needs attention
+        const start = new Date(s.CCAPStartDate);
+        const renewalDate = new Date(start);
+        renewalDate.setMonth(renewalDate.getMonth() + 12);
+        const daysUntil = (renewalDate - new Date()) / (1000*60*60*24);
+        return daysUntil <= 60; // Due within 60 days
+    });
+    if (ccapDueSoon.length) {
+        alerts.push({
+            type: 'warning',
+            icon: '🔄',
+            title: `${ccapDueSoon.length} CCAP renewal(s) due or missing start date`,
+            detail: ccapDueSoon.map(s => {
+                if (!s.CCAPStartDate) return `${s.First_Name} ${s.Last_Name} (no start date)`;
+                const start = new Date(s.CCAPStartDate);
+                const renewalDate = new Date(start);
+                renewalDate.setMonth(renewalDate.getMonth() + 12);
+                const days = Math.ceil((renewalDate - new Date()) / (1000*60*60*24));
+                return `${s.First_Name} ${s.Last_Name} (${days <= 0 ? 'OVERDUE' : days + ' days'})`;
+            }).join(', '),
+            actionText: 'Open CCAP Report →',
+            onclick: "setMode('reports');selectReport('ccap')"
         });
     }
 
@@ -1693,19 +1818,6 @@ function renderAlerts() {
             detail: window._summerUnmatched.join(', '),
             actionText: 'Open EMS to add student →',
             onclick: "setMode('ems'); startNewStudent()"
-        });
-    }
-
-    // Check for PFA/PI students missing proof of income
-    const missingProof = students.filter(s => isTruthy(s.Active) && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') && s.ProofOfIncomeUploaded !== '1' && s.ProofOfIncomeUploaded !== 1);
-    if (missingProof.length) {
-        alerts.push({
-            type: 'info',
-            icon: '📄',
-            title: `${missingProof.length} PFA/PI students missing proof of income`,
-            detail: missingProof.slice(0, 10).map(s => `${s.First_Name} ${s.Last_Name}`).join(', ') + (missingProof.length > 10 ? '...' : ''),
-            actionText: 'Open EMS to update →',
-            onclick: "setMode('ems')"
         });
     }
 
@@ -1751,9 +1863,16 @@ function renderAlerts() {
                 type: 'info',
                 icon: '📅',
                 title: 'Annual F/R/P recalculation due',
-                detail: 'New thresholds are active for this period. Click to recalculate all students.',
-                actionText: 'Recalculate All F/R/P →',
-                onclick: "recalculateAllFRP()"
+                detail: 'New thresholds are active for this period. Click the button below to recalculate all students.',
+                actionText: '',
+                custom: true,
+                render: function() {
+                    return `<div style="border-left:4px solid var(--primary);padding:14px 18px;margin-bottom:12px;background:#f8fafc;border-radius:0 8px 8px 0;">
+                        <div style="font-weight:700;font-size:0.9rem;color:var(--text);margin-bottom:4px;">📅 Annual F/R/P recalculation due</div>
+                        <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:10px;">New thresholds are active for this period. Click to recalculate all students and dismiss this alert.</div>
+                        <button onclick="recalculateAllFRP()" style="padding:8px 16px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer;">🔄 Recalculate All F/R/P Now</button>
+                    </div>`;
+                }
             });
         }
     }
@@ -1764,11 +1883,12 @@ function renderAlerts() {
         el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--success);font-weight:600;">✓ No alerts — everything looks good!</div>';
     } else {
         el.innerHTML = alerts.map(a => {
+            if (a.custom && a.render) return a.render();
             const borderColor = a.type === 'error' ? 'var(--danger)' : a.type === 'warning' ? '#f59e0b' : 'var(--primary)';
             return `<div style="border-left:4px solid ${borderColor};padding:14px 18px;margin-bottom:12px;background:#f8fafc;border-radius:0 8px 8px 0;cursor:pointer;transition:background 0.15s;" onclick="${a.onclick}" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='#f8fafc'">
                 <div style="font-weight:700;font-size:0.9rem;color:var(--text);margin-bottom:4px;">${a.icon} ${a.title}</div>
                 <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">${a.detail}</div>
-                <div style="font-size:0.72rem;color:var(--primary);font-weight:600;">${a.actionText}</div>
+                ${a.actionText ? `<div style="font-size:0.72rem;color:var(--primary);font-weight:600;">${a.actionText}</div>` : ''}
             </div>`;
         }).join('');
     }
@@ -1777,6 +1897,26 @@ function renderAlerts() {
     const badge = document.getElementById('alertBadge');
     if (alerts.length) { badge.textContent = alerts.length; badge.style.display = 'inline'; }
     else { badge.style.display = 'none'; }
+}
+
+async function saveCCAPIncome(studentId, firstName, lastName) {
+    const income = document.getElementById('ccap_inc_' + studentId).value;
+    const hhSize = document.getElementById('ccap_hh_' + studentId).value;
+    try {
+        const res = await apiFetch('/api/students/' + encodeURIComponent(firstName) + '/' + encodeURIComponent(lastName), {
+            method: 'PUT',
+            body: JSON.stringify({ householdIncome: income, householdSize: hhSize })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('Income updated for ' + firstName + ' ' + lastName, 'success');
+            // Update local data
+            const s = students.find(x => String(x.Id) === String(studentId));
+            if (s) { s.HouseholdIncome = income; s.HouseholdSize = hhSize; }
+        } else {
+            showNotification('Failed to update: ' + (data.error||''), 'error');
+        }
+    } catch(e) { showNotification('Error: ' + e.message, 'error'); }
 }
 
 async function recalculateAllFRP() {
@@ -1862,10 +2002,11 @@ function renderBenefitsRoom() {
     grid.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
         <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
             <th style="padding:8px 10px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
-            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:75px;">Pay</th>
-            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:45px;">F/R/P</th>
-            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:60px;">Income</th>
-            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:30px;">HH</th>
+            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:75px;" title="Pay Type: Paid (full tuition), CCAP (IL Child Care Assistance Program - 225% FPL), Half Price, Free (staff/scholarship), Foster (DCFS ward)">Pay</th>
+            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:45px;" title="Food Program eligibility: Free (≤130% FPL or public benefits/foster/military/PFA), Reduced (≤185% FPL), Paid (above 185% FPL). Current thresholds: HH4 Free=$42,900 / Reduced=$61,050">F/R/P</th>
+            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:60px;" title="Annual gross household income before deductions">Income</th>
+            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:30px;" title="Number of people living in the household">HH</th>
+            <th style="padding:8px 4px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:80px;cursor:help;" title="CCAP Approval Start Date. Renewals are every 12 months. Parent receives redetermination form from CCR&R before expiry. Need 2 pay stubs within 60 days for renewal. Current CCAP threshold (225% FPL): HH1=$35,888 | HH2=$48,668 | HH3=$61,448 | HH4=$74,228 | HH5=$87,008 | HH6=$99,788 | HH7=$112,568 | HH8=$125,348">CCAP Start</th>
             ${benefitKeys.map(b => `<th style="padding:8px 4px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:42px;">${b}</th>`).join('')}
             <th style="padding:8px 4px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:36px;">Save</th>
             <th style="padding:8px 6px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);min-width:140px;">Notes</th>
@@ -1890,6 +2031,7 @@ function renderBenefitsRoom() {
                 <td style="padding:5px 6px;text-align:center;font-weight:700;font-size:0.7rem;color:${frpColor(frp)};">${frp || '—'}</td>
                 <td style="padding:4px 4px;"><input type="number" id="benIncome_${i}" value="${income || ''}" onchange="markBenefitChanged(${i})" style="width:60px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:0.68rem;text-align:center;"></td>
                 <td style="padding:4px 4px;"><input type="number" id="benHH_${i}" value="${hhSize || ''}" min="1" max="15" onchange="markBenefitChanged(${i})" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:0.68rem;text-align:center;"></td>
+                <td style="padding:4px 4px;"><input type="date" id="benCCAPStart_${i}" value="${s.CCAPStartDate || ''}" onchange="markBenefitChanged(${i})" style="padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.65rem;width:100%;" ${s.Category==='CCAP'?'':'disabled title="Set Pay Type to CCAP to enable"'}></td>
                 ${benefitKeys.map(b => `<td style="padding:4px 4px;text-align:center;">
                     <input type="checkbox" id="ben_${rn}_${i}_${b}" ${ben.includes(b)?'checked':''} onchange="markBenefitChanged(${i})" style="width:auto;accent-color:var(--primary);">
                 </td>`).join('')}
@@ -1931,11 +2073,14 @@ async function saveBenefitRow(i) {
     const newCategory = document.getElementById(`benPay_${i}`)?.value || s.Category || '';
     const newIncome = document.getElementById(`benIncome_${i}`)?.value || '';
     const newHHSize = document.getElementById(`benHH_${i}`)?.value || '';
+    const newCCAPStart = document.getElementById(`benCCAPStart_${i}`)?.value || '';
     const btn = document.getElementById(`benSave_${i}`);
     btn.disabled = true; btn.textContent = '…';
     try {
+        const body = { publicBenefits: benefits, category: newCategory, householdIncome: newIncome, householdSize: newHHSize };
+        if (newCategory === 'CCAP' && newCCAPStart) body.ccapStartDate = newCCAPStart;
         const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
-            method: 'PUT', body: JSON.stringify({ publicBenefits: benefits, category: newCategory, householdIncome: newIncome, householdSize: newHHSize })
+            method: 'PUT', body: JSON.stringify(body)
         });
         const data = await res.json();
         if (data.success) {
@@ -1943,6 +2088,7 @@ async function saveBenefitRow(i) {
             s.Category = newCategory;
             s.HouseholdIncome = newIncome;
             s.HouseholdSize = newHHSize;
+            if (newCCAPStart) s.CCAPStartDate = newCCAPStart;
             showNotification(`${s.First_Name} ${s.Last_Name} updated`, 'success');
             btn.style.opacity = '0.3';
         } else {

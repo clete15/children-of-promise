@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Portal – Children Of Promise</title>
+    <style>
+        :root { --primary:#2563eb; --primary-dark:#1d4ed8; --success:#16a34a; --danger:#dc2626; --border:#e2e8f0; --text:#1e293b; --text-muted:#64748b; }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#1e40af 100%); min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:24px; }
+        .logo-header { text-align:center; margin-bottom:24px; }
+        .logo-header img { height:80px; filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3)); margin-bottom:12px; }
+        .logo-header h1 { color:white; font-size:1.4rem; font-weight:800; }
+        .logo-header p { color:rgba(255,255,255,0.7); font-size:0.85rem; margin-top:4px; }
+
+        .card { background:white; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.2); width:100%; max-width:600px; overflow:hidden; }
+        .card-header { padding:16px 24px; border-bottom:1px solid var(--border); }
+        .card-header h2 { font-size:1rem; font-weight:800; color:var(--text); }
+        .card-header p { font-size:0.78rem; color:var(--text-muted); margin-top:4px; }
+        .card-body { padding:24px; }
+
+        /* Login */
+        .login-form { display:flex; flex-direction:column; gap:14px; max-width:320px; margin:0 auto; }
+        .login-form label { font-size:0.75rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; }
+        .login-form input { padding:12px 14px; border:1.5px solid var(--border); border-radius:8px; font-size:1.1rem; text-align:center; letter-spacing:0.2em; font-weight:700; text-transform:uppercase; }
+        .login-form input:focus { outline:none; border-color:var(--primary); box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
+        .login-form button { padding:12px; background:var(--primary); color:white; border:none; border-radius:8px; font-size:0.95rem; font-weight:700; cursor:pointer; }
+        .login-form button:hover { background:var(--primary-dark); }
+        .login-error { color:var(--danger); font-size:0.8rem; font-weight:600; text-align:center; display:none; }
+
+        /* Child info bar */
+        .child-bar { background:#f0f9ff; border:1px solid #bae6fd; border-radius:8px; padding:12px 16px; margin-bottom:20px; display:flex; align-items:center; gap:12px; }
+        .child-bar .child-name { font-weight:800; font-size:0.95rem; color:var(--text); }
+        .child-bar .child-detail { font-size:0.75rem; color:var(--text-muted); }
+
+        /* Form cards */
+        .form-list { display:flex; flex-direction:column; gap:12px; }
+        .form-item { border:1.5px solid var(--border); border-radius:10px; padding:16px 20px; transition:border-color 0.15s; }
+        .form-item:hover { border-color:var(--primary); }
+        .form-item-header { display:flex; align-items:center; justify-content:space-between; }
+        .form-item-title { font-weight:700; font-size:0.88rem; color:var(--text); }
+        .form-item-status { font-size:0.72rem; font-weight:700; padding:3px 10px; border-radius:12px; }
+        .form-item-status.pending { background:#fef3c7; color:#92400e; }
+        .form-item-status.signed { background:#d1fae5; color:#065f46; }
+        .form-item-desc { font-size:0.75rem; color:var(--text-muted); margin-top:6px; }
+        .form-item-btn { margin-top:10px; padding:8px 16px; background:var(--primary); color:white; border:none; border-radius:6px; font-size:0.8rem; font-weight:700; cursor:pointer; }
+        .form-item-btn:hover { background:var(--primary-dark); }
+        .form-item-btn:disabled { background:#94a3b8; cursor:not-allowed; }
+
+        /* Form modal overlay */
+        .p-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center; padding:16px; }
+        .p-overlay.open { display:flex; }
+        .p-modal { background:white; border-radius:12px; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.3); }
+        .p-modal-header { padding:16px 24px; border-bottom:1px solid #e5e7eb; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; background:white; z-index:2; border-radius:12px 12px 0 0; }
+        .p-modal-header h3 { font-size:1rem; font-weight:700; color:#1e3a8a; }
+        .p-modal-close { background:none; border:none; font-size:1.5rem; cursor:pointer; color:#6b7280; }
+        .p-modal-body { padding:24px; }
+        .p-modal-footer { padding:16px 24px; border-top:1px solid #e5e7eb; display:flex; gap:10px; justify-content:flex-end; position:sticky; bottom:0; background:white; }
+        .p-btn { padding:10px 20px; border-radius:6px; font-size:0.85rem; font-weight:600; cursor:pointer; border:none; }
+        .p-btn-primary { background:var(--primary); color:white; }
+        .p-btn-primary:hover { background:var(--primary-dark); }
+        .p-btn-secondary { background:white; color:#374151; border:1px solid #d1d5db; }
+
+        .p-section { margin-bottom:18px; }
+        .p-section h4 { font-size:0.75rem; font-weight:700; text-transform:uppercase; letter-spacing:0.05em; color:#6b7280; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #f3f4f6; }
+        .p-field { margin-bottom:10px; }
+        .p-field label { display:block; font-size:0.72rem; font-weight:600; color:#6b7280; margin-bottom:3px; }
+        .p-field input, .p-field textarea { width:100%; padding:8px 10px; border:1px solid #d1d5db; border-radius:6px; font-size:0.85rem; font-family:inherit; }
+        .p-field textarea { min-height:60px; resize:vertical; }
+        .p-field input:focus, .p-field textarea:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .p-field .p-static { font-size:0.85rem; padding:8px 10px; background:#f8fafc; border-radius:6px; color:var(--text); }
+        .p-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+        .consent-text { font-size:0.85rem; line-height:1.7; color:#374151; margin-bottom:16px; }
+        .sig-box { border:2px dashed #d1d5db; border-radius:8px; padding:16px; text-align:center; margin-top:12px; }
+        .sig-box input { border:none; border-bottom:2px solid #1e3a8a; border-radius:0; text-align:center; font-size:1.1rem; font-weight:600; font-style:italic; padding:8px; width:80%; }
+        .sig-box input:focus { box-shadow:none; border-color:var(--primary); }
+        .sig-box .sig-label { font-size:0.7rem; color:var(--text-muted); margin-top:6px; }
+
+        .success-msg { text-align:center; padding:20px; color:var(--success); font-weight:700; font-size:0.9rem; }
+
+        @media (max-width:480px) { .p-row { grid-template-columns:1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="logo-header">
+    <img src="/images/logo-sm.png" alt="Children Of Promise" onerror="this.style.display='none'">
+    <h1>Children Of Promise</h1>
+    <p>Parent Portal</p>
+</div>
+
+<!-- LOGIN VIEW -->
+<div class="card" id="loginCard">
+    <div class="card-header">
+        <h2>Welcome</h2>
+        <p>Enter your child's access code to view and sign forms.</p>
+    </div>
+    <div class="card-body">
+        <form class="login-form" onsubmit="event.preventDefault();parentLogin();">
+            <label>Access Code</label>
+            <input type="text" id="codeInput" placeholder="e.g. A7K2M9" maxlength="8" autocomplete="off" autofocus>
+            <div class="login-error" id="loginError">Invalid code. Please check and try again.</div>
+            <button type="submit">View My Child's Forms</button>
+        </form>
+    </div>
+</div>
+
+<!-- FORMS VIEW -->
+<div class="card" id="formsCard" style="display:none;">
+    <div class="card-header">
+        <h2>Forms &amp; Documents</h2>
+        <p>Review and sign forms for your child.</p>
+    </div>
+    <div class="card-body">
+        <div class="child-bar">
+            <div>
+                <div class="child-name" id="pChildName"></div>
+                <div class="child-detail" id="pChildDetail"></div>
+            </div>
+        </div>
+        <div class="form-list" id="formList">
+            <div style="text-align:center;padding:20px;color:var(--text-muted);">Loading forms...</div>
+        </div>
+    </div>
+</div>
+
+<!-- PERMISSION SLIP MODAL -->
+<div class="p-overlay" id="pPermSlipOverlay">
+    <div class="p-modal">
+        <div class="p-modal-header">
+            <h3>Permission to Perform Screenings</h3>
+            <button class="p-modal-close" onclick="closeModal('pPermSlipOverlay')">&times;</button>
+        </div>
+        <div class="p-modal-body">
+            <div class="p-section" style="text-align:center;">
+                <strong style="font-size:1rem;color:#1e3a8a;">Children of Promise PFA</strong><br>
+                <span style="font-size:0.9rem;font-weight:600;">Permission to perform screenings</span>
+            </div>
+            <div class="consent-text">
+                I, <strong id="ppParentNameInline">_______________</strong>,
+                consent to <em id="ppTeacherInline">_______________</em>
+                conducting screenings on my child for the
+                <strong id="ppYearInline">___________</strong> school year
+                using Ages and Stages ASQ and ASE screening instruments.
+                <br><br>
+                Screenings will be performed at the beginning, middle, and end of the school year.
+                <br><br>
+                Results of the screenings will be shared with the parents along with Teaching Strategies report cards at the middle and end of the school year.
+            </div>
+            <div class="p-section">
+                <div class="p-row">
+                    <div class="p-field"><label>Your Full Name</label><input type="text" id="ppParentName" oninput="document.getElementById('ppParentNameInline').textContent=this.value||'_______________'"></div>
+                    <div class="p-field"><label>Date</label><input type="date" id="ppDate"></div>
+                </div>
+            </div>
+            <div class="sig-box">
+                <div style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;">Sign below by typing your full name:</div>
+                <input type="text" id="ppSignature" placeholder="Your full name">
+                <div class="sig-label">Parent/Guardian Signature</div>
+            </div>
+        </div>
+        <div class="p-modal-footer">
+            <button class="p-btn p-btn-secondary" onclick="closeModal('pPermSlipOverlay')">Cancel</button>
+            <button class="p-btn p-btn-primary" id="ppSubmitBtn" onclick="submitPermissionSlip()">Sign &amp; Submit</button>
+        </div>
+    </div>
+</div>
+
+<!-- PARENT INTERVIEW MODAL -->
+<div class="p-overlay" id="pInterviewOverlay">
+    <div class="p-modal" style="max-width:720px;">
+        <div class="p-modal-header">
+            <h3>Prevention Initiative Parent Interview Form</h3>
+            <button class="p-modal-close" onclick="closeModal('pInterviewOverlay')">&times;</button>
+        </div>
+        <div class="p-modal-body">
+
+            <!-- Section 1: Basic Info -->
+            <div class="p-section">
+                <h4>Interview Information</h4>
+                <div class="p-row">
+                    <div class="p-field"><label>Person Interviewed</label><input type="text" id="pi_personInterviewed"></div>
+                    <div class="p-field"><label>Relationship to Child</label><select id="pi_relationship"><option value="">-- Select --</option><option>Mother</option><option>Father</option><option>Grandmother</option><option>Grandfather</option><option>Guardian</option><option>Foster Parent</option><option>Other</option></select></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Child's Full Name</label><div class="p-static" id="pi_childName"></div></div>
+                    <div class="p-field"><label>Date of Birth</label><div class="p-static" id="pi_childDOB"></div></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Name child likes to be called</label><input type="text" id="pi_nickname"></div>
+                    <div class="p-field"><label>How did you hear about this program?</label><input type="text" id="pi_howHeard"></div>
+                </div>
+            </div>
+
+            <!-- Section 2: Parent 1 -->
+            <div class="p-section">
+                <h4>Parent/Guardian 1</h4>
+                <div class="p-row">
+                    <div class="p-field"><label>Name</label><input type="text" id="pi_p1Name"></div>
+                    <div class="p-field"><label>Date of Birth</label><input type="date" id="pi_p1DOB"></div>
+                </div>
+                <div class="p-field"><label>Address</label><input type="text" id="pi_p1Address"></div>
+                <div class="p-row">
+                    <div class="p-field"><label>City</label><input type="text" id="pi_p1City"></div>
+                    <div class="p-field"><label>State</label><input type="text" id="pi_p1State" value="IL"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>ZIP</label><input type="text" id="pi_p1Zip"></div>
+                    <div class="p-field"><label>Phone</label><input type="text" id="pi_p1Phone"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Email</label><input type="text" id="pi_p1Email"></div>
+                    <div class="p-field"><label>Marital Status</label><select id="pi_p1Marital"><option value="">-- Select --</option><option>Single</option><option>Married</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Language Spoken in Home</label><input type="text" id="pi_p1Language" value="English"></div>
+                    <div class="p-field"><label>Translator Needed?</label><select id="pi_p1Translator"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Highest Grade Completed</label><input type="text" id="pi_p1Education"></div>
+                    <div class="p-field"><label>Place of Employment</label><input type="text" id="pi_p1Employer"></div>
+                </div>
+            </div>
+
+            <!-- Section 3: Parent 2 -->
+            <div class="p-section">
+                <h4>Parent/Guardian 2 (if applicable)</h4>
+                <div class="p-row">
+                    <div class="p-field"><label>Name</label><input type="text" id="pi_p2Name"></div>
+                    <div class="p-field"><label>Date of Birth</label><input type="date" id="pi_p2DOB"></div>
+                </div>
+                <div class="p-field"><label>Address</label><input type="text" id="pi_p2Address"></div>
+                <div class="p-row">
+                    <div class="p-field"><label>City</label><input type="text" id="pi_p2City"></div>
+                    <div class="p-field"><label>State</label><input type="text" id="pi_p2State"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>ZIP</label><input type="text" id="pi_p2Zip"></div>
+                    <div class="p-field"><label>Phone</label><input type="text" id="pi_p2Phone"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Email</label><input type="text" id="pi_p2Email"></div>
+                    <div class="p-field"><label>Marital Status</label><select id="pi_p2Marital"><option value="">-- Select --</option><option>Single</option><option>Married</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Language Spoken in Home</label><input type="text" id="pi_p2Language"></div>
+                    <div class="p-field"><label>Place of Employment</label><input type="text" id="pi_p2Employer"></div>
+                </div>
+            </div>
+
+            <!-- Section 4: Child Lives With / Siblings -->
+            <div class="p-section">
+                <h4>Household</h4>
+                <div class="p-field"><label>Child Lives With</label><select id="pi_livesWith"><option value="Parent(s)">Parent(s)</option><option value="Foster parent(s)">Foster parent(s) or legal guardian(s)</option><option value="Other">Other (specify below)</option></select></div>
+                <div class="p-field"><label>If other, names:</label><input type="text" id="pi_livesWithOther"></div>
+                <div class="p-field"><label>List Siblings (names and dates of birth)</label><textarea id="pi_siblings" placeholder="e.g. Ashlyn, 03/04/2021&#10;Bradley, 09/12/2019"></textarea></div>
+                <div class="p-field"><label>Are any siblings having academic difficulty or trouble in school?</label><textarea id="pi_siblingAcademic" placeholder="If yes, explain..."></textarea></div>
+            </div>
+
+            <!-- Section 5: Medical History -->
+            <div class="p-section">
+                <h4>Child's Medical History</h4>
+                <div class="p-field"><label>Was there anything unusual about the pregnancy/delivery or serious health problems at birth?</label><textarea id="pi_birthComplications" placeholder="If yes, explain..."></textarea></div>
+                <div class="p-row">
+                    <div class="p-field"><label>Length of Pregnancy</label><input type="text" id="pi_pregnancyLength" placeholder="e.g. 36 weeks"></div>
+                    <div class="p-field"><label>Weight at Birth</label><input type="text" id="pi_birthWeight" placeholder="e.g. 6 lbs"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Current Weight</label><input type="text" id="pi_currentWeight"></div>
+                    <div class="p-field"><label>Current Height</label><input type="text" id="pi_currentHeight"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Feeding difficulties as infant?</label><select id="pi_feedingDifficulty"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                    <div class="p-field"><label>Was child on a respirator?</label><select id="pi_respirator"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                </div>
+                <div class="p-field"><label>Is your child experiencing health issues? (chronic or terminal)</label><textarea id="pi_healthIssues" placeholder="If yes, explain..."></textarea></div>
+                <div class="p-field"><label>Does your child have a diagnosed disability?</label><textarea id="pi_disability" placeholder="If yes, explain..."></textarea></div>
+                <div class="p-row">
+                    <div class="p-field"><label>Referral to Child & Family Connections?</label><select id="pi_referralCFC"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                    <div class="p-field"><label>Taking any medication?</label><select id="pi_medication"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                </div>
+                <div class="p-field"><label>What medication(s) and why?</label><input type="text" id="pi_medicationDetail"></div>
+                <div class="p-field"><label>Surgeries (list with date and hospital)</label><textarea id="pi_surgeries" placeholder="e.g. Intussusception surgery, 2-24, Barnes Jewish"></textarea></div>
+                <div class="p-field"><label>Doctor Name, Clinic, Phone</label><input type="text" id="pi_doctor" placeholder="e.g. Dr. Murry, OSCE, 618-257-2550"></div>
+            </div>
+
+            <!-- Section 6: Health Checklist -->
+            <div class="p-section">
+                <h4>Health Concerns (check any that apply)</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:0.8rem;">
+                    <label><input type="checkbox" id="pi_hc_thumb"> Thumb sucking</label>
+                    <label><input type="checkbox" id="pi_hc_indigestion"> Frequent indigestion</label>
+                    <label><input type="checkbox" id="pi_hc_nailBiting"> Nail biting</label>
+                    <label><input type="checkbox" id="pi_hc_constipation"> Frequent constipation</label>
+                    <label><input type="checkbox" id="pi_hc_epilepsy"> Epilepsy</label>
+                    <label><input type="checkbox" id="pi_hc_diarrhea"> Frequent diarrhea</label>
+                    <label><input type="checkbox" id="pi_hc_heart"> Heart trouble</label>
+                    <label><input type="checkbox" id="pi_hc_vomiting"> Vomiting</label>
+                    <label><input type="checkbox" id="pi_hc_overtired"> Overtired</label>
+                    <label><input type="checkbox" id="pi_hc_fevers"> Frequent fevers</label>
+                    <label><input type="checkbox" id="pi_hc_appetite"> Lack of appetite</label>
+                    <label><input type="checkbox" id="pi_hc_sinus"> Sinus trouble</label>
+                    <label><input type="checkbox" id="pi_hc_overweight"> Overweight</label>
+                    <label><input type="checkbox" id="pi_hc_noseBleeding"> Nose bleeding</label>
+                    <label><input type="checkbox" id="pi_hc_underweight"> Underweight</label>
+                    <label><input type="checkbox" id="pi_hc_rashes"> Rashes</label>
+                    <label><input type="checkbox" id="pi_hc_headache"> Frequent headache</label>
+                    <label><input type="checkbox" id="pi_hc_earInfections"> Frequent ear infections</label>
+                    <label><input type="checkbox" id="pi_hc_nightmares"> Nightmares</label>
+                    <label><input type="checkbox" id="pi_hc_nightTerrors"> Night terrors</label>
+                    <label><input type="checkbox" id="pi_hc_asthma"> Asthma</label>
+                    <label><input type="checkbox" id="pi_hc_communicable"> Communicable diseases</label>
+                </div>
+                <div class="p-field" style="margin-top:8px;"><label>Allergies (explain)</label><input type="text" id="pi_allergies"></div>
+                <div class="p-field"><label>Hearing test date &amp; result</label><input type="text" id="pi_hearingTest" placeholder="e.g. 12/14/24, Pass, Dr. Visit"></div>
+                <div class="p-field"><label>Vision test date &amp; result</label><input type="text" id="pi_visionTest" placeholder="e.g. 12/14/24, Pass, Dr. Visit"></div>
+                <div class="p-field"><label>Developmental concern diagnosed?</label><input type="text" id="pi_devConcern" placeholder="If yes, describe..."></div>
+                <div class="p-field"><label>Therapy services child has received (therapist, agency, phone)</label><textarea id="pi_therapy"></textarea></div>
+            </div>
+
+            <!-- Section 7: Social History -->
+            <div class="p-section">
+                <h4>Social History</h4>
+                <div class="p-field"><label>Please describe your child</label><textarea id="pi_describeChild" placeholder="Personality, temperament, interests..."></textarea></div>
+                <div class="p-row">
+                    <div class="p-field"><label>Attends child care or in-home care?</label><select id="pi_childCare"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                    <div class="p-field"><label>Where?</label><input type="text" id="pi_childCareWhere"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Opportunities to play with other children?</label><select id="pi_playOpportunities"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                    <div class="p-field"><label>Where?</label><input type="text" id="pi_playWhere"></div>
+                </div>
+                <div class="p-field"><label>Has family experienced alcohol or drug abuse?</label><input type="text" id="pi_substanceAbuse" placeholder="If yes, explain..."></div>
+                <div class="p-field"><label>Has child been exposed to stress, trauma, or violence?</label><input type="text" id="pi_trauma" placeholder="If yes, explain..."></div>
+                <div class="p-field"><label>Currently receiving DCFS services?</label><select id="pi_dcfs"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                <div class="p-field"><label>Primary caregivers have chronic/terminal illness or disability?</label><input type="text" id="pi_caregiverIllness" placeholder="If yes, explain..."></div>
+                <div class="p-row">
+                    <div class="p-field"><label>Age of mother at birth of first child</label><input type="number" id="pi_motherAge"></div>
+                    <div class="p-field"><label>Age of father at birth of first child</label><input type="number" id="pi_fatherAge"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Family recently immigrated?</label><select id="pi_immigrated"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                    <div class="p-field"><label>Caregivers on active military duty?</label><select id="pi_military"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Caregivers incarcerated?</label><select id="pi_incarcerated"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                    <div class="p-field"><label>Death in immediate family?</label><select id="pi_familyDeath"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                </div>
+                <div class="p-field"><label>If yes to above, explain:</label><input type="text" id="pi_socialExplain"></div>
+                <div class="p-field"><label>Opportunities to socialize with family and friends?</label><input type="text" id="pi_socialize"></div>
+                <div class="p-field"><label>Receiving services from another agency?</label><input type="text" id="pi_otherAgency" placeholder="If yes, which agency..."></div>
+            </div>
+
+            <!-- Section 8: Daily Life -->
+            <div class="p-section">
+                <h4>Daily Life &amp; Routines</h4>
+                <div class="p-field"><label>What are your child's most enjoyable activities?</label><textarea id="pi_activities"></textarea></div>
+                <div class="p-field"><label>What do you enjoy doing as a family?</label><textarea id="pi_familyActivities"></textarea></div>
+                <div class="p-field"><label>What frightens your child?</label><input type="text" id="pi_fears"></div>
+                <div class="p-field"><label>What do you do to comfort your child?</label><input type="text" id="pi_comfort"></div>
+                <div class="p-field"><label>When transitioning between activities, how does your child respond?</label><input type="text" id="pi_transitions"></div>
+                <div class="p-field"><label>What is a typical day like for you and your family?</label><textarea id="pi_typicalDay"></textarea></div>
+                <div class="p-row">
+                    <div class="p-field"><label>Development similar to peers?</label><select id="pi_devSimilar"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                    <div class="p-field"><label>Noticed any regression?</label><select id="pi_regression"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                </div>
+                <div class="p-field"><label>Eating/snacking schedule</label><input type="text" id="pi_eatingSchedule" placeholder="e.g. Breakfast, snack, lunch, dinner, snack"></div>
+                <div class="p-field"><label>Sleeping/napping schedule</label><input type="text" id="pi_sleepSchedule" placeholder="e.g. 2 naps, 4pm to 1y, one in morning/2pm"></div>
+                <div class="p-field"><label>Does your child have behaviors that concern you?</label><textarea id="pi_behaviors" placeholder="If yes, explain..."></textarea></div>
+                <div class="p-field"><label>Special information or instructions for program staff</label><textarea id="pi_specialInstructions"></textarea></div>
+            </div>
+
+            <!-- Section 9: Pregnancy (if applicable) -->
+            <div class="p-section">
+                <h4>Current Pregnancy (if applicable)</h4>
+                <div class="p-row">
+                    <div class="p-field"><label>Currently pregnant?</label><select id="pi_pregnant"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                    <div class="p-field"><label>Estimated delivery date</label><input type="date" id="pi_dueDate"></div>
+                </div>
+                <div class="p-row">
+                    <div class="p-field"><label>Difficulties with pregnancy?</label><select id="pi_pregDifficulties"><option value="No">No</option><option value="Yes">Yes</option></select></div>
+                    <div class="p-field"><label>Date of last exam</label><input type="date" id="pi_lastExam"></div>
+                </div>
+            </div>
+
+            <!-- Section 10: Household Information -->
+            <div class="p-section">
+                <h4>Household Information</h4>
+                <div class="p-row">
+                    <div class="p-field"><label>Transportation available?</label><select id="pi_transportation"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                    <div class="p-field"><label>Times family moved in past year</label><input type="number" id="pi_moveCount" min="0"></div>
+                </div>
+                <div class="p-field"><label>Current living situation</label><select id="pi_livingSituation">
+                    <option value="Normal">My family has a fixed, regular, adequate nighttime residence</option>
+                    <option value="Shared housing">Shares housing due to hardship</option>
+                    <option value="Motel/hotel">Lives in motel, hotel, or camping grounds</option>
+                    <option value="Emergency/transitional">Emergency or transitional housing</option>
+                    <option value="Not designed for housing">Nighttime residence not designed for sleeping</option>
+                    <option value="Car/park/abandoned">Lives in car, park, public space, or abandoned building</option>
+                    <option value="Foster care">Child is awaiting foster care placement</option>
+                    <option value="Unaccompanied youth">Unaccompanied youth</option>
+                </select></div>
+                <div class="p-field"><label>Household structure</label><select id="pi_householdStructure">
+                    <option value="">-- Select --</option>
+                    <option value="Both parents">Both parents at home</option>
+                    <option value="Single parent">Single parent at home</option>
+                    <option value="Grandparent">Adult other than parent (grandparent) also in home</option>
+                    <option value="Shared custody">Shared custody (part time with mom/part time with dad)</option>
+                    <option value="Teen parent">Teen parent lives with parents</option>
+                    <option value="Other">Other situation</option>
+                </select></div>
+            </div>
+
+            <!-- Section 11: Significant people -->
+            <div class="p-section">
+                <h4>Significant People &amp; Nutrition</h4>
+                <div class="p-field"><label>List significant people in your child's life</label><input type="text" id="pi_significantPeople" placeholder="e.g. Mom, Dad, his sister"></div>
+                <div class="p-row">
+                    <div class="p-field"><label>Does everyone get enough to eat?</label><select id="pi_enoughFood"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                    <div class="p-field"><label>Access to fresh food/fruits/vegetables?</label><select id="pi_freshFood"><option value="Yes">Yes</option><option value="No">No</option></select></div>
+                </div>
+            </div>
+
+            <!-- Section 12: Goals -->
+            <div class="p-section">
+                <h4>Goals &amp; Dreams</h4>
+                <div class="p-field"><label>What are your dreams or goals for your child's future?</label><textarea id="pi_goals" placeholder="Share your hopes for your child..."></textarea></div>
+                <div class="p-field"><label>Please provide any other information that will help us serve you and your family better.</label><textarea id="pi_otherInfo"></textarea></div>
+            </div>
+
+            <!-- Section 13: Authorized Pick-Up -->
+            <div class="p-section">
+                <h4>Authorized Pick-Up List</h4>
+                <p style="font-size:0.75rem;color:#6b7280;margin-bottom:8px;">List people authorized to pick up your child (other than parents).</p>
+                <div class="p-row">
+                    <div class="p-field"><label>1. Name</label><input type="text" id="pi_pickup1Name"></div>
+                    <div class="p-field"><label>Phone</label><input type="text" id="pi_pickup1Phone"></div>
+                </div>
+                <div class="p-field"><label>Relationship</label><input type="text" id="pi_pickup1Rel"></div>
+                <div class="p-row">
+                    <div class="p-field"><label>2. Name</label><input type="text" id="pi_pickup2Name"></div>
+                    <div class="p-field"><label>Phone</label><input type="text" id="pi_pickup2Phone"></div>
+                </div>
+                <div class="p-field"><label>Relationship</label><input type="text" id="pi_pickup2Rel"></div>
+                <div class="p-row">
+                    <div class="p-field"><label>3. Name</label><input type="text" id="pi_pickup3Name"></div>
+                    <div class="p-field"><label>Phone</label><input type="text" id="pi_pickup3Phone"></div>
+                </div>
+                <div class="p-field"><label>Relationship</label><input type="text" id="pi_pickup3Rel"></div>
+            </div>
+
+            <!-- Signature -->
+            <div class="p-section">
+                <p style="font-size:0.82rem;color:#374151;font-weight:500;margin-bottom:12px;">The information provided is true and accurate to the best of my (our) knowledge.</p>
+                <div class="sig-box">
+                    <div style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;">Sign below by typing your full name:</div>
+                    <input type="text" id="piSignatureP" placeholder="Your full name">
+                    <div class="sig-label">Parent/Guardian Signature</div>
+                </div>
+                <div class="p-field" style="margin-top:10px;"><label>Date</label><input type="date" id="pi_signDate"></div>
+            </div>
+
+        </div>
+        <div class="p-modal-footer">
+            <button class="p-btn p-btn-secondary" onclick="closeModal('pInterviewOverlay')">Cancel</button>
+            <button class="p-btn p-btn-primary" id="piSubmitBtn" onclick="submitInterview()">Sign &amp; Submit</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let parentStudent = null;
+let parentCode = '';
+let trackingStatus = {};
+
+async function parentLogin() {
+    const code = document.getElementById('codeInput').value.trim().toUpperCase();
+    const err = document.getElementById('loginError');
+    if (!code) { err.style.display = 'block'; return; }
+
+    try {
+        const res = await fetch('/api/parent-portal/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: code })
+        });
+        const data = await res.json();
+        if (data.success && data.student) {
+            parentStudent = data.student;
+            parentCode = code;
+            trackingStatus = data.tracking || {};
+            preEnrollData = data.preEnroll || {};
+            localStorage.setItem('copParentCode', code);
+            err.style.display = 'none';
+            showForms();
+        } else {
+            err.style.display = 'block';
+        }
+    } catch (e) {
+        err.style.display = 'block';
+    }
+}
+
+function showForms() {
+    document.getElementById('loginCard').style.display = 'none';
+    document.getElementById('formsCard').style.display = 'block';
+    document.getElementById('pChildName').textContent = parentStudent.First_Name + ' ' + parentStudent.Last_Name;
+    document.getElementById('pChildDetail').textContent = parentStudent.Room + ' \u2022 ' + parentStudent.TeacherDescription;
+    renderFormList();
+}
+
+function renderFormList() {
+    const forms = [
+        {
+            key: 'PermissionSlip',
+            title: 'Permission to Perform Screenings',
+            desc: 'Consent for ASQ and ASE developmental screenings during the school year.',
+            action: "openModal('pPermSlipOverlay');prefillPermSlip()"
+        },
+        {
+            key: 'ParentInterview',
+            title: 'Parent Interview',
+            desc: 'Share your goals, concerns, and observations about your child.',
+            action: "openModal('pInterviewOverlay');prefillInterview()"
+        }
+    ];
+
+    const list = document.getElementById('formList');
+    var html = '';
+
+    // Conference banner (check if active)
+    html += '<div id="conferenceBanner" style="display:none;background:#ecfdf5;border:2px solid #10b981;border-radius:10px;padding:16px 20px;text-align:center;margin-bottom:12px;">' +
+        '<div style="font-size:1.2rem;margin-bottom:4px;">📹</div>' +
+        '<div style="font-weight:700;font-size:0.9rem;color:#065f46;">Conference Ready</div>' +
+        '<div style="font-size:0.78rem;color:#047857;margin-bottom:10px;">Your teacher has started a video conference.</div>' +
+        '<button onclick="joinConference()" style="padding:10px 24px;background:#059669;color:white;border:none;border-radius:8px;font-size:0.9rem;font-weight:700;cursor:pointer;">Join Video Call</button>' +
+    '</div>';
+
+    html += forms.map(function(f) {
+        const signed = trackingStatus[f.key];
+        const statusClass = signed ? 'signed' : 'pending';
+        const statusText = signed ? 'Signed' : 'Pending';
+        const btnText = signed ? 'View / Update' : 'Review & Sign';
+        return '<div class="form-item">' +
+            '<div class="form-item-header">' +
+                '<span class="form-item-title">' + f.title + '</span>' +
+                '<span class="form-item-status ' + statusClass + '">' + statusText + '</span>' +
+            '</div>' +
+            '<div class="form-item-desc">' + f.desc + '</div>' +
+            '<button class="form-item-btn" onclick="' + f.action + '">' + btnText + '</button>' +
+        '</div>';
+    }).join('');
+
+    list.innerHTML = html;
+
+    // Check for active conference
+    checkConference();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── Permission Slip ──
+function prefillPermSlip() {
+    document.getElementById('ppTeacherInline').textContent = parentStudent.TeacherDescription || '_______________';
+    var now = new Date();
+    var year = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    document.getElementById('ppYearInline').textContent = year + '-' + (year + 1);
+    document.getElementById('ppDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('ppParentName').value = '';
+    document.getElementById('ppSignature').value = '';
+    document.getElementById('ppParentNameInline').textContent = '_______________';
+}
+
+async function submitPermissionSlip() {
+    var sig = document.getElementById('ppSignature').value.trim();
+    var name = document.getElementById('ppParentName').value.trim();
+    if (!sig || !name) { alert('Please enter your name and signature.'); return; }
+
+    var btn = document.getElementById('ppSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+
+    var now = new Date();
+    var year = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+
+    try {
+        var res = await fetch('/api/parent-portal/sign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: parentCode,
+                formType: 'PermissionSlip',
+                data: {
+                    parentName: name,
+                    schoolYear: year + '-' + (year + 1),
+                    signedDate: document.getElementById('ppDate').value,
+                    teacher: parentStudent.TeacherDescription || '',
+                    parentSignature: sig,
+                    parentSigDate: document.getElementById('ppDate').value
+                }
+            })
+        });
+        var data = await res.json();
+        if (data.success) {
+            trackingStatus.PermissionSlip = true;
+            renderFormList();
+            closeModal('pPermSlipOverlay');
+        } else { alert('Error: ' + (data.error || 'Unknown error')); }
+    } catch (e) { alert('Error: ' + e.message); }
+    finally { btn.disabled = false; btn.textContent = 'Sign & Submit'; }
+}
+
+// ── Parent Interview ──
+let preEnrollData = {};
+
+function prefillInterview() {
+    // Pre-fill from student data
+    document.getElementById('pi_childName').textContent = parentStudent.First_Name + ' ' + parentStudent.Last_Name;
+    document.getElementById('pi_childDOB').textContent = parentStudent.Birth_date || '';
+    document.getElementById('pi_signDate').value = new Date().toISOString().split('T')[0];
+
+    // Pre-fill from pre-enrollment data
+    var pe = preEnrollData;
+    if (pe.FirstName) {
+        document.getElementById('pi_p1Name').value = pe.FirstName + ' ' + (pe.LastName || '');
+        document.getElementById('pi_personInterviewed').value = pe.FirstName + ' ' + (pe.LastName || '');
+    }
+    if (pe.Address) document.getElementById('pi_p1Address').value = pe.Address;
+    if (pe.City) document.getElementById('pi_p1City').value = pe.City;
+    if (pe.Zip) document.getElementById('pi_p1Zip').value = pe.Zip;
+    if (pe.Phone) document.getElementById('pi_p1Phone').value = pe.Phone;
+    if (pe.Email) document.getElementById('pi_p1Email').value = pe.Email;
+    if (pe.NonEnglishHome === 'Yes') document.getElementById('pi_p1Language').value = '';
+    if (pe.LivingSituation) {
+        var ls = document.getElementById('pi_livingSituation');
+        for (var i = 0; i < ls.options.length; i++) {
+            if (ls.options[i].value.toLowerCase().indexOf(pe.LivingSituation.toLowerCase()) >= 0) {
+                ls.selectedIndex = i; break;
+            }
+        }
+    }
+    if (pe.FosterAdopted === 'Yes') document.getElementById('pi_livesWith').value = 'Foster parent(s)';
+    if (pe.ActiveMilitary === 'Yes' || parentStudent.Military === 'Yes') document.getElementById('pi_military').value = 'Yes';
+
+    // Pre-fill from enrollment data
+    if (parentStudent.City_Town) document.getElementById('pi_p1City').value = parentStudent.City_Town;
+    if (parentStudent.IEP === 'Yes') document.getElementById('pi_disability').value = 'IEP on file';
+}
+
+async function submitInterview() {
+    var sig = document.getElementById('piSignatureP').value.trim();
+    if (!sig) { alert('Please type your name as a signature to submit.'); return; }
+
+    var btn = document.getElementById('piSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+
+    // Gather all form data
+    var formData = {
+        personInterviewed: document.getElementById('pi_personInterviewed').value,
+        relationship: document.getElementById('pi_relationship').value,
+        nickname: document.getElementById('pi_nickname').value,
+        howHeard: document.getElementById('pi_howHeard').value,
+        // Parent 1
+        p1Name: document.getElementById('pi_p1Name').value,
+        p1DOB: document.getElementById('pi_p1DOB').value,
+        p1Address: document.getElementById('pi_p1Address').value,
+        p1City: document.getElementById('pi_p1City').value,
+        p1State: document.getElementById('pi_p1State').value,
+        p1Zip: document.getElementById('pi_p1Zip').value,
+        p1Phone: document.getElementById('pi_p1Phone').value,
+        p1Email: document.getElementById('pi_p1Email').value,
+        p1Marital: document.getElementById('pi_p1Marital').value,
+        p1Language: document.getElementById('pi_p1Language').value,
+        p1Translator: document.getElementById('pi_p1Translator').value,
+        p1Education: document.getElementById('pi_p1Education').value,
+        p1Employer: document.getElementById('pi_p1Employer').value,
+        // Parent 2
+        p2Name: document.getElementById('pi_p2Name').value,
+        p2DOB: document.getElementById('pi_p2DOB').value,
+        p2Address: document.getElementById('pi_p2Address').value,
+        p2City: document.getElementById('pi_p2City').value,
+        p2State: document.getElementById('pi_p2State').value,
+        p2Zip: document.getElementById('pi_p2Zip').value,
+        p2Phone: document.getElementById('pi_p2Phone').value,
+        p2Email: document.getElementById('pi_p2Email').value,
+        p2Marital: document.getElementById('pi_p2Marital').value,
+        p2Language: document.getElementById('pi_p2Language').value,
+        p2Employer: document.getElementById('pi_p2Employer').value,
+        // Household
+        livesWith: document.getElementById('pi_livesWith').value,
+        livesWithOther: document.getElementById('pi_livesWithOther').value,
+        siblings: document.getElementById('pi_siblings').value,
+        siblingAcademic: document.getElementById('pi_siblingAcademic').value,
+        // Medical
+        birthComplications: document.getElementById('pi_birthComplications').value,
+        pregnancyLength: document.getElementById('pi_pregnancyLength').value,
+        birthWeight: document.getElementById('pi_birthWeight').value,
+        currentWeight: document.getElementById('pi_currentWeight').value,
+        currentHeight: document.getElementById('pi_currentHeight').value,
+        feedingDifficulty: document.getElementById('pi_feedingDifficulty').value,
+        respirator: document.getElementById('pi_respirator').value,
+        healthIssues: document.getElementById('pi_healthIssues').value,
+        disability: document.getElementById('pi_disability').value,
+        referralCFC: document.getElementById('pi_referralCFC').value,
+        medication: document.getElementById('pi_medication').value,
+        medicationDetail: document.getElementById('pi_medicationDetail').value,
+        surgeries: document.getElementById('pi_surgeries').value,
+        doctor: document.getElementById('pi_doctor').value,
+        // Health checklist
+        healthChecklist: getHealthChecklist(),
+        allergies: document.getElementById('pi_allergies').value,
+        hearingTest: document.getElementById('pi_hearingTest').value,
+        visionTest: document.getElementById('pi_visionTest').value,
+        devConcern: document.getElementById('pi_devConcern').value,
+        therapy: document.getElementById('pi_therapy').value,
+        // Social
+        describeChild: document.getElementById('pi_describeChild').value,
+        childCare: document.getElementById('pi_childCare').value,
+        childCareWhere: document.getElementById('pi_childCareWhere').value,
+        playOpportunities: document.getElementById('pi_playOpportunities').value,
+        playWhere: document.getElementById('pi_playWhere').value,
+        substanceAbuse: document.getElementById('pi_substanceAbuse').value,
+        trauma: document.getElementById('pi_trauma').value,
+        dcfs: document.getElementById('pi_dcfs').value,
+        caregiverIllness: document.getElementById('pi_caregiverIllness').value,
+        motherAge: document.getElementById('pi_motherAge').value,
+        fatherAge: document.getElementById('pi_fatherAge').value,
+        immigrated: document.getElementById('pi_immigrated').value,
+        military: document.getElementById('pi_military').value,
+        incarcerated: document.getElementById('pi_incarcerated').value,
+        familyDeath: document.getElementById('pi_familyDeath').value,
+        socialExplain: document.getElementById('pi_socialExplain').value,
+        socialize: document.getElementById('pi_socialize').value,
+        otherAgency: document.getElementById('pi_otherAgency').value,
+        // Daily life
+        activities: document.getElementById('pi_activities').value,
+        familyActivities: document.getElementById('pi_familyActivities').value,
+        fears: document.getElementById('pi_fears').value,
+        comfort: document.getElementById('pi_comfort').value,
+        transitions: document.getElementById('pi_transitions').value,
+        typicalDay: document.getElementById('pi_typicalDay').value,
+        devSimilar: document.getElementById('pi_devSimilar').value,
+        regression: document.getElementById('pi_regression').value,
+        eatingSchedule: document.getElementById('pi_eatingSchedule').value,
+        sleepSchedule: document.getElementById('pi_sleepSchedule').value,
+        behaviors: document.getElementById('pi_behaviors').value,
+        specialInstructions: document.getElementById('pi_specialInstructions').value,
+        // Pregnancy
+        pregnant: document.getElementById('pi_pregnant').value,
+        dueDate: document.getElementById('pi_dueDate').value,
+        pregDifficulties: document.getElementById('pi_pregDifficulties').value,
+        lastExam: document.getElementById('pi_lastExam').value,
+        // Household info
+        transportation: document.getElementById('pi_transportation').value,
+        moveCount: document.getElementById('pi_moveCount').value,
+        livingSituation: document.getElementById('pi_livingSituation').value,
+        householdStructure: document.getElementById('pi_householdStructure').value,
+        // Significant people
+        significantPeople: document.getElementById('pi_significantPeople').value,
+        enoughFood: document.getElementById('pi_enoughFood').value,
+        freshFood: document.getElementById('pi_freshFood').value,
+        // Goals
+        goals: document.getElementById('pi_goals').value,
+        otherInfo: document.getElementById('pi_otherInfo').value,
+        // Pickup
+        pickup1Name: document.getElementById('pi_pickup1Name').value,
+        pickup1Phone: document.getElementById('pi_pickup1Phone').value,
+        pickup1Rel: document.getElementById('pi_pickup1Rel').value,
+        pickup2Name: document.getElementById('pi_pickup2Name').value,
+        pickup2Phone: document.getElementById('pi_pickup2Phone').value,
+        pickup2Rel: document.getElementById('pi_pickup2Rel').value,
+        pickup3Name: document.getElementById('pi_pickup3Name').value,
+        pickup3Phone: document.getElementById('pi_pickup3Phone').value,
+        pickup3Rel: document.getElementById('pi_pickup3Rel').value,
+        // Signature
+        parentSignature: sig,
+        signDate: document.getElementById('pi_signDate').value
+    };
+
+    try {
+        var res = await fetch('/api/parent-portal/sign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: parentCode,
+                formType: 'ParentInterview',
+                data: formData
+            })
+        });
+        var data = await res.json();
+        if (data.success) {
+            trackingStatus.ParentInterview = true;
+            renderFormList();
+            closeModal('pInterviewOverlay');
+            alert('Thank you! Your Parent Interview form has been submitted successfully.');
+        } else { alert('Error: ' + (data.error || 'Unknown error')); }
+    } catch (e) { alert('Error: ' + e.message); }
+    finally { btn.disabled = false; btn.textContent = 'Sign & Submit'; }
+}
+
+function getHealthChecklist() {
+    var items = ['thumb','indigestion','nailBiting','constipation','epilepsy','diarrhea','heart','vomiting','overtired','fevers','appetite','sinus','overweight','noseBleeding','underweight','rashes','headache','earInfections','nightmares','nightTerrors','asthma','communicable'];
+    var checked = [];
+    items.forEach(function(item) {
+        if (document.getElementById('pi_hc_' + item).checked) checked.push(item);
+    });
+    return checked.join(',');
+}
+
+// Close on Escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.p-overlay.open').forEach(function(el) { el.classList.remove('open'); });
+    }
+});
+
+// Close on overlay click
+document.querySelectorAll('.p-overlay').forEach(function(el) {
+    el.addEventListener('click', function(e) { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ── Conference ──
+let activeMeetUrl = '';
+
+async function checkConference() {
+    try {
+        var res = await fetch('/api/parent-portal/conference?code=' + encodeURIComponent(parentCode));
+        var data = await res.json();
+        var banner = document.getElementById('conferenceBanner');
+        if (data.active && data.meetUrl) {
+            activeMeetUrl = data.meetUrl;
+            banner.style.display = 'block';
+        } else {
+            banner.style.display = 'none';
+        }
+    } catch (e) { /* ignore */ }
+}
+
+function joinConference() {
+    if (activeMeetUrl) window.open(activeMeetUrl, '_blank');
+}
+
+// Poll for conference every 15 seconds when logged in
+setInterval(function() {
+    if (parentCode) checkConference();
+}, 15000);
+
+// Check if code stored in localStorage
+(function() {
+    var saved = localStorage.getItem('copParentCode');
+    if (saved) {
+        document.getElementById('codeInput').value = saved;
+        parentLogin();
+    }
+})();
+</script>
+</body>
+</html>

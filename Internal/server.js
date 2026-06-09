@@ -203,7 +203,8 @@ function handleRequest(req, res) {
     // GET students (internal - protected)
     if (req.method === 'GET' && url === '/api/students') {
         if (!checkAuth(req, res)) return;
-        const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
+        const r = runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='CCAPStartDate') ALTER TABLE rptMasterEnrollment ADD CCAPStartDate NVARCHAR(20);
+            SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
@@ -216,7 +217,7 @@ function handleRequest(req, res) {
                     Monday: v[12], Tuesday: v[13], Wednesday: v[14], Thursday: v[15], Friday: v[16],
                     Active: v[17], Category: v[18], PFA_PI_na: v[19], F_R_P_Food: v[20],
                     IEP: v[21], Military: v[22], HouseholdIncome: v[23],
-                    ProofOfIncomeFile: v[24], ProofOfIncomeUploaded: v[25], PublicBenefits: v[26], HouseholdSize: v[27]
+                    ProofOfIncomeFile: v[24], ProofOfIncomeUploaded: v[25], PublicBenefits: v[26], HouseholdSize: v[27], CCAPStartDate: v[28]
                 };
             });
         return sendJSON(res, 200, rows);
@@ -349,6 +350,7 @@ function handleRequest(req, res) {
             if (d.householdSize !== undefined)    fields.push(`HouseholdSize=${d.householdSize?parseInt(d.householdSize):'NULL'}`);
             if (d.publicBenefits !== undefined)   fields.push(`PublicBenefits=${esc(d.publicBenefits)}`);
             if (d.proofOfIncome !== undefined)    fields.push(`ProofOfIncomeUploaded=${d.proofOfIncome?1:0}`);
+            if (d.ccapStartDate !== undefined)    fields.push(`CCAPStartDate=${esc(d.ccapStartDate)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
             const sql = `UPDATE rptMasterEnrollment SET ${fields.join(',')} WHERE First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
             console.log('[PUT SQL]', sql);
@@ -753,6 +755,239 @@ function handleRequest(req, res) {
         return;
     }
 
+    // ══════════════════════════════════════════
+    // PARENT PORTAL (public - code-authenticated)
+    // ══════════════════════════════════════════
+
+    // POST parent portal login (public)
+    if (req.method === 'POST' && url === '/api/parent-portal/login') {
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const code = (d.code || '').trim().toUpperCase();
+            if (!code) return sendJSON(res, 400, { error: 'Code required' });
+
+            // Ensure table exists and look up code
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentCodes')
+                CREATE TABLE ParentCodes (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    StudentId INT NOT NULL,
+                    Code NVARCHAR(10) NOT NULL UNIQUE,
+                    CreatedAt DATETIME DEFAULT GETDATE()
+                );
+                SELECT pc.StudentId,e.First_Name,e.Last_Name,e.Birth_date,e.RoomNumber,r.Room,r.TeacherDescription,
+                    ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
+                    ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(e.IEP,'') AS IEP,ISNULL(e.Military,'') AS Military,
+                    ISNULL(e.Category,'') AS Category,ISNULL(e.City_Town,'') AS City_Town,ISNULL(e.PFA_PI_na,'') AS PFA_PI_na
+                FROM ParentCodes pc
+                JOIN rptMasterEnrollment e ON pc.StudentId=e.Id
+                LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber
+                WHERE pc.Code=${esc(code)}`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            const lines = r.data.trim().split('\n')
+                .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+            if (!lines.length) return sendJSON(res, 200, { success: false, error: 'Invalid code' });
+            const v = lines[0].split('|').map(x => x.trim());
+            const student = { Id:v[0], First_Name:v[1], Last_Name:v[2], Birth_date:v[3], RoomNumber:v[4], Room:v[5], TeacherDescription:v[6], HouseholdIncome:v[7], HouseholdSize:v[8], PublicBenefits:v[9], IEP:v[10], Military:v[11], Category:v[12], City_Town:v[13], PFA_PI_na:v[14] };
+
+            // Get tracking status
+            const tSql = `SELECT PermissionSlip,ParentInterview FROM ISBETracking WHERE StudentId=${parseInt(student.Id)}`;
+            const tRes = runSQL(tSql);
+            let tracking = {};
+            if (tRes.ok) {
+                const tLines = tRes.data.trim().split('\n')
+                    .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+                if (tLines.length) {
+                    const tv = tLines[0].split('|').map(x => x.trim());
+                    tracking = { PermissionSlip: tv[0]==='1', ParentInterview: tv[1]==='1' };
+                }
+            }
+
+            // Get pre-enrollment data if available
+            let preEnroll = {};
+            const peSql = `SELECT TOP 1 FirstName,LastName,Phone,Email,Address,City,Zip,
+                ISNULL(Homeless,'') AS Homeless,ISNULL(FosterAdopted,'') AS FosterAdopted,
+                ISNULL(NonEnglishHome,'') AS NonEnglishHome,ISNULL(ActiveMilitary,'') AS ActiveMilitary,
+                ISNULL(TeenParent,'') AS TeenParent,ISNULL(LivingSituation,'') AS LivingSituation,
+                ISNULL(IEP,'') AS IEP,ISNULL(EarlyIntervention,'') AS EarlyIntervention,
+                ISNULL(ChildName,'') AS ChildName,ISNULL(ChildBirthDate,'') AS ChildBirthDate
+                FROM PreEnrollment WHERE
+                (ChildName LIKE '%'+${esc(student.First_Name)}+'%' OR FirstName=${esc(student.First_Name)})
+                ORDER BY Id DESC`;
+            const peRes = runSQL(peSql);
+            if (peRes.ok) {
+                const peLines = peRes.data.trim().split('\n')
+                    .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+                if (peLines.length) {
+                    const pv = peLines[0].split('|').map(x => x.trim());
+                    preEnroll = { FirstName:pv[0],LastName:pv[1],Phone:pv[2],Email:pv[3],Address:pv[4],City:pv[5],Zip:pv[6],Homeless:pv[7],FosterAdopted:pv[8],NonEnglishHome:pv[9],ActiveMilitary:pv[10],TeenParent:pv[11],LivingSituation:pv[12],IEP:pv[13],EarlyIntervention:pv[14],ChildName:pv[15],ChildBirthDate:pv[16] };
+                }
+            }
+
+            sendJSON(res, 200, { success: true, student, tracking, preEnroll });
+        });
+        return;
+    }
+
+    // POST parent portal sign form (public)
+    if (req.method === 'POST' && url === '/api/parent-portal/sign') {
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const code = (d.code || '').trim().toUpperCase();
+            const formType = d.formType;
+            const data = d.data || {};
+
+            // Verify code and get student ID
+            const lookupSql = `SELECT StudentId FROM ParentCodes WHERE Code=${esc(code)}`;
+            const lr = runSQL(lookupSql);
+            if (!lr.ok) return sendJSON(res, 500, { error: lr.error });
+            const lookupLines = lr.data.trim().split('\n')
+                .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+            if (!lookupLines.length) return sendJSON(res, 403, { error: 'Invalid code' });
+            const studentId = parseInt(lookupLines[0].trim());
+
+            if (formType === 'PermissionSlip') {
+                const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='PermissionSlips')
+                    CREATE TABLE PermissionSlips (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,StudentId INT NOT NULL,
+                        ParentName NVARCHAR(200),SchoolYear NVARCHAR(20),SignedDate NVARCHAR(20),
+                        Teacher NVARCHAR(200),ParentSignature NVARCHAR(200),ParentSigDate NVARCHAR(20),
+                        TeacherSignature NVARCHAR(200),TeacherSigDate NVARCHAR(20),
+                        CreatedAt DATETIME DEFAULT GETDATE(),UpdatedAt DATETIME DEFAULT GETDATE()
+                    );
+                    IF EXISTS (SELECT 1 FROM PermissionSlips WHERE StudentId=${studentId})
+                        UPDATE PermissionSlips SET ParentName=${esc(data.parentName)},SchoolYear=${esc(data.schoolYear)},SignedDate=${esc(data.signedDate)},Teacher=${esc(data.teacher)},ParentSignature=${esc(data.parentSignature)},ParentSigDate=${esc(data.parentSigDate)},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                    ELSE
+                        INSERT INTO PermissionSlips (StudentId,ParentName,SchoolYear,SignedDate,Teacher,ParentSignature,ParentSigDate) VALUES (${studentId},${esc(data.parentName)},${esc(data.schoolYear)},${esc(data.signedDate)},${esc(data.teacher)},${esc(data.parentSignature)},${esc(data.parentSigDate)});
+                    IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
+                        UPDATE ISBETracking SET PermissionSlip=1 WHERE StudentId=${studentId}
+                    ELSE
+                        INSERT INTO ISBETracking (StudentId,PermissionSlip) VALUES (${studentId},1)`;
+                const r = runSQL(sql);
+                if (!r.ok) return sendJSON(res, 500, { error: r.error });
+                return sendJSON(res, 200, { success: true });
+            }
+
+            if (formType === 'ParentInterview') {
+                // Store full interview as JSON in Notes field (comprehensive PI form)
+                const jsonData = JSON.stringify(data).replace(/'/g, "''");
+                const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
+                    CREATE TABLE ParentInterviews (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,StudentId INT NOT NULL,
+                        InterviewDate NVARCHAR(20),ParentGoals NVARCHAR(MAX),ParentConcerns NVARCHAR(MAX),
+                        ChildStrengths NVARCHAR(MAX),ParentSignature NVARCHAR(200),StaffSignature NVARCHAR(200),
+                        Notes NVARCHAR(MAX),CreatedAt DATETIME DEFAULT GETDATE(),UpdatedAt DATETIME DEFAULT GETDATE()
+                    );
+                    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='FormData') ALTER TABLE ParentInterviews ADD FormData NVARCHAR(MAX);
+                    IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId})
+                        UPDATE ParentInterviews SET InterviewDate=${esc(data.signDate||'')},ParentGoals=${esc(data.goals||'')},ParentConcerns=${esc(data.behaviors||'')},ChildStrengths=${esc(data.describeChild||'')},ParentSignature=${esc(data.parentSignature||'')},FormData='${jsonData}',UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                    ELSE
+                        INSERT INTO ParentInterviews (StudentId,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,FormData) VALUES (${studentId},${esc(data.signDate||'')},${esc(data.goals||'')},${esc(data.behaviors||'')},${esc(data.describeChild||'')},${esc(data.parentSignature||'')},'${jsonData}');
+                    IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
+                        UPDATE ISBETracking SET ParentInterview=1 WHERE StudentId=${studentId}
+                    ELSE
+                        INSERT INTO ISBETracking (StudentId,ParentInterview) VALUES (${studentId},1)`;
+                const r = runSQL(sql);
+                if (!r.ok) return sendJSON(res, 500, { error: r.error });
+                return sendJSON(res, 200, { success: true });
+            }
+
+            sendJSON(res, 400, { error: 'Unknown form type' });
+        });
+        return;
+    }
+
+    // GET parent codes for staff (internal - protected)
+    if (req.method === 'GET' && url === '/api/parent-codes') {
+        if (!checkAuth(req, res)) return;
+        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentCodes')
+            CREATE TABLE ParentCodes (
+                Id INT IDENTITY(1,1) PRIMARY KEY,
+                StudentId INT NOT NULL,
+                Code NVARCHAR(10) NOT NULL UNIQUE,
+                CreatedAt DATETIME DEFAULT GETDATE()
+            );
+            SELECT pc.StudentId,pc.Code,e.First_Name,e.Last_Name FROM ParentCodes pc JOIN rptMasterEnrollment e ON pc.StudentId=e.Id ORDER BY e.Last_Name`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+            .map(l => { const v = l.split('|').map(x => x.trim()); return { StudentId:v[0], Code:v[1], First_Name:v[2], Last_Name:v[3] }; });
+        return sendJSON(res, 200, rows);
+    }
+
+    // POST generate parent code (internal - protected)
+    if (req.method === 'POST' && url === '/api/parent-codes') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const studentId = parseInt(d.studentId);
+            if (!studentId) return sendJSON(res, 400, { error: 'Student ID required' });
+            // Generate random 6-char code
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentCodes')
+                CREATE TABLE ParentCodes (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    StudentId INT NOT NULL,
+                    Code NVARCHAR(10) NOT NULL UNIQUE,
+                    CreatedAt DATETIME DEFAULT GETDATE()
+                );
+                IF EXISTS (SELECT 1 FROM ParentCodes WHERE StudentId=${studentId})
+                    UPDATE ParentCodes SET Code=${esc(code)} WHERE StudentId=${studentId}
+                ELSE
+                    INSERT INTO ParentCodes (StudentId,Code) VALUES (${studentId},${esc(code)})`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true, code: code });
+        });
+        return;
+    }
+
+    // POST start conference (internal - protected)
+    if (req.method === 'POST' && url === '/api/conference') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const studentId = parseInt(d.studentId);
+            const meetUrl = d.meetUrl || '';
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='Conferences')
+                CREATE TABLE Conferences (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    StudentId INT NOT NULL,
+                    MeetUrl NVARCHAR(500),
+                    StartedAt DATETIME DEFAULT GETDATE(),
+                    Active BIT DEFAULT 1
+                );
+                UPDATE Conferences SET Active=0 WHERE StudentId=${studentId};
+                INSERT INTO Conferences (StudentId,MeetUrl,Active) VALUES (${studentId},${esc(meetUrl)},1)`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
+    // GET active conference for parent portal (public - code-authenticated via query)
+    if (req.method === 'GET' && url === '/api/parent-portal/conference') {
+        const query = req.url.split('?')[1] || '';
+        const params = new URLSearchParams(query);
+        const code = (params.get('code') || '').trim().toUpperCase();
+        if (!code) return sendJSON(res, 400, { error: 'Code required' });
+        const sql = `SELECT c.MeetUrl FROM Conferences c
+            JOIN ParentCodes pc ON c.StudentId=pc.StudentId
+            WHERE pc.Code=${esc(code)} AND c.Active=1
+            ORDER BY c.StartedAt DESC`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const lines = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+        if (!lines.length) return sendJSON(res, 200, { active: false });
+        return sendJSON(res, 200, { active: true, meetUrl: lines[0].trim() });
+    }
+
     // GET program compliance data (internal - protected)
     if (req.method === 'GET' && url === '/api/compliance') {
         if (!checkAuth(req, res)) return;
@@ -945,6 +1180,17 @@ function handleRequest(req, res) {
     if (url === '/portal' || url === '/portal/') {
         const rootIndex = path.join(__dirname, '..', 'index.html');
         fs.readFile(rootIndex, (err, data) => {
+            if (err) { res.writeHead(404); return res.end('Not found'); }
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(data);
+        });
+        return;
+    }
+
+    // Parent Portal (public - no auth)
+    if (url === '/parent' || url === '/parent/') {
+        const parentPage = path.join(__dirname, 'parent.html');
+        fs.readFile(parentPage, (err, data) => {
             if (err) { res.writeHead(404); return res.end('Not found'); }
             res.writeHead(200, { 'Content-Type': 'text/html' });
             res.end(data);
