@@ -914,7 +914,7 @@ function printScreening() {
 // ── Program Compliance Checklist ──
 const PFA_COMPLIANCE_ITEMS = [
     { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file' },
-    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted' },
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', link: 'https://childrenofpromisemillstadt.sharepoint.com/:w:/r/sites/ChildrenOfPromise/_layouts/15/Doc.aspx?sourcedoc=%7BF067D357-E395-433C-8179-387558881AFC%7D&file=PFA%20Compliance%20CQIP.docx&action=default&mobileredirect=true&DefaultItemOpen=1' },
     { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 classroom assessment and quality improvement plan' },
     { key: 'PEL_ECE5', label: 'PEL / ECE Level 5', description: 'Lead teacher holds Professional Educator License with ECE endorsement or Gateways ECE Credential Level 5' },
     { key: 'Paraprofessional', label: 'Paraprofessional Credentials', description: 'Paraprofessional holds ELS-Para license (60 credit hours, associate degree, or passing ACT WorkKeys exam)' },
@@ -963,12 +963,14 @@ async function loadCompliance(prog) {
         var fullKey = prefix + item.key;
         var checked = data[fullKey] ? 'checked' : '';
         var dateVal = data[fullKey + 'Date'] || '';
+        var linkBtn = item.link ? '<a href="' + item.link + '" target="_blank" style="padding:4px 10px;background:#2563eb;color:white;border-radius:5px;font-size:0.68rem;font-weight:600;text-decoration:none;white-space:nowrap;" title="Open document in SharePoint">📄 Open</a>' : '';
         return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb;">' +
             '<input type="checkbox" ' + checked + ' onchange="saveCompliance(\'' + fullKey + '\',this.checked)" style="width:18px;height:18px;accent-color:#2563eb;cursor:pointer;flex-shrink:0;">' +
             '<div style="flex:1;">' +
                 '<div style="font-size:0.85rem;font-weight:700;color:#1e293b;">' + item.label + '</div>' +
                 '<div style="font-size:0.72rem;color:#6b7280;">' + item.description + '</div>' +
             '</div>' +
+            linkBtn +
             '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + fullKey + '\',this.value)" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.75rem;width:130px;" title="Date completed">' +
         '</div>';
     }).join('');
