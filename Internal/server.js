@@ -394,7 +394,15 @@ function handleRequest(req, res) {
         if (!checkAuth(req, res)) return;
         sendJSON(res, 200, { success: true, message: 'Server restarting...' });
         setTimeout(() => {
-            try { execSync('schtasks /run /tn "CofPServer"', { shell: 'cmd.exe' }); } catch(e) {}
+            try {
+                // Spawn a detached process that waits 2 seconds then starts the server
+                const child = require('child_process').spawn('cmd.exe', ['/c', 'timeout /t 2 /nobreak >nul & cd /d C:\\app & Launch.bat'], {
+                    detached: true,
+                    stdio: 'ignore',
+                    shell: false
+                });
+                child.unref();
+            } catch(e) { console.error('[RESTART ERR]', e.message); }
             process.exit(0);
         }, 1000);
         return;
