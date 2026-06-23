@@ -1603,7 +1603,7 @@ function printFoodCountSheets() {
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const monthYear = monthNames[now.getMonth()] + ' ' + now.getFullYear();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const meals = ['Early Snack', 'Lunch', 'PM Snack'];
+    const meals = ['Breakfast', 'Lunch', 'PM Snack'];
     const roomGroups = {};
     activeStudents.forEach(s => {
         const room = s.Room || 'Room ' + s.RoomNumber;
