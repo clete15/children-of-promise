@@ -1463,7 +1463,7 @@ function renderRptBars(cardId, title, rows, order) {
                     </div>
                 </div>
             </div>`;
-        }).join('');
+        }).join('') + (cardId === 'rptFood' ? '<div style="margin-top:16px;display:flex;gap:8px;"><button onclick="toggleFoodRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📋 Full Roster</button><button onclick="exportFoodExcel()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export Excel</button></div>' : '');
 }
 
 let foodDetailData = [];
@@ -1547,6 +1547,54 @@ async function saveFoodDetailRow(i) {
         } else { showNotification('Update failed', 'error'); btn.disabled = false; btn.style.opacity = '1'; }
     } catch (e) { showNotification('Network error', 'error'); btn.disabled = false; btn.style.opacity = '1'; }
     finally { btn.textContent = 'Save'; }
+}
+
+function toggleFoodRoster() {
+    const card = document.getElementById('rptFood');
+    const existing = document.getElementById('foodRosterTable');
+    if (existing) { existing.remove(); return; }
+    const activeStudents = students.filter(s => s.Active === 'Yes' || s.Active === 'YES' || s.Active === 'yes');
+    const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
+    const div = document.createElement('div');
+    div.id = 'foodRosterTable';
+    div.style.cssText = 'margin-top:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+    div.innerHTML = `<div style="max-height:450px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+                <th style="padding:8px 12px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">First Name</th>
+                <th style="padding:8px 12px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Last Name</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">PFA/PI</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">F/R/P</th>
+                <th style="padding:8px 8px;text-align:right;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+                <th style="padding:8px 8px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+            </tr></thead>
+            <tbody>${activeStudents.map(s => `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
+                <td style="padding:6px 12px;font-size:0.73rem;">${s.First_Name}</td>
+                <td style="padding:6px 12px;font-weight:600;font-size:0.73rem;">${s.Last_Name}</td>
+                <td style="padding:6px 8px;font-size:0.73rem;">${s.PFA_PI_na || '—'}</td>
+                <td style="padding:6px 8px;font-size:0.73rem;">${s.Room || s.RoomNumber || '—'}</td>
+                <td style="padding:6px 8px;font-weight:700;color:${frpColor(s.F_R_P_Food)};">${s.F_R_P_Food || '—'}</td>
+                <td style="padding:6px 8px;text-align:right;font-size:0.73rem;">${s.HouseholdIncome ? '$' + Number(s.HouseholdIncome).toLocaleString() : '—'}</td>
+                <td style="padding:6px 8px;text-align:center;font-size:0.73rem;">${s.HouseholdSize || '—'}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+    card.appendChild(div);
+}
+
+function exportFoodExcel() {
+    const activeStudents = students.filter(s => s.Active === 'Yes' || s.Active === 'YES' || s.Active === 'yes');
+    const headers = ['First_Name','Last_Name','PFA_PI_na','Room','F_R_P_Food','HouseholdIncome','HouseholdSize'];
+    const rows = activeStudents.map(s => [s.First_Name, s.Last_Name, s.PFA_PI_na || '', s.Room || s.RoomNumber || '', s.F_R_P_Food || '', s.HouseholdIncome || '', s.HouseholdSize || '']);
+    let csv = headers.join('\t') + '\n';
+    rows.forEach(r => { csv += r.map(v => String(v).replace(/\t/g,' ')).join('\t') + '\n'; });
+    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Food_Program_Report_' + new Date().toISOString().split('T')[0] + '.xls';
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 function renderRptBenefits(rows) {
