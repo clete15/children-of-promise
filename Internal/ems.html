@@ -1598,12 +1598,28 @@ function exportFoodExcel() {
 }
 
 function printFoodCountSheets() {
-    const activeStudents = students.filter(s => s.Active === 'Yes' || s.Active === 'YES' || s.Active === 'yes');
+    // Show month picker
     const now = new Date();
+    const defaultMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const input = prompt('Enter month (YYYY-MM):', defaultMonth);
+    if (!input) return;
+    const parts = input.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // 0-indexed
+    if (isNaN(year) || isNaN(month) || month < 0 || month > 11) { alert('Invalid month format. Use YYYY-MM'); return; }
+
+    const activeStudents = students.filter(s => s.Active === 'Yes' || s.Active === 'YES' || s.Active === 'yes');
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const monthYear = monthNames[now.getMonth()] + ' ' + now.getFullYear();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const monthYear = monthNames[month] + ' ' + year;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
     const meals = ['Breakfast', 'Lunch', 'PM Snack'];
+
+    // Determine which days are weekends (Sat=6, Sun=0)
+    const weekendDays = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dow = new Date(year, month, d).getDay();
+        if (dow === 0 || dow === 6) weekendDays.push(d);
+    }
     const roomGroups = {};
     activeStudents.forEach(s => {
         const room = s.Room || 'Room ' + s.RoomNumber;
@@ -1626,6 +1642,7 @@ function printFoodCountSheets() {
     html += '.name-col { text-align: left; min-width: 130px; font-size: 8px; white-space: nowrap; }';
     html += '.frp-col { font-weight: bold; width: 18px; background: #f0f0f0; }';
     html += '.day-col { width: 20px; min-width: 20px; }';
+    html += '.day-col.weekend { background: #c0c0c0; }';
     html += '.total-col { width: 28px; background: #d9d9d9; font-weight: bold; }';
     html += '.totals-row td { font-weight: bold; font-size: 7px; background: #e8e8e8; }';
     html += '.totals-row .name-col { background: #d0d0d0; }';
@@ -1642,29 +1659,29 @@ function printFoodCountSheets() {
             html += '<div class="meta"><span>Site: Children of Promise</span><span>Month/Year: ' + monthYear + '</span></div>';
             html += '<div class="meta"><span>Classroom: ' + room + '</span><span>Program: ☑ Child Care Center</span><span>Meal Service: ☑ ' + meal + '</span></div>';
             html += '<table><thead><tr><th class="name-col">Child\'s Full Name</th><th class="frp-col">F/R/P</th>';
-            for (let d = 1; d <= daysInMonth; d++) html += '<th class="day-col">' + d + '</th>';
+            for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<th class="day-col' + (isWe ? ' weekend' : '') + '">' + d + '</th>'; }
             html += '<th class="total-col">Free</th><th class="total-col">Red</th><th class="total-col">Paid</th></tr></thead><tbody>';
             roomStudents.forEach((s, i) => {
                 const frp = (s.F_R_P_Food || 'P').charAt(0).toUpperCase();
                 html += '<tr><td class="name-col">' + (i+1) + '. ' + s.Last_Name + ', ' + s.First_Name + '</td>';
                 html += '<td class="frp-col">' + frp + '</td>';
-                for (let d = 1; d <= daysInMonth; d++) html += '<td class="day-col"></td>';
+                for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="day-col' + (isWe ? ' weekend' : '') + '"></td>'; }
                 html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             });
             // Add empty rows to fill up to 19
             for (let e = roomStudents.length; e < 19; e++) {
                 html += '<tr><td class="name-col">' + (e+1) + '.</td><td class="frp-col"></td>';
-                for (let d = 1; d <= daysInMonth; d++) html += '<td class="day-col"></td>';
+                for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="day-col' + (isWe ? ' weekend' : '') + '"></td>'; }
                 html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             }
             // Daily Totals row
             html += '<tr class="totals-row separator-row"><td class="name-col"><strong>Daily Totals</strong></td><td></td>';
-            for (let d = 1; d <= daysInMonth; d++) html += '<td></td>';
+            for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="' + (isWe ? 'weekend' : '') + '"></td>'; }
             html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             // Free/Reduced/Paid daily totals
             ['Free Daily Totals','Reduced Daily Totals','Paid Daily Totals'].forEach(label => {
                 html += '<tr class="frp-totals-row"><td class="name-col">' + label + '</td><td></td>';
-                for (let d = 1; d <= daysInMonth; d++) html += '<td></td>';
+                for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="' + (isWe ? 'weekend' : '') + '"></td>'; }
                 html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             });
             html += '</tbody></table>';
