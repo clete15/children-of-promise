@@ -1642,8 +1642,9 @@ function printFoodCountSheets() {
     html += '.name-col { text-align: left; min-width: 130px; font-size: 8px; white-space: nowrap; }';
     html += '.frp-col { font-weight: bold; width: 18px; background: #f0f0f0; }';
     html += '.day-col { width: 20px; min-width: 20px; }';
-    html += '.day-col.weekend { background: #c0c0c0; }';
+    html += '.day-col.weekend { background: #808080 !important; }';
     html += '.total-col { width: 28px; background: #d9d9d9; font-weight: bold; }';
+    html += '.total-col-free { width: 28px; background: #d9d9d9; font-weight: bold; border-left: 3px solid #000; }';
     html += '.totals-row td { font-weight: bold; font-size: 7px; background: #e8e8e8; }';
     html += '.totals-row .name-col { background: #d0d0d0; }';
     html += '.frp-totals-row td { font-weight: bold; font-size: 7px; background: #f5f5f5; }';
@@ -1652,7 +1653,13 @@ function printFoodCountSheets() {
     html += '</style></head><body>';
 
     Object.keys(roomGroups).sort().forEach(room => {
-        const roomStudents = roomGroups[room];
+        // Sort students: Free first, then Reduced, then Paid
+        const frpOrder = { 'F': 0, 'R': 1, 'P': 2 };
+        const roomStudents = roomGroups[room].sort((a, b) => {
+            const aFrp = (a.F_R_P_Food || 'Paid').charAt(0).toUpperCase();
+            const bFrp = (b.F_R_P_Food || 'Paid').charAt(0).toUpperCase();
+            return (frpOrder[aFrp] || 2) - (frpOrder[bFrp] || 2);
+        });
         meals.forEach(meal => {
             html += '<div class="sheet">';
             html += '<div class="header"><h2>MEAL PARTICIPATION RECORD</h2></div>';
@@ -1660,29 +1667,29 @@ function printFoodCountSheets() {
             html += '<div class="meta"><span>Classroom: ' + room + '</span><span>Program: ☑ Child Care Center</span><span>Meal Service: ☑ ' + meal + '</span></div>';
             html += '<table><thead><tr><th class="name-col">Child\'s Full Name</th><th class="frp-col">F/R/P</th>';
             for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<th class="day-col' + (isWe ? ' weekend' : '') + '">' + d + '</th>'; }
-            html += '<th class="total-col">Free</th><th class="total-col">Red</th><th class="total-col">Paid</th></tr></thead><tbody>';
+            html += '<th class="total-col-free">Free</th><th class="total-col">Red</th><th class="total-col">Paid</th></tr></thead><tbody>';
             roomStudents.forEach((s, i) => {
                 const frp = (s.F_R_P_Food || 'P').charAt(0).toUpperCase();
                 html += '<tr><td class="name-col">' + (i+1) + '. ' + s.Last_Name + ', ' + s.First_Name + '</td>';
                 html += '<td class="frp-col">' + frp + '</td>';
                 for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="day-col' + (isWe ? ' weekend' : '') + '"></td>'; }
-                html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+                html += '<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             });
             // Add empty rows to fill up to 19
             for (let e = roomStudents.length; e < 19; e++) {
                 html += '<tr><td class="name-col">' + (e+1) + '.</td><td class="frp-col"></td>';
                 for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="day-col' + (isWe ? ' weekend' : '') + '"></td>'; }
-                html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+                html += '<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             }
             // Daily Totals row
             html += '<tr class="totals-row separator-row"><td class="name-col"><strong>Daily Totals</strong></td><td></td>';
             for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="' + (isWe ? 'weekend' : '') + '"></td>'; }
-            html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+            html += '<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             // Free/Reduced/Paid daily totals
             ['Free Daily Totals','Reduced Daily Totals','Paid Daily Totals'].forEach(label => {
                 html += '<tr class="frp-totals-row"><td class="name-col">' + label + '</td><td></td>';
                 for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="' + (isWe ? 'weekend' : '') + '"></td>'; }
-                html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+                html += '<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             });
             html += '</tbody></table>';
             html += '<div style="font-size:7px;text-align:right;margin-top:3px;color:#666;">ISBE 68-75 (9/13)</div>';
