@@ -1691,10 +1691,17 @@ function printFoodCountSheets() {
     });
 
     html += '</body></html>';
-    const win = window.open('', '_blank');
-    win.document.write(html);
-    win.document.close();
-    setTimeout(() => win.print(), 500);
+    // Use iframe to avoid popup blockers
+    let frame = document.getElementById('foodPrintFrame');
+    if (frame) frame.remove();
+    frame = document.createElement('iframe');
+    frame.id = 'foodPrintFrame';
+    frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:0;height:0;';
+    document.body.appendChild(frame);
+    frame.contentDocument.open();
+    frame.contentDocument.write(html);
+    frame.contentDocument.close();
+    setTimeout(() => { frame.contentWindow.print(); }, 500);
 }
 
 function renderRptBenefits(rows) {
