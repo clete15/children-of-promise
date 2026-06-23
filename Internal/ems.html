@@ -1620,15 +1620,18 @@ function printFoodCountSheets() {
     html += '.header h2 { margin: 0; font-size: 13px; }';
     html += '.meta { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px; padding: 0 4px; }';
     html += '.meta span { font-weight: bold; }';
-    html += '.program-line { font-size: 9px; margin-bottom: 4px; }';
     html += 'table { border-collapse: collapse; width: 100%; font-size: 8px; }';
     html += 'th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; }';
-    html += 'th { background: #f0f0f0; font-size: 7px; }';
+    html += 'th { background: #d9d9d9; font-size: 7px; font-weight: bold; }';
     html += '.name-col { text-align: left; min-width: 130px; font-size: 8px; white-space: nowrap; }';
-    html += '.frp-col { font-weight: bold; width: 18px; }';
+    html += '.frp-col { font-weight: bold; width: 18px; background: #f0f0f0; }';
     html += '.day-col { width: 20px; min-width: 20px; }';
-    html += '.total-col { width: 28px; background: #f9f9f9; }';
-    html += '.totals-row td { font-weight: bold; font-size: 7px; }';
+    html += '.total-col { width: 28px; background: #d9d9d9; font-weight: bold; }';
+    html += '.totals-row td { font-weight: bold; font-size: 7px; background: #e8e8e8; }';
+    html += '.totals-row .name-col { background: #d0d0d0; }';
+    html += '.frp-totals-row td { font-weight: bold; font-size: 7px; background: #f5f5f5; }';
+    html += '.frp-totals-row .name-col { font-weight: bold; }';
+    html += '.separator-row td { border-top: 3px solid #000; }';
     html += '</style></head><body>';
 
     Object.keys(roomGroups).sort().forEach(room => {
@@ -1655,20 +1658,14 @@ function printFoodCountSheets() {
                 html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             }
             // Daily Totals row
-            html += '<tr class="totals-row"><td class="name-col"><strong>Daily Totals</strong></td><td></td>';
+            html += '<tr class="totals-row separator-row"><td class="name-col"><strong>Daily Totals</strong></td><td></td>';
             for (let d = 1; d <= daysInMonth; d++) html += '<td></td>';
-            html += '<td></td><td></td><td></td></tr>';
+            html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             // Free/Reduced/Paid daily totals
             ['Free Daily Totals','Reduced Daily Totals','Paid Daily Totals'].forEach(label => {
-                html += '<tr class="totals-row"><td class="name-col">' + label + '</td><td></td>';
+                html += '<tr class="frp-totals-row"><td class="name-col">' + label + '</td><td></td>';
                 for (let d = 1; d <= daysInMonth; d++) html += '<td></td>';
-                html += '<td></td><td></td><td></td></tr>';
-            });
-            // Adult meals
-            ['Program Adult Meals','Non-program Adult Meals'].forEach(label => {
-                html += '<tr><td class="name-col" style="font-size:7px;">' + label + '</td><td></td>';
-                for (let d = 1; d <= daysInMonth; d++) html += '<td></td>';
-                html += '<td></td><td></td><td></td></tr>';
+                html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
             });
             html += '</tbody></table>';
             html += '<div style="font-size:7px;text-align:right;margin-top:3px;color:#666;">ISBE 68-75 (9/13)</div>';
