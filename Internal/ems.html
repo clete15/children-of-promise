@@ -1463,7 +1463,7 @@ function renderRptBars(cardId, title, rows, order) {
                     </div>
                 </div>
             </div>`;
-        }).join('') + (cardId === 'rptFood' ? '<div style="margin-top:16px;display:flex;gap:8px;"><button onclick="toggleFoodRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📋 Full Roster</button><button onclick="exportFoodExcel()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export Excel</button></div>' : '');
+        }).join('') + (cardId === 'rptFood' ? '<div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;"><button onclick="toggleFoodRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📋 Full Roster</button><button onclick="exportFoodExcel()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export Excel</button><button onclick="printFoodCountSheets()" style="padding:6px 14px;background:#7c3aed;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">🖨️ Monthly Food Count Sheets</button></div>' : '');
 }
 
 let foodDetailData = [];
@@ -1595,6 +1595,92 @@ function exportFoodExcel() {
     a.download = 'Food_Program_Report_' + new Date().toISOString().split('T')[0] + '.xls';
     a.click();
     URL.revokeObjectURL(url);
+}
+
+function printFoodCountSheets() {
+    const activeStudents = students.filter(s => s.Active === 'Yes' || s.Active === 'YES' || s.Active === 'yes');
+    const now = new Date();
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthYear = monthNames[now.getMonth()] + ' ' + now.getFullYear();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const meals = ['Early Snack', 'Lunch', 'PM Snack'];
+    const roomGroups = {};
+    activeStudents.forEach(s => {
+        const room = s.Room || 'Room ' + s.RoomNumber;
+        if (!roomGroups[room]) roomGroups[room] = [];
+        roomGroups[room].push(s);
+    });
+
+    let html = '<!DOCTYPE html><html><head><title>Meal Participation Records - ' + monthYear + '</title><style>';
+    html += '@page { size: landscape; margin: 0.3in; }';
+    html += 'body { font-family: Arial, sans-serif; margin: 0; }';
+    html += '.sheet { page-break-after: always; padding: 10px; }';
+    html += '.sheet:last-child { page-break-after: auto; }';
+    html += '.header { text-align: center; margin-bottom: 6px; }';
+    html += '.header h2 { margin: 0; font-size: 13px; }';
+    html += '.meta { display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 4px; padding: 0 4px; }';
+    html += '.meta span { font-weight: bold; }';
+    html += '.program-line { font-size: 9px; margin-bottom: 4px; }';
+    html += 'table { border-collapse: collapse; width: 100%; font-size: 8px; }';
+    html += 'th, td { border: 1px solid #000; padding: 2px 3px; text-align: center; }';
+    html += 'th { background: #f0f0f0; font-size: 7px; }';
+    html += '.name-col { text-align: left; min-width: 130px; font-size: 8px; white-space: nowrap; }';
+    html += '.frp-col { font-weight: bold; width: 18px; }';
+    html += '.day-col { width: 20px; min-width: 20px; }';
+    html += '.total-col { width: 28px; background: #f9f9f9; }';
+    html += '.totals-row td { font-weight: bold; font-size: 7px; }';
+    html += '</style></head><body>';
+
+    Object.keys(roomGroups).sort().forEach(room => {
+        const roomStudents = roomGroups[room];
+        meals.forEach(meal => {
+            html += '<div class="sheet">';
+            html += '<div class="header"><h2>MEAL PARTICIPATION RECORD</h2></div>';
+            html += '<div class="meta"><span>Site: Children of Promise</span><span>Month/Year: ' + monthYear + '</span></div>';
+            html += '<div class="meta"><span>Classroom: ' + room + '</span><span>Program: ☑ Child Care Center</span><span>Meal Service: ☑ ' + meal + '</span></div>';
+            html += '<table><thead><tr><th class="name-col">Child\'s Full Name</th><th class="frp-col">F/R/P</th>';
+            for (let d = 1; d <= daysInMonth; d++) html += '<th class="day-col">' + d + '</th>';
+            html += '<th class="total-col">Free</th><th class="total-col">Red</th><th class="total-col">Paid</th></tr></thead><tbody>';
+            roomStudents.forEach((s, i) => {
+                const frp = (s.F_R_P_Food || 'P').charAt(0).toUpperCase();
+                html += '<tr><td class="name-col">' + (i+1) + '. ' + s.Last_Name + ', ' + s.First_Name + '</td>';
+                html += '<td class="frp-col">' + frp + '</td>';
+                for (let d = 1; d <= daysInMonth; d++) html += '<td class="day-col"></td>';
+                html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+            });
+            // Add empty rows to fill up to 19
+            for (let e = roomStudents.length; e < 19; e++) {
+                html += '<tr><td class="name-col">' + (e+1) + '.</td><td class="frp-col"></td>';
+                for (let d = 1; d <= daysInMonth; d++) html += '<td class="day-col"></td>';
+                html += '<td class="total-col"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+            }
+            // Daily Totals row
+            html += '<tr class="totals-row"><td class="name-col"><strong>Daily Totals</strong></td><td></td>';
+            for (let d = 1; d <= daysInMonth; d++) html += '<td></td>';
+            html += '<td></td><td></td><td></td></tr>';
+            // Free/Reduced/Paid daily totals
+            ['Free Daily Totals','Reduced Daily Totals','Paid Daily Totals'].forEach(label => {
+                html += '<tr class="totals-row"><td class="name-col">' + label + '</td><td></td>';
+                for (let d = 1; d <= daysInMonth; d++) html += '<td></td>';
+                html += '<td></td><td></td><td></td></tr>';
+            });
+            // Adult meals
+            ['Program Adult Meals','Non-program Adult Meals'].forEach(label => {
+                html += '<tr><td class="name-col" style="font-size:7px;">' + label + '</td><td></td>';
+                for (let d = 1; d <= daysInMonth; d++) html += '<td></td>';
+                html += '<td></td><td></td><td></td></tr>';
+            });
+            html += '</tbody></table>';
+            html += '<div style="font-size:7px;text-align:right;margin-top:3px;color:#666;">ISBE 68-75 (9/13)</div>';
+            html += '</div>';
+        });
+    });
+
+    html += '</body></html>';
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 500);
 }
 
 function renderRptBenefits(rows) {
