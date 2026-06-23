@@ -1654,11 +1654,12 @@ function printFoodCountSheets() {
 
     Object.keys(roomGroups).sort().forEach(room => {
         // Sort students: Free first, then Reduced, then Paid
-        const roomStudents = roomGroups[room].sort((a, b) => {
-            const order = { 'Free': 0, 'Reduced': 1, 'Paid': 2 };
-            const aVal = order[a.F_R_P_Food] !== undefined ? order[a.F_R_P_Food] : 2;
-            const bVal = order[b.F_R_P_Food] !== undefined ? order[b.F_R_P_Food] : 2;
-            return aVal - bVal;
+        const order = { 'free': 0, 'reduced': 1, 'paid': 2 };
+        const roomStudents = [...roomGroups[room]].sort((a, b) => {
+            const aVal = order[(a.F_R_P_Food || '').trim().toLowerCase()] !== undefined ? order[(a.F_R_P_Food || '').trim().toLowerCase()] : 2;
+            const bVal = order[(b.F_R_P_Food || '').trim().toLowerCase()] !== undefined ? order[(b.F_R_P_Food || '').trim().toLowerCase()] : 2;
+            if (aVal !== bVal) return aVal - bVal;
+            return (a.Last_Name || '').localeCompare(b.Last_Name || '');
         });
         meals.forEach(meal => {
             html += '<div class="sheet">';
