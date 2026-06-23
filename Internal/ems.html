@@ -1654,11 +1654,11 @@ function printFoodCountSheets() {
 
     Object.keys(roomGroups).sort().forEach(room => {
         // Sort students: Free first, then Reduced, then Paid
-        const frpOrder = { 'F': 0, 'R': 1, 'P': 2 };
         const roomStudents = roomGroups[room].sort((a, b) => {
-            const aFrp = (a.F_R_P_Food || 'Paid').charAt(0).toUpperCase();
-            const bFrp = (b.F_R_P_Food || 'Paid').charAt(0).toUpperCase();
-            return (frpOrder[aFrp] || 2) - (frpOrder[bFrp] || 2);
+            const order = { 'Free': 0, 'Reduced': 1, 'Paid': 2 };
+            const aVal = order[a.F_R_P_Food] !== undefined ? order[a.F_R_P_Food] : 2;
+            const bVal = order[b.F_R_P_Food] !== undefined ? order[b.F_R_P_Food] : 2;
+            return aVal - bVal;
         });
         meals.forEach(meal => {
             html += '<div class="sheet">';
