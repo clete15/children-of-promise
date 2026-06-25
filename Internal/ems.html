@@ -1661,6 +1661,31 @@ function printFoodCountSheets() {
             if (aVal !== bVal) return aVal - bVal;
             return (a.Last_Name || '').localeCompare(b.Last_Name || '');
         });
+
+        // Attendance sheet for this classroom
+        html += '<div class="sheet">';
+        html += '<div class="header"><h2>DAILY ATTENDANCE RECORD</h2></div>';
+        html += '<div class="meta"><span>Site: Children of Promise</span><span>Month/Year: ' + monthYear + '</span></div>';
+        html += '<div class="meta"><span>Classroom: ' + room + '</span></div>';
+        html += '<table><thead><tr><th class="name-col">Child\'s Full Name</th>';
+        for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<th class="day-col' + (isWe ? ' weekend' : '') + '">' + d + '</th>'; }
+        html += '<th class="total-col-free">Total</th></tr></thead><tbody>';
+        roomStudents.forEach((s, i) => {
+            html += '<tr><td class="name-col">' + (i+1) + '. ' + s.Last_Name + ', ' + s.First_Name + '</td>';
+            for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="day-col' + (isWe ? ' weekend' : '') + '"></td>'; }
+            html += '<td class="total-col-free"></td></tr>';
+        });
+        for (let e = roomStudents.length; e < 19; e++) {
+            html += '<tr><td class="name-col">' + (e+1) + '.</td>';
+            for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="day-col' + (isWe ? ' weekend' : '') + '"></td>'; }
+            html += '<td class="total-col-free"></td></tr>';
+        }
+        html += '<tr class="totals-row separator-row"><td class="name-col"><strong>Daily Total</strong></td>';
+        for (let d = 1; d <= daysInMonth; d++) { const isWe = weekendDays.includes(d); html += '<td class="' + (isWe ? 'weekend' : '') + '"></td>'; }
+        html += '<td class="total-col-free"></td></tr>';
+        html += '</tbody></table>';
+        html += '</div>';
+
         meals.forEach(meal => {
             html += '<div class="sheet">';
             html += '<div class="header"><h2>MEAL PARTICIPATION RECORD</h2></div>';
@@ -1969,6 +1994,20 @@ function renderAlerts() {
             }).join(', '),
             actionText: 'Open CCAP Report →',
             onclick: "setMode('reports');selectReport('ccap')"
+        });
+    }
+
+    // Check for pending children on waiting list
+    const wlBadgeEl = document.getElementById('wlBadge');
+    const pendingCount = wlBadgeEl && wlBadgeEl.style.display !== 'none' ? parseInt(wlBadgeEl.textContent) || 0 : 0;
+    if (pendingCount > 0) {
+        alerts.push({
+            type: 'info',
+            icon: '📝',
+            title: `${pendingCount} children pending on the waiting list`,
+            detail: 'New pre-enrollment submissions are waiting to be reviewed and processed.',
+            actionText: 'Open Waiting List →',
+            onclick: "setMode('waitlist')"
         });
     }
 
