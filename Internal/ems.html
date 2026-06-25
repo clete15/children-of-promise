@@ -1831,10 +1831,41 @@ function renderRptCcap(rows) {
 
 function renderRptSummer(rows) {
     const card = document.getElementById('rptSummer');
-    if (!rows || !rows.length) { card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program Sign-Ups</div><div style="color:var(--text-muted);font-size:0.85rem;">No sign-ups yet.</div>`; return; }
     const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
-    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program Sign-Ups <span style="background:#fffbeb;color:#92400e;padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:8px;">${rows.length} children</span></div>
-        <div style="max-height:300px;overflow:auto;">
+
+    // Get active Before and Afterschool students
+    const baStudents = students.filter(s => (s.Active === 'Yes' || s.Active === 'YES') && (s.Room || '').toLowerCase().includes('before and after'));
+
+    let html = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program</div>`;
+
+    // Before & Afterschool section
+    html += `<div style="margin-bottom:20px;">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">📋 Before & Afterschool Program (Year-Round) <span style="background:#eff6ff;color:var(--primary);padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:6px;">${baStudents.length} children</span></div>
+        <div style="max-height:250px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Child</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">F/R/P</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Category</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Days</th>
+            </tr></thead>
+            <tbody>${baStudents.length ? baStudents.map(s => {
+                const days = ['Monday','Tuesday','Wednesday','Thursday','Friday'].filter(d => s[d] === '1' || s[d] === 1 || s[d] === true).map(d => d.substring(0,3)).join(', ');
+                return `<tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:6px 10px;font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
+                    <td style="padding:6px 10px;font-weight:700;color:${frpColor(s.F_R_P_Food)};">${s.F_R_P_Food || '—'}</td>
+                    <td style="padding:6px 10px;">${s.Category || '—'}</td>
+                    <td style="padding:6px 10px;font-size:0.72rem;">${days || 'All'}</td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="4" style="padding:12px;color:var(--text-muted);text-align:center;">No students in Before & Afterschool</td></tr>'}</tbody>
+        </table></div></div>`;
+
+    // Summer sign-ups section
+    html += `<div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">📝 Additional Summer Sign-Ups <span style="background:#fffbeb;color:#92400e;padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:6px;">${(rows||[]).length} children</span></div>`;
+    if (!rows || !rows.length) {
+        html += `<div style="color:var(--text-muted);font-size:0.85rem;">No additional summer sign-ups yet.</div>`;
+    } else {
+        html += `<div style="max-height:250px;overflow:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
             <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
                 <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Child</th>
@@ -1853,6 +1884,8 @@ function renderRptSummer(rows) {
                 <td style="padding:6px 10px;font-size:0.72rem;">${r[7] || ''}</td>
             </tr>`).join('')}</tbody>
         </table></div>`;
+    }
+    card.innerHTML = html;
 }
 
 // ══════════════════════════════════════════
