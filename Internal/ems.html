@@ -1200,9 +1200,16 @@ async function loadWaitlist() {
 
 function updateWlTabCounts() {
     ['0-2','2-3','3-5','ba'].forEach(tab => {
-        const count = wlRows.filter(r => r.AgeGroup === tab && r.WaitlistStatus !== 'Declined' && r.WaitlistStatus !== 'Enrolled').length;
+        const active = wlRows.filter(r => r.AgeGroup === tab && r.WaitlistStatus !== 'Declined' && r.WaitlistStatus !== 'Enrolled');
+        const pendingOnly = active.filter(r => !r.WaitlistStatus || r.WaitlistStatus === 'Pending' || r.WaitlistStatus === 'NULL');
+        const contactedOnly = active.filter(r => r.WaitlistStatus === 'Contacted');
         const el = document.getElementById(`wl-count-${tab}`);
-        if (el) el.textContent = count ? `${count} pending` : 'None';
+        if (el) {
+            if (pendingOnly.length && contactedOnly.length) el.textContent = `${pendingOnly.length} pending, ${contactedOnly.length} contacted`;
+            else if (pendingOnly.length) el.textContent = `${pendingOnly.length} pending`;
+            else if (contactedOnly.length) el.textContent = `${contactedOnly.length} contacted`;
+            else el.textContent = 'None';
+        }
     });
 }
 
@@ -1998,13 +2005,12 @@ function renderAlerts() {
     }
 
     // Check for pending children on waiting list
-    const wlBadgeEl = document.getElementById('wlBadge');
-    const pendingCount = wlBadgeEl && wlBadgeEl.style.display !== 'none' ? parseInt(wlBadgeEl.textContent) || 0 : 0;
-    if (pendingCount > 0) {
+    const wlPendingCount = wlRows ? wlRows.filter(r => (!r.WaitlistStatus || r.WaitlistStatus === 'Pending' || r.WaitlistStatus === 'NULL') && r.WaitlistStatus !== 'Declined' && r.WaitlistStatus !== 'Enrolled').length : 0;
+    if (wlPendingCount > 0) {
         alerts.push({
             type: 'info',
             icon: '📝',
-            title: `${pendingCount} children pending on the waiting list`,
+            title: `${wlPendingCount} children pending on the waiting list`,
             detail: 'New pre-enrollment submissions are waiting to be reviewed and processed.',
             actionText: 'Open Waiting List →',
             onclick: "setMode('waitlist')"
