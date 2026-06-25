@@ -430,7 +430,7 @@
                     <div style="font-size:0.82rem;font-weight:700;color:white;">💳 Pay Type</div>
                 </button>
                 <button onclick="selectReport('ccap')" id="rptBtn-ccap" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
-                    <div style="font-size:0.82rem;font-weight:700;color:white;">💰 CCAP Eligible</div>
+                    <div style="font-size:0.82rem;font-weight:700;color:white;">💰 CCAP</div>
                 </button>
                 <button onclick="selectReport('summer')" id="rptBtn-summer" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
                     <div style="font-size:0.82rem;font-weight:700;color:white;">☀️ Summer Program</div>
@@ -444,7 +444,7 @@
                     <div id="rptFood" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Food Program</div><div>Loading…</div></div>
                     <div id="rptProgram" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Program Type</div><div>Loading…</div></div>
                     <div id="rptPayType" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">Pay Type</div><div>Loading…</div></div>
-                    <div id="rptCcap" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible (Not Currently on CCAP)</div><div>Loading…</div></div>
+                    <div id="rptCcap" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP</div><div>Loading…</div></div>
                     <div id="rptSummer" style="display:none;"><div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">☀️ Summer Program Sign-Ups</div><div>Loading…</div></div>
                 </div>
             </div>
@@ -1809,24 +1809,79 @@ function renderRptWaitlist(rows) {
 
 function renderRptCcap(rows) {
     const card = document.getElementById('rptCcap');
-    if (!rows || !rows.length) { card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible (Not Currently on CCAP)</div><div style="color:var(--success);font-weight:600;font-size:0.85rem;">✓ All eligible families are already on CCAP</div>`; return; }
-    card.innerHTML = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Eligible — Not Currently on CCAP <span style="background:#fef2f2;color:var(--danger);padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:8px;">${rows.length} families</span><a href="https://www.dhs.state.il.us/page.aspx?item=164270" target="_blank" style="float:right;font-size:0.7rem;font-weight:600;color:var(--primary);text-decoration:none;">IL CCAP Thresholds →</a></div>
-        <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
-            <thead><tr style="border-bottom:2px solid var(--border);">
-                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
-                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
-                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">CCAP Threshold</th>
-                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
-                <th style="padding:8px 12px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+    const thresholds = CCAP_THRESHOLDS;
+    const year = _usdaYear + '-' + (_usdaYear + 1);
+
+    let html = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Report <span style="font-size:0.68rem;font-weight:400;text-transform:none;color:var(--text-muted);margin-left:8px;">${year}</span></div>`;
+
+    // Thresholds chart
+    html += `<div style="margin-bottom:20px;">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">IL CCAP Income Thresholds (225% FPL — Annual)</div>
+        <table style="width:auto;border-collapse:collapse;font-size:0.78rem;margin-bottom:10px;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+                <th style="padding:6px 14px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+                <th style="padding:6px 14px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Max Annual Income</th>
+                <th style="padding:6px 14px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Max Monthly</th>
+            </tr></thead>
+            <tbody>${thresholds.map((t, i) => `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:5px 14px;text-align:center;font-weight:600;">${i + 1}</td>
+                <td style="padding:5px 14px;text-align:right;">$${t.toLocaleString()}</td>
+                <td style="padding:5px 14px;text-align:right;color:var(--text-muted);">$${Math.round(t/12).toLocaleString()}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+        <button onclick="exportCCAPReport()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export CCAP Report</button>
+    </div>`;
+
+    // Eligible students
+    if (!rows || !rows.length) {
+        html += `<div style="color:var(--success);font-weight:600;font-size:0.85rem;margin-top:12px;">✓ All eligible families are already on CCAP</div>`;
+    } else {
+        html += `<div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">Families Potentially Eligible (Not Currently on CCAP) <span style="background:#fef2f2;color:var(--danger);padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:6px;">${rows.length}</span></div>`;
+        html += `<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+            <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Threshold</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+                <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH</th>
             </tr></thead>
             <tbody>${rows.map(r => { const hhIdx = Math.max(1, Math.min(parseInt(r[4])||1, 8)) - 1; const threshold = CCAP_THRESHOLDS[hhIdx]; return `<tr style="border-bottom:1px solid var(--border);">
-                <td style="padding:8px 12px;font-weight:600;">${r[0]} ${r[1]}</td>
-                <td style="padding:8px 12px;">${r[2] || '—'}</td>
-                <td style="padding:8px 12px;color:var(--success);font-weight:600;">$${threshold.toLocaleString()}</td>
-                <td style="padding:8px 12px;">${"$" + parseInt(r[3] || 0).toLocaleString()}</td>
-                <td style="padding:8px 12px;">${r[4] || '—'}</td>
+                <td style="padding:6px 10px;font-weight:600;">${r[0]} ${r[1]}</td>
+                <td style="padding:6px 10px;">${r[2] || '—'}</td>
+                <td style="padding:6px 10px;text-align:right;color:var(--success);font-weight:600;">$${threshold.toLocaleString()}</td>
+                <td style="padding:6px 10px;text-align:right;">$${parseInt(r[3] || 0).toLocaleString()}</td>
+                <td style="padding:6px 10px;text-align:center;">${r[4] || '—'}</td>
             </tr>`; }).join('')}</tbody>
         </table>`;
+    }
+    card.innerHTML = html;
+}
+
+function exportCCAPReport() {
+    const thresholds = CCAP_THRESHOLDS;
+    let csv = 'CCAP INCOME THRESHOLDS (225% FPL)\nHH Size\tMax Annual Income\tMax Monthly\n';
+    thresholds.forEach((t, i) => { csv += (i+1) + '\t' + t + '\t' + Math.round(t/12) + '\n'; });
+    csv += '\nCCAP ELIGIBLE STUDENTS (Not Currently on CCAP)\nFirst Name\tLast Name\tRoom\tIncome\tHH Size\tThreshold\n';
+    const eligible = students.filter(s => {
+        if (!(s.Active === 'Yes' || s.Active === 'YES')) return false;
+        if (s.Category === 'CCAP' || s.Category === 'Foster') return false;
+        const income = parseInt(s.HouseholdIncome) || 0;
+        const hhSize = parseInt(s.HouseholdSize) || 0;
+        if (!income || !hhSize) return false;
+        const idx = Math.max(1, Math.min(hhSize, 8)) - 1;
+        return income <= CCAP_THRESHOLDS[idx];
+    });
+    eligible.forEach(s => {
+        const idx = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
+        csv += s.First_Name + '\t' + s.Last_Name + '\t' + (s.Room||'') + '\t' + (s.HouseholdIncome||'') + '\t' + (s.HouseholdSize||'') + '\t' + CCAP_THRESHOLDS[idx] + '\n';
+    });
+    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'CCAP_Report_' + new Date().toISOString().split('T')[0] + '.xls';
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 function renderRptSummer(rows) {
@@ -2245,10 +2300,8 @@ function renderBenefitsRoom() {
         <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
             <th style="padding:8px 10px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
             <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:75px;" title="Pay Type: Paid (full tuition), CCAP (IL Child Care Assistance Program - 225% FPL), Half Price, Free (staff/scholarship), Foster (DCFS ward)">Pay</th>
-            <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:45px;" title="Food Program eligibility: Free (≤130% FPL or public benefits/foster/military/PFA), Reduced (≤185% FPL), Paid (above 185% FPL). Current thresholds: HH4 Free=$42,900 / Reduced=$61,050">F/R/P</th>
             <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:60px;" title="Annual gross household income before deductions">Income</th>
             <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:30px;" title="Number of people living in the household">HH</th>
-            <th style="padding:8px 4px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:80px;cursor:help;" title="CCAP Approval Start Date. Renewals are every 12 months. Parent receives redetermination form from CCR&R before expiry. Need 2 pay stubs within 60 days for renewal. Current CCAP threshold (225% FPL): HH1=$35,888 | HH2=$48,668 | HH3=$61,448 | HH4=$74,228 | HH5=$87,008 | HH6=$99,788 | HH7=$112,568 | HH8=$125,348">CCAP Start</th>
             ${benefitKeys.map(b => `<th style="padding:8px 4px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:42px;">${b}</th>`).join('')}
             <th style="padding:8px 4px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:36px;">Save</th>
             <th style="padding:8px 6px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);min-width:140px;">Notes</th>
@@ -2270,10 +2323,8 @@ function renderBenefitsRoom() {
             return `<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background='white'">
                 <td style="padding:6px 10px;font-weight:600;white-space:nowrap;">${s.Last_Name}, ${s.First_Name}</td>
                 <td style="padding:4px 4px;"><select id="benPay_${i}" onchange="markBenefitChanged(${i})" style="padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.7rem;width:100%;">${payOpts}</select></td>
-                <td style="padding:5px 6px;text-align:center;font-weight:700;font-size:0.7rem;color:${frpColor(frp)};">${frp || '—'}</td>
                 <td style="padding:4px 4px;"><input type="number" id="benIncome_${i}" value="${income || ''}" onchange="markBenefitChanged(${i})" style="width:60px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:0.68rem;text-align:center;"></td>
                 <td style="padding:4px 4px;"><input type="number" id="benHH_${i}" value="${hhSize || ''}" min="1" max="15" onchange="markBenefitChanged(${i})" style="width:36px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:0.68rem;text-align:center;"></td>
-                <td style="padding:4px 4px;"><input type="date" id="benCCAPStart_${i}" value="${s.CCAPStartDate || ''}" onchange="markBenefitChanged(${i})" style="padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.65rem;width:100%;" ${s.Category==='CCAP'?'':'disabled title="Set Pay Type to CCAP to enable"'}></td>
                 ${benefitKeys.map(b => `<td style="padding:4px 4px;text-align:center;">
                     <input type="checkbox" id="ben_${rn}_${i}_${b}" ${ben.includes(b)?'checked':''} onchange="markBenefitChanged(${i})" style="width:auto;accent-color:var(--primary);">
                 </td>`).join('')}
