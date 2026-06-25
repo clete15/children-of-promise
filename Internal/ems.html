@@ -225,12 +225,12 @@
                             <label>Food Program</label>
                             <input type="text" id="frpFood" readonly style="background:#f8fafc;font-weight:700;">
                         </div>
-                        <div class="form-group" style="display:flex;align-items:flex-end;gap:16px;padding-bottom:2px;">
+                        <div class="form-group" style="display:none;align-items:flex-end;gap:16px;padding-bottom:2px;">
                             <div class="checkbox-item"><input type="checkbox" id="iep"><label for="iep">IEP</label></div>
                             <div class="checkbox-item"><input type="checkbox" id="military"><label for="military">Military</label></div>
                         </div>
                     </div>
-                    <div class="form-group" style="margin-top:8px;">
+                    <div class="form-group" style="display:none;margin-top:8px;">
                         <label>Public Benefits</label>
                         <div class="checkbox-grid">
                             <div class="checkbox-item"><input type="checkbox" id="benWIC" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benWIC">WIC</label></div>
@@ -242,8 +242,8 @@
                     </div>
                 </div>
 
-                <!-- Income & Proof -->
-                <div class="card" style="grid-column: 1 / -1;">
+                <!-- Income & Proof (hidden - managed on Benefits tab) -->
+                <div class="card" style="grid-column: 1 / -1; display:none;">
                     <div class="card-title">Household Income</div>
                     <div class="form-row">
                         <div class="form-group">
