@@ -1814,6 +1814,45 @@ function renderRptCcap(rows) {
 
     let html = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Report</div>`;
 
+    // Collapsible Families Potentially Eligible (above buttons)
+    if (rows && rows.length) {
+        html += `<div style="margin-bottom:16px;">
+            <div onclick="document.getElementById('ccapEligibleBody').style.display=document.getElementById('ccapEligibleBody').style.display==='none'?'block':'none';this.querySelector('.arrow').textContent=document.getElementById('ccapEligibleBody').style.display==='none'?'▶':'▼'" style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;cursor:pointer;user-select:none;">
+                <span class="arrow">▼</span> Families Potentially Eligible (Not Currently on CCAP) <span style="background:#fef2f2;color:var(--danger);padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:6px;">${rows.length}</span>
+            </div>
+            <div id="ccapEligibleBody">
+                <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+                    <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
+                        <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Parent</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Phone</th>
+                        <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Threshold</th>
+                        <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+                        <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH</th>
+                    </tr></thead>
+                    <tbody>${rows.map(r => { const hhIdx = Math.max(1, Math.min(parseInt(r[4])||1, 8)) - 1; const threshold = CCAP_THRESHOLDS[hhIdx]; return `<tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:6px 10px;font-weight:600;">${r[0]} ${r[1]}</td>
+                        <td style="padding:6px 10px;">${r[2] || '—'}</td>
+                        <td style="padding:6px 10px;">${r[5] || '—'}</td>
+                        <td style="padding:6px 10px;font-size:0.72rem;">${r[6] || '—'}</td>
+                        <td style="padding:6px 10px;text-align:right;color:var(--success);font-weight:600;">$${threshold.toLocaleString()}</td>
+                        <td style="padding:6px 10px;text-align:right;">$${parseInt(r[3] || 0).toLocaleString()}</td>
+                        <td style="padding:6px 10px;text-align:center;">${r[4] || '—'}</td>
+                    </tr>`; }).join('')}</tbody>
+                </table>
+            </div>
+        </div>`;
+    } else {
+        html += `<div style="color:var(--success);font-weight:600;font-size:0.85rem;margin-bottom:16px;">✓ All eligible families are already on CCAP</div>`;
+    }
+
+    // Buttons
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+        <button onclick="exportCCAPReport()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export CCAP Report</button>
+        <button onclick="toggleCCAPRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📋 Full CCAP Roster</button>
+    </div>`;
+
     // Collapsible Thresholds chart (collapsed by default)
     html += `<div style="margin-bottom:20px;">
         <div onclick="document.getElementById('ccapThresholdsBody').style.display=document.getElementById('ccapThresholdsBody').style.display==='none'?'block':'none';this.querySelector('.arrow').textContent=document.getElementById('ccapThresholdsBody').style.display==='none'?'▶':'▼'" style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;cursor:pointer;user-select:none;">
@@ -1834,38 +1873,8 @@ function renderRptCcap(rows) {
                 </tr>`).join('')}</tbody>
             </table>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button onclick="exportCCAPReport()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export CCAP Report</button>
-            <button onclick="toggleCCAPRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📋 Full CCAP Roster</button>
-        </div>
     </div>`;
 
-    // Eligible students
-    if (!rows || !rows.length) {
-        html += `<div style="color:var(--success);font-weight:600;font-size:0.85rem;margin-top:12px;">✓ All eligible families are already on CCAP</div>`;
-    } else {
-        html += `<div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">Families Potentially Eligible (Not Currently on CCAP) <span style="background:#fef2f2;color:var(--danger);padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:6px;">${rows.length}</span></div>`;
-        html += `<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
-            <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
-                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
-                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
-                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Parent</th>
-                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Phone</th>
-                <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Threshold</th>
-                <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
-                <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH</th>
-            </tr></thead>
-            <tbody>${rows.map(r => { const hhIdx = Math.max(1, Math.min(parseInt(r[4])||1, 8)) - 1; const threshold = CCAP_THRESHOLDS[hhIdx]; return `<tr style="border-bottom:1px solid var(--border);">
-                <td style="padding:6px 10px;font-weight:600;">${r[0]} ${r[1]}</td>
-                <td style="padding:6px 10px;">${r[2] || '—'}</td>
-                <td style="padding:6px 10px;">${r[5] || '—'}</td>
-                <td style="padding:6px 10px;font-size:0.72rem;">${r[6] || '—'}</td>
-                <td style="padding:6px 10px;text-align:right;color:var(--success);font-weight:600;">$${threshold.toLocaleString()}</td>
-                <td style="padding:6px 10px;text-align:right;">$${parseInt(r[3] || 0).toLocaleString()}</td>
-                <td style="padding:6px 10px;text-align:center;">${r[4] || '—'}</td>
-            </tr>`; }).join('')}</tbody>
-        </table>`;
-    }
     card.innerHTML = html;
 }
 
