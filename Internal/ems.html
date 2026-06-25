@@ -1810,27 +1810,34 @@ function renderRptWaitlist(rows) {
 function renderRptCcap(rows) {
     const card = document.getElementById('rptCcap');
     const thresholds = CCAP_THRESHOLDS;
-    const year = _usdaYear + '-' + (_usdaYear + 1);
+    const effectiveDate = 'July 1, ' + _usdaYear;
 
-    let html = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Report <span style="font-size:0.68rem;font-weight:400;text-transform:none;color:var(--text-muted);margin-left:8px;">${year}</span></div>`;
+    let html = `<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);">CCAP Report</div>`;
 
-    // Thresholds chart
+    // Collapsible Thresholds chart (collapsed by default)
     html += `<div style="margin-bottom:20px;">
-        <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">IL CCAP Income Thresholds (225% FPL — Annual)</div>
-        <table style="width:auto;border-collapse:collapse;font-size:0.78rem;margin-bottom:10px;">
-            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
-                <th style="padding:6px 14px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
-                <th style="padding:6px 14px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Max Annual Income</th>
-                <th style="padding:6px 14px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Max Monthly</th>
-            </tr></thead>
-            <tbody>${thresholds.map((t, i) => `<tr style="border-bottom:1px solid var(--border);">
-                <td style="padding:5px 14px;text-align:center;font-weight:600;">${i + 1}</td>
-                <td style="padding:5px 14px;text-align:right;">$${t.toLocaleString()}</td>
-                <td style="padding:5px 14px;text-align:right;color:var(--text-muted);">$${Math.round(t/12).toLocaleString()}</td>
-            </tr>`).join('')}</tbody>
-        </table>
-        <button onclick="exportCCAPReport()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export CCAP Report</button>
-        <button onclick="toggleCCAPRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;margin-left:8px;">📋 Full CCAP Roster</button>
+        <div onclick="document.getElementById('ccapThresholdsBody').style.display=document.getElementById('ccapThresholdsBody').style.display==='none'?'block':'none';this.querySelector('.arrow').textContent=document.getElementById('ccapThresholdsBody').style.display==='none'?'▶':'▼'" style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;cursor:pointer;user-select:none;">
+            <span class="arrow">▶</span> IL CCAP Income Thresholds (225% FPL — Annual)
+            <span style="font-size:0.7rem;font-weight:400;color:var(--text-muted);margin-left:6px;">Effective ${effectiveDate}</span>
+        </div>
+        <div id="ccapThresholdsBody" style="display:none;">
+            <table style="width:auto;border-collapse:collapse;font-size:0.78rem;margin-bottom:10px;">
+                <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+                    <th style="padding:6px 14px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+                    <th style="padding:6px 14px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Max Annual Income</th>
+                    <th style="padding:6px 14px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Max Monthly</th>
+                </tr></thead>
+                <tbody>${thresholds.map((t, i) => `<tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:5px 14px;text-align:center;font-weight:600;">${i + 1}</td>
+                    <td style="padding:5px 14px;text-align:right;">$${t.toLocaleString()}</td>
+                    <td style="padding:5px 14px;text-align:right;color:var(--text-muted);">$${Math.round(t/12).toLocaleString()}</td>
+                </tr>`).join('')}</tbody>
+            </table>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button onclick="exportCCAPReport()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export CCAP Report</button>
+            <button onclick="toggleCCAPRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📋 Full CCAP Roster</button>
+        </div>
     </div>`;
 
     // Eligible students
@@ -1842,6 +1849,8 @@ function renderRptCcap(rows) {
             <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
                 <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
                 <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Parent</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Phone</th>
                 <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Threshold</th>
                 <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
                 <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH</th>
@@ -1849,6 +1858,8 @@ function renderRptCcap(rows) {
             <tbody>${rows.map(r => { const hhIdx = Math.max(1, Math.min(parseInt(r[4])||1, 8)) - 1; const threshold = CCAP_THRESHOLDS[hhIdx]; return `<tr style="border-bottom:1px solid var(--border);">
                 <td style="padding:6px 10px;font-weight:600;">${r[0]} ${r[1]}</td>
                 <td style="padding:6px 10px;">${r[2] || '—'}</td>
+                <td style="padding:6px 10px;">${r[5] || '—'}</td>
+                <td style="padding:6px 10px;font-size:0.72rem;">${r[6] || '—'}</td>
                 <td style="padding:6px 10px;text-align:right;color:var(--success);font-weight:600;">$${threshold.toLocaleString()}</td>
                 <td style="padding:6px 10px;text-align:right;">$${parseInt(r[3] || 0).toLocaleString()}</td>
                 <td style="padding:6px 10px;text-align:center;">${r[4] || '—'}</td>
