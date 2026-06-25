@@ -479,8 +479,8 @@ const USDA_GUIDELINES = {
 };
 // Illinois CCAP eligibility (225% FPL) - update annually when IL DHS publishes
 const CCAP_GUIDELINES = {
-    2025: [35888,48668,61448,74228,87008,99788,112568,125348],
-    2026: [35213,47592,59964,72336,84708,97080,109464,121836],
+    2025: [35213,47588,59963,72338,84713,97088,109463,121838],
+    2026: [35910,48690,61470,74250,87030,99810,112590,125370],
 };
 // Determine which year's thresholds to use (effective July 1)
 const _now = new Date();
@@ -1847,12 +1847,6 @@ function renderRptCcap(rows) {
         html += `<div style="color:var(--success);font-weight:600;font-size:0.85rem;margin-bottom:16px;">✓ All eligible families are already on CCAP</div>`;
     }
 
-    // Buttons
-    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
-        <button onclick="exportCCAPReport()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export CCAP Report</button>
-        <button onclick="toggleCCAPRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📋 Full CCAP Roster</button>
-    </div>`;
-
     // Collapsible Thresholds chart (collapsed by default)
     html += `<div style="margin-bottom:20px;">
         <div onclick="document.getElementById('ccapThresholdsBody').style.display=document.getElementById('ccapThresholdsBody').style.display==='none'?'block':'none';this.querySelector('.arrow').textContent=document.getElementById('ccapThresholdsBody').style.display==='none'?'▶':'▼'" style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;cursor:pointer;user-select:none;">
@@ -1873,6 +1867,12 @@ function renderRptCcap(rows) {
                 </tr>`).join('')}</tbody>
             </table>
         </div>
+    </div>`;
+
+    // Buttons (below both collapsible sections)
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button onclick="exportCCAPReport()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export CCAP Report</button>
+        <button onclick="toggleCCAPRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📋 Full CCAP Roster</button>
     </div>`;
 
     card.innerHTML = html;
