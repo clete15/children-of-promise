@@ -1830,6 +1830,7 @@ function renderRptCcap(rows) {
             </tr>`).join('')}</tbody>
         </table>
         <button onclick="exportCCAPReport()" style="padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;">📥 Export CCAP Report</button>
+        <button onclick="toggleCCAPRoster()" style="padding:6px 14px;background:var(--primary);color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;margin-left:8px;">📋 Full CCAP Roster</button>
     </div>`;
 
     // Eligible students
@@ -1882,6 +1883,69 @@ function exportCCAPReport() {
     a.download = 'CCAP_Report_' + new Date().toISOString().split('T')[0] + '.xls';
     a.click();
     URL.revokeObjectURL(url);
+}
+
+function toggleCCAPRoster() {
+    const card = document.getElementById('rptCcap');
+    const existing = document.getElementById('ccapFullRoster');
+    if (existing) { existing.remove(); return; }
+
+    const ccapStudents = students.filter(s => (s.Active === 'Yes' || s.Active === 'YES') && s.Category === 'CCAP');
+    const div = document.createElement('div');
+    div.id = 'ccapFullRoster';
+    div.style.cssText = 'margin-top:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+    div.innerHTML = `<div style="padding:10px 14px;background:#f8fafc;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:0.8rem;font-weight:700;color:var(--text);">Current CCAP Students (${ccapStudents.length})</span>
+    </div>
+    <div style="max-height:350px;overflow:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+            <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Eligibility Date</th>
+            <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+            <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH</th>
+            <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Renewal Status</th>
+        </tr></thead>
+        <tbody>${ccapStudents.map(s => {
+            const startDate = s.CCAPStartDate || '';
+            let renewalStatus = '';
+            if (!startDate) {
+                renewalStatus = '<span style="color:#dc2626;font-weight:700;">No date set</span>';
+            } else {
+                const start = new Date(startDate);
+                const renewal = new Date(start);
+                renewal.setMonth(renewal.getMonth() + 12);
+                const daysUntil = Math.ceil((renewal - new Date()) / (1000*60*60*24));
+                if (daysUntil <= 0) renewalStatus = '<span style="color:#dc2626;font-weight:700;">OVERDUE</span>';
+                else if (daysUntil <= 60) renewalStatus = '<span style="color:#d97706;font-weight:700;">' + daysUntil + ' days</span>';
+                else renewalStatus = '<span style="color:#16a34a;">' + daysUntil + ' days</span>';
+            }
+            return `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:6px 10px;font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
+                <td style="padding:6px 10px;">${s.Room || s.RoomNumber || '—'}</td>
+                <td style="padding:6px 10px;text-align:center;"><input type="date" value="${startDate}" onchange="saveCCAPDate('${s.First_Name}','${s.Last_Name}',this.value)" style="padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.72rem;"></td>
+                <td style="padding:6px 10px;text-align:right;">${s.HouseholdIncome ? '$'+Number(s.HouseholdIncome).toLocaleString() : '—'}</td>
+                <td style="padding:6px 10px;text-align:center;">${s.HouseholdSize || '—'}</td>
+                <td style="padding:6px 10px;text-align:center;">${renewalStatus}</td>
+            </tr>`;
+        }).join('')}</tbody>
+    </table></div>`;
+    card.appendChild(div);
+}
+
+async function saveCCAPDate(firstName, lastName, dateValue) {
+    try {
+        const res = await apiFetch('/api/students/' + encodeURIComponent(firstName) + '/' + encodeURIComponent(lastName), {
+            method: 'PUT', body: JSON.stringify({ ccapStartDate: dateValue })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const s = students.find(x => x.First_Name === firstName && x.Last_Name === lastName);
+            if (s) s.CCAPStartDate = dateValue;
+            showNotification('CCAP date saved for ' + firstName + ' ' + lastName, 'success');
+        } else { showNotification('Failed to save', 'error'); }
+    } catch (e) { showNotification('Network error', 'error'); }
 }
 
 function renderRptSummer(rows) {
