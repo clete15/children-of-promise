@@ -373,7 +373,7 @@ function printMenus() {
         // Themed banner
         html += `<div style="background:${theme.accentBg};color:white;text-align:center;padding:10px 16px;border-radius:8px;margin-bottom:10px;font-size:16px;font-weight:700;letter-spacing:1px;font-family:'Fredoka',sans-serif;">${theme.banner}</div>`;
         // Header with logo and dates + themed emojis
-        html += `<div class="print-header"><img src="logo-sm.png" alt="Children of Promise"><h1 style="color:${theme.headerBg};">${theme.emojis.charAt(0)} ${dateRange} ${theme.emojis.charAt(theme.emojis.length-1)}</h1></div>`;
+        html += `<div class="print-header"><img src="logo-sm.png" alt="Children of Promise"><h1 style="color:${theme.headerBg};"><span style="font-family:sans-serif;font-size:36px;">${theme.emojis.substring(0,2)}</span> ${dateRange} <span style="font-family:sans-serif;font-size:36px;">${theme.emojis.substring(2)}</span></h1></div>`;
         html += `<div class="print-subtitle" style="color:${theme.headerBg};font-size:14px;font-family:'Fredoka',sans-serif;">${sec.title}</div>`;
         // Table with themed colors
         html += `<table style="border:2px solid ${theme.borderColor};">`;
