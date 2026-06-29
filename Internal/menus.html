@@ -305,6 +305,20 @@ async function loadMenus() {
 function getSeasonalTheme(weekStart) {
     const m = weekStart.getMonth();
     const d = weekStart.getDate();
+    // Check if a specific date falls within this Mon-Fri week
+    function weekContains(month, day) {
+        const target = new Date(weekStart.getFullYear(), month, day);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 4);
+        return target >= weekStart && target <= weekEnd;
+    }
+    // Also check if holiday is on the weekend right after this week (Sat/Sun)
+    function weekNear(month, day) {
+        const target = new Date(weekStart.getFullYear(), month, day);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6); // include Sat+Sun
+        return target >= weekStart && target <= weekEnd;
+    }
     // SVG corner art for each theme
     const svgSnowflakes = '<svg viewBox="0 0 60 60" width="50" height="50" style="opacity:0.3;"><path d="M30 5v50M5 30h50M12 12l36 36M48 12L12 48" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="30" cy="30" r="4" fill="currentColor"/><circle cx="30" cy="10" r="2" fill="currentColor"/><circle cx="30" cy="50" r="2" fill="currentColor"/><circle cx="10" cy="30" r="2" fill="currentColor"/><circle cx="50" cy="30" r="2" fill="currentColor"/></svg>';
     const svgLeaves = '<svg viewBox="0 0 60 60" width="50" height="50" style="opacity:0.3;"><path d="M10 50C10 50 20 10 50 10C50 10 40 30 30 40C20 50 10 50 10 50Z" fill="currentColor"/><path d="M15 45L45 15" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>';
@@ -316,14 +330,16 @@ function getSeasonalTheme(weekStart) {
     const svgPumpkin = '<svg viewBox="0 0 60 60" width="50" height="50" style="opacity:0.3;"><ellipse cx="30" cy="35" rx="20" ry="18" fill="currentColor"/><rect x="27" y="10" width="6" height="12" rx="2" fill="#16a34a"/><path d="M30 10C30 10 35 5 40 8" stroke="#16a34a" stroke-width="2" fill="none"/></svg>';
     const svgEgg = '<svg viewBox="0 0 60 60" width="50" height="50" style="opacity:0.3;"><ellipse cx="30" cy="32" rx="16" ry="22" fill="currentColor"/><path d="M14 28h32M14 36h32" stroke="white" stroke-width="2" stroke-dasharray="4,3"/></svg>';
 
-    // Holidays first
-    if (m === 6 && d <= 7) return { name:'4th of July', banner:'🎆 Happy 4th of July! 🇺🇸', headerBg:'#1e3a8a', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#1e3a8a,#dc2626,#1e3a8a)', emojis:'🎆🇺🇸🎇', cornerSvg:svgStar, cornerColor:'#1e3a8a' };
-    if (m === 9 && d >= 25) return { name:'Halloween', banner:'🎃 Happy Halloween! 👻', headerBg:'#1c1917', headerColor:'#fb923c', cellBg:'#fff7ed', borderColor:'#ea580c', accentBg:'linear-gradient(135deg,#1c1917,#ea580c)', emojis:'🎃👻🦇🕷️', cornerSvg:svgPumpkin, cornerColor:'#ea580c' };
+    // Holidays first (triggers if holiday falls within or adjacent to this week)
+    if (weekNear(6, 4)) return { name:'4th of July', banner:'🎆 Happy 4th of July! 🇺🇸', headerBg:'#1e3a8a', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#1e3a8a,#dc2626,#1e3a8a)', emojis:'🎆🇺🇸🎇', cornerSvg:svgStar, cornerColor:'#1e3a8a' };
+    if (weekNear(9, 31)) return { name:'Halloween', banner:'🎃 Happy Halloween! 👻', headerBg:'#1c1917', headerColor:'#fb923c', cellBg:'#fff7ed', borderColor:'#ea580c', accentBg:'linear-gradient(135deg,#1c1917,#ea580c)', emojis:'🎃👻🦇🕷️', cornerSvg:svgPumpkin, cornerColor:'#ea580c' };
+    if (weekNear(11, 25)) return { name:'Christmas', banner:'🎄 Merry Christmas! ⛄', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#14532d,#dc2626,#14532d)', emojis:'🎄⛄🎅🎁', cornerSvg:svgTree, cornerColor:'#14532d' };
+    if (weekNear(1, 14)) return { name:'Valentines', banner:'💕 Happy Valentine\'s Day! 💝', headerBg:'#831843', headerColor:'#fdf2f8', cellBg:'#fdf2f8', borderColor:'#ec4899', accentBg:'linear-gradient(135deg,#831843,#ec4899)', emojis:'💕💝🌹❤️', cornerSvg:svgHeart, cornerColor:'#ec4899' };
+    if (weekNear(2, 17)) return { name:'St Patricks', banner:'☘️ Happy St. Patrick\'s Day! 🌈', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#16a34a', accentBg:'linear-gradient(135deg,#14532d,#16a34a)', emojis:'☘️🌈🍀💚', cornerSvg:svgLeaves, cornerColor:'#16a34a' };
+    // Thanksgiving (4th Thursday of November)
     if (m === 10 && d >= 18 && d <= 28) return { name:'Thanksgiving', banner:'🦃 Happy Thanksgiving! 🍂', headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706', accentBg:'linear-gradient(135deg,#78350f,#d97706)', emojis:'🦃🍂🌽🥧', cornerSvg:svgLeaves, cornerColor:'#d97706' };
-    if (m === 11 && d >= 15) return { name:'Christmas', banner:'🎄 Merry Christmas! ⛄', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#14532d,#dc2626,#14532d)', emojis:'🎄⛄🎅🎁', cornerSvg:svgTree, cornerColor:'#14532d' };
-    if (m === 1 && d >= 7 && d <= 16) return { name:'Valentines', banner:'💕 Happy Valentine\'s Day! 💝', headerBg:'#831843', headerColor:'#fdf2f8', cellBg:'#fdf2f8', borderColor:'#ec4899', accentBg:'linear-gradient(135deg,#831843,#ec4899)', emojis:'💕💝🌹❤️', cornerSvg:svgHeart, cornerColor:'#ec4899' };
-    if (m === 2 && d >= 10 && d <= 20) return { name:'St Patricks', banner:'☘️ Happy St. Patrick\'s Day! 🌈', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#16a34a', accentBg:'linear-gradient(135deg,#14532d,#16a34a)', emojis:'☘️🌈🍀💚', cornerSvg:svgLeaves, cornerColor:'#16a34a' };
-    if (m === 3 && d >= 14 && d <= 21) return { name:'Easter', banner:'🐣 Happy Easter! 🌷', headerBg:'#581c87', headerColor:'#faf5ff', cellBg:'#faf5ff', borderColor:'#a855f7', accentBg:'linear-gradient(135deg,#581c87,#a855f7,#ec4899)', emojis:'🐣🌷🥚🐰', cornerSvg:svgEgg, cornerColor:'#a855f7' };
+    // Easter (approximate - mid April)
+    if (m === 3 && d >= 7 && d <= 21) return { name:'Easter', banner:'🐣 Happy Easter! 🌷', headerBg:'#581c87', headerColor:'#faf5ff', cellBg:'#faf5ff', borderColor:'#a855f7', accentBg:'linear-gradient(135deg,#581c87,#a855f7,#ec4899)', emojis:'🐣🌷🥚🐰', cornerSvg:svgEgg, cornerColor:'#a855f7' };
     // Seasons
     if (m >= 5 && m <= 7) return { name:'Summer', banner:'☀️ Summer Fun! 🌊', headerBg:'#1e40af', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#2563eb', accentBg:'linear-gradient(135deg,#0ea5e9,#2563eb)', emojis:'☀️🌊🍉🏖️', cornerSvg:svgSun, cornerColor:'#2563eb' };
     if (m >= 8 && m <= 10) return { name:'Fall', banner:'🍁 Fall Harvest 🌽', headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706', accentBg:'linear-gradient(135deg,#92400e,#d97706)', emojis:'🍁🌽🎃🍎', cornerSvg:svgLeaves, cornerColor:'#d97706' };
