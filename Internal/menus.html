@@ -410,6 +410,22 @@ function printMenus() {
 
 render();
 loadMenus();
+
+function applyTemplate(idx) {
+    ['pfa','other'].forEach(section => {
+        const template = TEMPLATES[section][idx];
+        DAYS.forEach((day, di) => {
+            const dayData = template[day] || {};
+            MEALS.forEach(meal => {
+                const key = meal.replace(/\s/g,'');
+                const el = document.getElementById(`${section}_${di}_${key}`);
+                if (el && !el.value) el.value = dayData[key] || '';
+            });
+        });
+    });
+}
+// Auto-load template 1 after loadMenus (fills empty fields only)
+setTimeout(() => applyTemplate(0), 500);
 </script>
 <div id="printArea"></div>
 </body>
