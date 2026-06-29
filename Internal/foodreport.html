@@ -129,7 +129,6 @@ function renderFoodReport() {
     }
 
     document.getElementById('fpBody').innerHTML =
-        '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #e5e7eb;">Food Program Summary</div>' +
         bar('Free', free, '#16a34a') +
         bar('Reduced', reduced, '#d97706') +
         bar('Paid', paid, '#2563eb') +
@@ -139,32 +138,69 @@ function renderFoodReport() {
 function renderFullRoster() {
     const active = students.filter(s => isTruthy(s.Active));
     const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
+    const roomOpts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.Room}</option>`).join('');
     document.getElementById('fpBody').innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;">Full Roster (${active.length} students)</div>
+            <div style="font-size:0.82rem;font-weight:600;color:#374151;">${active.length} active students</div>
             <button onclick="exportFoodExcel()" style="padding:5px 12px;background:#16a34a;color:white;border:none;border-radius:5px;font-size:0.72rem;font-weight:600;cursor:pointer;">📥 Export Excel</button>
         </div>
-        <div style="max-height:calc(100vh - 280px);overflow:auto;">
+        <div style="max-height:calc(100vh - 260px);overflow:auto;">
         <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
             <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb;position:sticky;top:0;z-index:1;">
-                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">First Name</th>
-                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Last Name</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Name</th>
                 <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">PFA/PI</th>
-                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Room</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;width:130px;">Room</th>
                 <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">F/R/P</th>
-                <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Income</th>
-                <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">HH</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;width:90px;">Income</th>
+                <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;width:50px;">HH</th>
+                <th style="padding:7px 6px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;width:45px;">Save</th>
             </tr></thead>
-            <tbody>${active.map(s => `<tr style="border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
-                <td style="padding:6px 10px;">${s.First_Name}</td>
-                <td style="padding:6px 10px;font-weight:600;">${s.Last_Name}</td>
+            <tbody>${active.map((s, i) => `<tr style="border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                <td style="padding:6px 10px;font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
                 <td style="padding:6px 10px;">${s.PFA_PI_na || '—'}</td>
-                <td style="padding:6px 10px;">${s.Room || '—'}</td>
+                <td style="padding:4px 6px;"><select id="frRoom_${i}" onchange="markFRChanged(${i})" style="padding:2px 4px;border:1px solid #d1d5db;border-radius:3px;font-size:0.7rem;width:100%;">${roomOpts}</select></td>
                 <td style="padding:6px 10px;font-weight:700;color:${frpColor(s.F_R_P_Food)};">${s.F_R_P_Food || '—'}</td>
-                <td style="padding:6px 10px;text-align:right;">${s.HouseholdIncome ? '$' + Number(s.HouseholdIncome).toLocaleString() : '—'}</td>
-                <td style="padding:6px 10px;text-align:center;">${s.HouseholdSize || '—'}</td>
+                <td style="padding:4px 6px;"><input type="number" id="frIncome_${i}" value="${s.HouseholdIncome || ''}" onchange="markFRChanged(${i})" style="width:80px;padding:2px 4px;border:1px solid #d1d5db;border-radius:3px;font-size:0.7rem;text-align:right;"></td>
+                <td style="padding:4px 6px;"><input type="number" id="frHH_${i}" value="${s.HouseholdSize || ''}" min="1" max="15" onchange="markFRChanged(${i})" style="width:40px;padding:2px 4px;border:1px solid #d1d5db;border-radius:3px;font-size:0.7rem;text-align:center;"></td>
+                <td style="padding:4px 6px;text-align:center;"><button id="frSave_${i}" onclick="saveFRRow(${i})" disabled style="padding:3px 6px;background:#2563eb;color:white;border:none;border-radius:3px;font-size:0.63rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button></td>
             </tr>`).join('')}</tbody>
         </table></div>`;
+    // Set room dropdowns
+    active.forEach((s, i) => {
+        const sel = document.getElementById('frRoom_' + i);
+        if (sel) sel.value = s.RoomNumber || '';
+    });
+}
+
+function markFRChanged(i) {
+    const btn = document.getElementById('frSave_' + i);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+}
+
+async function saveFRRow(i) {
+    const active = students.filter(s => isTruthy(s.Active));
+    const s = active[i];
+    if (!s) return;
+    const newIncome = document.getElementById('frIncome_' + i).value;
+    const newHH = document.getElementById('frHH_' + i).value;
+    const newRoom = document.getElementById('frRoom_' + i).value;
+    const btn = document.getElementById('frSave_' + i);
+    btn.disabled = true; btn.textContent = '…';
+    try {
+        const res = await apiFetch('/api/students/' + encodeURIComponent(s.First_Name) + '/' + encodeURIComponent(s.Last_Name), {
+            method: 'PUT', body: JSON.stringify({ householdIncome: newIncome, householdSize: newHH, roomNumber: newRoom })
+        });
+        const data = await res.json();
+        if (data.success) {
+            s.HouseholdIncome = newIncome;
+            s.HouseholdSize = newHH;
+            s.RoomNumber = newRoom;
+            const cr = classrooms.find(c => String(c.RoomNumber) === String(newRoom));
+            if (cr) s.Room = cr.Room;
+            btn.style.opacity = '0.3';
+        } else { btn.disabled = false; btn.style.opacity = '1'; }
+    } catch (e) { btn.disabled = false; btn.style.opacity = '1'; }
+    finally { btn.textContent = 'Save'; }
 }
 
 function exportFoodExcel() {
