@@ -30,7 +30,7 @@
         .menu-meal { padding:5px 8px;border-bottom:1px solid #f3f4f6; }
         .menu-meal:last-child { border-bottom:none; }
         .menu-meal-label { font-size:0.58rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:2px; }
-        .menu-meal textarea { width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;font-size:0.7rem;font-family:inherit;resize:vertical;min-height:56px;transition:border-color 0.15s; }
+        .menu-meal textarea { width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;font-size:0.7rem;font-family:inherit;resize:vertical;min-height:80px;transition:border-color 0.15s; }
         .menu-meal textarea:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
         .seasonal-banner { text-align:center;padding:8px;font-size:0.8rem;font-weight:700;border-radius:6px;margin-bottom:12px; }
 
@@ -342,20 +342,20 @@ function getSeasonalTheme(weekStart) {
     const svgEgg = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><ellipse cx="30" cy="32" rx="18" ry="24" fill="currentColor"/><path d="M12 26h36" stroke="white" stroke-width="2.5"/><path d="M12 38h36" stroke="white" stroke-width="2.5"/><circle cx="20" cy="32" r="3" fill="white" opacity="0.7"/><circle cx="30" cy="32" r="3" fill="white" opacity="0.7"/><circle cx="40" cy="32" r="3" fill="white" opacity="0.7"/></svg>';
 
     // Holidays first (triggers if holiday falls within or adjacent to this week)
-    if (weekNear(6, 4)) return { name:'4th of July', banner:'🎆 Happy 4th of July! 🇺🇸', headerBg:'#1e3a8a', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#1e3a8a,#dc2626,#1e3a8a)', emojis:'🎆🇺🇸🎇', cornerSvg:svgStar, cornerColor:'#1e3a8a' };
-    if (weekNear(9, 31)) return { name:'Halloween', banner:'🎃 Happy Halloween! 👻', headerBg:'#1c1917', headerColor:'#fb923c', cellBg:'#fff7ed', borderColor:'#ea580c', accentBg:'linear-gradient(135deg,#1c1917,#ea580c)', emojis:'🎃👻🦇🕷️', cornerSvg:svgPumpkin, cornerColor:'#ea580c' };
-    if (weekNear(11, 25)) return { name:'Christmas', banner:'🎄 Merry Christmas! ⛄', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#14532d,#dc2626,#14532d)', emojis:'🎄⛄🎅🎁', cornerSvg:svgTree, cornerColor:'#14532d' };
-    if (weekNear(1, 14)) return { name:'Valentines', banner:'💕 Happy Valentine\'s Day! 💝', headerBg:'#831843', headerColor:'#fdf2f8', cellBg:'#fdf2f8', borderColor:'#ec4899', accentBg:'linear-gradient(135deg,#831843,#ec4899)', emojis:'💕💝🌹❤️', cornerSvg:svgHeart, cornerColor:'#ec4899' };
-    if (weekNear(2, 17)) return { name:'St Patricks', banner:'☘️ Happy St. Patrick\'s Day! 🌈', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#16a34a', accentBg:'linear-gradient(135deg,#14532d,#16a34a)', emojis:'☘️🌈🍀💚', cornerSvg:svgLeaves, cornerColor:'#16a34a' };
+    if (weekNear(6, 4)) return { name:'4th of July', banner:'🎆 Happy 4th of July!', headerBg:'#1e3a8a', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#1e3a8a,#dc2626,#1e3a8a)', leftEmoji:'🎆', rightEmoji:'🎇', cornerSvg:svgStar, cornerColor:'#1e3a8a' };
+    if (weekNear(9, 31)) return { name:'Halloween', banner:'🎃 Happy Halloween! 👻', headerBg:'#1c1917', headerColor:'#fb923c', cellBg:'#fff7ed', borderColor:'#ea580c', accentBg:'linear-gradient(135deg,#1c1917,#ea580c)', leftEmoji:'🎃', rightEmoji:'👻', cornerSvg:svgPumpkin, cornerColor:'#ea580c' };
+    if (weekNear(11, 25)) return { name:'Christmas', banner:'🎄 Merry Christmas! ⛄', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#14532d,#dc2626,#14532d)', leftEmoji:'🎄', rightEmoji:'🎅', cornerSvg:svgTree, cornerColor:'#14532d' };
+    if (weekNear(1, 14)) return { name:'Valentines', banner:'💕 Happy Valentine\'s Day! 💝', headerBg:'#831843', headerColor:'#fdf2f8', cellBg:'#fdf2f8', borderColor:'#ec4899', accentBg:'linear-gradient(135deg,#831843,#ec4899)', leftEmoji:'💕', rightEmoji:'💝', cornerSvg:svgHeart, cornerColor:'#ec4899' };
+    if (weekNear(2, 17)) return { name:'St Patricks', banner:'☘️ Happy St. Patrick\'s Day! 🌈', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#16a34a', accentBg:'linear-gradient(135deg,#14532d,#16a34a)', leftEmoji:'☘️', rightEmoji:'🌈', cornerSvg:svgLeaves, cornerColor:'#16a34a' };
     // Thanksgiving (4th Thursday of November)
-    if (m === 10 && d >= 18 && d <= 28) return { name:'Thanksgiving', banner:'🦃 Happy Thanksgiving! 🍂', headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706', accentBg:'linear-gradient(135deg,#78350f,#d97706)', emojis:'🦃🍂🌽🥧', cornerSvg:svgLeaves, cornerColor:'#d97706' };
+    if (m === 10 && d >= 18 && d <= 28) return { name:'Thanksgiving', banner:'🦃 Happy Thanksgiving! 🍂', headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706', accentBg:'linear-gradient(135deg,#78350f,#d97706)', leftEmoji:'🦃', rightEmoji:'🍂', cornerSvg:svgLeaves, cornerColor:'#d97706' };
     // Easter (approximate - mid April)
-    if (m === 3 && d >= 7 && d <= 21) return { name:'Easter', banner:'🐣 Happy Easter! 🌷', headerBg:'#581c87', headerColor:'#faf5ff', cellBg:'#faf5ff', borderColor:'#a855f7', accentBg:'linear-gradient(135deg,#581c87,#a855f7,#ec4899)', emojis:'🐣🌷🥚🐰', cornerSvg:svgEgg, cornerColor:'#a855f7' };
+    if (m === 3 && d >= 7 && d <= 21) return { name:'Easter', banner:'🐣 Happy Easter! 🌷', headerBg:'#581c87', headerColor:'#faf5ff', cellBg:'#faf5ff', borderColor:'#a855f7', accentBg:'linear-gradient(135deg,#581c87,#a855f7,#ec4899)', leftEmoji:'🐣', rightEmoji:'🐰', cornerSvg:svgEgg, cornerColor:'#a855f7' };
     // Seasons
-    if (m >= 5 && m <= 7) return { name:'Summer', banner:'☀️ Summer Fun! 🌊', headerBg:'#1e40af', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#2563eb', accentBg:'linear-gradient(135deg,#0ea5e9,#2563eb)', emojis:'☀️🌊🍉🏖️', cornerSvg:svgSun, cornerColor:'#2563eb' };
-    if (m >= 8 && m <= 10) return { name:'Fall', banner:'🍁 Fall Harvest 🌽', headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706', accentBg:'linear-gradient(135deg,#92400e,#d97706)', emojis:'🍁🌽🎃🍎', cornerSvg:svgLeaves, cornerColor:'#d97706' };
-    if (m >= 11 || m <= 1) return { name:'Winter', banner:'❄️ Winter Wonderland ⛄', headerBg:'#1e3a5f', headerColor:'#e0f2fe', cellBg:'#f0f9ff', borderColor:'#0284c7', accentBg:'linear-gradient(135deg,#1e3a5f,#0284c7)', emojis:'❄️⛄🌨️☕', cornerSvg:svgSnowflakes, cornerColor:'#0284c7' };
-    return { name:'Spring', banner:'🌸 Spring is Here! 🐝', headerBg:'#4c1d95', headerColor:'#faf5ff', cellBg:'#fdf4ff', borderColor:'#a855f7', accentBg:'linear-gradient(135deg,#7c3aed,#ec4899)', emojis:'🌸🐝🌷🦋', cornerSvg:svgFlower, cornerColor:'#a855f7' };
+    if (m >= 5 && m <= 7) return { name:'Summer', banner:'☀️ Summer Fun! 🌊', headerBg:'#1e40af', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#2563eb', accentBg:'linear-gradient(135deg,#0ea5e9,#2563eb)', leftEmoji:'☀️', rightEmoji:'🌊', cornerSvg:svgSun, cornerColor:'#2563eb' };
+    if (m >= 8 && m <= 10) return { name:'Fall', banner:'🍁 Fall Harvest 🌽', headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706', accentBg:'linear-gradient(135deg,#92400e,#d97706)', leftEmoji:'🍁', rightEmoji:'🍎', cornerSvg:svgLeaves, cornerColor:'#d97706' };
+    if (m >= 11 || m <= 1) return { name:'Winter', banner:'❄️ Winter Wonderland ⛄', headerBg:'#1e3a5f', headerColor:'#e0f2fe', cellBg:'#f0f9ff', borderColor:'#0284c7', accentBg:'linear-gradient(135deg,#1e3a5f,#0284c7)', leftEmoji:'❄️', rightEmoji:'⛄', cornerSvg:svgSnowflakes, cornerColor:'#0284c7' };
+    return { name:'Spring', banner:'🌸 Spring is Here! 🐝', headerBg:'#4c1d95', headerColor:'#faf5ff', cellBg:'#fdf4ff', borderColor:'#a855f7', accentBg:'linear-gradient(135deg,#7c3aed,#ec4899)', leftEmoji:'🌸', rightEmoji:'🦋', cornerSvg:svgFlower, cornerColor:'#a855f7' };
 }
 
 function printMenus() {
@@ -382,7 +382,7 @@ function printMenus() {
         // Themed banner
         html += `<div style="background:${theme.accentBg};color:white;text-align:center;padding:8px 16px;border-radius:8px;margin-bottom:6px;font-size:16px;font-weight:700;letter-spacing:1px;font-family:'Fredoka',sans-serif;">${theme.banner}</div>`;
         // Header with logo and dates + themed emojis
-        html += `<div class="print-header"><img src="logo-sm.png" alt="Children of Promise"><h1 style="color:${theme.headerBg};"><span style="font-family:sans-serif;font-size:36px;">${theme.emojis.substring(0,2)}</span> ${dateRange} <span style="font-family:sans-serif;font-size:36px;">${theme.emojis.substring(2)}</span></h1></div>`;
+        html += `<div class="print-header"><img src="logo-sm.png" alt="Children of Promise"><h1 style="color:${theme.headerBg};"><span style="font-family:sans-serif;font-size:52px;vertical-align:middle;">${theme.leftEmoji || ''}</span> ${dateRange} <span style="font-family:sans-serif;font-size:52px;vertical-align:middle;">${theme.rightEmoji || ''}</span></h1></div>`;
         html += `<div class="print-subtitle" style="color:${theme.headerBg};font-size:14px;font-family:'Fredoka',sans-serif;">${sec.title}</div>`;
         // Table with themed colors
         html += `<table style="border:2px solid ${theme.borderColor};">`;
