@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Menus – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        .menu-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px;min-height:calc(100vh - 90px); }
+        .menu-container { background:white;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);width:100%;max-width:1100px;overflow:hidden; }
+        .menu-header { padding:16px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px; }
+        .menu-header h2 { font-size:1.1rem;font-weight:800;color:#1e3a8a;margin:0; }
+        .menu-controls { display:flex;gap:8px;align-items:center; }
+        .menu-controls button { padding:6px 14px;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s; }
+        .btn-primary { background:#2563eb;color:white; }
+        .btn-primary:hover { background:#1d4ed8; }
+        .btn-green { background:#16a34a;color:white; }
+        .btn-green:hover { background:#15803d; }
+        .btn-purple { background:#7c3aed;color:white; }
+        .btn-purple:hover { background:#6d28d9; }
+        .menu-controls select, .menu-controls input { padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.78rem; }
+        .menu-body { padding:24px;overflow-y:auto;max-height:calc(100vh - 180px); }
+        .menu-section { margin-bottom:28px; }
+        .menu-section-title { font-size:0.85rem;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #2563eb; }
+        .menu-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:8px; }
+        .menu-day { border:1px solid #e5e7eb;border-radius:8px;overflow:hidden; }
+        .menu-day-header { background:#f1f5f9;padding:8px 10px;font-size:0.72rem;font-weight:700;color:#374151;text-align:center;border-bottom:1px solid #e5e7eb; }
+        .menu-day-header .day-date { font-size:0.65rem;font-weight:400;color:#6b7280;margin-top:2px; }
+        .menu-meal { padding:6px 8px;border-bottom:1px solid #f3f4f6; }
+        .menu-meal:last-child { border-bottom:none; }
+        .menu-meal-label { font-size:0.6rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:3px; }
+        .menu-meal textarea { width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;font-size:0.72rem;font-family:inherit;resize:vertical;min-height:36px;transition:border-color 0.15s; }
+        .menu-meal textarea:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+
+        @media print {
+            body { background:white !important; }
+            .site-header, .menu-controls, .header-back { display:none !important; }
+            .menu-layout { padding:0; }
+            .menu-container { box-shadow:none;border-radius:0;max-width:100%; }
+            .menu-body { max-height:none;overflow:visible; }
+            .menu-section { page-break-inside:avoid; }
+            .menu-meal textarea { border:1px solid #ccc;min-height:30px; }
+            .menu-header { border-bottom:2px solid #000; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/ems.html">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Weekly Menu Planner &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/ems.html">← Back to EMS</a>
+</header>
+
+<div class="menu-layout">
+    <div class="menu-container">
+        <div class="menu-header">
+            <h2>🍽️ Weekly Menu — <span id="weekLabel"></span></h2>
+            <div class="menu-controls">
+                <button class="btn-primary" onclick="prevWeek()">← Prev</button>
+                <button class="btn-primary" onclick="nextWeek()">Next →</button>
+                <button class="btn-primary" onclick="goToThisWeek()">This Week</button>
+                <button class="btn-green" onclick="saveMenus()">💾 Save</button>
+                <button class="btn-purple" onclick="window.print()">🖨️ Print</button>
+            </div>
+        </div>
+        <div class="menu-body">
+            <div class="menu-section">
+                <div class="menu-section-title">📚 PFA Classroom (Pre-School)</div>
+                <div class="menu-grid" id="pfaGrid"></div>
+            </div>
+            <div class="menu-section">
+                <div class="menu-section-title">🏫 All Other Rooms (Infant through B&A)</div>
+                <div class="menu-grid" id="otherGrid"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const AUTH = 'Basic ' + btoa(':cofpadmin');
+function apiFetch(url, opts = {}) {
+    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
+    return fetch(url, opts);
+}
+
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+const MEALS = ['Breakfast','Lunch','PM Snack'];
+let currentWeekStart = getMonday(new Date());
+
+function getMonday(d) {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+}
+
+function formatDate(d) {
+    return (d.getMonth()+1) + '/' + d.getDate();
+}
+
+function getWeekKey() {
+    return currentWeekStart.toISOString().split('T')[0];
+}
+
+function prevWeek() {
+    currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+    render();
+    loadMenus();
+}
+
+function nextWeek() {
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    render();
+    loadMenus();
+}
+
+function goToThisWeek() {
+    currentWeekStart = getMonday(new Date());
+    render();
+    loadMenus();
+}
+
+function render() {
+    const dates = [];
+    for (let i = 0; i < 5; i++) {
+        const d = new Date(currentWeekStart);
+        d.setDate(d.getDate() + i);
+        dates.push(d);
+    }
+    const endDate = dates[4];
+    document.getElementById('weekLabel').textContent = formatDate(currentWeekStart) + ' – ' + formatDate(endDate) + ', ' + currentWeekStart.getFullYear();
+
+    ['pfa','other'].forEach(section => {
+        const grid = document.getElementById(section + 'Grid');
+        grid.innerHTML = dates.map((d, di) => {
+            const dayName = DAYS[di];
+            const dateStr = formatDate(d);
+            return `<div class="menu-day">
+                <div class="menu-day-header">${dayName}<div class="day-date">${dateStr}</div></div>
+                ${MEALS.map(meal => `<div class="menu-meal">
+                    <div class="menu-meal-label">${meal}</div>
+                    <textarea id="${section}_${di}_${meal.replace(/\s/g,'')}" placeholder="${meal}..."></textarea>
+                </div>`).join('')}
+            </div>`;
+        }).join('');
+    });
+}
+
+async function saveMenus() {
+    const weekKey = getWeekKey();
+    const data = { week: weekKey, pfa: {}, other: {} };
+    ['pfa','other'].forEach(section => {
+        for (let di = 0; di < 5; di++) {
+            MEALS.forEach(meal => {
+                const key = DAYS[di] + '_' + meal.replace(/\s/g,'');
+                const el = document.getElementById(`${section}_${di}_${meal.replace(/\s/g,'')}`);
+                if (el) data[section][key] = el.value;
+            });
+        }
+    });
+    try {
+        const res = await apiFetch('/api/menus', { method: 'POST', body: JSON.stringify(data) });
+        const result = await res.json();
+        if (result.success) {
+            const btn = document.querySelector('.btn-green');
+            btn.textContent = '✓ Saved!';
+            setTimeout(() => btn.textContent = '💾 Save', 2000);
+        }
+    } catch (e) { alert('Failed to save: ' + e.message); }
+}
+
+async function loadMenus() {
+    const weekKey = getWeekKey();
+    try {
+        const res = await apiFetch('/api/menus?week=' + encodeURIComponent(weekKey));
+        const data = await res.json();
+        if (data && data.pfa) {
+            ['pfa','other'].forEach(section => {
+                const sectionData = data[section] || {};
+                for (let di = 0; di < 5; di++) {
+                    MEALS.forEach(meal => {
+                        const key = DAYS[di] + '_' + meal.replace(/\s/g,'');
+                        const el = document.getElementById(`${section}_${di}_${meal.replace(/\s/g,'')}`);
+                        if (el && sectionData[key]) el.value = sectionData[key];
+                    });
+                }
+            });
+        }
+    } catch (e) { /* no saved menu for this week */ }
+}
+
+render();
+loadMenus();
+</script>
+</body>
+</html>

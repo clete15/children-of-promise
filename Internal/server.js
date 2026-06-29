@@ -979,6 +979,59 @@ function handleRequest(req, res) {
         return;
     }
 
+    // GET weekly menus (internal - protected)
+    if (req.method === 'GET' && url.startsWith('/api/menus')) {
+        if (!checkAuth(req, res)) return;
+        const query = req.url.split('?')[1] || '';
+        const params = new URLSearchParams(query);
+        const week = params.get('week') || '';
+        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='WeeklyMenus')
+            CREATE TABLE WeeklyMenus (
+                Id INT IDENTITY(1,1) PRIMARY KEY,
+                WeekKey NVARCHAR(20) NOT NULL UNIQUE,
+                PfaData NVARCHAR(MAX),
+                OtherData NVARCHAR(MAX),
+                UpdatedAt DATETIME DEFAULT GETDATE()
+            );
+            SELECT PfaData,OtherData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const lines = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()) && l.includes('|'));
+        if (!lines.length) return sendJSON(res, 200, {});
+        const v = lines[0].split('|').map(x => x.trim());
+        try {
+            return sendJSON(res, 200, { pfa: JSON.parse(v[0] || '{}'), other: JSON.parse(v[1] || '{}') });
+        } catch(e) { return sendJSON(res, 200, {}); }
+    }
+
+    // POST save weekly menus (internal - protected)
+    if (req.method === 'POST' && url === '/api/menus') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const week = d.week || '';
+            const pfaJson = JSON.stringify(d.pfa || {}).replace(/'/g, "''");
+            const otherJson = JSON.stringify(d.other || {}).replace(/'/g, "''");
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='WeeklyMenus')
+                CREATE TABLE WeeklyMenus (
+                    Id INT IDENTITY(1,1) PRIMARY KEY,
+                    WeekKey NVARCHAR(20) NOT NULL UNIQUE,
+                    PfaData NVARCHAR(MAX),
+                    OtherData NVARCHAR(MAX),
+                    UpdatedAt DATETIME DEFAULT GETDATE()
+                );
+                IF EXISTS (SELECT 1 FROM WeeklyMenus WHERE WeekKey=${esc(week)})
+                    UPDATE WeeklyMenus SET PfaData='${pfaJson}',OtherData='${otherJson}',UpdatedAt=GETDATE() WHERE WeekKey=${esc(week)}
+                ELSE
+                    INSERT INTO WeeklyMenus (WeekKey,PfaData,OtherData) VALUES (${esc(week)},'${pfaJson}','${otherJson}')`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     // GET active conference for parent portal (public - code-authenticated via query)
     if (req.method === 'GET' && url === '/api/parent-portal/conference') {
         const query = req.url.split('?')[1] || '';
