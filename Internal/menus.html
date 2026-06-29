@@ -8,18 +8,16 @@
     <style>
         body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
         .menu-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px;min-height:calc(100vh - 90px); }
-        .menu-container { background:white;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);width:100%;max-width:1100px;overflow:hidden; }
+        .menu-container { background:white;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);width:100%;max-width:1200px;overflow:hidden; }
         .menu-header { padding:16px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px; }
         .menu-header h2 { font-size:1.1rem;font-weight:800;color:#1e3a8a;margin:0; }
-        .menu-controls { display:flex;gap:8px;align-items:center; }
-        .menu-controls button { padding:6px 14px;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s; }
+        .menu-controls { display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
+        .menu-controls button, .menu-controls a { padding:6px 14px;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-block; }
         .btn-primary { background:#2563eb;color:white; }
         .btn-primary:hover { background:#1d4ed8; }
         .btn-green { background:#16a34a;color:white; }
-        .btn-green:hover { background:#15803d; }
         .btn-purple { background:#7c3aed;color:white; }
-        .btn-purple:hover { background:#6d28d9; }
-        .menu-controls select, .menu-controls input { padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.78rem; }
+        .btn-orange { background:#ea580c;color:white; }
         .menu-body { padding:24px;overflow-y:auto;max-height:calc(100vh - 180px); }
         .menu-section { margin-bottom:28px; }
         .menu-section-title { font-size:0.85rem;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #2563eb; }
@@ -27,21 +25,24 @@
         .menu-day { border:1px solid #e5e7eb;border-radius:8px;overflow:hidden; }
         .menu-day-header { background:#f1f5f9;padding:8px 10px;font-size:0.72rem;font-weight:700;color:#374151;text-align:center;border-bottom:1px solid #e5e7eb; }
         .menu-day-header .day-date { font-size:0.65rem;font-weight:400;color:#6b7280;margin-top:2px; }
-        .menu-meal { padding:6px 8px;border-bottom:1px solid #f3f4f6; }
+        .menu-day.holiday .menu-day-header { background:#fef2f2;color:#dc2626; }
+        .menu-meal { padding:5px 8px;border-bottom:1px solid #f3f4f6; }
         .menu-meal:last-child { border-bottom:none; }
-        .menu-meal-label { font-size:0.6rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:3px; }
-        .menu-meal textarea { width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;font-size:0.72rem;font-family:inherit;resize:vertical;min-height:36px;transition:border-color 0.15s; }
+        .menu-meal-label { font-size:0.58rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:2px; }
+        .menu-meal textarea { width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;font-size:0.7rem;font-family:inherit;resize:vertical;min-height:48px;transition:border-color 0.15s; }
         .menu-meal textarea:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .seasonal-banner { text-align:center;padding:8px;font-size:0.8rem;font-weight:700;border-radius:6px;margin-bottom:12px; }
 
         @media print {
-            body { background:white !important; }
+            body { background:white !important; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
             .site-header, .menu-controls, .header-back { display:none !important; }
             .menu-layout { padding:0; }
             .menu-container { box-shadow:none;border-radius:0;max-width:100%; }
-            .menu-body { max-height:none;overflow:visible; }
-            .menu-section { page-break-inside:avoid; }
-            .menu-meal textarea { border:1px solid #ccc;min-height:30px; }
-            .menu-header { border-bottom:2px solid #000; }
+            .menu-body { max-height:none;overflow:visible;padding:12px; }
+            .menu-section { page-break-inside:avoid;margin-bottom:20px; }
+            .menu-meal textarea { border:1px solid #ccc;min-height:40px;font-size:0.68rem; }
+            .menu-header { border-bottom:2px solid #000;padding:10px 16px; }
+            .menu-grid { gap:4px; }
         }
     </style>
 </head>
@@ -68,9 +69,11 @@
                 <button class="btn-primary" onclick="goToThisWeek()">This Week</button>
                 <button class="btn-green" onclick="saveMenus()">💾 Save</button>
                 <button class="btn-purple" onclick="window.print()">🖨️ Print</button>
+                <button class="btn-orange" onclick="loadTemplate()">📋 Load Template</button>
             </div>
         </div>
         <div class="menu-body">
+            <div id="seasonalBanner"></div>
             <div class="menu-section">
                 <div class="menu-section-title">📚 PFA Classroom (Pre-School)</div>
                 <div class="menu-grid" id="pfaGrid"></div>
@@ -91,8 +94,100 @@ function apiFetch(url, opts = {}) {
 }
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-const MEALS = ['Breakfast','Lunch','PM Snack'];
+const MEALS = ['Breakfast','AM Snack','Lunch','PM Snack'];
 let currentWeekStart = getMonday(new Date());
+
+// 4-week rotating templates
+const TEMPLATES = {
+    pfa: [
+        // Week 1
+        {
+            Monday: { Breakfast:'Cereal\nFresh Fruit\nMilk', AMSnack:'Brown Sugar/Cinnamon\nCrunchy Biscuits\nApple Juice', Lunch:'Bologna/Cheese Sandwich\nCorn\nMango\nMilk', PMSnack:'Chex Mix\nWater' },
+            Tuesday: { Breakfast:'Cereal\nFresh Fruit\nMilk', AMSnack:'Rice Krispies\nGoGurt\nGrape Juice', Lunch:'Fish Sticks\nFrench Fries\nPears\nMilk', PMSnack:'Whole Wheat Toast\nApple Butter\nWater' },
+            Wednesday: { Breakfast:'Cereal\nFresh Fruit\nMilk', AMSnack:'Teddy Grahams\nApple Juice', Lunch:'Beef and Noodles\nGreen Beans\nPeaches\nMilk', PMSnack:'Multigrain Crackers\nColby/Jack Cheese\nWater' },
+            Thursday: { Breakfast:'Cereal\nFresh Fruit\nMilk', AMSnack:'Pretzels\nString Cheese\nGrape Juice', Lunch:'Pizza\nPeas\nFruit Cocktail\nMilk', PMSnack:'Rice Cakes\nPeanut Butter\nWater' },
+            Friday: { Breakfast:'', AMSnack:'', Lunch:'', PMSnack:'' }
+        },
+        // Week 2
+        {
+            Monday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Nutrigrain Bar\nApple Juice', Lunch:'Ham/Cheese Sandwich\nCorn\nMango\nMilk', PMSnack:'French Toast Sticks\nWater' },
+            Tuesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Doritos\nFruit/Yogurt Snacks\nGrape Juice', Lunch:'Chicken Nuggets\nFrench Fries\nPears\nMilk', PMSnack:'PBJ Squares\nWater' },
+            Wednesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Scooby Snacks\nRaisins\nApple Juice', Lunch:'Mostaccioli\nGreen Beans\nPeaches\nMilk', PMSnack:'Yogurt\nGranola\nWater' },
+            Thursday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Wheat Round Crackers\nCheese Cubes\nGrape Juice', Lunch:'BBQ\nCarrots\nApple Sauce\nMilk', PMSnack:'WG Rice Cakes\nPB\nWater' },
+            Friday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Goldfish\nCucumber/Ranch\nApple Juice', Lunch:'Sloppy Joes\nTator Tots\nPineapple\nMilk', PMSnack:'Bagels\nCream Cheese\nWater' }
+        },
+        // Week 3
+        {
+            Monday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Iced Oatmeal Bars\nApple Juice', Lunch:'Chicken/Cheese Sandwich\nCorn\nMango\nMilk', PMSnack:'Chex Mix\nWater' },
+            Tuesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Baked Cheetos\nFruit/Yogurt Snacks\nGrape Juice', Lunch:'Hot Dogs\nTator Tots\nFruit Cocktail\nMilk', PMSnack:'Wheat Crackers\nColby/Jack Cheese Slices\nWater' },
+            Wednesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Whole Grain Honey\nTeddy Grahams\nApple Juice', Lunch:'Tuna Noodle Casserole\nPeas\nPears\nMilk', PMSnack:'English Muffins\nButter/Jelly\nWater' },
+            Thursday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Pretzels\nString Cheese\nGrape Juice', Lunch:'Ham\nCarrots\nApple Sauce\nMilk', PMSnack:'Rice Cakes\nPeanut Butter\nWater' },
+            Friday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Whole Grain Sun Chips\nBroccoli/Ranch\nApple Juice', Lunch:'Pizza\nGreen Beans\nPineapple\nMilk', PMSnack:'Pita Crackers\nHummus\nWater' }
+        },
+        // Week 4
+        {
+            Monday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Nutrigrain Bar\nApple Juice', Lunch:'Turkey/Cheese Sandwich\nCorn\nMango\nMilk', PMSnack:'French Toast Sticks\nWater' },
+            Tuesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Ranch Doritos\nFruit/Yogurt Snacks\nGrape Juice', Lunch:'Salisbury Steak\nPeas\nPears\nMilk', PMSnack:'Goldfish\nWater' },
+            Wednesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'WG Scooby Cookies\nRaisins\nApple Juice', Lunch:'Spaghetti\nGreen Beans\nPeaches\nMilk', PMSnack:'Wheat Round Crackers\nCheese Cubes\nWater' },
+            Thursday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'WG Rice Cakes\nGrape Juice', Lunch:'Chicken Patty on Bun\nCarrots\nApple Sauce\nMilk', PMSnack:'Yogurt\nGranola\nWater' },
+            Friday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'WG Cheese Its\nGrapes\nApple Juice', Lunch:'Tacos\nRefried Beans\nPineapple\nMilk', PMSnack:'PBJ Squares\nWater' }
+        }
+    ],
+    other: [
+        // Week 1
+        {
+            Monday: { Breakfast:'Cereal\nFresh Fruit\nMilk', AMSnack:'Iced Oatmeal Bars\nApple Juice', Lunch:'Bologna/Cheese Sandwich\nCorn\nMango\nMilk', PMSnack:'Chex Mix\nWater' },
+            Tuesday: { Breakfast:'Cereal\nFresh Fruit\nMilk', AMSnack:'Fig Newtons\nGrape Juice', Lunch:'Fish Sticks\nFrench Fries\nPears\nMilk', PMSnack:'Toast\nApple Butter\nWater' },
+            Wednesday: { Breakfast:'Cereal\nFresh Fruit\nMilk', AMSnack:'Teddy Grahams\nApple Juice', Lunch:'Beef and Noodles\nGreen Beans\nPeaches\nMilk', PMSnack:'Wheat Round Crackers\nCheese Cubes\nWater' },
+            Thursday: { Breakfast:'Cereal\nFresh Fruit\nMilk', AMSnack:'Pretzels\nString Cheese\nGrape Juice', Lunch:'Pizza\nPeas\nFruit Cocktail\nMilk', PMSnack:'Rice Cakes\nPeanut Butter\nWater' },
+            Friday: { Breakfast:'', AMSnack:'', Lunch:'', PMSnack:'' }
+        },
+        // Week 2
+        {
+            Monday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Nutrigrain Bars\nApple Juice', Lunch:'Ham/Cheese Sandwich\nCorn\nMango\nMilk', PMSnack:'French Toast Sticks\nWater' },
+            Tuesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Vanilla Wafers\nGrape Juice', Lunch:'Chicken Nuggets\nFrench Fries\nPears\nMilk', PMSnack:'PBJ Squares\nWater' },
+            Wednesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Cinnamon Grahams\nRaisins\nApple Juice', Lunch:'Mostaccioli\nGreen Beans\nPeaches\nMilk', PMSnack:'Yogurt\nGranola\nWater' },
+            Thursday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Round Crackers\nCheese Cubes\nGrape Juice', Lunch:'BBQ\nCarrots\nApple Sauce\nMilk', PMSnack:'WG Rice Cakes\nPB\nWater' },
+            Friday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Goldfish\nApple Juice', Lunch:'Sloppy Joes\nTator Tots\nPineapple\nMilk', PMSnack:'Bagel\nCream Cheese\nWater' }
+        },
+        // Week 3
+        {
+            Monday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Iced Oatmeal Bars\nApple Juice', Lunch:'Chicken/Cheese Sandwich\nCorn\nMango\nMilk', PMSnack:'Chex Mix\nWater' },
+            Tuesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Fig Newtons\nGrape Juice', Lunch:'Hot Dogs\nTator Tots\nFruit Cocktail\nMilk', PMSnack:'Wheat Crackers\nCheese Slices\nWater' },
+            Wednesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Teddy Grahams\nApple Juice', Lunch:'Tuna Noodle Casserole\nPeas\nPears\nMilk', PMSnack:'English Muffins\nButter/Jelly\nWater' },
+            Thursday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Pretzels\nString Cheese\nGrape Juice', Lunch:'Ham\nCarrots\nApple Sauce\nMilk', PMSnack:'Rice Cakes\nPeanut Butter\nWater' },
+            Friday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Cheddar Sun Chips\nApple Juice', Lunch:'Pizza\nGreen Beans\nPineapple\nMilk', PMSnack:'Pita Crackers\nHummus\nWater' }
+        },
+        // Week 4
+        {
+            Monday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Nutrigrain Bar\nApple Juice', Lunch:'Turkey/Cheese Sandwich\nCorn\nMango\nMilk', PMSnack:'French Toast Sticks\nWater' },
+            Tuesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Vanilla Wafers\nGrape Juice', Lunch:'Salisbury Steak\nPeas\nPears\nMilk', PMSnack:'Goldfish\nWater' },
+            Wednesday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'WG Scooby Cookies\nRaisins\nApple Juice', Lunch:'Spaghetti\nGreen Beans\nPeaches\nMilk', PMSnack:'Wheat Crackers\nCheese Cubes\nWater' },
+            Thursday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Rice Cakes\nPeanut Butter\nGrape Juice', Lunch:'Chicken Patty on Bun\nPeas\nPears\nMilk', PMSnack:'Yogurt\nGranola\nWater' },
+            Friday: { Breakfast:'Asst Cereal\nFresh Fruit\nMilk', AMSnack:'Cheese Its\nGrapes\nApple Juice', Lunch:'Tacos\nRefried Beans\nPineapple\nMilk', PMSnack:'PBJ Squares\nWater' }
+        }
+    ]
+};
+
+// Seasonal themes
+function getSeasonalBanner(weekStart) {
+    const m = weekStart.getMonth();
+    const d = weekStart.getDate();
+    // Check for holidays near this week
+    if (m === 6 && d <= 7) return { text:'🎆 Happy 4th of July! 🇺🇸', bg:'#fef2f2', color:'#dc2626' };
+    if (m === 9 && d >= 25) return { text:'🎃 Happy Halloween! 👻', bg:'#fff7ed', color:'#ea580c' };
+    if (m === 10 && d >= 18 && d <= 28) return { text:'🦃 Happy Thanksgiving! 🍂', bg:'#fefce8', color:'#a16207' };
+    if (m === 11 && d >= 15) return { text:'🎄 Merry Christmas! ⛄', bg:'#f0fdf4', color:'#16a34a' };
+    if (m === 1 && d >= 7 && d <= 16) return { text:'💕 Happy Valentine\'s Day! 💝', bg:'#fdf2f8', color:'#db2777' };
+    if (m === 2 && d >= 10 && d <= 20) return { text:'☘️ Happy St. Patrick\'s Day! 🌈', bg:'#f0fdf4', color:'#16a34a' };
+    if (m === 3 && d >= 14 && d <= 21) return { text:'🐣 Happy Easter! 🌷', bg:'#faf5ff', color:'#7c3aed' };
+    // Seasons
+    if (m >= 5 && m <= 7) return { text:'☀️ Summer Vibes! 🌊', bg:'#eff6ff', color:'#2563eb' };
+    if (m >= 8 && m <= 10) return { text:'🍁 Fall Harvest Season 🌽', bg:'#fffbeb', color:'#d97706' };
+    if (m >= 11 || m <= 1) return { text:'❄️ Winter Wonderland ⛄', bg:'#f0f9ff', color:'#0284c7' };
+    if (m >= 2 && m <= 4) return { text:'🌸 Spring is Here! 🐝', bg:'#fdf4ff', color:'#a855f7' };
+    return null;
+}
 
 function getMonday(d) {
     const date = new Date(d);
@@ -101,55 +196,56 @@ function getMonday(d) {
     return new Date(date.setDate(diff));
 }
 
-function formatDate(d) {
-    return (d.getMonth()+1) + '/' + d.getDate();
-}
+function formatDate(d) { return (d.getMonth()+1) + '/' + d.getDate(); }
+function getWeekKey() { return currentWeekStart.toISOString().split('T')[0]; }
 
-function getWeekKey() {
-    return currentWeekStart.toISOString().split('T')[0];
-}
-
-function prevWeek() {
-    currentWeekStart.setDate(currentWeekStart.getDate() - 7);
-    render();
-    loadMenus();
-}
-
-function nextWeek() {
-    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
-    render();
-    loadMenus();
-}
-
-function goToThisWeek() {
-    currentWeekStart = getMonday(new Date());
-    render();
-    loadMenus();
-}
+function prevWeek() { currentWeekStart.setDate(currentWeekStart.getDate() - 7); render(); loadMenus(); }
+function nextWeek() { currentWeekStart.setDate(currentWeekStart.getDate() + 7); render(); loadMenus(); }
+function goToThisWeek() { currentWeekStart = getMonday(new Date()); render(); loadMenus(); }
 
 function render() {
     const dates = [];
-    for (let i = 0; i < 5; i++) {
-        const d = new Date(currentWeekStart);
-        d.setDate(d.getDate() + i);
-        dates.push(d);
-    }
-    const endDate = dates[4];
-    document.getElementById('weekLabel').textContent = formatDate(currentWeekStart) + ' – ' + formatDate(endDate) + ', ' + currentWeekStart.getFullYear();
+    for (let i = 0; i < 5; i++) { const d = new Date(currentWeekStart); d.setDate(d.getDate() + i); dates.push(d); }
+    document.getElementById('weekLabel').textContent = formatDate(currentWeekStart) + ' – ' + formatDate(dates[4]) + ', ' + currentWeekStart.getFullYear();
+
+    // Seasonal banner
+    const banner = getSeasonalBanner(currentWeekStart);
+    const bannerEl = document.getElementById('seasonalBanner');
+    if (banner) {
+        bannerEl.innerHTML = `<div class="seasonal-banner" style="background:${banner.bg};color:${banner.color};">${banner.text}</div>`;
+    } else { bannerEl.innerHTML = ''; }
 
     ['pfa','other'].forEach(section => {
         const grid = document.getElementById(section + 'Grid');
         grid.innerHTML = dates.map((d, di) => {
             const dayName = DAYS[di];
             const dateStr = formatDate(d);
-            return `<div class="menu-day">
+            const isHoliday = (d.getMonth()===6 && d.getDate()===4) || (d.getMonth()===11 && d.getDate()===25);
+            return `<div class="menu-day${isHoliday?' holiday':''}">
                 <div class="menu-day-header">${dayName}<div class="day-date">${dateStr}</div></div>
                 ${MEALS.map(meal => `<div class="menu-meal">
                     <div class="menu-meal-label">${meal}</div>
-                    <textarea id="${section}_${di}_${meal.replace(/\s/g,'')}" placeholder="${meal}..."></textarea>
+                    <textarea id="${section}_${di}_${meal.replace(/\s/g,'')}" placeholder="${meal}...">${isHoliday?'CLOSED - Holiday':''}</textarea>
                 </div>`).join('')}
             </div>`;
         }).join('');
+    });
+}
+
+function loadTemplate() {
+    const weekNum = prompt('Load template week (1-4):', '1');
+    const idx = parseInt(weekNum) - 1;
+    if (isNaN(idx) || idx < 0 || idx > 3) { alert('Enter 1, 2, 3, or 4'); return; }
+    ['pfa','other'].forEach(section => {
+        const template = TEMPLATES[section][idx];
+        DAYS.forEach((day, di) => {
+            const dayData = template[day] || {};
+            MEALS.forEach(meal => {
+                const key = meal.replace(/\s/g,'');
+                const el = document.getElementById(`${section}_${di}_${key}`);
+                if (el) el.value = dayData[key] || '';
+            });
+        });
     });
 }
 
