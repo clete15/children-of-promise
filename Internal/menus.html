@@ -369,8 +369,8 @@ function printMenus() {
     const theme = getSeasonalTheme(currentWeekStart);
 
     const sections = [
-        { title: 'Preschool', id: 'pfa' },
-        { title: 'Birth to Three', id: 'other' }
+        { title: 'PFA', id: 'pfa' },
+        { title: 'PI', id: 'other' }
     ];
 
     let html = '';
@@ -416,8 +416,8 @@ function printMenus() {
             <div style="color:${theme.cornerColor};opacity:0.6;transform:scale(0.7) rotate(-5deg);">${theme.cornerSvg}</div>
             <div style="color:${theme.cornerColor};transform:rotate(20deg);">${theme.cornerSvg}</div>
         </div>`;
-        // Classroom name at bottom center
-        html += `<div style="text-align:center;font-size:13px;font-weight:700;color:${theme.headerBg};font-family:'Fredoka',sans-serif;margin-top:6px;">${sec.title}</div>`;
+        // Classroom name at bottom right
+        html += `<div style="text-align:right;font-size:11px;font-weight:600;color:#6b7280;margin-top:4px;padding-right:8px;">${sec.title}</div>`;
         html += '</div>';
     });
 
