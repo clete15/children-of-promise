@@ -519,15 +519,6 @@ async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
     loadWlBadge();
     renderAlerts();
-    // Check if opened from Food Program card
-    if (sessionStorage.getItem('openMode') === 'reports' && sessionStorage.getItem('openReport') === 'food') {
-        sessionStorage.removeItem('openMode');
-        sessionStorage.removeItem('openReport');
-        document.querySelector('.mode-toggle-bar').style.display = 'none';
-        setMode('reports');
-        setTimeout(() => selectReport('food'), 300);
-        return;
-    }
     // Check if redirected from waiting list
     if (new URLSearchParams(window.location.search).get('enroll') === '1') {
         const data = sessionStorage.getItem('enrollFromWaitlist');

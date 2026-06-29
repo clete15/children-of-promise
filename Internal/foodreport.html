@@ -3,200 +3,261 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Food Program Report – Children Of Promise</title>
+    <title>Food Program – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
-        .report-wrap { max-width: 800px; margin: 24px auto; padding: 0 24px; }
-        .report-paper {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.18);
-            padding: 32px 36px;
-        }
-        .report-header { text-align: center; margin-bottom: 24px; }
-        .report-header h2 { font-size: 1.1rem; font-weight: 800; color: var(--text); margin-bottom: 4px; }
-        .report-header p { font-size: 0.78rem; color: var(--text-muted); }
-        .print-btn {
-            display: inline-block;
-            padding: 10px 28px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.88rem;
-            font-weight: 700;
-            cursor: pointer;
-            margin-bottom: 20px;
-            transition: background 0.15s;
-        }
-        .print-btn:hover { background: var(--primary-dark); }
-        .food-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-        .food-table thead tr { background: #f8fafc; border-bottom: 2px solid var(--border); }
-        .food-table th {
-            padding: 10px 12px;
-            text-align: left;
-            font-size: 0.68rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            color: var(--text-muted);
-        }
-        .food-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); }
-        .food-table tbody tr:last-child td { border-bottom: none; }
-        .room-group td { background: #eff6ff; font-weight: 700; color: var(--primary); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 12px; }
-        .badge-free { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 0.72rem; }
-        .badge-reduced { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 0.72rem; }
-        .badge-paid { background: #f1f5f9; color: var(--text-muted); padding: 2px 8px; border-radius: 10px; font-weight: 700; font-size: 0.72rem; }
-        @media print {
-            body { background: white !important; }
-            .site-header, .print-btn, .header-back { display: none !important; }
-            .report-wrap { margin: 0; padding: 0; max-width: 100%; }
-            .report-paper { box-shadow: none; border-radius: 0; padding: 16px; }
-        }
+        .fp-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
+        .fp-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1100px; }
+        .fp-sidebar { width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .fp-sidebar button, .fp-sidebar a { display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;transition:background 0.15s;text-decoration:none; }
+        .fp-sidebar button.active { background:rgba(255,255,255,0.2); }
+        .fp-sidebar button:hover:not(.active), .fp-sidebar a:hover { background:rgba(255,255,255,0.1); }
+        .fp-sidebar .nav-label { font-size:0.82rem;font-weight:700;color:white; }
+        .fp-sidebar .nav-sub { font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.8);padding-left:28px; }
+        .fp-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
+        .fp-header { padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px; }
+        .fp-header h2 { font-size:1rem;font-weight:800;color:#1e3a8a;margin:0; }
+        .fp-body { overflow-y:auto;flex:1;padding:20px 24px; }
     </style>
 </head>
 <body>
 
 <header class="site-header">
-    <a class="brand-link" href="index.html">
+    <a class="brand-link" href="/staff/">
         <img src="logo-sm.png" alt="Children Of Promise">
         <div class="brand-text">
             <h1>Children Of Promise</h1>
-            <p>Food Program Report &nbsp;·&nbsp; Millstadt, IL</p>
+            <p>Food Program Management System &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="reports.html">← Reports</a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
 </header>
 
-<div class="report-wrap">
-    <div class="report-paper">
-        <div class="report-header">
-            <h2>Food Program Report</h2>
-            <p>Children Of Promise Christian Dayschool — Active Students</p>
+<div class="fp-layout">
+    <div class="fp-wrapper">
+        <div class="fp-sidebar">
+            <button class="active" id="navFood" onclick="showPanel('food')">
+                <div class="nav-label">🍽️ Food Program</div>
+            </button>
+            <button id="navRoster" onclick="showPanel('roster')">
+                <div class="nav-sub">📋 Full Roster</div>
+            </button>
+            <button id="navCount" onclick="printFoodCountSheets()">
+                <div class="nav-sub">🖨️ Monthly Count Sheets</div>
+            </button>
+            <a href="/staff/menus.html">
+                <div class="nav-sub">🍽️ Weekly Menus</div>
+            </a>
         </div>
-        <button class="print-btn" onclick="window.print()">🖨️ Print Report</button>
-        <table class="food-table">
-            <thead>
-                <tr>
-                    <th>Student</th>
-                    <th>Room</th>
-                    <th>Household Income</th>
-                    <th>Household Size</th>
-                    <th>Qualifiers</th>
-                    <th>Food Program</th>
-                    <th>Save</th>
-                </tr>
-            </thead>
-            <tbody id="foodBody">
-                <tr><td colspan="5" style="text-align:center;padding:32px;color:var(--text-muted);">Loading…</td></tr>
-            </tbody>
-        </table>
+        <div class="fp-card">
+            <div class="fp-header">
+                <h2 id="fpTitle">Food Program</h2>
+            </div>
+            <div class="fp-body" id="fpBody">
+                <div>Loading...</div>
+            </div>
+        </div>
     </div>
 </div>
 
+<div id="foodPrintFrame" style="display:none;"></div>
+
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
-let allStudents = [];
+function apiFetch(url, opts = {}) {
+    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
+    return fetch(url, opts);
+}
 
-async function load() {
+let students = [];
+let classrooms = [];
+let currentPanel = 'food';
+
+async function init() {
     try {
-        const res = await fetch('/api/students', { headers: { 'Authorization': AUTH } });
-        const students = await res.json();
-        allStudents = students.filter(s => {
-            if (!s.Active) return false;
-            return s.Active.toLowerCase() === 'yes';
-        });
-
-        // Group by room
-        const rooms = {};
-        allStudents.forEach(s => {
-            const room = s.Room || 'Unknown';
-            if (!rooms[room]) rooms[room] = [];
-            rooms[room].push(s);
-        });
-
-        const tbody = document.getElementById('foodBody');
-        let html = '';
-        let globalIdx = 0;
-        for (const [room, students] of Object.entries(rooms)) {
-            html += `<tr class="room-group"><td colspan="7">${room}</td></tr>`;
-            students.sort((a, b) => a.Last_Name.localeCompare(b.Last_Name));
-            students.forEach((s, idx) => {
-                // Build qualifiers
-                const quals = [];
-                const benefits = (s.PublicBenefits || '').toLowerCase();
-                if (benefits.includes('wic'))      quals.push('WIC');
-                if (benefits.includes('snap'))     quals.push('SNAP');
-                if (benefits.includes('tanf'))     quals.push('TANF');
-                if (benefits.includes('ccap'))     quals.push('CCAP');
-                if (benefits.includes('medicaid')) quals.push('Medicaid');
-                if (s.Military && s.Military.toLowerCase() === 'yes') quals.push('Military');
-                if (s.Category && s.Category.toLowerCase() === 'foster') quals.push('Foster');
-                const qualStr = quals.join(', ');
-
-                // If any qualifier, default to Free
-                let frp = s.F_R_P_Food || 'Paid';
-                if (quals.length > 0) frp = 'Free';
-
-                const badge = frp === 'Free' ? 'badge-free' : frp === 'Reduced' ? 'badge-reduced' : 'badge-paid';
-                const gi = globalIdx++;
-                html += `<tr>
-                    <td style="font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
-                    <td>${room}</td>
-                    <td><input type="number" value="${s.HouseholdIncome || ''}" id="inc-${gi}" style="width:80px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;" max="100000" min="0"></td>
-                    <td><input type="number" value="${s.HouseholdSize || ''}" id="hs-${gi}" style="width:50px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;" min="1" max="15"></td>
-                    <td style="font-size:0.75rem;color:var(--primary);font-weight:600;">${qualStr || '—'}</td>
-                    <td><span class="${badge}" id="badge-${gi}">${frp}</span></td>
-                    <td><button onclick="saveIncome(${gi},'${s.First_Name.replace(/'/g,"\\'")}','${s.Last_Name.replace(/'/g,"\\'")}')" style="padding:3px 10px;background:var(--primary);color:white;border:none;border-radius:4px;font-size:0.7rem;font-weight:700;cursor:pointer;">Save</button></td>
-                </tr>`;
-            });
-        }
-        tbody.innerHTML = html;
+        const [sRes, cRes] = await Promise.all([
+            apiFetch('/api/students'),
+            apiFetch('/api/classrooms')
+        ]);
+        students = await sRes.json();
+        classrooms = await cRes.json();
+        showPanel('food');
     } catch (e) {
-        document.getElementById('foodBody').innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--danger);">Failed to load.</td></tr>';
+        document.getElementById('fpBody').innerHTML = '<div style="color:red;padding:20px;">Error loading data: ' + e.message + '</div>';
     }
 }
 
-load();
+function isTruthy(v) {
+    if (v === true || v === 1 || v === '1') return true;
+    if (typeof v === 'string') return v.toLowerCase() === 'yes';
+    return false;
+}
 
-async function saveIncome(idx, firstName, lastName) {
-    const income = document.getElementById(`inc-${idx}`)?.value || '';
-    const hhSize = document.getElementById(`hs-${idx}`)?.value || '';
-
-    // Auto-calculate F/R/P
-    const freeThresholds    = [19578,26572,33566,40560,47554,54548,61542,68536];
-    const reducedThresholds = [27861,37814,47767,57720,67673,77626,87579,97532];
-    const sizeIdx = Math.max(0, Math.min(parseInt(hhSize)||1, 8) - 1);
-    const inc = parseInt(income) || 100000;
-    let frpFood = 'Paid';
-    if (inc <= freeThresholds[sizeIdx]) frpFood = 'Free';
-    else if (inc <= reducedThresholds[sizeIdx]) frpFood = 'Reduced';
-
-    try {
-        const res = await fetch(`/api/students/${encodeURIComponent(firstName)}/${encodeURIComponent(lastName)}`, {
-            method: 'PUT',
-            headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                householdIncome: income,
-                householdSize: hhSize,
-                frpFood: frpFood,
-            })
-        });
-        const data = await res.json();
-        if (data.success) {
-            const badge = document.getElementById(`badge-${idx}`);
-            if (badge) {
-                badge.textContent = frpFood;
-                badge.className = frpFood === 'Free' ? 'badge-free' : frpFood === 'Reduced' ? 'badge-reduced' : 'badge-paid';
-            }
-        } else {
-            alert('Failed: ' + (data.error || ''));
-        }
-    } catch (e) {
-        alert('Error: ' + e.message);
+function showPanel(panel) {
+    currentPanel = panel;
+    document.querySelectorAll('.fp-sidebar button').forEach(b => b.classList.remove('active'));
+    if (panel === 'food') {
+        document.getElementById('navFood').classList.add('active');
+        document.getElementById('fpTitle').textContent = 'Food Program';
+        renderFoodReport();
+    } else if (panel === 'roster') {
+        document.getElementById('navRoster').classList.add('active');
+        document.getElementById('fpTitle').textContent = 'Full Roster';
+        renderFullRoster();
     }
 }
+
+function renderFoodReport() {
+    const active = students.filter(s => isTruthy(s.Active));
+    const free = active.filter(s => s.F_R_P_Food === 'Free').length;
+    const reduced = active.filter(s => s.F_R_P_Food === 'Reduced').length;
+    const paid = active.filter(s => s.F_R_P_Food === 'Paid').length;
+    const unknown = active.length - free - reduced - paid;
+    const max = Math.max(free, reduced, paid, unknown, 1);
+
+    function bar(label, count, color) {
+        const pct = Math.round(count / max * 100);
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="font-size:0.8rem;font-weight:600;color:#374151;min-width:80px;">${label}</div>
+            <div style="flex:1;background:#e2e8f0;border-radius:4px;height:20px;overflow:hidden;">
+                <div style="height:100%;width:${Math.max(pct,3)}%;background:${color};border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;">
+                    <span style="font-size:0.7rem;font-weight:700;color:white;">${count}</span>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    document.getElementById('fpBody').innerHTML =
+        '<div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid #e5e7eb;">Food Program Summary</div>' +
+        bar('Free', free, '#16a34a') +
+        bar('Reduced', reduced, '#d97706') +
+        bar('Paid', paid, '#2563eb') +
+        bar('Unknown', unknown, '#94a3b8');
+}
+
+function renderFullRoster() {
+    const active = students.filter(s => isTruthy(s.Active));
+    const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
+    document.getElementById('fpBody').innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:#2563eb;">Full Roster (${active.length} students)</div>
+            <button onclick="exportFoodExcel()" style="padding:5px 12px;background:#16a34a;color:white;border:none;border-radius:5px;font-size:0.72rem;font-weight:600;cursor:pointer;">📥 Export Excel</button>
+        </div>
+        <div style="max-height:calc(100vh - 280px);overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb;position:sticky;top:0;z-index:1;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">First Name</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Last Name</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">PFA/PI</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Room</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">F/R/P</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Income</th>
+                <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">HH</th>
+            </tr></thead>
+            <tbody>${active.map(s => `<tr style="border-bottom:1px solid #f3f4f6;" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''">
+                <td style="padding:6px 10px;">${s.First_Name}</td>
+                <td style="padding:6px 10px;font-weight:600;">${s.Last_Name}</td>
+                <td style="padding:6px 10px;">${s.PFA_PI_na || '—'}</td>
+                <td style="padding:6px 10px;">${s.Room || '—'}</td>
+                <td style="padding:6px 10px;font-weight:700;color:${frpColor(s.F_R_P_Food)};">${s.F_R_P_Food || '—'}</td>
+                <td style="padding:6px 10px;text-align:right;">${s.HouseholdIncome ? '$' + Number(s.HouseholdIncome).toLocaleString() : '—'}</td>
+                <td style="padding:6px 10px;text-align:center;">${s.HouseholdSize || '—'}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+}
+
+function exportFoodExcel() {
+    const active = students.filter(s => isTruthy(s.Active));
+    const headers = ['First_Name','Last_Name','PFA_PI_na','Room','F_R_P_Food','HouseholdIncome','HouseholdSize'];
+    let csv = headers.join('\t') + '\n';
+    active.forEach(s => { csv += [s.First_Name, s.Last_Name, s.PFA_PI_na||'', s.Room||'', s.F_R_P_Food||'', s.HouseholdIncome||'', s.HouseholdSize||''].join('\t') + '\n'; });
+    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Food_Program_Roster_' + new Date().toISOString().split('T')[0] + '.xls';
+    a.click();
+}
+
+function printFoodCountSheets() {
+    const input = prompt('Enter month (YYYY-MM):', new Date().getFullYear() + '-' + String(new Date().getMonth() + 2).padStart(2,'0'));
+    if (!input) return;
+    const parts = input.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1;
+    if (isNaN(year) || isNaN(month)) { alert('Invalid format'); return; }
+
+    const active = students.filter(s => isTruthy(s.Active));
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthYear = monthNames[month] + ' ' + year;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const meals = ['Breakfast', 'Lunch', 'PM Snack'];
+    const weekendDays = [];
+    for (let d = 1; d <= daysInMonth; d++) { if ([0,6].includes(new Date(year, month, d).getDay())) weekendDays.push(d); }
+
+    const roomGroups = {};
+    active.forEach(s => { const room = s.Room || 'Room ' + s.RoomNumber; if (!roomGroups[room]) roomGroups[room] = []; roomGroups[room].push(s); });
+
+    let html = '<!DOCTYPE html><html><head><style>';
+    html += '@page{size:landscape;margin:0.2in}body{font-family:Arial,sans-serif;margin:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}';
+    html += '.sheet{page-break-after:always;padding:6px}.sheet:last-child{page-break-after:auto}';
+    html += 'table{border-collapse:collapse;width:100%;font-size:9px;table-layout:fixed}th,td{border:1px solid #000;padding:3px 2px;text-align:center}';
+    html += 'th{background:#d9d9d9;font-size:8px;font-weight:bold}.name-col{text-align:left;min-width:140px;font-size:9px;white-space:nowrap;padding-left:4px;font-weight:bold}';
+    html += '.frp-col{font-weight:bold;width:20px;background:#f0f0f0}.day-col{width:18px;min-width:18px}.day-col.weekend{background:#808080!important}';
+    html += '.total-col{width:30px;background:#d9d9d9;font-weight:bold}.total-col-free{width:30px;background:#d9d9d9;font-weight:bold;border-left:3px solid #000}';
+    html += '.totals-row td{font-weight:bold;font-size:8px;background:#e8e8e8}.separator-row td{border-top:3px solid #000}';
+    html += '.header{text-align:center;margin-bottom:4px}.header h2{margin:0;font-size:14px}.meta{display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px;padding:0 4px}.meta span{font-weight:bold}';
+    html += '</style></head><body>';
+
+    const order = {'free':0,'reduced':1,'paid':2};
+    Object.keys(roomGroups).sort().forEach(room => {
+        const roomStudents = [...roomGroups[room]].sort((a,b) => {
+            const av = order[(a.F_R_P_Food||'').trim().toLowerCase()] !== undefined ? order[(a.F_R_P_Food||'').trim().toLowerCase()] : 2;
+            const bv = order[(b.F_R_P_Food||'').trim().toLowerCase()] !== undefined ? order[(b.F_R_P_Food||'').trim().toLowerCase()] : 2;
+            return av !== bv ? av - bv : (a.Last_Name||'').localeCompare(b.Last_Name||'');
+        });
+
+        // Attendance sheet
+        html += '<div class="sheet"><div class="header"><h2>DAILY ATTENDANCE RECORD</h2></div>';
+        html += '<div class="meta"><span>Site: Children of Promise</span><span>Month/Year: '+monthYear+'</span></div>';
+        html += '<div class="meta"><span>Classroom: '+room+'</span></div>';
+        html += '<table><thead><tr><th class="name-col">Child\'s Full Name</th>';
+        for(let d=1;d<=daysInMonth;d++){html+='<th class="day-col'+(weekendDays.includes(d)?' weekend':'')+'">'+d+'</th>';}
+        html += '<th class="total-col-free">Total</th></tr></thead><tbody>';
+        roomStudents.forEach((s,i)=>{html+='<tr><td class="name-col">'+(i+1)+'. '+s.Last_Name+', '+s.First_Name+'</td>';for(let d=1;d<=daysInMonth;d++)html+='<td class="day-col'+(weekendDays.includes(d)?' weekend':'')+'"></td>';html+='<td class="total-col-free"></td></tr>';});
+        for(let e=roomStudents.length;e<19;e++){html+='<tr><td class="name-col">'+(e+1)+'.</td>';for(let d=1;d<=daysInMonth;d++)html+='<td class="day-col'+(weekendDays.includes(d)?' weekend':'')+'"></td>';html+='<td class="total-col-free"></td></tr>';}
+        html+='<tr class="totals-row separator-row"><td class="name-col"><strong>Daily Total</strong></td>';for(let d=1;d<=daysInMonth;d++)html+='<td class="'+(weekendDays.includes(d)?'weekend':'')+'"></td>';html+='<td class="total-col-free"></td></tr></tbody></table></div>';
+
+        // Meal sheets
+        meals.forEach(meal => {
+            html += '<div class="sheet"><div class="header"><h2>MEAL PARTICIPATION RECORD</h2></div>';
+            html += '<div class="meta"><span>Site: Children of Promise</span><span>Month/Year: '+monthYear+'</span></div>';
+            html += '<div class="meta"><span>Classroom: '+room+'</span><span>Program: ☑ Child Care Center</span><span>Meal Service: ☑ '+meal+'</span></div>';
+            html += '<table><thead><tr><th class="name-col">Child\'s Full Name</th><th class="frp-col">F/R/P</th>';
+            for(let d=1;d<=daysInMonth;d++)html+='<th class="day-col'+(weekendDays.includes(d)?' weekend':'')+'">'+d+'</th>';
+            html += '<th class="total-col-free">Free</th><th class="total-col">Red</th><th class="total-col">Paid</th></tr></thead><tbody>';
+            roomStudents.forEach((s,i)=>{const frp=(s.F_R_P_Food||'P').charAt(0).toUpperCase();html+='<tr><td class="name-col">'+(i+1)+'. '+s.Last_Name+', '+s.First_Name+'</td><td class="frp-col">'+frp+'</td>';for(let d=1;d<=daysInMonth;d++)html+='<td class="day-col'+(weekendDays.includes(d)?' weekend':'')+'"></td>';html+='<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';});
+            for(let e=roomStudents.length;e<19;e++){html+='<tr><td class="name-col">'+(e+1)+'.</td><td class="frp-col"></td>';for(let d=1;d<=daysInMonth;d++)html+='<td class="day-col'+(weekendDays.includes(d)?' weekend':'')+'"></td>';html+='<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';}
+            html+='<tr class="totals-row separator-row"><td class="name-col"><strong>Daily Totals</strong></td><td></td>';for(let d=1;d<=daysInMonth;d++)html+='<td class="'+(weekendDays.includes(d)?'weekend':'')+'"></td>';html+='<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+            ['Free Daily Totals','Reduced Daily Totals','Paid Daily Totals'].forEach(label=>{html+='<tr class="totals-row"><td class="name-col">'+label+'</td><td></td>';for(let d=1;d<=daysInMonth;d++)html+='<td class="'+(weekendDays.includes(d)?'weekend':'')+'"></td>';html+='<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';});
+            html += '</tbody></table><div style="font-size:7px;text-align:right;margin-top:3px;color:#666;">ISBE 68-75 (9/13)</div></div>';
+        });
+    });
+    html += '</body></html>';
+
+    let frame = document.getElementById('foodPrintFrame');
+    if (frame) frame.remove();
+    frame = document.createElement('iframe');
+    frame.id = 'foodPrintFrame';
+    frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:0;height:0;';
+    document.body.appendChild(frame);
+    frame.contentDocument.open();
+    frame.contentDocument.write(html);
+    frame.contentDocument.close();
+    setTimeout(() => frame.contentWindow.print(), 500);
+}
+
+init();
 </script>
 </body>
 </html>
