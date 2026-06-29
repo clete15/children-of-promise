@@ -174,8 +174,8 @@ function renderFullRoster() {
                 <td style="padding:4px 6px;font-weight:600;white-space:nowrap;font-size:0.75rem;">${s.Last_Name}, ${s.First_Name}</td>
                 <td style="padding:3px 3px;"><select id="frRoom_${i}" onchange="markFRChanged(${i})" style="padding:2px 2px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;width:100%;">${roomOpts}</select></td>
                 <td style="padding:4px 4px;text-align:center;font-weight:700;color:${frpColor(s.F_R_P_Food)};" id="frFRP_${i}">${s.F_R_P_Food || '—'}</td>
-                <td style="padding:3px 3px;"><input type="number" id="frIncome_${i}" value="${s.HouseholdIncome || ''}" onchange="markFRChanged(${i})" style="width:68px;padding:2px 3px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;text-align:right;"></td>
-                <td style="padding:3px 3px;"><input type="number" id="frHH_${i}" value="${s.HouseholdSize || ''}" min="1" max="15" onchange="markFRChanged(${i})" style="width:30px;padding:2px 2px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;text-align:center;"></td>
+                <td style="padding:3px 3px;"><input type="number" id="frIncome_${i}" value="${s.HouseholdIncome || ''}" onchange="markFRChanged(${i})" style="width:100%;padding:2px 3px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;text-align:right;box-sizing:border-box;"></td>
+                <td style="padding:3px 3px;"><input type="number" id="frHH_${i}" value="${s.HouseholdSize || ''}" min="1" max="15" onchange="markFRChanged(${i})" style="width:100%;padding:2px 2px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;text-align:center;box-sizing:border-box;"></td>
                 <td style="padding:3px 3px;text-align:center;"><button id="frSave_${i}" onclick="saveFRRow(${i})" disabled style="padding:2px 5px;background:#2563eb;color:white;border:none;border-radius:3px;font-size:0.6rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button></td>
             </tr>`).join('')}</tbody>
         </table></div>`;
