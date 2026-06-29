@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weekly Menus – Children Of Promise</title>
+    <title>Menu</title>
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
@@ -103,6 +103,8 @@ function apiFetch(url, opts = {}) {
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const MEALS = ['Breakfast','AM Snack','Lunch','PM Snack'];
 let currentWeekStart = getMonday(new Date());
+// Default to next week
+currentWeekStart.setDate(currentWeekStart.getDate() + 7);
 
 // 4-week rotating templates
 const TEMPLATES = {
@@ -342,7 +344,7 @@ function printMenus() {
     // Set landscape via a style tag
     let styleTag = document.getElementById('printPageStyle');
     if (!styleTag) { styleTag = document.createElement('style'); styleTag.id = 'printPageStyle'; document.head.appendChild(styleTag); }
-    styleTag.textContent = '@page { size: landscape; margin: 0.4in; }';
+    styleTag.textContent = '@page { size: landscape; margin: 0.4in; margin-top: 0.2in; margin-bottom: 0.2in; }';
     setTimeout(() => window.print(), 200);
 }
 
