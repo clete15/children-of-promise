@@ -260,18 +260,6 @@ function getRotatingTemplateIndex() {
     const weekNum = Math.round(((d - firstThursday) / 86400000 + 1) / 7) + 1;
     return (weekNum - 1) % 4;
 }
-    ['pfa','other'].forEach(section => {
-        const template = TEMPLATES[section][idx];
-        DAYS.forEach((day, di) => {
-            const dayData = template[day] || {};
-            MEALS.forEach(meal => {
-                const key = meal.replace(/\s/g,'');
-                const el = document.getElementById(`${section}_${di}_${key}`);
-                if (el) el.value = dayData[key] || '';
-            });
-        });
-    });
-}
 
 async function saveMenus() {
     const weekKey = getWeekKey();
