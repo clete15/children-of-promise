@@ -365,11 +365,9 @@ function printMenus() {
     let html = '';
     sections.forEach(sec => {
         html += `<div class="print-sheet" style="border:4px solid ${theme.borderColor};border-radius:12px;padding:16px;position:relative;overflow:hidden;">`;
-        // Corner art (4 corners)
-        html += `<div style="position:absolute;top:8px;left:8px;color:${theme.cornerColor};">${theme.cornerSvg}</div>`;
-        html += `<div style="position:absolute;top:8px;right:8px;color:${theme.cornerColor};transform:scaleX(-1);">${theme.cornerSvg}</div>`;
-        html += `<div style="position:absolute;bottom:8px;left:8px;color:${theme.cornerColor};transform:scaleY(-1);">${theme.cornerSvg}</div>`;
-        html += `<div style="position:absolute;bottom:8px;right:8px;color:${theme.cornerColor};transform:scale(-1);">${theme.cornerSvg}</div>`;
+        // Top corner art - staggered (left higher, right lower)
+        html += `<div style="position:absolute;top:12px;left:12px;color:${theme.cornerColor};">${theme.cornerSvg}</div>`;
+        html += `<div style="position:absolute;top:35px;right:12px;color:${theme.cornerColor};transform:scaleX(-1);">${theme.cornerSvg}</div>`;
         // Themed banner
         html += `<div style="background:${theme.accentBg};color:white;text-align:center;padding:10px 16px;border-radius:8px;margin-bottom:10px;font-size:16px;font-weight:700;letter-spacing:1px;font-family:'Fredoka',sans-serif;">${theme.banner}</div>`;
         // Header with logo and dates + themed emojis
@@ -395,6 +393,14 @@ function printMenus() {
             html += '</tr>';
         });
         html += '</tbody></table>';
+        // Bottom decorative art - centered row of themed SVGs
+        html += `<div style="display:flex;justify-content:space-around;align-items:center;margin-top:14px;padding:8px 40px;">
+            <div style="color:${theme.cornerColor};transform:rotate(-15deg);">${theme.cornerSvg}</div>
+            <div style="color:${theme.cornerColor};opacity:0.6;transform:scale(0.7);">${theme.cornerSvg}</div>
+            <div style="color:${theme.cornerColor};transform:rotate(10deg);">${theme.cornerSvg}</div>
+            <div style="color:${theme.cornerColor};opacity:0.6;transform:scale(0.7) rotate(-5deg);">${theme.cornerSvg}</div>
+            <div style="color:${theme.cornerColor};transform:rotate(20deg);">${theme.cornerSvg}</div>
+        </div>`;
         html += '</div>';
     });
 
