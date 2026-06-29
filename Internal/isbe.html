@@ -122,16 +122,18 @@
                             <th title="Parent signs consent form allowing ASQ and ASE developmental screenings to be performed on their child for the school year.">Permission<br>Slip</th>
                             <th title="Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Complete at enrollment or beginning of year.">Parent<br>Interview</th>
                             <th title="Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.">Proof of<br>Income</th>
+                            <th title="Enter student into the ISBE Student Information System (SIS) before beginning screenings.">Enter<br>into SIS</th>
                             <th title="Administer the ASQ-3 developmental screening at the beginning of the school year. Parent completes the questionnaire; teacher scores it.">Beg ASQ</th>
                             <th title="Administer the ASQ:SE-2 social-emotional screening at the beginning of the school year. Parent completes; teacher scores and reviews results.">Beg ASE</th>
                             <th title="Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.">Mid Year<br>Report Card</th>
                             <th title="Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.">End ASQ</th>
                             <th title="Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.">End ASE</th>
                             <th title="Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.">End Year<br>Report Card</th>
+                            <th title="Remove student from ISBE Student Information System (SIS) after completing end-of-year reporting.">Remove<br>from SIS</th>
                         </tr>
                     </thead>
                     <tbody id="isbeBody">
-                        <tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
+                        <tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -464,7 +466,7 @@ async function init() {
         renderRoster();
     } catch(e) {
         console.error('[INIT ERROR]', e);
-        document.getElementById('isbeBody').innerHTML = '<tr><td colspan="11" style="color:red;padding:20px;">Error loading data: ' + e.message + '</td></tr>';
+        document.getElementById('isbeBody').innerHTML = '<tr><td colspan="13" style="color:red;padding:20px;">Error loading data: ' + e.message + '</td></tr>';
     }
 }
 
@@ -495,13 +497,13 @@ function setProgram(prog) {
     }
 }
 
-const FIELDS = ['PermissionSlip','ParentInterview','ProofOfIncome','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport'];
+const FIELDS = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS'];
 
 function renderRoster() {
     const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'));
     document.getElementById('isbeCount').textContent = roster.length + ' students';
     const tbody = document.getElementById('isbeBody');
-    if (!roster.length) { tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
+    if (!roster.length) { tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
 
     tbody.innerHTML = roster.map(s => {
         const t = trackingData[s.Id] || {};
