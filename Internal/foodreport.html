@@ -203,8 +203,8 @@ function renderFullRoster() {
                 let lastRoom = ''; let roomIdx = 0;
                 return filtered.map((s, i) => {
                     if (s.Room !== lastRoom) { if (lastRoom) roomIdx++; lastRoom = s.Room; }
-                    const rowBg = roomIdx % 2 === 0 ? 'background:white;' : 'background:#f8fafc;';
-                    return `<tr style="border-bottom:1px solid #f3f4f6;${rowBg}" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='${roomIdx%2===0?'white':'#f8fafc'}'">
+                    const rowBg = roomIdx % 2 === 0 ? 'background:white;' : 'background:#eef2f7;';
+                    return `<tr style="border-bottom:1px solid #f3f4f6;${rowBg}" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='${roomIdx%2===0?'white':'#eef2f7'}'">
                 <td style="padding:4px 6px;font-weight:600;white-space:nowrap;font-size:0.75rem;">${s.Last_Name}, ${s.First_Name} <span style="font-weight:500;color:#dc2626;font-size:0.65rem;margin-left:6px;">${s.TeacherDescription || ''}</span></td>
                 <td style="padding:3px 3px;"><select id="frRoom_${i}" onchange="markFRChanged(${i})" style="padding:2px 2px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;width:100%;">${roomOpts}</select></td>
                 <td style="padding:4px 4px;text-align:center;font-weight:700;color:${frpColor(s.F_R_P_Food)};" id="frFRP_${i}">${s.F_R_P_Food || '—'}</td>
