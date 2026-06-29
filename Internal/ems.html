@@ -420,9 +420,6 @@
                 <button onclick="selectReport('attendance')" id="rptBtn-attendance" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:rgba(255,255,255,0.2);border-left:none;transition:background 0.15s;">
                     <div style="font-size:0.82rem;font-weight:700;color:white;">📊 Attendance</div>
                 </button>
-                <button onclick="selectReport('food')" id="rptBtn-food" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
-                    <div style="font-size:0.82rem;font-weight:700;color:white;">🍽️ Food Program</div>
-                </button>
                 <button onclick="selectReport('program')" id="rptBtn-program" style="display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;border-left:none;transition:background 0.15s;">
                     <div style="font-size:0.82rem;font-weight:700;color:white;">📋 Program Type</div>
                 </button>
@@ -509,6 +506,14 @@ async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
     loadWlBadge();
     renderAlerts();
+    // Check if opened from Food Program card
+    if (sessionStorage.getItem('openMode') === 'reports' && sessionStorage.getItem('openReport') === 'food') {
+        sessionStorage.removeItem('openMode');
+        sessionStorage.removeItem('openReport');
+        setMode('reports');
+        setTimeout(() => selectReport('food'), 300);
+        return;
+    }
     // Check if redirected from waiting list
     if (new URLSearchParams(window.location.search).get('enroll') === '1') {
         const data = sessionStorage.getItem('enrollFromWaitlist');
