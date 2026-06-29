@@ -30,7 +30,7 @@
         .menu-meal { padding:5px 8px;border-bottom:1px solid #f3f4f6; }
         .menu-meal:last-child { border-bottom:none; }
         .menu-meal-label { font-size:0.58rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:2px; }
-        .menu-meal textarea { width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;font-size:0.7rem;font-family:inherit;resize:vertical;min-height:80px;transition:border-color 0.15s; }
+        .menu-meal textarea { width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;font-size:0.7rem;font-family:inherit;resize:vertical;min-height:48px;height:auto;transition:border-color 0.15s;overflow:hidden; }
         .menu-meal textarea:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
         .seasonal-banner { text-align:center;padding:8px;font-size:0.8rem;font-weight:700;border-radius:6px;margin-bottom:12px; }
 
@@ -234,7 +234,7 @@ function render() {
                 <div class="menu-day-header">${dayName}<div class="day-date">${dateStr}</div></div>
                 ${MEALS.map(meal => `<div class="menu-meal">
                     <div class="menu-meal-label">${meal}</div>
-                    <textarea id="${section}_${di}_${meal.replace(/\s/g,'')}" placeholder="${meal}...">${isHoliday?'CLOSED - Holiday':''}</textarea>
+                    <textarea id="${section}_${di}_${meal.replace(/\s/g,'')}" placeholder="${meal}..." oninput="this.style.height='auto';this.style.height=this.scrollHeight+'px'">${isHoliday?'CLOSED - Holiday':''}</textarea>
                 </div>`).join('')}
             </div>`;
         }).join('');
@@ -440,7 +440,11 @@ function applyTemplate(idx, overwrite) {
     });
 }
 // Auto-load rotating template after loadMenus (fills empty fields only)
-setTimeout(() => applyTemplate(getRotatingTemplateIndex(), false), 500);
+setTimeout(() => { applyTemplate(getRotatingTemplateIndex(), false); autoResizeAll(); }, 500);
+
+function autoResizeAll() {
+    document.querySelectorAll('.menu-meal textarea').forEach(ta => { ta.style.height = 'auto'; ta.style.height = ta.scrollHeight + 'px'; });
+}
 </script>
 <div id="printArea"></div>
 </body>
