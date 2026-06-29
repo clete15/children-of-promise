@@ -70,7 +70,7 @@
 <div class="menu-layout">
     <div class="menu-container">
         <div class="menu-header">
-            <h2>🍽️ Weekly Menu — <span id="weekLabel"></span></h2>
+            <h2>🍽️ Weekly Menu — <span id="weekLabel"></span> <span id="rotationLabel" style="font-size:0.65rem;font-weight:400;color:#6b7280;margin-left:8px;"></span></h2>
             <div class="menu-controls">
                 <button class="btn-primary" onclick="prevWeek()">← Prev</button>
                 <button class="btn-primary" onclick="nextWeek()">Next →</button>
@@ -217,6 +217,7 @@ function render() {
     const dates = [];
     for (let i = 0; i < 5; i++) { const d = new Date(currentWeekStart); d.setDate(d.getDate() + i); dates.push(d); }
     document.getElementById('weekLabel').textContent = formatDate(currentWeekStart) + ' – ' + formatDate(dates[4]) + ', ' + currentWeekStart.getFullYear();
+    document.getElementById('rotationLabel').textContent = '(Template Wk ' + (getRotatingTemplateIndex() + 1) + ' of 4)';
 
     // Seasonal banner
     const banner = getSeasonalBanner(currentWeekStart);
@@ -243,9 +244,22 @@ function render() {
 }
 
 function loadTemplate() {
-    const weekNum = prompt('Load template week (1-4):', '1');
-    const idx = parseInt(weekNum) - 1;
-    if (isNaN(idx) || idx < 0 || idx > 3) { alert('Enter 1, 2, 3, or 4'); return; }
+    const idx = getRotatingTemplateIndex();
+    const weekNum = prompt('Load template week (1-4):\n(Current rotation: Week ' + (idx+1) + ')', String(idx+1));
+    const i = parseInt(weekNum) - 1;
+    if (isNaN(i) || i < 0 || i > 3) { alert('Enter 1, 2, 3, or 4'); return; }
+    applyTemplate(i, true);
+}
+
+function getRotatingTemplateIndex() {
+    // Calculate which template week we're on based on ISO week number mod 4
+    const d = new Date(currentWeekStart);
+    const dayNum = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - dayNum + 3);
+    const firstThursday = new Date(d.getFullYear(), 0, 4);
+    const weekNum = Math.round(((d - firstThursday) / 86400000 + 1) / 7) + 1;
+    return (weekNum - 1) % 4;
+}
     ['pfa','other'].forEach(section => {
         const template = TEMPLATES[section][idx];
         DAYS.forEach((day, di) => {
@@ -261,7 +275,8 @@ function loadTemplate() {
 
 async function saveMenus() {
     const weekKey = getWeekKey();
-    const data = { week: weekKey, pfa: {}, other: {} };
+    const templateIdx = getRotatingTemplateIndex();
+    const data = { week: weekKey, pfa: {}, other: {}, templateIndex: templateIdx };
     ['pfa','other'].forEach(section => {
         for (let di = 0; di < 5; di++) {
             MEALS.forEach(meal => {
@@ -270,13 +285,23 @@ async function saveMenus() {
                 if (el) data[section][key] = el.value;
             });
         }
+        // Update the in-memory template so future rotations use the updated menu
+        const template = TEMPLATES[section][templateIdx];
+        DAYS.forEach((day, di) => {
+            if (!template[day]) template[day] = {};
+            MEALS.forEach(meal => {
+                const mealKey = meal.replace(/\s/g,'');
+                const el = document.getElementById(`${section}_${di}_${mealKey}`);
+                if (el) template[day][mealKey] = el.value;
+            });
+        });
     });
     try {
         const res = await apiFetch('/api/menus', { method: 'POST', body: JSON.stringify(data) });
         const result = await res.json();
         if (result.success) {
             const btn = document.querySelector('.btn-green');
-            btn.textContent = '✓ Saved!';
+            btn.textContent = '✓ Saved (Wk ' + (templateIdx+1) + ')!';
             setTimeout(() => btn.textContent = '💾 Save', 2000);
         }
     } catch (e) { alert('Failed to save: ' + e.message); }
@@ -415,7 +440,7 @@ function printMenus() {
 render();
 loadMenus();
 
-function applyTemplate(idx) {
+function applyTemplate(idx, overwrite) {
     ['pfa','other'].forEach(section => {
         const template = TEMPLATES[section][idx];
         DAYS.forEach((day, di) => {
@@ -423,13 +448,13 @@ function applyTemplate(idx) {
             MEALS.forEach(meal => {
                 const key = meal.replace(/\s/g,'');
                 const el = document.getElementById(`${section}_${di}_${key}`);
-                if (el && !el.value) el.value = dayData[key] || '';
+                if (el && (overwrite || !el.value)) el.value = dayData[key] || '';
             });
         });
     });
 }
-// Auto-load template 1 after loadMenus (fills empty fields only)
-setTimeout(() => applyTemplate(0), 500);
+// Auto-load rotating template after loadMenus (fills empty fields only)
+setTimeout(() => applyTemplate(getRotatingTemplateIndex(), false), 500);
 </script>
 <div id="printArea"></div>
 </body>
