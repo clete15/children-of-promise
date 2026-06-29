@@ -46,9 +46,9 @@
             <button id="navCount" onclick="printFoodCountSheets()">
                 <div class="nav-sub">🖨️ Monthly Count Sheets</div>
             </button>
-            <a href="/staff/menus.html" target="_blank">
+            <button id="navMenus" onclick="showPanel('menus')">
                 <div class="nav-sub">🍽️ Weekly Menus</div>
-            </a>
+            </button>
         </div>
         <div class="fp-card">
             <div class="fp-header">
@@ -105,6 +105,10 @@ function showPanel(panel) {
         document.getElementById('navRoster').classList.add('active');
         document.getElementById('fpTitle').textContent = 'Full Roster';
         renderFullRoster();
+    } else if (panel === 'menus') {
+        document.getElementById('navMenus').classList.add('active');
+        document.getElementById('fpTitle').textContent = 'Weekly Menus';
+        document.getElementById('fpBody').innerHTML = '<iframe src="/staff/menus.html" style="width:100%;height:calc(100vh - 200px);border:none;border-radius:8px;"></iframe>';
     }
 }
 
