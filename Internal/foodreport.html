@@ -43,7 +43,7 @@
             <button id="navRoster" onclick="showPanel('roster')">
                 <div class="nav-sub">📋 Full Roster</div>
             </button>
-            <button id="navCount" onclick="printFoodCountSheets()">
+            <button id="navCount" onclick="showPanel('countPicker')">
                 <div class="nav-sub">🖨️ Monthly Count Sheets</div>
             </button>
             <button id="navMenus" onclick="showPanel('menus')">
@@ -109,6 +109,31 @@ function showPanel(panel) {
         document.getElementById('navMenus').classList.add('active');
         document.getElementById('fpTitle').textContent = 'Weekly Menus';
         document.getElementById('fpBody').innerHTML = '<iframe src="/staff/menus.html" style="width:100%;height:calc(100vh - 200px);border:none;border-radius:8px;"></iframe>';
+    } else if (panel === 'countPicker') {
+        document.getElementById('navCount').classList.add('active');
+        document.getElementById('fpTitle').textContent = 'Monthly Count Sheets';
+        const now = new Date();
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const months = [];
+        for (let i = -2; i <= 6; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+            months.push(d);
+        }
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        document.getElementById('fpBody').innerHTML = `
+            <div style="max-width:400px;margin:0 auto;padding:20px 0;">
+                <p style="font-size:0.82rem;color:#6b7280;margin-bottom:16px;">Select a month to generate attendance and meal participation sheets for all classrooms.</p>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                    ${months.map(d => {
+                        const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+                        const isNext = d.getMonth() === nextMonth.getMonth() && d.getFullYear() === nextMonth.getFullYear();
+                        return `<button onclick="printFoodCountSheets('${key}')" style="padding:14px 10px;border-radius:8px;border:${isNext?'2px solid #2563eb':'1px solid #d1d5db'};background:${isNext?'#eff6ff':'white'};cursor:pointer;transition:all 0.15s;font-size:0.8rem;font-weight:${isNext?'700':'500'};color:#374151;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='${isNext?'#eff6ff':'white'}'">
+                            <div>${monthNames[d.getMonth()]}</div>
+                            <div style="font-size:0.68rem;color:#6b7280;margin-top:2px;">${d.getFullYear()}</div>
+                        </button>`;
+                    }).join('')}
+                </div>
+            </div>`;
     }
 }
 
@@ -253,13 +278,11 @@ function exportFoodExcel() {
     a.click();
 }
 
-function printFoodCountSheets() {
-    const input = prompt('Enter month (YYYY-MM):', new Date().getFullYear() + '-' + String(new Date().getMonth() + 2).padStart(2,'0'));
-    if (!input) return;
-    const parts = input.split('-');
+function printFoodCountSheets(monthKey) {
+    if (!monthKey) { showPanel('countPicker'); return; }
+    const parts = monthKey.split('-');
     const year = parseInt(parts[0]);
     const month = parseInt(parts[1]) - 1;
-    if (isNaN(year) || isNaN(month)) { alert('Invalid format'); return; }
 
     const active = students.filter(s => isTruthy(s.Active));
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
