@@ -182,7 +182,7 @@ function getSeasonalBanner(weekStart) {
     const m = weekStart.getMonth();
     const d = weekStart.getDate();
     // Check for holidays near this week
-    if (m === 6 && d <= 7) return { text:'🎆 Happy 4th of July! 🇺🇸', bg:'#fef2f2', color:'#dc2626' };
+    if (m === 6 && d <= 7) return { text:'🎆 Happy 4th of July! 🎇', bg:'#fef2f2', color:'#dc2626' };
     if (m === 9 && d >= 25) return { text:'🎃 Happy Halloween! 👻', bg:'#fff7ed', color:'#ea580c' };
     if (m === 10 && d >= 18 && d <= 28) return { text:'🦃 Happy Thanksgiving! 🍂', bg:'#fefce8', color:'#a16207' };
     if (m === 11 && d >= 15) return { text:'🎄 Merry Christmas! ⛄', bg:'#f0fdf4', color:'#16a34a' };
@@ -207,9 +207,9 @@ function getMonday(d) {
 function formatDate(d) { return (d.getMonth()+1) + '/' + d.getDate(); }
 function getWeekKey() { return currentWeekStart.toISOString().split('T')[0]; }
 
-function prevWeek() { currentWeekStart.setDate(currentWeekStart.getDate() - 7); render(); loadMenus(); }
-function nextWeek() { currentWeekStart.setDate(currentWeekStart.getDate() + 7); render(); loadMenus(); }
-function goToThisWeek() { currentWeekStart = getMonday(new Date()); render(); loadMenus(); }
+function prevWeek() { currentWeekStart.setDate(currentWeekStart.getDate() - 7); render(); loadMenus().then(() => applyTemplate(getRotatingTemplateIndex(), false)); }
+function nextWeek() { currentWeekStart.setDate(currentWeekStart.getDate() + 7); render(); loadMenus().then(() => applyTemplate(getRotatingTemplateIndex(), false)); }
+function goToThisWeek() { currentWeekStart = getMonday(new Date()); render(); loadMenus().then(() => applyTemplate(getRotatingTemplateIndex(), false)); }
 
 function render() {
     const dates = [];
@@ -382,7 +382,7 @@ function printMenus() {
         // Themed banner
         html += `<div style="background:${theme.accentBg};color:white;text-align:center;padding:8px 16px;border-radius:8px;margin-bottom:6px;font-size:16px;font-weight:700;letter-spacing:1px;font-family:'Fredoka',sans-serif;">${theme.banner}</div>`;
         // Header with logo and dates + themed emojis
-        html += `<div class="print-header"><img src="logo-sm.png" alt="Children of Promise"><h1 style="color:${theme.headerBg};"><span style="font-family:sans-serif;font-size:52px;vertical-align:middle;">${theme.leftEmoji || ''}</span> ${dateRange} <span style="font-family:sans-serif;font-size:52px;vertical-align:middle;">${theme.rightEmoji || ''}</span></h1></div>`;
+        html += `<div class="print-header"><img src="logo-sm.png" alt="Children of Promise"><h1 style="color:${theme.headerBg};"><span style="font-family:sans-serif;font-size:72px;vertical-align:middle;">${theme.leftEmoji || ''}</span> ${dateRange} <span style="font-family:sans-serif;font-size:72px;vertical-align:middle;">${theme.rightEmoji || ''}</span></h1></div>`;
         html += `<div class="print-subtitle" style="color:${theme.headerBg};font-size:14px;font-family:'Fredoka',sans-serif;">${sec.title}</div>`;
         // Table with themed colors
         html += `<table style="border:2px solid ${theme.borderColor};">`;
@@ -424,7 +424,11 @@ function printMenus() {
 }
 
 render();
-loadMenus();
+async function initMenus() {
+    await loadMenus();
+    applyTemplate(getRotatingTemplateIndex(), false);
+}
+initMenus();
 
 function applyTemplate(idx, overwrite) {
     ['pfa','other'].forEach(section => {
@@ -439,8 +443,6 @@ function applyTemplate(idx, overwrite) {
         });
     });
 }
-// Auto-load rotating template after loadMenus (fills empty fields only)
-setTimeout(() => { applyTemplate(getRotatingTemplateIndex(), false); }, 500);
 </script>
 <div id="printArea"></div>
 </body>
