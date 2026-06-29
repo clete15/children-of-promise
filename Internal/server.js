@@ -1111,7 +1111,7 @@ function handleRequest(req, res) {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const { studentId, field, value } = d;
-            const validFields = ['PermissionSlip','ParentInterview','ProofOfIncome','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport'];
+            const validFields = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS'];
             if (!validFields.includes(field)) return sendJSON(res, 400, { error: 'Invalid field' });
             const sql = `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${parseInt(studentId)})
                 UPDATE ISBETracking SET ${field}=${value?1:0} WHERE StudentId=${parseInt(studentId)}
