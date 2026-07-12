@@ -989,8 +989,8 @@ function handleRequest(req, res) {
         const r1 = runSQL(`SELECT PfaData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`);
         const r2 = runSQL(`SELECT OtherData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`);
         if (!r1.ok && !r2.ok) return sendJSON(res, 200, {});
-        const pfaRaw = (r1.data || '').split('\n').filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()) && l.includes('{')).join('');
-        const otherRaw = (r2.data || '').split('\n').filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()) && l.includes('{')).join('');
+        const pfaRaw = (r1.data || '').split('\n').filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim())).join('').trim();
+        const otherRaw = (r2.data || '').split('\n').filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim())).join('').trim();
         try {
             const pfa = pfaRaw ? JSON.parse(pfaRaw.trim()) : {};
             const other = otherRaw ? JSON.parse(otherRaw.trim()) : {};
