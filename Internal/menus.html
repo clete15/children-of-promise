@@ -234,7 +234,7 @@ function render() {
                 <div class="menu-day-header">${dayName}<div class="day-date">${dateStr}</div></div>
                 ${MEALS.map(meal => `<div class="menu-meal">
                     <div class="menu-meal-label">${meal}</div>
-                    <textarea id="${section}_${di}_${meal.replace(/\s/g,'')}" placeholder="${meal}...">${isHoliday?'CLOSED - Holiday':''}</textarea>
+                    <textarea id="${section}_${di}_${meal.replace(/\s/g,'')}" placeholder="${meal}..." onchange="autoSave()">${isHoliday?'CLOSED - Holiday':''}</textarea>
                 </div>`).join('')}
             </div>`;
         }).join('');
@@ -257,6 +257,12 @@ function getRotatingTemplateIndex() {
     const firstThursday = new Date(d.getFullYear(), 0, 4);
     const weekNum = Math.round(((d - firstThursday) / 86400000 + 1) / 7) + 1;
     return (weekNum - 1) % 4;
+}
+
+let _saveTimeout = null;
+function autoSave() {
+    if (_saveTimeout) clearTimeout(_saveTimeout);
+    _saveTimeout = setTimeout(() => saveMenus(), 1000);
 }
 
 async function saveMenus() {
