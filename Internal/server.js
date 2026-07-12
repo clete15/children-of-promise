@@ -985,23 +985,16 @@ function handleRequest(req, res) {
         const query = req.url.split('?')[1] || '';
         const params = new URLSearchParams(query);
         const week = params.get('week') || '';
-        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='WeeklyMenus')
-            CREATE TABLE WeeklyMenus (
-                Id INT IDENTITY(1,1) PRIMARY KEY,
-                WeekKey NVARCHAR(20) NOT NULL UNIQUE,
-                PfaData NVARCHAR(MAX),
-                OtherData NVARCHAR(MAX),
-                UpdatedAt DATETIME DEFAULT GETDATE()
-            );
-            SELECT '<<PFA>>' + ISNULL(PfaData,'{}') + '<<OTHER>>' + ISNULL(OtherData,'{}') + '<<END>>' FROM WeeklyMenus WHERE WeekKey=${esc(week)}`;
-        const r = runSQL(sql);
-        if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const raw = r.data || '';
-        const pfaMatch = raw.match(/<<PFA>>([\s\S]*?)<<OTHER>>/);
-        const otherMatch = raw.match(/<<OTHER>>([\s\S]*?)<<END>>/);
-        if (!pfaMatch) return sendJSON(res, 200, {});
+        // Read PFA and Other data separately to avoid sqlcmd line truncation
+        const r1 = runSQL(`SELECT PfaData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`);
+        const r2 = runSQL(`SELECT OtherData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`);
+        if (!r1.ok && !r2.ok) return sendJSON(res, 200, {});
+        const pfaRaw = (r1.data || '').split('\n').filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()) && l.includes('{')).join('');
+        const otherRaw = (r2.data || '').split('\n').filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()) && l.includes('{')).join('');
         try {
-            return sendJSON(res, 200, { pfa: JSON.parse(pfaMatch[1] || '{}'), other: JSON.parse(otherMatch[1] || '{}') });
+            const pfa = pfaRaw ? JSON.parse(pfaRaw.trim()) : {};
+            const other = otherRaw ? JSON.parse(otherRaw.trim()) : {};
+            return sendJSON(res, 200, { pfa, other });
         } catch(e) { return sendJSON(res, 200, {}); }
     }
 
