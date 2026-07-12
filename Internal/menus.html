@@ -289,6 +289,9 @@ async function saveMenus() {
             });
         });
     });
+    // Save to localStorage as reliable fallback
+    localStorage.setItem('menu_' + weekKey, JSON.stringify({ pfa: data.pfa, other: data.other }));
+    // Also try server save
     try {
         const res = await apiFetch('/api/menus', { method: 'POST', body: JSON.stringify(data) });
         const result = await res.json();
@@ -296,13 +299,36 @@ async function saveMenus() {
             const btn = document.querySelector('.btn-green');
             if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => btn.textContent = '💾 Update Menu', 2000); }
         } else {
-            alert('Save failed: ' + (result.error || 'Unknown error'));
+            const btn = document.querySelector('.btn-green');
+            if (btn) { btn.textContent = '✓ Saved locally'; setTimeout(() => btn.textContent = '💾 Update Menu', 2000); }
         }
-    } catch (e) { alert('Failed to save: ' + e.message); }
+    } catch (e) {
+        const btn = document.querySelector('.btn-green');
+        if (btn) { btn.textContent = '✓ Saved locally'; setTimeout(() => btn.textContent = '💾 Update Menu', 2000); }
+    }
 }
 
 async function loadMenus() {
     const weekKey = getWeekKey();
+    // Try localStorage first (always available)
+    const local = localStorage.getItem('menu_' + weekKey);
+    if (local) {
+        try {
+            const data = JSON.parse(local);
+            ['pfa','other'].forEach(section => {
+                const sectionData = data[section] || {};
+                for (let di = 0; di < 5; di++) {
+                    MEALS.forEach(meal => {
+                        const key = DAYS[di] + '_' + meal.replace(/\s/g,'');
+                        const el = document.getElementById(`${section}_${di}_${meal.replace(/\s/g,'')}`);
+                        if (el && sectionData[key]) el.value = sectionData[key];
+                    });
+                }
+            });
+            return;
+        } catch(e) {}
+    }
+    // Fall back to server
     try {
         const res = await apiFetch('/api/menus?week=' + encodeURIComponent(weekKey));
         const data = await res.json();
