@@ -993,15 +993,15 @@ function handleRequest(req, res) {
                 OtherData NVARCHAR(MAX),
                 UpdatedAt DATETIME DEFAULT GETDATE()
             );
-            SELECT PfaData,OtherData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`;
+            SELECT '<<PFA>>' + ISNULL(PfaData,'{}') + '<<OTHER>>' + ISNULL(OtherData,'{}') + '<<END>>' FROM WeeklyMenus WHERE WeekKey=${esc(week)}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const lines = r.data.trim().split('\n')
-            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()) && l.includes('|'));
-        if (!lines.length) return sendJSON(res, 200, {});
-        const v = lines[0].split('|').map(x => x.trim());
+        const raw = r.data || '';
+        const pfaMatch = raw.match(/<<PFA>>([\s\S]*?)<<OTHER>>/);
+        const otherMatch = raw.match(/<<OTHER>>([\s\S]*?)<<END>>/);
+        if (!pfaMatch) return sendJSON(res, 200, {});
         try {
-            return sendJSON(res, 200, { pfa: JSON.parse(v[0] || '{}'), other: JSON.parse(v[1] || '{}') });
+            return sendJSON(res, 200, { pfa: JSON.parse(pfaMatch[1] || '{}'), other: JSON.parse(otherMatch[1] || '{}') });
         } catch(e) { return sendJSON(res, 200, {}); }
     }
 
