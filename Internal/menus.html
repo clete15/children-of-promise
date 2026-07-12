@@ -295,6 +295,8 @@ async function saveMenus() {
         if (result.success) {
             const btn = document.querySelector('.btn-green');
             if (btn) { btn.textContent = '✓ Saved!'; setTimeout(() => btn.textContent = '💾 Update Menu', 2000); }
+        } else {
+            alert('Save failed: ' + (result.error || 'Unknown error'));
         }
     } catch (e) { alert('Failed to save: ' + e.message); }
 }
@@ -316,7 +318,7 @@ async function loadMenus() {
                 }
             });
         }
-    } catch (e) { /* no saved menu for this week */ }
+    } catch (e) { console.error('[Menu Load Error]', e); }
 }
 
 function getSeasonalTheme(weekStart) {
