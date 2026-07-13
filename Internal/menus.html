@@ -310,7 +310,25 @@ async function saveMenus() {
 
 async function loadMenus() {
     const weekKey = getWeekKey();
-    // Try localStorage first (always available)
+    // Try server first (shared across all users)
+    try {
+        const res = await apiFetch('/api/menus?week=' + encodeURIComponent(weekKey));
+        const data = await res.json();
+        if (data && data.pfa && Object.keys(data.pfa).length > 0) {
+            ['pfa','other'].forEach(section => {
+                const sectionData = data[section] || {};
+                for (let di = 0; di < 5; di++) {
+                    MEALS.forEach(meal => {
+                        const key = DAYS[di] + '_' + meal.replace(/\s/g,'');
+                        const el = document.getElementById(`${section}_${di}_${meal.replace(/\s/g,'')}`);
+                        if (el && sectionData[key]) el.value = sectionData[key];
+                    });
+                }
+            });
+            return;
+        }
+    } catch (e) { console.error('[Menu Server Load Error]', e); }
+    // Fallback to localStorage if server returned nothing
     const local = localStorage.getItem('menu_' + weekKey);
     if (local) {
         try {
@@ -325,26 +343,8 @@ async function loadMenus() {
                     });
                 }
             });
-            return;
         } catch(e) {}
     }
-    // Fall back to server
-    try {
-        const res = await apiFetch('/api/menus?week=' + encodeURIComponent(weekKey));
-        const data = await res.json();
-        if (data && data.pfa) {
-            ['pfa','other'].forEach(section => {
-                const sectionData = data[section] || {};
-                for (let di = 0; di < 5; di++) {
-                    MEALS.forEach(meal => {
-                        const key = DAYS[di] + '_' + meal.replace(/\s/g,'');
-                        const el = document.getElementById(`${section}_${di}_${meal.replace(/\s/g,'')}`);
-                        if (el && sectionData[key]) el.value = sectionData[key];
-                    });
-                }
-            });
-        }
-    } catch (e) { console.error('[Menu Load Error]', e); }
 }
 
 function getSeasonalTheme(weekStart) {
