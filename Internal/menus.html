@@ -432,7 +432,7 @@ function printMenus() {
             html += `<tr><td class="meal-label" style="background:${theme.cellBg};color:${theme.headerBg};border-color:${theme.borderColor};">${meal}</td>`;
             for (let di = 0; di < 5; di++) {
                 const el = document.getElementById(sec.id + '_' + di + '_' + meal.replace(/\s/g,''));
-                const val = el ? el.value : '';
+                const val = el ? el.value.replace(/\n+$/,'').trim() : '';
                 if (val === 'CLOSED - Holiday') {
                     html += `<td class="holiday-cell" style="background:${theme.cellBg};border-color:${theme.borderColor};font-size:18px;">🎉</td>`;
                 } else {
@@ -442,15 +442,7 @@ function printMenus() {
             html += '</tr>';
         });
         html += '</tbody></table>';
-        // Bottom decorative art - centered row of themed SVGs (slightly smaller)
-        html += `<div style="display:flex;justify-content:space-around;align-items:center;margin-top:2px;padding:0 40px;transform:scale(0.75);">
-            <div style="color:${theme.cornerColor};transform:rotate(-15deg);">${theme.cornerSvg}</div>
-            <div style="color:${theme.cornerColor};opacity:0.6;transform:scale(0.7);">${theme.cornerSvg}</div>
-            <div style="color:${theme.cornerColor};transform:rotate(10deg);">${theme.cornerSvg}</div>
-            <div style="color:${theme.cornerColor};opacity:0.6;transform:scale(0.7) rotate(-5deg);">${theme.cornerSvg}</div>
-            <div style="color:${theme.cornerColor};transform:rotate(20deg);">${theme.cornerSvg}</div>
-        </div>`;
-        // Classroom name at bottom right
+        // PFA/PI label bottom right (inside the page)
         html += `<div style="text-align:right;font-size:11px;font-weight:600;color:#6b7280;margin-top:4px;padding-right:8px;">${sec.title}</div>`;
         html += '</div>';
     });
