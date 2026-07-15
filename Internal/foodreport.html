@@ -268,14 +268,25 @@ async function saveFRRow(i) {
 
 function exportFoodExcel() {
     const active = students.filter(s => isTruthy(s.Active));
-    const headers = ['First_Name','Last_Name','PFA_PI_na','Room','F_R_P_Food','HouseholdIncome','HouseholdSize'];
-    let csv = headers.join('\t') + '\n';
-    active.forEach(s => { csv += [s.First_Name, s.Last_Name, s.PFA_PI_na||'', s.Room||'', s.F_R_P_Food||'', s.HouseholdIncome||'', s.HouseholdSize||''].join('\t') + '\n'; });
-    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' });
+    const headers = ['First Name','Last Name','Room','Teacher','F/R/P','Income','HH Size'];
+    let csv = headers.join(',') + '\n';
+    active.forEach(s => {
+        csv += [
+            '"' + (s.First_Name||'') + '"',
+            '"' + (s.Last_Name||'') + '"',
+            '"' + (s.Room||'') + '"',
+            '"' + (s.TeacherDescription||'') + '"',
+            '"' + (s.F_R_P_Food||'') + '"',
+            s.HouseholdIncome||'',
+            s.HouseholdSize||''
+        ].join(',') + '\n';
+    });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'Food_Program_Roster_' + new Date().toISOString().split('T')[0] + '.xls';
+    a.download = 'Food_Program_Roster_' + new Date().toISOString().split('T')[0] + '.csv';
     a.click();
+    URL.revokeObjectURL(a.href);
 }
 
 function printFoodCountSheets(monthKey) {
