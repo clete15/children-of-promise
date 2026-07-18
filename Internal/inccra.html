@@ -184,24 +184,24 @@ async function exportInccraRoster() {
         // Sort by days old (youngest to oldest)
         rows.sort((a, b) => (parseInt(a.DaysOld) || 0) - (parseInt(b.DaysOld) || 0));
 
-        // Build CSV with tab-separated values for better Excel column widths
+        // Build CSV
         const headers = ['Room', 'Last Initial', 'First Initial', 'Age in Years', 'Days Old'];
-        let csv = headers.join('\t') + '\n';
+        let csv = headers.join(',') + '\n';
         rows.forEach(r => {
             csv += [
-                r.Room,
-                r.LastInitial,
-                r.FirstInitial,
+                '"' + r.Room + '"',
+                '"' + r.LastInitial + '"',
+                '"' + r.FirstInitial + '"',
                 r.AgeInYears,
                 r.DaysOld
-            ].join('\t') + '\n';
+            ].join(',') + '\n';
         });
 
-        // Download as .xls (tab-delimited opens natively in Excel with proper column widths)
-        const blob = new Blob(['\uFEFF' + csv], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+        // Download as CSV
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'INCCRA_Classroom_Roster_' + today.toISOString().split('T')[0] + '.xls';
+        a.download = 'INCCRA_Classroom_Roster_' + today.toISOString().split('T')[0] + '.csv';
         a.click();
         URL.revokeObjectURL(a.href);
 
