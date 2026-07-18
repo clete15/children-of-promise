@@ -1209,6 +1209,7 @@ function handleRequest(req, res) {
             const fields = [];
             if (d.status !== undefined) fields.push(`WaitlistStatus=${esc(d.status)}`);
             if (d.notes !== undefined) fields.push(`Notes=${esc(d.notes)}`);
+            if (d.ageGroup !== undefined) fields.push(`AgeGroup=${esc(d.ageGroup)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
             const r = runSQL(`UPDATE PreEnrollment SET ${fields.join(',')} WHERE Id=${id}`);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
