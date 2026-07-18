@@ -31,9 +31,9 @@
             flex-direction: column;
             gap: 10px;
             transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+            cursor: pointer;
         }
         .link-card:hover { transform: translateY(-3px); border-color: #2563eb; box-shadow: 0 8px 24px rgba(37,99,235,0.12); }
-        .link-card.disabled { opacity: 0.5; pointer-events: none; }
         .link-card .card-icon { font-size: 2rem; }
         .link-card h3 { font-size: 0.95rem; font-weight: 700; color: #2563eb; margin: 0; }
         .link-card p { font-size: 0.8rem; color: #64748b; line-height: 1.5; margin: 0; }
@@ -47,7 +47,18 @@
             letter-spacing: 0.05em;
         }
         .badge-external { background: #dbeafe; color: #1d4ed8; }
-        .badge-coming { background: #fef3c7; color: #92400e; }
+        .badge-export { background: #dcfce7; color: #166534; }
+
+        .export-status {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: none;
+        }
+        .export-status.success { display: block; background: #dcfce7; color: #166534; }
+        .export-status.error { display: block; background: #fef2f2; color: #991b1b; }
     </style>
 </head>
 <body>
@@ -81,18 +92,131 @@
                         <span class="badge badge-external">↗ Opens in SharePoint</span>
                     </a>
 
-                    <!-- Classroom Roster Report (placeholder) -->
-                    <div class="link-card disabled">
+                    <!-- Classroom Roster Report -->
+                    <div class="link-card" onclick="exportInccraRoster()">
                         <div class="card-icon">📋</div>
                         <h3>Classroom Roster Report</h3>
-                        <p>Generate and print classroom rosters for INCCRA grant reporting and compliance documentation.</p>
-                        <span class="badge badge-coming">🚧 Coming Soon</span>
+                        <p>Export an Excel roster of INCCRA children (excludes school-age and summer program). Shows initials only.</p>
+                        <span class="badge badge-export">📥 Export Excel</span>
                     </div>
                 </div>
+
+                <div class="export-status" id="exportStatus"></div>
             </div>
         </div>
     </div>
 </div>
 
+<script>
+const AUTH = 'Basic ' + btoa(':cofpadmin');
+
+function apiFetch(url, opts = {}) {
+    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
+    return fetch(url, opts);
+}
+
+function isTruthy(v) {
+    if (v === true || v === 1 || v === '1') return true;
+    if (typeof v === 'string') return v.toLowerCase() === 'yes';
+    return false;
+}
+
+function isSchoolAgeOrSummer(room) {
+    if (!room) return false;
+    const r = room.toLowerCase();
+    return r.includes('before') || r.includes('after') || r.includes('school age') || r.includes('summer');
+}
+
+async function exportInccraRoster() {
+    const status = document.getElementById('exportStatus');
+    status.className = 'export-status';
+    status.style.display = 'block';
+    status.textContent = 'Loading roster data…';
+    status.style.background = '#eff6ff';
+    status.style.color = '#1d4ed8';
+
+    try {
+        const res = await apiFetch('/api/students');
+        const students = await res.json();
+
+        // Filter: active, INCCRA program, not school-age/summer rooms
+        const inccra = students.filter(s =>
+            isTruthy(s.Active) &&
+            s.PFA_PI_na === 'INCCRA' &&
+            !isSchoolAgeOrSummer(s.Room)
+        );
+
+        if (!inccra.length) {
+            status.className = 'export-status error';
+            status.textContent = 'No INCCRA students found (excluding school-age/summer).';
+            return;
+        }
+
+        // Calculate age in years and days old
+        const today = new Date();
+        const rows = inccra.map(s => {
+            const lastInitial = s.Last_Name ? s.Last_Name.charAt(0).toUpperCase() : '';
+            const firstInitial = s.First_Name ? s.First_Name.charAt(0).toUpperCase() : '';
+            let ageYears = '';
+            let daysOld = '';
+            if (s.Birth_date) {
+                const bd = new Date(s.Birth_date);
+                if (!isNaN(bd.getTime())) {
+                    const diffMs = today - bd;
+                    daysOld = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                    ageYears = (daysOld / 365.25).toFixed(1);
+                }
+            }
+            // Fallback to Days_Old from DB if birth date calc fails
+            if (!daysOld && s.Days_Old) {
+                daysOld = parseInt(s.Days_Old) || '';
+                if (daysOld) ageYears = (daysOld / 365.25).toFixed(1);
+            }
+            return {
+                Room: s.Room || '',
+                LastInitial: lastInitial,
+                FirstInitial: firstInitial,
+                AgeInYears: ageYears,
+                DaysOld: daysOld
+            };
+        });
+
+        // Sort by room then age
+        rows.sort((a, b) => {
+            if (a.Room !== b.Room) return a.Room.localeCompare(b.Room);
+            return (parseInt(a.DaysOld) || 0) - (parseInt(b.DaysOld) || 0);
+        });
+
+        // Build CSV
+        const headers = ['Room', 'Last Initial', 'First Initial', 'Age in Years', 'Days Old'];
+        let csv = headers.join(',') + '\n';
+        rows.forEach(r => {
+            csv += [
+                '"' + r.Room + '"',
+                r.LastInitial,
+                r.FirstInitial,
+                r.AgeInYears,
+                r.DaysOld
+            ].join(',') + '\n';
+        });
+
+        // Download
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'INCCRA_Classroom_Roster_' + today.toISOString().split('T')[0] + '.csv';
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        status.className = 'export-status success';
+        status.textContent = `✓ Exported ${rows.length} INCCRA students`;
+        setTimeout(() => { status.style.display = 'none'; }, 4000);
+
+    } catch (e) {
+        status.className = 'export-status error';
+        status.textContent = 'Failed to load data: ' + e.message;
+    }
+}
+</script>
 </body>
 </html>
