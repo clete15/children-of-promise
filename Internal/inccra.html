@@ -181,20 +181,8 @@ async function exportInccraRoster() {
             };
         });
 
-        // Sort by custom room order then age
-        const roomOrder = ['Infants', 'Infants / Toddlers', 'Toddlers', '2 Year Olds / Toddlers', '2 Year Olds', 'Pre-School', 'Pre-School 2'];
-        function getRoomRank(room) {
-            for (let i = 0; i < roomOrder.length; i++) {
-                if (room.toLowerCase().includes(roomOrder[i].toLowerCase())) return i;
-            }
-            return roomOrder.length;
-        }
-        rows.sort((a, b) => {
-            const ra = getRoomRank(a.Room);
-            const rb = getRoomRank(b.Room);
-            if (ra !== rb) return ra - rb;
-            return (parseInt(a.DaysOld) || 0) - (parseInt(b.DaysOld) || 0);
-        });
+        // Sort by days old (youngest to oldest)
+        rows.sort((a, b) => (parseInt(a.DaysOld) || 0) - (parseInt(b.DaysOld) || 0));
 
         // Build CSV with tab-separated values for better Excel column widths
         const headers = ['Room', 'Last Initial', 'First Initial', 'Age in Years', 'Days Old'];
