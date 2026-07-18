@@ -184,24 +184,45 @@ async function exportInccraRoster() {
         // Sort by days old (youngest to oldest)
         rows.sort((a, b) => (parseInt(a.DaysOld) || 0) - (parseInt(b.DaysOld) || 0));
 
-        // Build CSV
-        const headers = ['Room', 'Last Initial', 'First Initial', 'Age in Years', 'Days Old'];
-        let csv = headers.join(',') + '\n';
-        rows.forEach(r => {
-            csv += [
-                '"' + r.Room + '"',
-                '"' + r.LastInitial + '"',
-                '"' + r.FirstInitial + '"',
-                r.AgeInYears,
-                r.DaysOld
-            ].join(',') + '\n';
+        // Build Excel XML for proper formatting (bold headers, auto-width columns)
+        let xml = '<?xml version="1.0"?>\n';
+        xml += '<?mso-application progid="Excel.Sheet"?>\n';
+        xml += '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n';
+        xml += ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">\n';
+        xml += '<Styles>\n';
+        xml += '  <Style ss:ID="Header"><Font ss:Bold="1" ss:Size="11"/></Style>\n';
+        xml += '  <Style ss:ID="Default"><Font ss:Size="10"/></Style>\n';
+        xml += '</Styles>\n';
+        xml += '<Worksheet ss:Name="INCCRA Roster">\n';
+        xml += '<Table>\n';
+        xml += '  <Column ss:Width="160"/>\n';
+        xml += '  <Column ss:Width="80"/>\n';
+        xml += '  <Column ss:Width="80"/>\n';
+        xml += '  <Column ss:Width="90"/>\n';
+        xml += '  <Column ss:Width="70"/>\n';
+        // Header row
+        xml += '  <Row>\n';
+        ['Room', 'Last Initial', 'First Initial', 'Age in Years', 'Days Old'].forEach(h => {
+            xml += '    <Cell ss:StyleID="Header"><Data ss:Type="String">' + h + '</Data></Cell>\n';
         });
+        xml += '  </Row>\n';
+        // Data rows
+        rows.forEach(r => {
+            xml += '  <Row>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + r.Room + '</Data></Cell>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + r.LastInitial + '</Data></Cell>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + r.FirstInitial + '</Data></Cell>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="Number">' + (r.AgeInYears || '') + '</Data></Cell>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="Number">' + (r.DaysOld || '') + '</Data></Cell>\n';
+            xml += '  </Row>\n';
+        });
+        xml += '</Table>\n</Worksheet>\n</Workbook>';
 
-        // Download as CSV
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        // Download as .xls
+        const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'INCCRA_Classroom_Roster_' + today.toISOString().split('T')[0] + '.csv';
+        a.download = 'INCCRA_Classroom_Roster_' + today.toISOString().split('T')[0] + '.xls';
         a.click();
         URL.revokeObjectURL(a.href);
 
