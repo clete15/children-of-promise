@@ -181,30 +181,39 @@ async function exportInccraRoster() {
             };
         });
 
-        // Sort by room then age
+        // Sort by custom room order then age
+        const roomOrder = ['Infants', 'Infants / Toddlers', 'Toddlers', '2 Year Olds', '2 Year Olds / Toddlers', 'Pre-School', 'Pre-School 2'];
+        function getRoomRank(room) {
+            for (let i = 0; i < roomOrder.length; i++) {
+                if (room.toLowerCase().includes(roomOrder[i].toLowerCase())) return i;
+            }
+            return roomOrder.length;
+        }
         rows.sort((a, b) => {
-            if (a.Room !== b.Room) return a.Room.localeCompare(b.Room);
+            const ra = getRoomRank(a.Room);
+            const rb = getRoomRank(b.Room);
+            if (ra !== rb) return ra - rb;
             return (parseInt(a.DaysOld) || 0) - (parseInt(b.DaysOld) || 0);
         });
 
-        // Build CSV
+        // Build CSV with tab-separated values for better Excel column widths
         const headers = ['Room', 'Last Initial', 'First Initial', 'Age in Years', 'Days Old'];
-        let csv = headers.join(',') + '\n';
+        let csv = headers.join('\t') + '\n';
         rows.forEach(r => {
             csv += [
-                '"' + r.Room + '"',
+                r.Room,
                 r.LastInitial,
                 r.FirstInitial,
                 r.AgeInYears,
                 r.DaysOld
-            ].join(',') + '\n';
+            ].join('\t') + '\n';
         });
 
-        // Download
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        // Download as .xls (tab-delimited opens natively in Excel with proper column widths)
+        const blob = new Blob(['\uFEFF' + csv], { type: 'application/vnd.ms-excel;charset=utf-8;' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'INCCRA_Classroom_Roster_' + today.toISOString().split('T')[0] + '.csv';
+        a.download = 'INCCRA_Classroom_Roster_' + today.toISOString().split('T')[0] + '.xls';
         a.click();
         URL.revokeObjectURL(a.href);
 
