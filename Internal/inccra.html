@@ -182,7 +182,7 @@ async function exportInccraRoster() {
         });
 
         // Sort by custom room order then age
-        const roomOrder = ['Infants', 'Infants / Toddlers', 'Toddlers', '2 Year Olds', '2 Year Olds / Toddlers', 'Pre-School', 'Pre-School 2'];
+        const roomOrder = ['Infants', 'Infants / Toddlers', 'Toddlers', '2 Year Olds / Toddlers', '2 Year Olds', 'Pre-School', 'Pre-School 2'];
         function getRoomRank(room) {
             for (let i = 0; i < roomOrder.length; i++) {
                 if (room.toLowerCase().includes(roomOrder[i].toLowerCase())) return i;
