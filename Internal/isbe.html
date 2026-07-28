@@ -130,10 +130,11 @@
                             <th title="Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.">End ASE</th>
                             <th title="Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.">End Year<br>Report Card</th>
                             <th title="Remove student from ISBE Student Information System (SIS) after completing end-of-year reporting.">Remove<br>from SIS</th>
+                            <th title="Grant Periodic Performance Report – open and complete the report document for PFA/PI compliance.">Grant Perf<br>Report</th>
                         </tr>
                     </thead>
                     <tbody id="isbeBody">
-                        <tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
+                        <tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -497,13 +498,13 @@ function setProgram(prog) {
     }
 }
 
-const FIELDS = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS'];
+const FIELDS = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS','GrantPerfReport'];
 
 function renderRoster() {
     const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'));
     document.getElementById('isbeCount').textContent = roster.length + ' students';
     const tbody = document.getElementById('isbeBody');
-    if (!roster.length) { tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
+    if (!roster.length) { tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
 
     tbody.innerHTML = roster.map(s => {
         const t = trackingData[s.Id] || {};
@@ -522,6 +523,9 @@ function renderRoster() {
             if (f === 'BegASE' || f === 'EndASE') {
                 var period2 = f === 'BegASE' ? 'Beginning' : 'End';
                 return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openScreening(' + s.Id + ',\'ASQ:SE-2\',\'' + period2 + '\')" title="Open ASQ:SE-2 Score Entry">[form]</a></td>';
+            }
+            if (f === 'GrantPerfReport' && activeProgram === 'PFA') {
+                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026" target="_blank" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" title="Open Grant Performance Report in SharePoint">[doc]</a></td>';
             }
             return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)"></td>';
         }).join('');

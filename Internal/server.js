@@ -530,16 +530,18 @@ function handleRequest(req, res) {
                 MidYearReport BIT DEFAULT 0,
                 EndASQ BIT DEFAULT 0,
                 EndASE BIT DEFAULT 0,
-                EndYearReport BIT DEFAULT 0
+                EndYearReport BIT DEFAULT 0,
+                GrantPerfReport BIT DEFAULT 0
             );
-            SELECT StudentId,PermissionSlip,ParentInterview,ProofOfIncome,BegASQ,BegASE,MidYearReport,EndASQ,EndASE,EndYearReport FROM ISBETracking`;
+            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ISBETracking' AND COLUMN_NAME='GrantPerfReport') ALTER TABLE ISBETracking ADD GrantPerfReport BIT DEFAULT 0;
+            SELECT StudentId,PermissionSlip,ParentInterview,ProofOfIncome,BegASQ,BegASE,MidYearReport,EndASQ,EndASE,EndYearReport,ISNULL(GrantPerfReport,0) AS GrantPerfReport FROM ISBETracking`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
-                return { StudentId: v[0], PermissionSlip: v[1]==='1', ParentInterview: v[2]==='1', ProofOfIncome: v[3]==='1', BegASQ: v[4]==='1', BegASE: v[5]==='1', MidYearReport: v[6]==='1', EndASQ: v[7]==='1', EndASE: v[8]==='1', EndYearReport: v[9]==='1' };
+                return { StudentId: v[0], PermissionSlip: v[1]==='1', ParentInterview: v[2]==='1', ProofOfIncome: v[3]==='1', BegASQ: v[4]==='1', BegASE: v[5]==='1', MidYearReport: v[6]==='1', EndASQ: v[7]==='1', EndASE: v[8]==='1', EndYearReport: v[9]==='1', GrantPerfReport: v[10]==='1' };
             });
         return sendJSON(res, 200, rows);
     }
@@ -1104,7 +1106,7 @@ function handleRequest(req, res) {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const { studentId, field, value } = d;
-            const validFields = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS'];
+            const validFields = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS','GrantPerfReport'];
             if (!validFields.includes(field)) return sendJSON(res, 400, { error: 'Invalid field' });
             const sql = `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${parseInt(studentId)})
                 UPDATE ISBETracking SET ${field}=${value?1:0} WHERE StudentId=${parseInt(studentId)}
