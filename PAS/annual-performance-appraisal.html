@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annual Performance Appraisal — Children of Promise LLC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt; line-height: 1.4; color: #333;
+            padding: 0.5in 0.75in;
+        }
+        .header {
+            text-align: center; border-bottom: 2px solid #2c5282;
+            padding-bottom: 12px; margin-bottom: 20px;
+        }
+        .header h1 { font-size: 14pt; color: #2c5282; margin-bottom: 4px; }
+        .header .org-name { font-size: 11pt; color: #666; margin-bottom: 6px; }
+        .info-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 10px; margin-bottom: 20px;
+        }
+        .info-field {
+            display: flex; align-items: baseline; gap: 8px;
+        }
+        .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
+        .info-field .line {
+            flex: 1; border-bottom: 1px solid #999;
+            min-width: 80px; height: 1.2em;
+        }
+        .section-title {
+            font-size: 11pt; font-weight: 700; color: #2c5282;
+            margin-top: 18px; margin-bottom: 10px;
+            border-bottom: 1px solid #cbd5e0; padding-bottom: 4px;
+        }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        table th, table td {
+            border: 1px solid #cbd5e0; padding: 5px 6px;
+            text-align: center; font-size: 10pt;
+        }
+        table th { background-color: #edf2f7; font-weight: 600; color: #2c5282; }
+        table td:first-child { text-align: left; width: 40%; }
+        .write-lines {
+            border-bottom: 1px solid #999; height: 1.4em; margin-bottom: 6px;
+        }
+        .narrative-section { margin-bottom: 14px; }
+        .narrative-section p { font-weight: 600; margin-bottom: 6px; font-size: 10pt; }
+        .goal-table { margin-bottom: 16px; }
+        .goal-table td { height: 2em; text-align: left; }
+        .goal-table th { font-size: 9pt; }
+        .signature-section {
+            margin-top: 25px; display: grid;
+            grid-template-columns: 2fr 1fr; gap: 24px;
+        }
+        .sig-field label {
+            font-weight: 600; font-size: 10pt; display: block; margin-bottom: 20px;
+        }
+        .sig-field .sig-line { border-bottom: 1px solid #333; margin-top: 25px; }
+        .footer {
+            margin-top: 30px; padding-top: 10px;
+            border-top: 1px solid #cbd5e0; display: flex;
+            justify-content: space-between; font-size: 9pt; color: #666;
+        }
+        @media print {
+            body { padding: 0; }
+            @page { margin: 0.5in 0.6in; size: letter; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
+        <h1>Annual Performance Appraisal</h1>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-field">
+            <label>Employee Name:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Position:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Supervisor:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Review Period:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Date:</label><div class="line"></div>
+        </div>
+    </div>
+
+    <div class="section-title">Performance Rating</div>
+    <p style="font-size:9pt; margin-bottom:8px; color:#555;">E = Exceeds Expectations | M = Meets Expectations | D = Developing | DNM = Does Not Meet Expectations</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Performance Area</th>
+                <th>E</th>
+                <th>M</th>
+                <th>D</th>
+                <th>DNM</th>
+                <th>Comments</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Job Responsibilities</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td style="width:22%"></td></tr>
+            <tr><td>Classroom Management</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
+            <tr><td>Curriculum Implementation</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
+            <tr><td>Parent Communication</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
+            <tr><td>Teamwork &amp; Collaboration</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
+            <tr><td>Professionalism</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
+            <tr><td>Safety Compliance</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
+        </tbody>
+    </table>
+
+    <div class="section-title">Narrative Summary</div>
+    <div class="narrative-section">
+        <p>Summary of Accomplishments:</p>
+        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+    </div>
+    <div class="narrative-section">
+        <p>Areas for Growth:</p>
+        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+    </div>
+
+    <div class="section-title">Professional Development Goals for Next Year</div>
+    <table class="goal-table">
+        <thead>
+            <tr><th style="width:5%">#</th><th>Goal</th><th style="width:25%">Target Date</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>1</td><td></td><td></td></tr>
+            <tr><td>2</td><td></td><td></td></tr>
+            <tr><td>3</td><td></td><td></td></tr>
+        </tbody>
+    </table>
+
+    <div class="section-title">Employee Comments</div>
+    <div class="write-lines"></div><div class="write-lines"></div>
+    <div class="write-lines"></div><div class="write-lines"></div>
+
+    <div class="signature-section">
+        <div class="sig-field"><label>Supervisor Signature:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+    </div>
+    <div class="signature-section">
+        <div class="sig-field"><label>Employee Signature:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+    </div>
+    <p style="font-size:9pt; color:#555; margin-top:8px; font-style:italic;">Employee signature indicates receipt and discussion of this appraisal, not necessarily agreement.</p>
+
+    <div class="footer">
+        <span>PAS Documentation — Confidential</span>
+        <span>Children of Promise LLC — Annual Performance Appraisal</span>
+    </div>
+</body>
+</html>
