@@ -49,6 +49,9 @@
             <button id="navMenus" onclick="showPanel('menus')">
                 <div class="nav-sub">🍽️ Weekly Menus</div>
             </button>
+            <button id="navRecap" onclick="showPanel('recapPicker')">
+                <div class="nav-sub">📊 Total Meal Recap</div>
+            </button>
         </div>
         <div class="fp-card">
             <div class="fp-header">
@@ -128,6 +131,31 @@ function showPanel(panel) {
                         const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
                         const isNext = d.getMonth() === nextMonth.getMonth() && d.getFullYear() === nextMonth.getFullYear();
                         return `<button onclick="printFoodCountSheets('${key}')" style="padding:14px 10px;border-radius:8px;border:${isNext?'2px solid #2563eb':'1px solid #d1d5db'};background:${isNext?'#eff6ff':'white'};cursor:pointer;transition:all 0.15s;font-size:0.8rem;font-weight:${isNext?'700':'500'};color:#374151;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='${isNext?'#eff6ff':'white'}'">
+                            <div>${monthNames[d.getMonth()]}</div>
+                            <div style="font-size:0.68rem;color:#6b7280;margin-top:2px;">${d.getFullYear()}</div>
+                        </button>`;
+                    }).join('')}
+                </div>
+            </div>`;
+    } else if (panel === 'recapPicker') {
+        document.getElementById('navRecap').classList.add('active');
+        document.getElementById('fpTitle').textContent = 'Total Meal Recap';
+        const now = new Date();
+        const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const months = [];
+        for (let i = -2; i <= 6; i++) {
+            const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+            months.push(d);
+        }
+        const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        document.getElementById('fpBody').innerHTML = `
+            <div style="max-width:400px;margin:0 auto;padding:20px 0;">
+                <p style="font-size:0.82rem;color:#6b7280;margin-bottom:16px;">Select a month to generate Total Meal Recap sheets (Breakfast, Lunch, PM Snack) with classroom rows.</p>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+                    ${months.map(d => {
+                        const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+                        const isNext = d.getMonth() === nextMonth.getMonth() && d.getFullYear() === nextMonth.getFullYear();
+                        return `<button onclick="printMealRecap('${key}')" style="padding:14px 10px;border-radius:8px;border:${isNext?'2px solid #2563eb':'1px solid #d1d5db'};background:${isNext?'#eff6ff':'white'};cursor:pointer;transition:all 0.15s;font-size:0.8rem;font-weight:${isNext?'700':'500'};color:#374151;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='${isNext?'#eff6ff':'white'}'">
                             <div>${monthNames[d.getMonth()]}</div>
                             <div style="font-size:0.68rem;color:#6b7280;margin-top:2px;">${d.getFullYear()}</div>
                         </button>`;
@@ -351,6 +379,90 @@ function printFoodCountSheets(monthKey) {
             html += '</tbody></table><div style="font-size:7px;text-align:right;margin-top:3px;color:#666;">ISBE 68-75 (9/13)</div></div>';
         });
     });
+    html += '</body></html>';
+
+    let frame = document.getElementById('foodPrintFrame');
+    if (frame) frame.remove();
+    frame = document.createElement('iframe');
+    frame.id = 'foodPrintFrame';
+    frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:0;height:0;';
+    document.body.appendChild(frame);
+    frame.contentDocument.open();
+    frame.contentDocument.write(html);
+    frame.contentDocument.close();
+    setTimeout(() => frame.contentWindow.print(), 500);
+}
+
+function printMealRecap(monthKey) {
+    if (!monthKey) { showPanel('recapPicker'); return; }
+    const parts = monthKey.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1;
+
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthYear = monthNames[month] + ' ' + year;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const weekendDays = [];
+    for (let d = 1; d <= daysInMonth; d++) { if ([0,6].includes(new Date(year, month, d).getDay())) weekendDays.push(d); }
+
+    const meals = ['Breakfast', 'Lunch', 'PM Snack'];
+    const numClassrooms = 8;
+
+    let html = '<!DOCTYPE html><html><head><style>';
+    html += '@page{size:landscape;margin:0.2in}body{font-family:Arial,sans-serif;margin:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}';
+    html += '.sheet{page-break-after:always;padding:6px}.sheet:last-child{page-break-after:auto}';
+    html += 'table{border-collapse:collapse;width:100%;font-size:8px;table-layout:fixed}th,td{border:1px solid #000;padding:3px 2px;text-align:center}';
+    html += 'th{background:#d9d9d9;font-size:7px;font-weight:bold}.name-col{text-align:left;min-width:160px;font-size:8px;white-space:nowrap;padding-left:4px;font-weight:bold}';
+    html += '.day-col{width:18px;min-width:18px}.day-col.weekend{background:#808080!important}';
+    html += '.total-col{width:32px;background:#d9d9d9;font-weight:bold;border-left:3px solid #000}';
+    html += '.totals-row td{font-weight:bold;font-size:7px;background:#e8e8e8}.separator-row td{border-top:3px solid #000}';
+    html += '.section-header{font-size:9px;font-weight:bold;padding:4px 6px;text-align:left;background:#e8f4fd;border:1px solid #000;}';
+    html += '.header{text-align:center;margin-bottom:2px}.header h2{margin:0;font-size:13px;font-weight:bold}.header-info{display:flex;justify-content:space-between;font-size:9px;margin-bottom:2px;padding:0 4px}';
+    html += '.header-info span{font-weight:bold}.meal-check{font-size:8px;margin-top:2px;padding:0 4px}';
+    html += '</style></head><body>';
+
+    meals.forEach(meal => {
+        html += '<div class="sheet">';
+        html += '<div class="header"><h2>TOTAL MEAL RECAP</h2></div>';
+        html += '<div class="header-info"><span>Site: Children of Promise</span><span>Month/Year: ' + monthYear + '</span></div>';
+        html += '<div class="meal-check">Program: ☑ Child Care Center &nbsp;&nbsp;&nbsp; Meal Service: ☑ ' + meal + '</div>';
+
+        // Three sections: Free, Reduced, Paid
+        const sections = [
+            { label: 'SECTION I', sub: 'Free Daily', totalLabel: 'TOTAL DAILY FREE MEALS' },
+            { label: 'SECTION II', sub: 'Reduced Daily', totalLabel: 'TOTAL DAILY REDUCED MEALS' },
+            { label: 'SECTION III', sub: 'Paid Daily', totalLabel: 'TOTAL DAILY PAID MEALS' }
+        ];
+
+        html += '<table>';
+        sections.forEach(sec => {
+            // Section header row
+            html += '<tr><td colspan="' + (daysInMonth + 2) + '" class="section-header">' + sec.label + '</td></tr>';
+            // Column headers
+            html += '<tr><th class="name-col">' + sec.sub + '<br>(List all classrooms)</th>';
+            for (let d = 1; d <= daysInMonth; d++) {
+                html += '<th class="day-col' + (weekendDays.includes(d) ? ' weekend' : '') + '">' + d + '</th>';
+            }
+            html += '<th class="total-col">TOTAL</th></tr>';
+            // Classroom rows
+            for (let i = 1; i <= numClassrooms; i++) {
+                html += '<tr><td class="name-col">' + i + '.</td>';
+                for (let d = 1; d <= daysInMonth; d++) {
+                    html += '<td class="day-col' + (weekendDays.includes(d) ? ' weekend' : '') + '"></td>';
+                }
+                html += '<td class="total-col"></td></tr>';
+            }
+            // Totals row
+            html += '<tr class="totals-row separator-row"><td class="name-col"><strong>' + sec.totalLabel + '</strong></td>';
+            for (let d = 1; d <= daysInMonth; d++) {
+                html += '<td class="' + (weekendDays.includes(d) ? 'weekend' : '') + '">0</td>';
+            }
+            html += '<td class="total-col">0</td></tr>';
+        });
+        html += '</table>';
+        html += '</div>';
+    });
+
     html += '</body></html>';
 
     let frame = document.getElementById('foodPrintFrame');
