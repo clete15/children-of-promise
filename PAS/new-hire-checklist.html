@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Employee Onboarding Checklist — Children of Promise LLC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt; line-height: 1.4; color: #333;
+            padding: 0.5in 0.75in;
+        }
+        .header {
+            text-align: center; border-bottom: 2px solid #2c5282;
+            padding-bottom: 12px; margin-bottom: 20px;
+        }
+        .header h1 { font-size: 14pt; color: #2c5282; margin-bottom: 4px; }
+        .header .org-name { font-size: 11pt; color: #666; margin-bottom: 6px; }
+        .info-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 10px; margin-bottom: 20px;
+        }
+        .info-grid.three-col {
+            grid-template-columns: 1fr 1fr 1fr;
+        }
+        .info-field {
+            display: flex; align-items: baseline; gap: 8px;
+        }
+        .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
+        .info-field .line {
+            flex: 1; border-bottom: 1px solid #999;
+            min-width: 80px; height: 1.2em;
+        }
+        .section-title {
+            font-size: 11pt; font-weight: 700; color: #2c5282;
+            margin-top: 18px; margin-bottom: 10px;
+            border-bottom: 1px solid #cbd5e0; padding-bottom: 4px;
+        }
+        .checklist { list-style: none; margin-bottom: 16px; }
+        .checklist li {
+            font-size: 10pt; padding: 4px 0 4px 24px;
+            position: relative; border-bottom: 1px solid #f0f0f0;
+        }
+        .checklist li::before {
+            content: "\2610";
+            position: absolute; left: 0; top: 4px;
+            font-size: 13pt; line-height: 1;
+        }
+        .checklist li .date-col {
+            float: right; width: 100px;
+            border-bottom: 1px solid #ccc;
+            font-size: 9pt; color: #666;
+            text-align: center;
+        }
+        .signature-section {
+            margin-top: 25px; display: grid;
+            grid-template-columns: 2fr 1fr; gap: 24px;
+        }
+        .sig-field label {
+            font-weight: 600; font-size: 10pt; display: block; margin-bottom: 18px;
+        }
+        .sig-field .sig-line { border-bottom: 1px solid #333; margin-top: 22px; }
+        .footer {
+            margin-top: 25px; padding-top: 10px;
+            border-top: 1px solid #cbd5e0; display: flex;
+            justify-content: space-between; font-size: 9pt; color: #666;
+        }
+        @media print {
+            body { padding: 0; }
+            @page { margin: 0.4in 0.5in; size: letter; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
+        <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
+        <h1>New Employee Onboarding Checklist</h1>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-field">
+            <label>Employee Name:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Position:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Hire Date:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Supervisor:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Mentor Assigned:</label><div class="line"></div>
+        </div>
+        <div class="info-field">
+            <label>Orientation Dates:</label><div class="line"></div>
+        </div>
+    </div>
+
+    <div class="section-title">Pre-Start (Before First Day)</div>
+    <ul class="checklist">
+        <li>Offer letter signed and returned <span class="date-col">Date: ____</span></li>
+        <li>Background check completed <span class="date-col">Date: ____</span></li>
+        <li>W-4 and I-9 forms completed <span class="date-col">Date: ____</span></li>
+        <li>Emergency contact information collected <span class="date-col">Date: ____</span></li>
+        <li>Assign mentor/buddy <span class="date-col">Date: ____</span></li>
+        <li>Prepare workspace/classroom access <span class="date-col">Date: ____</span></li>
+        <li>Schedule orientation dates <span class="date-col">Date: ____</span></li>
+    </ul>
+
+    <div class="section-title">Day 1–3: Orientation Week 1</div>
+    <ul class="checklist">
+        <li>Welcome and building tour <span class="date-col">Date: ____</span></li>
+        <li>Introduce to all staff members <span class="date-col">Date: ____</span></li>
+        <li>Provide Employee Handbook <span class="date-col">Date: ____</span></li>
+        <li>Provide Parent Handbook <span class="date-col">Date: ____</span></li>
+        <li>Review job description <span class="date-col">Date: ____</span></li>
+        <li>Review personnel policies <span class="date-col">Date: ____</span></li>
+        <li>Review health and safety procedures <span class="date-col">Date: ____</span></li>
+        <li>Set up Brightwheel account <span class="date-col">Date: ____</span></li>
+        <li>Set up email/technology access <span class="date-col">Date: ____</span></li>
+        <li>Review emergency procedures and exits <span class="date-col">Date: ____</span></li>
+    </ul>
+
+    <div class="section-title">Day 4–10: Orientation Week 2</div>
+    <ul class="checklist">
+        <li>Observe in assigned classroom <span class="date-col">Date: ____</span></li>
+        <li>Meet children and families <span class="date-col">Date: ____</span></li>
+        <li>Review curriculum (Creative Curriculum) <span class="date-col">Date: ____</span></li>
+        <li>Review assessment tools (Teaching Strategies, ASQ) <span class="date-col">Date: ____</span></li>
+        <li>Review classroom daily schedule <span class="date-col">Date: ____</span></li>
+        <li>Review behavior guidance policies <span class="date-col">Date: ____</span></li>
+        <li>Review food program procedures <span class="date-col">Date: ____</span></li>
+        <li>Review allergy/medical condition protocols <span class="date-col">Date: ____</span></li>
+        <li>Review sign-in/sign-out procedures <span class="date-col">Date: ____</span></li>
+    </ul>
+
+    <div class="section-title">Within 30 Days</div>
+    <ul class="checklist">
+        <li>Complete CPR/First Aid certification (if not current) <span class="date-col">Date: ____</span></li>
+        <li>Complete mandatory reporter training <span class="date-col">Date: ____</span></li>
+        <li>Complete food handler certification <span class="date-col">Date: ____</span></li>
+        <li>Complete initial required training modules <span class="date-col">Date: ____</span></li>
+        <li>Mentor check-in meeting #1 <span class="date-col">Date: ____</span></li>
+        <li>Register on Gateways to Opportunity <span class="date-col">Date: ____</span></li>
+    </ul>
+
+    <div class="section-title">Within 60 Days</div>
+    <ul class="checklist">
+        <li>Mentor check-in meeting #2 <span class="date-col">Date: ____</span></li>
+        <li>Begin Individual Professional Development Plan <span class="date-col">Date: ____</span></li>
+        <li>First classroom observation by supervisor <span class="date-col">Date: ____</span></li>
+        <li>Review of initial performance <span class="date-col">Date: ____</span></li>
+    </ul>
+
+    <div class="section-title">Within 90 Days</div>
+    <ul class="checklist">
+        <li>90-Day Introductory Review completed <span class="date-col">Date: ____</span></li>
+        <li>Orientation Feedback Form completed <span class="date-col">Date: ____</span></li>
+        <li>Individual Professional Development Plan finalized <span class="date-col">Date: ____</span></li>
+        <li>Decision: extend to regular employment / extend probation / terminate <span class="date-col">Date: ____</span></li>
+        <li>Mentor assignment concluded or extended <span class="date-col">Date: ____</span></li>
+    </ul>
+
+    <div class="section-title">Ongoing (First Year)</div>
+    <ul class="checklist">
+        <li>Jan 15 OR Jun 30: First formal performance evaluation <span class="date-col">Date: ____</span></li>
+        <li>Complete minimum 20 hours professional development <span class="date-col">Date: ____</span></li>
+        <li>Attend all-staff meetings <span class="date-col">Date: ____</span></li>
+        <li>Complete Staff Program Evaluation Survey (when distributed) <span class="date-col">Date: ____</span></li>
+    </ul>
+
+    <div class="signature-section">
+        <div class="sig-field"><label>Supervisor Signature:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+    </div>
+    <div class="signature-section">
+        <div class="sig-field"><label>Employee Signature:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+    </div>
+
+    <div class="footer">
+        <span>PAS Documentation — Confidential</span>
+        <span>Children of Promise LLC — New Employee Onboarding Checklist</span>
+    </div>
+</body>
+</html>
