@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAS Compliance – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        .pas-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
+        .pas-wrapper { display:flex;flex-direction:column;max-height:calc(100vh - 130px);width:100%;max-width:1000px; }
+        .pas-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2); }
+        .pas-header { padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px; }
+        .pas-header h2 { font-size:1rem;font-weight:800;color:#1e3a8a;margin:0; }
+        .pas-body { overflow-y:auto;flex:1;padding:24px 28px; }
+
+        .doc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .doc-card {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px 18px;
+            text-decoration: none;
+            color: #1e293b;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+        .doc-card:hover { transform: translateY(-3px); border-color: #2563eb; box-shadow: 0 8px 24px rgba(37,99,235,0.12); }
+        .doc-card .card-icon { font-size: 1.8rem; }
+        .doc-card h3 { font-size: 0.88rem; font-weight: 700; color: #2563eb; margin: 0; }
+        .doc-card p { font-size: 0.75rem; color: #64748b; line-height: 1.4; margin: 0; }
+        .doc-card .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .badge-html { background: #dbeafe; color: #1d4ed8; }
+        .badge-pdf { background: #fef2f2; color: #991b1b; }
+        .badge-xlsx { background: #dcfce7; color: #166534; }
+        .badge-docx { background: #f3e8ff; color: #6b21a8; }
+
+        .section-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6b7280;
+            margin-top: 24px;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>PAS Compliance &amp; Documentation &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="pas-layout">
+    <div class="pas-wrapper">
+        <div class="pas-card">
+            <div class="pas-header">
+                <h2>📊 Program Administration Scale (PAS)</h2>
+            </div>
+            <div class="pas-body">
+                <p style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">Documentation, policies, and compliance resources for the PAS monitoring visit. Items 1–25 covering staff orientation, compensation, facilities, family engagement, and more.</p>
+
+                <div class="section-title">Compliance Guides</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/pas/pas-documentation.html" target="_blank">
+                        <div class="card-icon">📋</div>
+                        <h3>PAS Documentation Guide</h3>
+                        <p>Full compliance guide covering all 25 PAS items with status, evidence needed, and document references.</p>
+                        <span class="badge badge-html">HTML</span>
+                    </a>
+                    <a class="doc-card" href="/pas/PAS%20checklist.pdf" target="_blank">
+                        <div class="card-icon">✅</div>
+                        <h3>PAS Checklist</h3>
+                        <p>Printable checklist for tracking completion of PAS documentation requirements.</p>
+                        <span class="badge badge-pdf">PDF</span>
+                    </a>
+                </div>
+
+                <div class="section-title">Salary &amp; Compensation</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/pas/salary-scale-2026.html" target="_blank">
+                        <div class="card-icon">💰</div>
+                        <h3>Salary Scale 2026</h3>
+                        <p>Staff compensation structure, salary scale, and pay policies for the current year.</p>
+                        <span class="badge badge-html">HTML</span>
+                    </a>
+                    <a class="doc-card" href="/pas/PAS%20Salary%20Analysis.xlsx" target="_blank">
+                        <div class="card-icon">📊</div>
+                        <h3>PAS Salary Analysis</h3>
+                        <p>Salary analysis spreadsheet with market comparisons and internal equity review.</p>
+                        <span class="badge badge-xlsx">Excel</span>
+                    </a>
+                </div>
+
+                <div class="section-title">Handbooks &amp; Policies</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/pas/employee-handbook-2026.html" target="_blank">
+                        <div class="card-icon">📖</div>
+                        <h3>Employee Handbook 2026</h3>
+                        <p>Current employee handbook with policies, procedures, benefits, and expectations.</p>
+                        <span class="badge badge-html">HTML</span>
+                    </a>
+                    <a class="doc-card" href="/pas/parent-handbook-2026.html" target="_blank">
+                        <div class="card-icon">👪</div>
+                        <h3>Parent Handbook 2026</h3>
+                        <p>Family-facing handbook covering enrollment, policies, communication, and program info.</p>
+                        <span class="badge badge-html">HTML</span>
+                    </a>
+                    <a class="doc-card" href="/pas/Employee%20Handbook%202025.docx" target="_blank">
+                        <div class="card-icon">📄</div>
+                        <h3>Employee Handbook 2025</h3>
+                        <p>Previous year employee handbook (Word document).</p>
+                        <span class="badge badge-docx">DOCX</span>
+                    </a>
+                    <a class="doc-card" href="/pas/Children%20of%20Promise%20parent%20handbook%202024-2025.doc.docx" target="_blank">
+                        <div class="card-icon">📄</div>
+                        <h3>Parent Handbook 2024-25</h3>
+                        <p>Previous year parent handbook (Word document).</p>
+                        <span class="badge badge-docx">DOCX</span>
+                    </a>
+                </div>
+
+                <div class="section-title">Staff Orientation &amp; HR</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/pas/employee%20orientation%20checklist%20.docx" target="_blank">
+                        <div class="card-icon">📝</div>
+                        <h3>Employee Orientation Checklist</h3>
+                        <p>New hire orientation checklist covering required training, policies, and documentation.</p>
+                        <span class="badge badge-docx">DOCX</span>
+                    </a>
+                    <a class="doc-card" href="/pas/Transitional%20policy%20.docx" target="_blank">
+                        <div class="card-icon">🔄</div>
+                        <h3>Transitional Policy</h3>
+                        <p>Policy for transitioning children between classrooms and age groups.</p>
+                        <span class="badge badge-docx">DOCX</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</body>
+</html>

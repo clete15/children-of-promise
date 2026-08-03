@@ -1267,6 +1267,18 @@ function handleRequest(req, res) {
         return;
     }
 
+    // PAS static files (protected - served under /pas/)
+    if (url.startsWith('/pas/') || url === '/pas') {
+        const subPath = url === '/pas' || url === '/pas/' ? '/pas-documentation.html' : url.replace('/pas', '');
+        const filePath = path.join(__dirname, '..', 'PAS', subPath);
+        fs.readFile(filePath, (err, data) => {
+            if (err) { res.writeHead(404); return res.end('Not found'); }
+            res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' });
+            res.end(data);
+        });
+        return;
+    }
+
     // Internal static files (protected) - served under /staff/
     // Allow images/css without auth (needed for login page logo)
     if (url.startsWith('/staff') && (url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.css'))) {
