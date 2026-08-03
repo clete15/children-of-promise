@@ -7,6 +7,29 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+
+        /* Password overlay */
+        #pasPasswordOverlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #1e40af 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 24px;
+        }
+        #pasPasswordOverlay h2 { color: white; font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+        #pasPasswordOverlay p { color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-bottom: 24px; }
+        .pas-pw-box { background: white; border-radius: 12px; padding: 28px 32px; width: 100%; max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 12px; }
+        .pas-pw-box label { font-size: 0.78rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+        .pas-pw-box input { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.95rem; }
+        .pas-pw-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+        .pas-pw-box button { width: 100%; padding: 11px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+        .pas-pw-box button:hover { background: #1d4ed8; }
+        .pas-pw-error { color: #dc2626; font-size: 0.8rem; font-weight: 600; text-align: center; display: none; }
+
         .pas-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
         .pas-wrapper { display:flex;flex-direction:column;max-height:calc(100vh - 130px);width:100%;max-width:1000px; }
         .pas-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2); }
@@ -65,6 +88,21 @@
     </style>
 </head>
 <body>
+
+<!-- PASSWORD OVERLAY -->
+<div id="pasPasswordOverlay">
+    <h2>🔒 PAS Compliance</h2>
+    <p>Enter password to access PAS documents</p>
+    <form class="pas-pw-box" id="pasPwForm">
+        <label for="pasPwInput">Password</label>
+        <input type="password" id="pasPwInput" placeholder="Enter password" autofocus>
+        <div class="pas-pw-error" id="pasPwError">Incorrect password.</div>
+        <button type="submit">Unlock</button>
+    </form>
+</div>
+
+<!-- MAIN CONTENT (hidden until authenticated) -->
+<div id="pasMainContent" style="display:none;">
 
 <header class="site-header">
     <a class="brand-link" href="/staff/">
@@ -166,5 +204,35 @@
     </div>
 </div>
 
+</div><!-- end pasMainContent -->
+
+<script>
+const PAS_PASSWORD = 'pasadmin';
+
+function checkPasAuth() {
+    if (sessionStorage.getItem('pasAuth') === '1') {
+        document.getElementById('pasPasswordOverlay').style.display = 'none';
+        document.getElementById('pasMainContent').style.display = 'block';
+    }
+}
+
+document.getElementById('pasPwForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const val = document.getElementById('pasPwInput').value;
+    const err = document.getElementById('pasPwError');
+    if (val === PAS_PASSWORD) {
+        sessionStorage.setItem('pasAuth', '1');
+        err.style.display = 'none';
+        document.getElementById('pasPasswordOverlay').style.display = 'none';
+        document.getElementById('pasMainContent').style.display = 'block';
+    } else {
+        err.style.display = 'block';
+        document.getElementById('pasPwInput').value = '';
+        document.getElementById('pasPwInput').focus();
+    }
+});
+
+checkPasAuth();
+</script>
 </body>
 </html>
