@@ -411,10 +411,10 @@ function printMealRecap(monthKey) {
     let html = '<!DOCTYPE html><html><head><style>';
     html += '@page{size:landscape;margin:0.2in}body{font-family:Arial,sans-serif;margin:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}';
     html += '.sheet{page-break-after:always;padding:6px}.sheet:last-child{page-break-after:auto}';
-    html += 'table{border-collapse:collapse;width:100%;font-size:8px;table-layout:fixed}th,td{border:1px solid #000;padding:2px 1px;text-align:center}';
-    html += 'th{background:#d9d9d9;font-size:7px;font-weight:bold}.name-col{text-align:left;min-width:220px;width:220px;font-size:8px;white-space:nowrap;padding-left:4px;font-weight:bold}';
-    html += '.day-col{width:14px;min-width:14px}.day-col.weekend{background:#808080!important}';
-    html += '.total-col{width:28px;background:#d9d9d9;font-weight:bold;border-left:3px solid #000}';
+    html += 'table{border-collapse:collapse;width:100%;font-size:8px}th,td{border:1px solid #000;padding:2px 1px;text-align:center}';
+    html += 'th{background:#d9d9d9;font-size:7px;font-weight:bold}.name-col{text-align:left;width:180px;font-size:7.5px;white-space:nowrap;padding-left:4px;font-weight:bold;overflow:visible}';
+    html += '.day-col{width:13px;min-width:13px;max-width:13px}.day-col.weekend{background:#808080!important}';
+    html += '.total-col{width:26px;background:#d9d9d9;font-weight:bold;border-left:3px solid #000}';
     html += '.totals-row td{font-weight:bold;font-size:7px;background:#e8e8e8}.separator-row td{border-top:3px solid #000}';
     html += '.section-header{font-size:9px;font-weight:bold;padding:4px 6px;text-align:left;background:#e8f4fd;border:1px solid #000;}';
     html += '.header{text-align:center;margin-bottom:2px}.header h2{margin:0;font-size:13px;font-weight:bold}.header-info{display:flex;justify-content:space-between;font-size:9px;margin-bottom:2px;padding:0 4px}';
