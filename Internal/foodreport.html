@@ -444,14 +444,16 @@ function printMealRecap(monthKey) {
                 html += '<th class="day-col' + (weekendDays.includes(d) ? ' weekend' : '') + '">' + d + '</th>';
             }
             html += '<th class="total-col">TOTAL</th></tr>';
-            // Classroom rows
-            for (let i = 1; i <= numClassrooms; i++) {
-                html += '<tr><td class="name-col">' + i + '.</td>';
+            // Classroom rows - use actual classroom names
+            const roomNames = classrooms.map(c => c.Room).filter(r => r);
+            const allRooms = roomNames.length ? roomNames : ['1.','2.','3.','4.','5.','6.','7.','8.'];
+            allRooms.forEach((room, i) => {
+                html += '<tr><td class="name-col">' + (i+1) + '. ' + room + '</td>';
                 for (let d = 1; d <= daysInMonth; d++) {
                     html += '<td class="day-col' + (weekendDays.includes(d) ? ' weekend' : '') + '"></td>';
                 }
                 html += '<td class="total-col"></td></tr>';
-            }
+            });
             // Totals row
             html += '<tr class="totals-row separator-row"><td class="name-col"><strong>' + sec.totalLabel + '</strong></td>';
             for (let d = 1; d <= daysInMonth; d++) {
