@@ -40,7 +40,11 @@ const MIME = {
     '.html': 'text/html', '.css': 'text/css',
     '.js': 'application/javascript', '.json': 'application/json',
     '.png': 'image/png', '.ico': 'image/x-icon',
-    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg'
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+    '.pdf': 'application/pdf',
+    '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    '.doc': 'application/msword'
 };
 
 const COLS = ['Last_Name','First_Name','Birth_date','Start_Date','City_Town','Days_Old',
