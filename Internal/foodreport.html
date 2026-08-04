@@ -457,9 +457,9 @@ function printMealRecap(monthKey) {
             // Totals row
             html += '<tr class="totals-row separator-row"><td class="name-col"><strong>' + sec.totalLabel + '</strong></td>';
             for (let d = 1; d <= daysInMonth; d++) {
-                html += '<td class="' + (weekendDays.includes(d) ? 'weekend' : '') + '">0</td>';
+                html += '<td class="' + (weekendDays.includes(d) ? 'weekend' : '') + '"></td>';
             }
-            html += '<td class="total-col">0</td></tr>';
+            html += '<td class="total-col"></td></tr>';
         });
         html += '</table>';
         html += '</div>';
