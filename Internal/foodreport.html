@@ -411,10 +411,10 @@ function printMealRecap(monthKey) {
     let html = '<!DOCTYPE html><html><head><style>';
     html += '@page{size:landscape;margin:0.2in}body{font-family:Arial,sans-serif;margin:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}';
     html += '.sheet{page-break-after:always;padding:6px}.sheet:last-child{page-break-after:auto}';
-    html += 'table{border-collapse:collapse;width:100%;font-size:7px;table-layout:fixed}th,td{border:1px solid #000;padding:1px 0px;text-align:center}';
-    html += 'th{background:#d9d9d9;font-size:6px;font-weight:bold}.name-col{text-align:left;width:15%;font-size:7px;white-space:nowrap;padding-left:3px;font-weight:bold;overflow:hidden}';
-    html += '.day-col{width:2.55%}.day-col.weekend{background:#808080!important}';
-    html += '.total-col{width:3.5%;background:#d9d9d9;font-weight:bold;border-left:2px solid #000}';
+    html += 'table{border-collapse:collapse;width:100%;font-size:7px}th,td{border:1px solid #000;padding:1px 0px;text-align:center}';
+    html += 'th{background:#d9d9d9;font-size:6px;font-weight:bold}.name-col{text-align:left;font-size:7px;white-space:nowrap;padding-left:3px;font-weight:bold}';
+    html += '.day-col{}.day-col.weekend{background:#808080!important}';
+    html += '.total-col{background:#d9d9d9;font-weight:bold;border-left:2px solid #000}';
     html += '.totals-row td{font-weight:bold;font-size:7px;background:#e8e8e8}.separator-row td{border-top:3px solid #000}';
     html += '.section-header{font-size:9px;font-weight:bold;padding:4px 6px;text-align:left;background:#e8f4fd;border:1px solid #000;}';
     html += '.header{text-align:center;margin-bottom:2px}.header h2{margin:0;font-size:13px;font-weight:bold}.header-info{display:flex;justify-content:space-between;font-size:9px;margin-bottom:2px;padding:0 4px}';
@@ -434,7 +434,9 @@ function printMealRecap(monthKey) {
             { label: 'SECTION III', sub: 'Paid Daily', totalLabel: 'TOTAL DAILY PAID MEALS' }
         ];
 
-        html += '<table>';
+        html += '<table><colgroup><col style="width:160px">';
+        for (let d = 1; d <= daysInMonth; d++) html += '<col style="width:20px">';
+        html += '<col style="width:32px"></colgroup>';
         sections.forEach(sec => {
             // Section header row
             html += '<tr><td colspan="' + (daysInMonth + 2) + '" class="section-header">' + sec.label + '</td></tr>';
