@@ -35,7 +35,9 @@
         li { margin-bottom: 0.3rem; }
         @media print {
             .no-print { display: none; }
+            input[type="checkbox"].criteria-cb { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
+        input.criteria-cb { width: 14px; height: 14px; margin-right: 4px; vertical-align: middle; accent-color: #27ae60; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -1281,6 +1283,50 @@
     <p><strong>Children of Promise LLC</strong> — PAS Documentation Compliance Guide</p>
     <p>Prepared June 2026 | Status Key: <span class="status-have">✓ HAVE</span> | <span class="status-partial">◐ PARTIAL</span> | <span class="status-need">✗ NEED</span></p>
 </footer>
+
+<script>
+// Convert ☐ characters to interactive checkboxes and save/restore state
+(function() {
+    const STORAGE_KEY = 'pas_criteria_checks';
+
+    function loadState() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch(e) { return {}; }
+    }
+
+    function saveState(state) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    // Find all table cells in Criteria column (3rd column) and replace ☐ with checkboxes
+    const tables = document.querySelectorAll('table');
+    let cbIndex = 0;
+    const state = loadState();
+
+    tables.forEach(table => {
+        const rows = table.querySelectorAll('tbody tr');
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 3) {
+                const criteriaCell = cells[2]; // 3rd column (0-indexed)
+                const html = criteriaCell.innerHTML;
+                if (html.includes('☐')) {
+                    criteriaCell.innerHTML = html.replace(/☐/g, () => {
+                        const id = 'cb_' + cbIndex++;
+                        const checked = state[id] ? 'checked' : '';
+                        return '<input type="checkbox" class="criteria-cb" id="' + id + '" ' + checked + ' onchange="window._saveCB(this)">';
+                    });
+                }
+            }
+        });
+    });
+
+    window._saveCB = function(el) {
+        const state = loadState();
+        state[el.id] = el.checked;
+        saveState(state);
+    };
+})();
+</script>
 
 </body>
 </html>
