@@ -22,9 +22,13 @@
         .policy-box { background: var(--light-bg); border-left: 4px solid var(--accent); padding: 0.8rem 1.2rem; margin: 1rem 0; border-radius: 0 6px 6px 0; }
         .confidential { background: #fff3cd; border: 1px solid #ffc107; padding: 0.8rem; text-align: center; margin-bottom: 1.5rem; border-radius: 6px; font-weight: bold; }
         footer { text-align: center; padding: 1.5rem 0; color: var(--muted); font-size: 0.8rem; border-top: 2px solid var(--primary); margin-top: 2rem; }
+        @media print {
+            .no-print { display: none; }
+        }
     </style>
 </head>
 <body>
+<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
 
 <header>
     <h1>Children of Promise LLC</h1>
