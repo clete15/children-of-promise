@@ -20,14 +20,20 @@
         section { margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
         h2 { color: var(--primary); font-size: 1.4rem; margin-bottom: 1rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--accent); }
         h3 { color: var(--primary); font-size: 1.05rem; margin: 1.2rem 0 0.6rem; }
-        table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.85rem; }
-        th, td { border: 1px solid var(--border); padding: 0.5rem 0.7rem; text-align: left; vertical-align: top; }
+        table { width: 100%; border-collapse: collapse; margin: 0.8rem 0; font-size: 0.82rem; table-layout: fixed; }
+        th, td { border: 1px solid var(--border); padding: 0.4rem 0.5rem; text-align: left; vertical-align: top; word-wrap: break-word; }
+        th:nth-child(1) { width: 6%; }
+        th:nth-child(2) { width: 12%; }
+        th:nth-child(3) { width: 28%; }
+        th:nth-child(4) { width: 26%; }
+        th:nth-child(5) { width: 10%; }
+        th:nth-child(6) { width: 18%; }
         th { background: var(--primary); color: #fff; font-weight: 600; }
         tr:nth-child(even) { background: var(--light-bg); }
         .status-have { color: var(--green); font-weight: bold; }
         .status-partial { color: var(--orange); font-weight: bold; }
         .status-need { color: var(--red); font-weight: bold; }
-        td:last-child { min-width: 120px; }
+        td:nth-last-child(2) { min-width: 100px; }
         .doc-ref { background: #eaf4ff; border-left: 3px solid var(--accent); padding: 0.5rem 1rem; margin: 0.5rem 0; font-size: 0.85rem; }
         .doc-ref a { color: var(--accent); text-decoration: none; font-weight: 500; }
         .doc-ref a:hover { text-decoration: underline; color: #1a5276; }
@@ -85,7 +91,7 @@
 <section id="pas1">
     <h2>1. Staff Orientation</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>1.1</td>
@@ -106,7 +112,7 @@
                     <div class="doc-ref">→ Job Descriptions (by position)</div>
                     <div class="doc-ref"><a href="90-day-review-form.html">→ 90-Day Introductory Review Form</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>1.2</td>
@@ -126,7 +132,7 @@
                     <div class="doc-ref"><a href="new-hire-checklist.html">→ Employee Orientation Checklist (4 sections, specific forms listed)</a></div>
                     <div class="doc-ref">→ Mentor assignment documentation</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>1.3</td>
@@ -141,7 +147,7 @@
                     <div class="doc-ref"><a href="orientation-feedback-form.html">→ Orientation Evaluation/Feedback Form</a></div>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#orientation">→ Employee Handbook: Orientation Feedback (Sec 3.6)</a></div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need orientation feedback form</td>
+                <td class="status-partial">◐ PARTIAL — Need orientation feedback form</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -151,7 +157,7 @@
 <section id="pas2">
     <h2>2. Supervision &amp; Performance Appraisal</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>2.1</td>
@@ -168,7 +174,7 @@
                     <div class="doc-ref"><a href="staff-self-appraisal.html">→ Staff Self-Appraisal Forms</a></div>
                     <div class="doc-ref"><a href="90-day-review-form.html">→ Six-Month Review Forms</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>2.2</td>
@@ -186,7 +192,7 @@
                     <div class="doc-ref"><a href="classroom-observation-form.html">→ Classroom Observation Notes</a></div>
                     <div class="doc-ref"><a href="parent-satisfaction-survey.html">→ Parent Evaluations of Teaching Staff</a></div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need role-specific eval criteria</td>
+                <td class="status-partial">◐ PARTIAL — Need role-specific eval criteria</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>2.3</td>
@@ -201,7 +207,7 @@
                     <div class="doc-ref"><a href="classroom-observation-form.html">→ Supervisor Observation Notes/Feedback Forms</a></div>
                     <div class="doc-ref">→ Regularly Scheduled Coaching Meeting Records</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -211,7 +217,7 @@
 <section id="pas3">
     <h2>3. Staff Development</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>3.1</td>
@@ -228,7 +234,7 @@
                     <div class="doc-ref"><a href="individual-pd-plan.html">→ Center-wide Professional Development Plan</a></div>
                     <div class="doc-ref">→ Training Announcements/Flyers</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>3.2</td>
@@ -243,7 +249,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#development">→ Employee Handbook: Individualized PD Plans (Sec 10.3)</a></div>
                     <div class="doc-ref"><a href="individual-pd-plan.html">→ Staff Training Logs (per employee)</a></div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need individualized PD plans per staff</td>
+                <td class="status-partial">◐ PARTIAL — Need individualized PD plans per staff</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>3.3</td>
@@ -258,7 +264,7 @@
                     <div class="doc-ref">→ Posted Gateways/Scholarship Announcements</div>
                     <div class="doc-ref"><a href="staff-meeting-minutes.html">→ Staff Meeting Minutes (PD opportunities discussed)</a></div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need career development plans</td>
+                <td class="status-partial">◐ PARTIAL — Need career development plans</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -268,7 +274,7 @@
 <section id="pas4">
     <h2>4. Compensation</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>4.1</td>
@@ -286,7 +292,7 @@
                     <div class="doc-ref">→ Annual Review Record (June 2026, next June 2027)</div>
                     <div class="doc-ref">→ Market Analysis Documentation</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>4.2</td>
@@ -303,7 +309,7 @@
                     <div class="doc-ref"><a href="salary-scale-2026.html">→ Salary Scale (Tiers 1–4 by role, education, credentials)</a></div>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#compensation">→ Employee Handbook: Salary Scale Criteria (Sec 6.2)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>4.3</td>
@@ -320,7 +326,7 @@
                     <div class="doc-ref">→ Dated memos/emails documenting past wage increases</div>
                     <div class="doc-ref">→ Grid/record of salary history per employee</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -330,7 +336,7 @@
 <section id="pas5">
     <h2>5. Benefits</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>5.1</td>
@@ -342,7 +348,7 @@
                 <td>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#benefits">→ Employee Handbook: Benefits — Health Insurance Not Offered (Sec 7.2)</a></div>
                 </td>
-                <td class="status-need">✗ NOT MET — No employer health insurance offered</td>
+                <td class="status-need">✗ NOT MET — No employer health insurance offered</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>5.2</td>
@@ -355,7 +361,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#leave">→ Employee Handbook: Sick Leave &amp; Personal Days (Sec 8.3, 8.4)</a></div>
                     <div class="doc-ref"><a href="salary-scale-2026.html">→ Salary Scale Grid (32 hours personal &amp; sick leave all tiers)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>5.3</td>
@@ -368,7 +374,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#leave">→ Employee Handbook: Vacation Leave (Sec 8.2)</a></div>
                     <div class="doc-ref"><a href="salary-scale-2026.html">→ Salary Scale Grid (vacation allocation by tier)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>5.4</td>
@@ -382,7 +388,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#benefits">→ Employee Handbook: 401(k) — 3% employer match (Sec 7.1)</a></div>
                     <div class="doc-ref"><a href="salary-scale-2026.html">→ Salary Scale Grid (401(k) 3% match all tiers)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>5.5</td>
@@ -396,7 +402,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#development">→ Employee Handbook: Staff Development &amp; Training (Sec 10)</a></div>
                     <div class="doc-ref">→ Budget line item for PD expenses</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -406,7 +412,7 @@
 <section id="pas6">
     <h2>6. Staffing Patterns &amp; Scheduling</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>6.1</td>
@@ -420,7 +426,7 @@
                     <div class="doc-ref">→ Staffing Plan (floating teacher / over-ratio coverage)</div>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#scheduling">→ Employee Handbook: Scheduling &amp; Attendance (Sec 5.6)</a></div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need written staffing plan document</td>
+                <td class="status-partial">◐ PARTIAL — Need written staffing plan document</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>6.2</td>
@@ -436,7 +442,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#scheduling">→ Employee Handbook: Planning &amp; Preparation Time (Sec 5.5)</a></div>
                     <div class="doc-ref">→ Job Descriptions (planning time referenced)</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need documented planning time schedule</td>
+                <td class="status-partial">◐ PARTIAL — Need documented planning time schedule</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>6.3</td>
@@ -451,7 +457,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#scheduling">→ Employee Handbook: Staffing Ratios (Sec 5.6)</a></div>
                     <div class="doc-ref"><a href="parent-handbook-2026.html#welcome">→ Parent Handbook (ratio references)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -461,7 +467,7 @@
 <section id="pas7">
     <h2>7. Facilities Management</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>7.1</td>
@@ -477,7 +483,7 @@
                     <div class="doc-ref">→ HVAC Service Contract (regular servicing)</div>
                     <div class="doc-ref">→ Daily Sanitation/Cleaning Checklists</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -487,7 +493,7 @@
 <section id="pas8">
     <h2>8. Risk Management</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>8.1</td>
@@ -501,7 +507,7 @@
                     <div class="doc-ref">→ Risk Management Plan (written)</div>
                     <div class="doc-ref">→ Meeting Minutes (annual review of risk plan)</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need formal written risk management plan</td>
+                <td class="status-partial">◐ PARTIAL — Need formal written risk management plan</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>8.2</td>
@@ -516,7 +522,7 @@
                     <div class="doc-ref">→ Posted Allergy Information (in classrooms/kitchen)</div>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#health-safety">→ Employee Handbook: Allergies &amp; Medical Conditions (Sec 11.5)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>8.3</td>
@@ -532,7 +538,7 @@
                     <div class="doc-ref">→ Calendar with drill dates</div>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#health-safety">→ Employee Handbook: Emergency Procedures (Sec 11.3)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>8.4</td>
@@ -548,7 +554,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#orientation">→ Employee Handbook: Orientation Checklist (CPR item)</a></div>
                     <div class="doc-ref">→ Annual Training Plan</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -558,7 +564,7 @@
 <section id="pas9">
     <h2>9. Internal Communications</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>9.1</td>
@@ -570,7 +576,7 @@
                     <div class="doc-ref">→ Internal memos/emails</div>
                     <div class="doc-ref">→ Office write-in calendar</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>9.2</td>
@@ -586,7 +592,7 @@
                     <div class="doc-ref"><a href="staff-meeting-minutes.html">→ Team Meeting Records</a></div>
                     <div class="doc-ref">→ Employee Handbook (coaching meetings referenced)</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need consistent meeting minutes on file</td>
+                <td class="status-partial">◐ PARTIAL — Need consistent meeting minutes on file</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>9.3</td>
@@ -600,7 +606,7 @@
                     <div class="doc-ref"><a href="staff-meeting-minutes.html">→ Staff Meeting Agendas (showing staff-led items)</a></div>
                     <div class="doc-ref"><a href="staff-meeting-minutes.html">→ Meeting Minutes</a></div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Document staff-led agenda items</td>
+                <td class="status-partial">◐ PARTIAL — Document staff-led agenda items</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>9.4</td>
@@ -616,7 +622,7 @@
                     <div class="doc-ref"><a href="staff-meeting-minutes.html">→ Staff Meeting Minutes (with action items)</a></div>
                     <div class="doc-ref">→ Email distributing minutes to staff</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need action item follow-up documented</td>
+                <td class="status-partial">◐ PARTIAL — Need action item follow-up documented</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>9.5</td>
@@ -631,7 +637,7 @@
                     <div class="doc-ref"><a href="employee-handbook-2026.html#communications">→ Employee Handbook: Conflict Resolution Policy (Sec 12.4)</a></div>
                     <div class="doc-ref">→ Training logs (conflict resolution training)</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need written conflict resolution procedures</td>
+                <td class="status-partial">◐ PARTIAL — Need written conflict resolution procedures</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -641,7 +647,7 @@
 <section id="pas10">
     <h2>10. Screening &amp; Identification of Special Needs</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>10.1</td>
@@ -658,7 +664,7 @@
                     <div class="doc-ref">→ Parent Handbook (screening info)</div>
                     <div class="doc-ref">→ Parent consent letters</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>10.2</td>
@@ -674,7 +680,7 @@
                     <div class="doc-ref">→ Screening Reports shared with families</div>
                     <div class="doc-ref">→ Conference/Meeting Notes</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>10.3</td>
@@ -690,7 +696,7 @@
                     <div class="doc-ref">→ IEP/IFSP documentation on file</div>
                     <div class="doc-ref">→ Interagency contacts/agreements</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -700,7 +706,7 @@
 <section id="pas11">
     <h2>11. Assessment in Support of Learning</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>11.1</td>
@@ -717,7 +723,7 @@
                     <div class="doc-ref">→ Teacher Observational Notes</div>
                     <div class="doc-ref">→ Children's Portfolios</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>11.2</td>
@@ -733,7 +739,7 @@
                     <div class="doc-ref">→ Lesson Plans (linked to assessment data)</div>
                     <div class="doc-ref">→ Program evaluation using aggregated data</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -743,7 +749,7 @@
 <section id="pas12">
     <h2>12. Budget Planning</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>12.1</td>
@@ -759,7 +765,7 @@
                     <div class="doc-ref">→ Needs Assessment</div>
                     <div class="doc-ref">→ Meeting Minutes (budget discussions)</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need written program goals tied to budget</td>
+                <td class="status-partial">◐ PARTIAL — Need written program goals tied to budget</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>12.2</td>
@@ -775,7 +781,7 @@
                     <div class="doc-ref">→ Projected Operating Budget (next FY)</div>
                     <div class="doc-ref">→ Meeting minutes approving budget</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Verify projected budget exists</td>
+                <td class="status-partial">◐ PARTIAL — Verify projected budget exists</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>12.3</td>
@@ -791,7 +797,7 @@
                     <div class="doc-ref">→ Parent Handbook (tuition collection policies)</div>
                     <div class="doc-ref">→ Written policies on tuition/fees collection</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need quarterly cash-flow documentation</td>
+                <td class="status-partial">◐ PARTIAL — Need quarterly cash-flow documentation</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -801,7 +807,7 @@
 <section id="pas13">
     <h2>13. Accounting Practices</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>13.1</td>
@@ -815,7 +821,7 @@
                 <td>
                     <div class="doc-ref">→ Quarterly Financial Statements (QuickBooks)</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need printed quarterly statements on file</td>
+                <td class="status-partial">◐ PARTIAL — Need printed quarterly statements on file</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>13.2</td>
@@ -825,7 +831,7 @@
                     <div class="doc-ref">→ Policy regarding separation of financial duties</div>
                     <div class="doc-ref">→ QuickBooks records</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need written checks/balances policy</td>
+                <td class="status-partial">◐ PARTIAL — Need written checks/balances policy</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>13.3</td>
@@ -838,7 +844,7 @@
                 <td>
                     <div class="doc-ref">→ CPA Audit Documentation (last 3 years)</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Verify CPA audit records</td>
+                <td class="status-partial">◐ PARTIAL — Verify CPA audit records</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -848,7 +854,7 @@
 <section id="pas14">
     <h2>14. Program Evaluation</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>14.1</td>
@@ -859,7 +865,7 @@
                     <div class="doc-ref">→ Meeting Agendas &amp; Minutes</div>
                     <div class="doc-ref">→ Exit Interview Forms</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need staff program evaluation surveys</td>
+                <td class="status-partial">◐ PARTIAL — Need staff program evaluation surveys</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>14.2</td>
@@ -869,7 +875,7 @@
                     <div class="doc-ref"><a href="parent-satisfaction-survey.html">→ Parent Satisfaction Surveys</a></div>
                     <div class="doc-ref">→ Parent Meeting Minutes</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need parent surveys on file</td>
+                <td class="status-partial">◐ PARTIAL — Need parent surveys on file</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>14.3</td>
@@ -883,7 +889,7 @@
                     <div class="doc-ref"><a href="program-improvement-plan.html">→ Written Program Improvement Plan</a></div>
                     <div class="doc-ref">→ Newsletter/communication sharing improvements</div>
                 </td>
-                <td class="status-need">✗ NEED — Written program improvement plan</td>
+                <td class="status-need">✗ NEED — Written program improvement plan</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -893,7 +899,7 @@
 <section id="pas15">
     <h2>15. Strategic Planning</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>15.1</td>
@@ -910,7 +916,7 @@
                     <div class="doc-ref"><a href="https://childrenofpromisedaycare.com/">→ External Website: Mission Statement (public site)</a></div>
                     <div class="doc-ref">→ Meeting Minutes (mission review)</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>15.2</td>
@@ -925,7 +931,7 @@
                     <div class="doc-ref">→ Business/Strategic Plan</div>
                     <div class="doc-ref">→ Meeting Minutes (strategic plan review)</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need written strategic plan document</td>
+                <td class="status-partial">◐ PARTIAL — Need written strategic plan document</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -935,7 +941,7 @@
 <section id="pas16">
     <h2>16. Family Communication</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>16.1</td>
@@ -958,7 +964,7 @@
                     <div class="doc-ref">→ Onboarding Information Packet</div>
                     <div class="doc-ref">→ Pre-Admission Site Visit requirement</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>16.2</td>
@@ -974,7 +980,7 @@
                     <div class="doc-ref"><a href="transition-policy.html#intake">→ Transition Policy (cultural practices reviewed at intake)</a></div>
                     <div class="doc-ref">→ Parent Conference Forms</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>16.3</td>
@@ -990,7 +996,7 @@
                     <div class="doc-ref">→ Monthly Newsletter</div>
                     <div class="doc-ref"><a href="parent-handbook-2026.html#communication">→ Parent Handbook: Communication Methods (Sec 6)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>16.4</td>
@@ -1007,7 +1013,7 @@
                     <div class="doc-ref"><a href="parent-handbook-2026.html#communication">→ Parent Handbook: Daily Discussion &amp; Conferences (Sec 6)</a></div>
                     <div class="doc-ref">→ Sign-up sheets for conferences</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -1017,7 +1023,7 @@
 <section id="pas17">
     <h2>17. Family Support &amp; Involvement</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>17.1</td>
@@ -1028,7 +1034,7 @@
                     <div class="doc-ref">→ Bulletin board / resource information</div>
                     <div class="doc-ref"><a href="parent-handbook-2026.html#transitions">→ Parent Handbook: Transitions (school readiness, exit briefing)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>17.2</td>
@@ -1038,7 +1044,7 @@
                     <div class="doc-ref"><a href="parent-handbook-2026.html#arrival">→ Parent Handbook: Visitors &amp; Open Door Policy (Sec 5.4)</a></div>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#general">→ Employee Handbook: Visitors Policy (Sec 17.1)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>17.3</td>
@@ -1048,7 +1054,7 @@
                     <div class="doc-ref"><a href="parent-handbook-2026.html#involvement">→ Parent Handbook: Open Door Policy &amp; Volunteering (Sec 12.1)</a></div>
                     <div class="doc-ref">→ Event flyers/sign-up sheets</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -1058,7 +1064,7 @@
 <section id="pas18">
     <h2>18. External Communications</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>18.1</td>
@@ -1069,7 +1075,7 @@
                     <div class="doc-ref">→ Signage</div>
                     <div class="doc-ref">→ Brochures / Flyers</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>18.2</td>
@@ -1085,7 +1091,7 @@
                     <div class="doc-ref">→ Consistent branding across materials</div>
                     <div class="doc-ref">→ Review documentation</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Ensure consistency across all materials</td>
+                <td class="status-partial">◐ PARTIAL — Ensure consistency across all materials</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>18.3</td>
@@ -1100,7 +1106,7 @@
                     <div class="doc-ref">→ Follow-up inquiry packet</div>
                     <div class="doc-ref">→ Staff guide for inquiry responses</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Need inquiry log and staff guide</td>
+                <td class="status-partial">◐ PARTIAL — Need inquiry log and staff guide</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -1110,7 +1116,7 @@
 <section id="pas19">
     <h2>19. Community Outreach</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>19.1</td>
@@ -1120,7 +1126,7 @@
                     <div class="doc-ref">→ Membership certificates/cards</div>
                     <div class="doc-ref">→ Event attendance records</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Gather evidence of community involvement</td>
+                <td class="status-partial">◐ PARTIAL — Gather evidence of community involvement</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>19.2</td>
@@ -1130,7 +1136,7 @@
                     <div class="doc-ref">→ Community event participation records</div>
                     <div class="doc-ref">→ Letters/flyers from community partners</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Document neighborhood relationships</td>
+                <td class="status-partial">◐ PARTIAL — Document neighborhood relationships</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>19.3</td>
@@ -1141,7 +1147,7 @@
                     <div class="doc-ref">→ NAEYC affiliation</div>
                     <div class="doc-ref">→ Conference attendance certificates</div>
                 </td>
-                <td class="status-partial">◐ PARTIAL — Gather membership/attendance records</td>
+                <td class="status-partial">◐ PARTIAL — Gather membership/attendance records</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -1151,7 +1157,7 @@
 <section id="pas20">
     <h2>20. Technological Resources</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>20.1</td>
@@ -1162,7 +1168,7 @@
                     <div class="doc-ref">→ Technology Policy</div>
                     <div class="doc-ref">→ Tablets available (Brightwheel, Teaching Strategies)</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>20.2</td>
@@ -1172,7 +1178,7 @@
                     <div class="doc-ref">→ Wi-Fi access for staff</div>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#technology">→ Employee Handbook: Center Technology (Sec 13.1)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -1182,7 +1188,7 @@
 <section id="pas21">
     <h2>21. Use of Technology</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
             <tr>
                 <td>21.1</td>
@@ -1199,7 +1205,7 @@
                     <div class="doc-ref">→ Teaching Strategies (assessment platform)</div>
                     <div class="doc-ref">→ Email/website for communications</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>21.2</td>
@@ -1214,7 +1220,7 @@
                     <div class="doc-ref">→ Teaching Strategies (documentation of children's work)</div>
                     <div class="doc-ref">→ Training logs (Brightwheel/TS training)</div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
             <tr>
                 <td>21.3</td>
@@ -1223,7 +1229,7 @@
                 <td>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#technology">→ Employee Handbook: Cell Phone &amp; Technology Policy (Sec 13.2)</a></div>
                 </td>
-                <td class="status-have">✓ HAVE</td>
+                <td class="status-have">✓ HAVE</td><td class="comments-cell"></td>
             </tr>
         </tbody>
     </table>
@@ -1233,13 +1239,13 @@
 <section id="pas22">
     <h2>22. Administrator</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
-            <tr><td>22.1</td><td>Educational level</td><td>Evidence of highest level of education</td><td><div class="doc-ref">→ Transcripts / Diplomas on file</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>22.2</td><td>Specialized ECE/CD coursework</td><td>Evidence of ECE/child development coursework</td><td><div class="doc-ref">→ Transcripts / Gateways credential</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>22.3</td><td>Specialized management coursework</td><td>Evidence of management coursework</td><td><div class="doc-ref">→ Transcripts</div></td><td class="status-partial">◐ PARTIAL — Verify management coursework on file</td></tr>
-            <tr><td>22.4</td><td>Experience</td><td>Evidence of experience in management</td><td><div class="doc-ref">→ Portfolio / HR employment records</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>22.5</td><td>Professional contributions</td><td>Evidence of activities/roles in ECE organizations</td><td><div class="doc-ref">→ Memberships, certificates, conference attendance</div></td><td class="status-partial">◐ PARTIAL — Gather documentation</td></tr>
+            <tr><td>22.1</td><td>Educational level</td><td>Evidence of highest level of education</td><td><div class="doc-ref">→ Transcripts / Diplomas on file</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>22.2</td><td>Specialized ECE/CD coursework</td><td>Evidence of ECE/child development coursework</td><td><div class="doc-ref">→ Transcripts / Gateways credential</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>22.3</td><td>Specialized management coursework</td><td>Evidence of management coursework</td><td><div class="doc-ref">→ Transcripts</div></td><td class="status-partial">◐ PARTIAL — Verify management coursework on file</td><td class="comments-cell"></td></tr>
+            <tr><td>22.4</td><td>Experience</td><td>Evidence of experience in management</td><td><div class="doc-ref">→ Portfolio / HR employment records</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>22.5</td><td>Professional contributions</td><td>Evidence of activities/roles in ECE organizations</td><td><div class="doc-ref">→ Memberships, certificates, conference attendance</div></td><td class="status-partial">◐ PARTIAL — Gather documentation</td><td class="comments-cell"></td></tr>
         </tbody>
     </table>
 </section>
@@ -1247,11 +1253,11 @@
 <section id="pas23">
     <h2>23. Lead Teacher</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
-            <tr><td>23.1</td><td>Educational level</td><td>Evidence of highest level of education; enrollment in BA program</td><td><div class="doc-ref">→ Transcripts / Diplomas / Enrollment forms</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>23.2</td><td>Specialized ECE/CD coursework</td><td>Evidence of ECE coursework; certification</td><td><div class="doc-ref">→ Transcripts / PEL / ECE Credentials</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>23.3</td><td>Experience</td><td>Evidence of experience teaching young children</td><td><div class="doc-ref">→ HR employment records / Applications</div></td><td class="status-have">✓ HAVE</td></tr>
+            <tr><td>23.1</td><td>Educational level</td><td>Evidence of highest level of education; enrollment in BA program</td><td><div class="doc-ref">→ Transcripts / Diplomas / Enrollment forms</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>23.2</td><td>Specialized ECE/CD coursework</td><td>Evidence of ECE coursework; certification</td><td><div class="doc-ref">→ Transcripts / PEL / ECE Credentials</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>23.3</td><td>Experience</td><td>Evidence of experience teaching young children</td><td><div class="doc-ref">→ HR employment records / Applications</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
         </tbody>
     </table>
 </section>
@@ -1259,11 +1265,11 @@
 <section id="pas24">
     <h2>24. Teacher</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
-            <tr><td>24.1</td><td>Educational level</td><td>Evidence of highest education level; enrollment in baccalaureate program</td><td><div class="doc-ref">→ Transcripts / Diplomas / Enrollment forms</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>24.2</td><td>Specialized ECE/CD coursework</td><td>Evidence of ECE coursework; CDA or CCP credential</td><td><div class="doc-ref">→ Transcripts / CDA credential</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>24.3</td><td>Experience</td><td>Evidence of experience teaching young children</td><td><div class="doc-ref">→ HR employment records / Applications</div></td><td class="status-have">✓ HAVE</td></tr>
+            <tr><td>24.1</td><td>Educational level</td><td>Evidence of highest education level; enrollment in baccalaureate program</td><td><div class="doc-ref">→ Transcripts / Diplomas / Enrollment forms</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>24.2</td><td>Specialized ECE/CD coursework</td><td>Evidence of ECE coursework; CDA or CCP credential</td><td><div class="doc-ref">→ Transcripts / CDA credential</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>24.3</td><td>Experience</td><td>Evidence of experience teaching young children</td><td><div class="doc-ref">→ HR employment records / Applications</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
         </tbody>
     </table>
 </section>
@@ -1271,11 +1277,11 @@
 <section id="pas25">
     <h2>25. Apprentice Teacher/Aide</h2>
     <table>
-        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th></tr></thead>
+        <thead><tr><th>Indicator</th><th>Theme</th><th>Criteria</th><th>Our Documentation</th><th>Status</th><th>Comments</th></tr></thead>
         <tbody>
-            <tr><td>25.1</td><td>Educational level</td><td>Evidence of highest level of education</td><td><div class="doc-ref">→ Transcripts / Diplomas</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>25.2</td><td>Specialized ECE/CD coursework</td><td>Evidence of ECE coursework; enrollment in ECE coursework</td><td><div class="doc-ref">→ Transcripts / Enrollment forms</div></td><td class="status-have">✓ HAVE</td></tr>
-            <tr><td>25.3</td><td>Experience</td><td>Evidence of experience teaching young children</td><td><div class="doc-ref">→ HR records / Applications</div></td><td class="status-have">✓ HAVE</td></tr>
+            <tr><td>25.1</td><td>Educational level</td><td>Evidence of highest level of education</td><td><div class="doc-ref">→ Transcripts / Diplomas</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>25.2</td><td>Specialized ECE/CD coursework</td><td>Evidence of ECE coursework; enrollment in ECE coursework</td><td><div class="doc-ref">→ Transcripts / Enrollment forms</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
+            <tr><td>25.3</td><td>Experience</td><td>Evidence of experience teaching young children</td><td><div class="doc-ref">→ HR records / Applications</div></td><td class="status-have">✓ HAVE</td><td class="comments-cell"></td></tr>
         </tbody>
     </table>
 </section>
@@ -1370,6 +1376,30 @@
         else if (sel.value === 'partial') { sel.style.background = '#fef3c7'; sel.style.color = '#92400e'; }
         else { sel.style.background = '#fef2f2'; sel.style.color = '#991b1b'; }
     }
+})();
+
+// Make comments cells editable and save to localStorage
+(function() {
+    const COMMENTS_KEY = 'pas_comments';
+    function loadComments() { try { return JSON.parse(localStorage.getItem(COMMENTS_KEY)) || {}; } catch(e) { return {}; } }
+    function saveComments(c) { localStorage.setItem(COMMENTS_KEY, JSON.stringify(c)); }
+
+    const saved = loadComments();
+    const commentCells = document.querySelectorAll('td.comments-cell');
+    commentCells.forEach((cell, i) => {
+        const id = 'comment_' + i;
+        const textarea = document.createElement('textarea');
+        textarea.id = id;
+        textarea.value = saved[id] || '';
+        textarea.placeholder = 'Add notes...';
+        textarea.style.cssText = 'width:100%;min-height:40px;padding:4px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;font-family:inherit;resize:vertical;';
+        textarea.onchange = function() {
+            const c = loadComments();
+            c[this.id] = this.value;
+            saveComments(c);
+        };
+        cell.appendChild(textarea);
+    });
 })();
 </script>
 
