@@ -206,7 +206,35 @@
 
                 <div class="section-title">Admin Meetings Log</div>
                 <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:20px;">
-                    <p style="font-size:0.8rem;color:#64748b;margin-bottom:12px;">Tracking administrative meetings related to PAS compliance, documentation review, and program planning.</p>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                        <p style="font-size:0.8rem;color:#64748b;margin:0;">Tracking administrative meetings related to PAS compliance, documentation review, and program planning.</p>
+                        <button onclick="document.getElementById('newMeetingForm').style.display=document.getElementById('newMeetingForm').style.display==='none'?'block':'none'" style="padding:6px 14px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;white-space:nowrap;">+ New Meeting</button>
+                    </div>
+                    <div id="newMeetingForm" style="display:none;background:white;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px;">
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                            <div>
+                                <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Date</label>
+                                <input type="date" id="mtgDate" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Time</label>
+                                <input type="text" id="mtgTime" placeholder="e.g. 11:00 AM – 1:00 PM" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Attendees</label>
+                                <input type="text" id="mtgAttendees" placeholder="e.g. Clete Holliday, Megan Nooney" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;">
+                            </div>
+                            <div>
+                                <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Topic</label>
+                                <input type="text" id="mtgTopic" placeholder="Meeting topic" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:10px;">
+                            <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Notes</label>
+                            <textarea id="mtgNotes" rows="2" placeholder="Meeting notes..." style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;resize:vertical;"></textarea>
+                        </div>
+                        <button onclick="addMeetingRow()" style="padding:7px 16px;background:#16a34a;color:white;border:none;border-radius:5px;font-size:0.78rem;font-weight:700;cursor:pointer;">Save Meeting</button>
+                    </div>
                     <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
                         <thead>
                             <tr style="background:#2563eb;color:white;">
@@ -262,6 +290,43 @@ document.getElementById('pasPwForm').addEventListener('submit', function(e) {
 });
 
 checkPasAuth();
+
+function addMeetingRow() {
+    const date = document.getElementById('mtgDate').value;
+    const time = document.getElementById('mtgTime').value;
+    const attendees = document.getElementById('mtgAttendees').value;
+    const topic = document.getElementById('mtgTopic').value;
+    const notes = document.getElementById('mtgNotes').value;
+    if (!date || !topic) { alert('Please fill in at least a date and topic.'); return; }
+    const dateStr = new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    const row = document.createElement('tr');
+    row.style.borderBottom = '1px solid #e2e8f0';
+    row.innerHTML = '<td style="padding:8px 12px;font-weight:600;">' + dateStr + '</td><td style="padding:8px 12px;">' + (time||'—') + '</td><td style="padding:8px 12px;">' + (attendees||'—') + '</td><td style="padding:8px 12px;">' + topic + '</td><td style="padding:8px 12px;">' + (notes||'') + '</td>';
+    document.getElementById('adminMeetingsBody').insertBefore(row, document.getElementById('adminMeetingsBody').firstChild);
+    // Save to localStorage
+    const meetings = JSON.parse(localStorage.getItem('pas_admin_meetings') || '[]');
+    meetings.unshift({ date: dateStr, time, attendees, topic, notes });
+    localStorage.setItem('pas_admin_meetings', JSON.stringify(meetings));
+    // Clear form
+    document.getElementById('mtgDate').value = '';
+    document.getElementById('mtgTime').value = '';
+    document.getElementById('mtgAttendees').value = '';
+    document.getElementById('mtgTopic').value = '';
+    document.getElementById('mtgNotes').value = '';
+    document.getElementById('newMeetingForm').style.display = 'none';
+}
+
+// Load saved meetings on page load
+(function() {
+    const meetings = JSON.parse(localStorage.getItem('pas_admin_meetings') || '[]');
+    const tbody = document.getElementById('adminMeetingsBody');
+    meetings.forEach(m => {
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid #e2e8f0';
+        row.innerHTML = '<td style="padding:8px 12px;font-weight:600;">' + m.date + '</td><td style="padding:8px 12px;">' + (m.time||'—') + '</td><td style="padding:8px 12px;">' + (m.attendees||'—') + '</td><td style="padding:8px 12px;">' + m.topic + '</td><td style="padding:8px 12px;">' + (m.notes||'') + '</td>';
+        tbody.insertBefore(row, tbody.firstChild);
+    });
+})();
 </script>
 </body>
 </html>
