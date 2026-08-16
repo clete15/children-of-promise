@@ -183,6 +183,16 @@
                     <option value="No">No</option>
                 </select>
             </div>
+            <div class="form-group">
+                <label>Days Requesting Care <span class="required">*</span></label>
+                <div class="checkbox-group" style="display:flex;gap:16px;flex-wrap:wrap;">
+                    <label><input type="checkbox" class="child-day" value="Mon"> Mon</label>
+                    <label><input type="checkbox" class="child-day" value="Tue"> Tue</label>
+                    <label><input type="checkbox" class="child-day" value="Wed"> Wed</label>
+                    <label><input type="checkbox" class="child-day" value="Thu"> Thu</label>
+                    <label><input type="checkbox" class="child-day" value="Fri"> Fri</label>
+                </div>
+            </div>
         </div>
     </div>
     <div id="addChildPrompt" style="margin-top:14px;display:none;">
@@ -531,6 +541,16 @@ function addChild() {
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
             </select>
+        </div>
+        <div class="form-group">
+            <label>Days Requesting Care <span class="required">*</span></label>
+            <div class="checkbox-group" style="display:flex;gap:16px;flex-wrap:wrap;">
+                <label><input type="checkbox" class="child-day" value="Mon"> Mon</label>
+                <label><input type="checkbox" class="child-day" value="Tue"> Tue</label>
+                <label><input type="checkbox" class="child-day" value="Wed"> Wed</label>
+                <label><input type="checkbox" class="child-day" value="Thu"> Thu</label>
+                <label><input type="checkbox" class="child-day" value="Fri"> Fri</label>
+            </div>
         </div>`;
     container.appendChild(div);
     div.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -634,6 +654,7 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
         notYetBorn: block.querySelector('.child-notBorn')?.checked ? 'Yes' : 'No',
         ageGroup: block.querySelector('.child-ageGroup').value,
         iep: block.querySelector('.child-iep').value,
+        daysRequested: [...block.querySelectorAll('.child-day:checked')].map(cb => cb.value).join(','),
     }));
 
     let successCount = 0;
@@ -647,6 +668,7 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
             childStartDate: child.childStartDate,
             ageGroup:       child.ageGroup,
             iep:            child.iep,
+            daysRequested:  child.daysRequested,
             childrenInfo:   child.childName,
         };
         data.score = calcScore(data);
