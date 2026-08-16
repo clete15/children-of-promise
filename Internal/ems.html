@@ -389,6 +389,7 @@
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Start Date</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Contact</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Children</th>
+                                <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Days</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Score</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Room</th>
                                 <th style="padding:10px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);">Risk Factors</th>
@@ -399,7 +400,7 @@
                             </tr>
                         </thead>
                         <tbody id="wlBody">
-                            <tr><td colspan="12" style="text-align:center;padding:48px;color:var(--text-muted);">Loading…</td></tr>
+                            <tr><td colspan="13" style="text-align:center;padding:48px;color:var(--text-muted);">Loading…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1247,7 +1248,7 @@ function renderWlTable() {
     );
     document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
     if (!rows.length) {
-        document.getElementById('wlBody').innerHTML = '<tr><td colspan="12" style="text-align:center;padding:48px;color:var(--text-muted);">No records found.</td></tr>';
+        document.getElementById('wlBody').innerHTML = '<tr><td colspan="13" style="text-align:center;padding:48px;color:var(--text-muted);">No records found.</td></tr>';
         return;
     }
     document.getElementById('wlBody').innerHTML = rows.map((r, i) => {
@@ -1262,6 +1263,7 @@ function renderWlTable() {
             <td style="padding:10px 12px;font-size:0.78rem;">${r.ChildStartDate || r.ChildBirthDate || '—'}</td>
             <td style="padding:10px 12px;"><div>${r.Phone || '—'}</div><div style="font-size:0.72rem;color:var(--text-muted);">${r.Email || ''}</div></td>
             <td style="padding:10px 12px;max-width:160px;">${r.ChildrenInfo || '—'}</td>
+            <td style="padding:10px 12px;font-size:0.72rem;">${r.DaysRequested || '—'}</td>
             <td style="padding:10px 12px;"><span style="display:inline-block;padding:3px 10px;border-radius:20px;font-weight:700;font-size:0.78rem;background:#f8fafc;${scoreClass}">${score} pts</span></td>
             <td style="padding:8px 8px;">
                 <select style="padding:4px 6px;border:1px solid var(--border);border-radius:4px;font-size:0.72rem;width:100%;" onchange="updateWlAgeGroup(${parseInt(r.Id)},this.value)">
