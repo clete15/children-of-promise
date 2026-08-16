@@ -906,6 +906,7 @@
                 <td>
                     <div class="doc-ref"><a href="employee-handbook-2026.html#welcome">→ Employee Handbook: Mission Statement (Sec 1.1)</a></div>
                     <div class="doc-ref"><a href="parent-handbook-2026.html#welcome">→ Parent Handbook: Welcome &amp; Mission (Sec 1)</a></div>
+                    <div class="doc-ref"><a href="https://childrenofpromisedaycare.com/">→ External Website: Mission Statement (public site)</a></div>
                     <div class="doc-ref">→ Meeting Minutes (mission review)</div>
                 </td>
                 <td class="status-have">✓ HAVE</td>
@@ -1324,6 +1325,50 @@
         state[el.id] = el.checked;
         saveState(state);
     };
+})();
+
+// Convert status cells to interactive dropdowns
+(function() {
+    const STATUS_KEY = 'pas_status_selections';
+    function loadStatus() { try { return JSON.parse(localStorage.getItem(STATUS_KEY)) || {}; } catch(e) { return {}; } }
+    function saveStatus(s) { localStorage.setItem(STATUS_KEY, JSON.stringify(s)); }
+
+    const saved = loadStatus();
+    const statusCells = document.querySelectorAll('td[class^="status-"]');
+    statusCells.forEach((cell, i) => {
+        const id = 'status_' + i;
+        // Determine current value
+        let current = 'have';
+        if (cell.classList.contains('status-partial')) current = 'partial';
+        if (cell.classList.contains('status-need')) current = 'need';
+        // Use saved value if exists
+        if (saved[id]) current = saved[id];
+
+        const select = document.createElement('select');
+        select.id = id;
+        select.style.cssText = 'padding:4px 6px;border-radius:4px;font-size:0.78rem;font-weight:700;border:1px solid #d1d5db;cursor:pointer;width:100%;';
+        select.innerHTML = '<option value="have">✓ HAVE</option><option value="partial">◐ PARTIAL</option><option value="need">✗ NEED</option>';
+        select.value = current;
+        updateSelectStyle(select);
+
+        select.onchange = function() {
+            updateSelectStyle(this);
+            const s = loadStatus();
+            s[this.id] = this.value;
+            saveStatus(s);
+        };
+
+        cell.innerHTML = '';
+        cell.className = '';
+        cell.style.textAlign = 'center';
+        cell.appendChild(select);
+    });
+
+    function updateSelectStyle(sel) {
+        if (sel.value === 'have') { sel.style.background = '#dcfce7'; sel.style.color = '#166534'; }
+        else if (sel.value === 'partial') { sel.style.background = '#fef3c7'; sel.style.color = '#92400e'; }
+        else { sel.style.background = '#fef2f2'; sel.style.color = '#991b1b'; }
+    }
 })();
 </script>
 
