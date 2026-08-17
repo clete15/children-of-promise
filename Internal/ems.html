@@ -85,9 +85,6 @@
         <button class="toggle-btn active" id="btnEmsMode" onclick="setMode('ems')">
             <span class="toggle-icon">📋</span> EMS
         </button>
-        <button class="toggle-btn" id="btnRosterMode" onclick="setMode('roster')">
-            <span class="toggle-icon">🏫</span> Room Roster
-        </button>
         <button class="toggle-btn" id="btnBenefitsMode" onclick="setMode('benefits')">
             <span class="toggle-icon">💳</span> Benefits
         </button>
@@ -518,8 +515,10 @@ async function init() {
     // Check if should start on waiting list tab - redirect to standalone page
     if (sessionStorage.getItem('emsStartTab') === 'waitlist' || new URLSearchParams(window.location.search).get('view') === 'waitlist') {
         sessionStorage.removeItem('emsStartTab');
-        // Load waitlist in standalone mode
         setMode('waitlist');
+        document.querySelector('.mode-toggle-bar').style.display = 'none';
+    } else if (new URLSearchParams(window.location.search).get('view') === 'roster') {
+        setMode('roster');
         document.querySelector('.mode-toggle-bar').style.display = 'none';
     } else if (sessionStorage.getItem('emsStartTab') === 'notifications') {
         sessionStorage.removeItem('emsStartTab');
@@ -1166,7 +1165,7 @@ function setMode(mode) {
     document.getElementById('reportsMode').style.display  = mode === 'reports'  ? 'block' : 'none';
     document.getElementById('notificationsMode').style.display = mode === 'notifications' ? 'block' : 'none';
     document.getElementById('btnEmsMode').classList.toggle('active',      mode === 'ems');
-    document.getElementById('btnRosterMode').classList.toggle('active',   mode === 'roster');
+    var rosterBtn = document.getElementById('btnRosterMode'); if (rosterBtn) rosterBtn.classList.toggle('active', mode === 'roster');
     document.getElementById('btnBenefitsMode').classList.toggle('active', mode === 'benefits');
     var wlBtn = document.getElementById('btnWaitlistMode'); if (wlBtn) wlBtn.classList.toggle('active', mode === 'waitlist');
     document.getElementById('btnReportsMode').classList.toggle('active',  mode === 'reports');
