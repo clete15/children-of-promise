@@ -76,15 +76,12 @@
             <p>Enrollment Management System &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="index.html">← Staff Portal</a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
 </header>
 
 <!-- MODE TOGGLE -->
 <div class="mode-toggle-bar">
     <div class="mode-toggle">
-        <button class="toggle-btn" id="btnWaitlistMode" onclick="setMode('waitlist')">
-            <span class="toggle-icon">📝</span> Waiting List <span id="wlBadge" style="display:none;background:#dc2626;color:white;font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;"></span>
-        </button>
         <button class="toggle-btn active" id="btnEmsMode" onclick="setMode('ems')">
             <span class="toggle-icon">📋</span> EMS
         </button>
@@ -96,9 +93,6 @@
         </button>
         <button class="toggle-btn" id="btnReportsMode" onclick="setMode('reports')">
             <span class="toggle-icon">📊</span> Reports
-        </button>
-        <button class="toggle-btn" id="btnNotificationsMode" onclick="setMode('notifications')">
-            <span class="toggle-icon">🔔</span> Alerts <span id="alertBadge" style="display:none;background:#dc2626;color:white;font-size:0.68rem;font-weight:700;padding:2px 7px;border-radius:10px;margin-left:4px;"></span>
         </button>
     </div>
 </div>
@@ -521,17 +515,16 @@ async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
     loadWlBadge();
     renderAlerts();
-    // Check if should start on waiting list tab
+    // Check if should start on waiting list tab - redirect to standalone page
     if (sessionStorage.getItem('emsStartTab') === 'waitlist' || new URLSearchParams(window.location.search).get('view') === 'waitlist') {
         sessionStorage.removeItem('emsStartTab');
+        // Load waitlist in standalone mode
         setMode('waitlist');
-        // Hide mode toggle if opened as standalone waitlist view
-        if (new URLSearchParams(window.location.search).get('view') === 'waitlist') {
-            document.querySelector('.mode-toggle-bar').style.display = 'none';
-        }
+        document.querySelector('.mode-toggle-bar').style.display = 'none';
     } else if (sessionStorage.getItem('emsStartTab') === 'notifications') {
         sessionStorage.removeItem('emsStartTab');
-        setMode('notifications');
+        window.location.href = '/staff/alerts.html';
+        return;
     }
     // Check if redirected from waiting list
     if (new URLSearchParams(window.location.search).get('enroll') === '1') {
@@ -1175,9 +1168,9 @@ function setMode(mode) {
     document.getElementById('btnEmsMode').classList.toggle('active',      mode === 'ems');
     document.getElementById('btnRosterMode').classList.toggle('active',   mode === 'roster');
     document.getElementById('btnBenefitsMode').classList.toggle('active', mode === 'benefits');
-    document.getElementById('btnWaitlistMode').classList.toggle('active', mode === 'waitlist');
+    var wlBtn = document.getElementById('btnWaitlistMode'); if (wlBtn) wlBtn.classList.toggle('active', mode === 'waitlist');
     document.getElementById('btnReportsMode').classList.toggle('active',  mode === 'reports');
-    document.getElementById('btnNotificationsMode').classList.toggle('active', mode === 'notifications');
+    var notBtn = document.getElementById('btnNotificationsMode'); if (notBtn) notBtn.classList.toggle('active', mode === 'notifications');
     if (mode === 'roster') buildRoster();
     if (mode === 'benefits') buildBenefitsRoster();
     if (mode === 'ems') { buildViewSidebar(); updateRoomNavDisplay(); }
@@ -1206,8 +1199,10 @@ async function loadWlBadge() {
         const res = await apiFetch('/api/waitinglist/count');
         const data = await res.json();
         const badge = document.getElementById('wlBadge');
-        if (data.count > 0) { badge.textContent = data.count; badge.style.display = 'inline'; }
-        else { badge.style.display = 'none'; }
+        if (badge) {
+            if (data.count > 0) { badge.textContent = data.count; badge.style.display = 'inline'; }
+            else { badge.style.display = 'none'; }
+        }
     } catch (e) {}
 }
 
@@ -2323,8 +2318,10 @@ function renderAlerts() {
 
     // Update badge
     const badge = document.getElementById('alertBadge');
-    if (alerts.length) { badge.textContent = alerts.length; badge.style.display = 'inline'; }
-    else { badge.style.display = 'none'; }
+    if (badge) {
+        if (alerts.length) { badge.textContent = alerts.length; badge.style.display = 'inline'; }
+        else { badge.style.display = 'none'; }
+    }
 }
 
 async function saveCCAPIncome(studentId, firstName, lastName) {

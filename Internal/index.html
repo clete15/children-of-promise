@@ -495,6 +495,10 @@ async function loadAlertCount() {
         // Waiting list pending
         if (wlData && wlData.Total > 0) alertCount++;
 
+        // Missing income data for PFA/PI
+        const missingIncome = students.filter(s => (s.Active==='Yes'||s.Active==='YES') && (s.PFA_PI_na==='PFA'||s.PFA_PI_na==='PI') && (!s.HouseholdIncome||!s.HouseholdSize));
+        if (missingIncome.length) alertCount++;
+
         if (alertCount > 0) {
             document.getElementById('alertBadgePortal').style.display = 'inline-flex';
             document.getElementById('alertCountPortal').textContent = alertCount + ' alert' + (alertCount>1?'s':'');
