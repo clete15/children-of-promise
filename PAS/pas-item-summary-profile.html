@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAS Item Summary &amp; Profile — Children of Promise LLC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt; line-height: 1.4; color: #333;
+            padding: 0.5in 0.75in;
+        }
+        .header {
+            text-align: center; border-bottom: 2px solid #2c5282;
+            padding-bottom: 12px; margin-bottom: 20px;
+        }
+        .header h1 { font-size: 14pt; color: #2c5282; margin-bottom: 4px; }
+        .header .org-name { font-size: 11pt; color: #666; margin-bottom: 6px; }
+        .info-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px; margin-bottom: 20px;
+        }
+        .info-field {
+            display: flex; align-items: baseline; gap: 8px;
+        }
+        .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
+        .info-field input {
+            flex: 1; border: none; border-bottom: 1px solid #999;
+            font-family: inherit; font-size: 10pt; padding: 2px 4px;
+            background: transparent; min-width: 80px;
+        }
+        .info-field input:focus { outline: none; border-bottom-color: #2c5282; }
+        .section-title {
+            font-size: 11pt; font-weight: 700; color: #2c5282;
+            margin-top: 18px; margin-bottom: 10px;
+            border-bottom: 1px solid #cbd5e0; padding-bottom: 4px;
+        }
+        .score-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        .score-table th, .score-table td {
+            border: 1px solid #cbd5e0; padding: 5px 8px;
+            text-align: left; font-size: 9.5pt; vertical-align: middle;
+        }
+        .score-table th {
+            background-color: #2c5282; color: #fff; font-weight: 600;
+            font-size: 9pt;
+        }
+        .score-table tr:nth-child(even) { background: #f8f9fa; }
+        .score-table .item-num { text-align: center; font-weight: 600; width: 6%; }
+        .score-table .item-name { width: 34%; }
+        .score-table .item-subscale { width: 28%; font-size: 8.5pt; color: #555; }
+        .score-table .item-score { width: 12%; text-align: center; }
+        .score-table input[type="number"] {
+            width: 50px; border: 1px solid #ccc; border-radius: 3px;
+            font-family: inherit; font-size: 10pt; padding: 3px 6px;
+            text-align: center; background: #fff;
+        }
+        .score-table input[type="number"]:focus {
+            outline: none; border-color: #2c5282;
+        }
+        .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        .summary-table th, .summary-table td {
+            border: 1px solid #cbd5e0; padding: 6px 10px;
+            text-align: left; font-size: 9.5pt; vertical-align: middle;
+        }
+        .summary-table th {
+            background-color: #2c5282; color: #fff; font-weight: 600;
+            font-size: 9pt;
+        }
+        .summary-table tr:nth-child(even) { background: #f8f9fa; }
+        .summary-table .avg-cell {
+            text-align: center; font-weight: 600; color: #2c5282; font-size: 11pt;
+        }
+        .summary-table .total-row {
+            background: #edf2f7 !important; font-weight: 700;
+        }
+        .summary-table .total-row td { font-size: 10.5pt; }
+        .btn-save {
+            display: inline-block; padding: 10px 24px;
+            background: #2c5282; color: #fff; border: none;
+            border-radius: 6px; font-size: 10pt; font-weight: 600;
+            cursor: pointer; margin-top: 12px;
+        }
+        .btn-save:hover { background: #1a365d; }
+        .save-confirm {
+            display: inline-block; margin-left: 12px;
+            color: #27ae60; font-weight: 600; font-size: 10pt;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .save-confirm.show { opacity: 1; }
+        .notes-section { margin-top: 20px; }
+        .notes-section textarea {
+            width: 100%; min-height: 100px; border: 1px solid #cbd5e0;
+            border-radius: 4px; padding: 10px; font-family: inherit;
+            font-size: 10pt; resize: vertical;
+        }
+        .notes-section textarea:focus {
+            outline: none; border-color: #2c5282;
+        }
+        .footer {
+            margin-top: 25px; padding-top: 10px;
+            border-top: 1px solid #cbd5e0; display: flex;
+            justify-content: space-between; font-size: 9pt; color: #666;
+        }
+        @media print {
+            body { padding: 0; }
+            @page { margin: 0.4in 0.5in; size: letter; }
+            .no-print { display: none; }
+            .score-table input[type="number"] {
+                border: none; -webkit-appearance: none;
+            }
+            .info-field input { border-bottom: none; }
+            .notes-section textarea { border: 1px solid #ccc; }
+        }
+    </style>
+</head>
+<body>
+<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
+
+<div class="header">
+    <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
+    <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
+    <h1>PAS Item Summary &amp; Profile</h1>
+</div>
+
+<div class="info-grid">
+    <div class="info-field">
+        <label>Program Name:</label>
+        <input type="text" id="programName" value="Children of Promise LLC">
+    </div>
+    <div class="info-field">
+        <label>Date Completed:</label>
+        <input type="date" id="dateCompleted">
+    </div>
+    <div class="info-field">
+        <label>Self-Assessment Date:</label>
+        <input type="date" id="selfAssessDate">
+    </div>
+</div>
+
+<div class="section-title">Item Scores (1–7 Scale)</div>
+
+<table class="score-table">
+    <thead>
+        <tr>
+            <th class="item-num">Item #</th>
+            <th class="item-name">Item Name</th>
+            <th class="item-subscale">Subscale</th>
+            <th class="item-score">Score (1-7)</th>
+        </tr>
+    </thead>
+    <tbody id="itemTableBody">
+    </tbody>
+</table>
+
+<div class="section-title">Subscale Summary</div>
+
+<table class="summary-table">
+    <thead>
+        <tr>
+            <th style="width:35%">Subscale Name</th>
+            <th style="width:30%">Items Included</th>
+            <th style="width:20%">Average Score</th>
+        </tr>
+    </thead>
+    <tbody id="subscaleTableBody">
+    </tbody>
+    <tfoot>
+        <tr class="total-row">
+            <td colspan="2" style="text-align:right; padding-right:16px;">Total PAS Average (All 25 Items)</td>
+            <td class="avg-cell" id="totalAverage">—</td>
+        </tr>
+    </tfoot>
+</table>
+
+<div class="notes-section">
+    <div class="section-title">Assessor Notes / Comments</div>
+    <textarea id="assessorNotes" placeholder="Enter notes, observations, or action items here..."></textarea>
+</div>
+
+<div class="no-print" style="margin-top:16px;">
+    <button class="btn-save" onclick="saveData()">💾 Save</button>
+    <span class="save-confirm" id="saveConfirm">Saved ✓</span>
+</div>
+
+<div class="footer">
+    <span>PAS Documentation — Confidential</span>
+    <span>Children of Promise LLC — PAS Item Summary &amp; Profile</span>
+</div>
+
+<script>
+const STORAGE_KEY = 'pas_item_scores';
+
+const PAS_ITEMS = [
+    { num: 1, name: 'Staff Orientation', subscale: 'Human Resources Operations' },
+    { num: 2, name: 'Supervision & Performance Appraisal', subscale: 'Human Resources Operations' },
+    { num: 3, name: 'Staff Development', subscale: 'Human Resources Operations' },
+    { num: 4, name: 'Compensation', subscale: 'Human Resources Operations' },
+    { num: 5, name: 'Benefits', subscale: 'Human Resources Operations' },
+    { num: 6, name: 'Staffing Patterns & Scheduling', subscale: 'Human Resources Operations' },
+    { num: 7, name: 'Facilities Management', subscale: 'Facilities & Risk Management' },
+    { num: 8, name: 'Risk Management', subscale: 'Facilities & Risk Management' },
+    { num: 9, name: 'Internal Communications', subscale: 'Internal Communications' },
+    { num: 10, name: 'Screening & Identification of Special Needs', subscale: 'Child Development' },
+    { num: 11, name: 'Assessment in Support of Learning', subscale: 'Child Development' },
+    { num: 12, name: 'Budget Planning', subscale: 'Fiscal Management' },
+    { num: 13, name: 'Accounting Practices', subscale: 'Fiscal Management' },
+    { num: 14, name: 'Program Evaluation', subscale: 'Program Planning' },
+    { num: 15, name: 'Strategic Planning', subscale: 'Program Planning' },
+    { num: 16, name: 'Family Communication', subscale: 'Family Partnerships' },
+    { num: 17, name: 'Family Support & Involvement', subscale: 'Family Partnerships' },
+    { num: 18, name: 'External Communications', subscale: 'Marketing & Public Relations' },
+    { num: 19, name: 'Community Outreach', subscale: 'Marketing & Public Relations' },
+    { num: 20, name: 'Technological Resources', subscale: 'Technology' },
+    { num: 21, name: 'Use of Technology', subscale: 'Technology' },
+    { num: 22, name: 'Administrator', subscale: 'Staff Qualifications' },
+    { num: 23, name: 'Lead Teacher', subscale: 'Staff Qualifications' },
+    { num: 24, name: 'Teacher', subscale: 'Staff Qualifications' },
+    { num: 25, name: 'Apprentice Teacher/Aide', subscale: 'Staff Qualifications' }
+];
+
+const SUBSCALES = [
+    { name: 'Human Resources Operations', items: [1,2,3,4,5,6], label: 'Items 1–6' },
+    { name: 'Facilities & Risk Management', items: [7,8], label: 'Items 7–8' },
+    { name: 'Internal Communications', items: [9], label: 'Item 9' },
+    { name: 'Child Development', items: [10,11], label: 'Items 10–11' },
+    { name: 'Fiscal Management', items: [12,13], label: 'Items 12–13' },
+    { name: 'Program Planning', items: [14,15], label: 'Items 14–15' },
+    { name: 'Family Partnerships', items: [16,17], label: 'Items 16–17' },
+    { name: 'Marketing & Public Relations', items: [18,19], label: 'Items 18–19' },
+    { name: 'Technology', items: [20,21], label: 'Items 20–21' },
+    { name: 'Staff Qualifications', items: [22,23,24,25], label: 'Items 22–25' }
+];
+
+function initItemTable() {
+    const tbody = document.getElementById('itemTableBody');
+    let html = '';
+    PAS_ITEMS.forEach(item => {
+        html += `<tr>
+            <td class="item-num">${item.num}</td>
+            <td class="item-name">${item.name}</td>
+            <td class="item-subscale">${item.subscale}</td>
+            <td class="item-score">
+                <input type="number" id="score_${item.num}" min="1" max="7" step="1" placeholder="—">
+            </td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+function initSubscaleTable() {
+    const tbody = document.getElementById('subscaleTableBody');
+    let html = '';
+    SUBSCALES.forEach((sub, idx) => {
+        html += `<tr>
+            <td>${sub.name}</td>
+            <td>${sub.label}</td>
+            <td class="avg-cell" id="subscaleAvg_${idx}">—</td>
+        </tr>`;
+    });
+    tbody.innerHTML = html;
+}
+
+function calculateAverages() {
+    let allScores = [];
+
+    SUBSCALES.forEach((sub, idx) => {
+        let scores = [];
+        sub.items.forEach(itemNum => {
+            const input = document.getElementById(`score_${itemNum}`);
+            const val = parseFloat(input.value);
+            if (!isNaN(val) && val >= 1 && val <= 7) {
+                scores.push(val);
+                allScores.push(val);
+            }
+        });
+
+        const cell = document.getElementById(`subscaleAvg_${idx}`);
+        if (scores.length > 0) {
+            const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+            cell.textContent = avg.toFixed(2);
+        } else {
+            cell.textContent = '—';
+        }
+    });
+
+    const totalCell = document.getElementById('totalAverage');
+    if (allScores.length > 0) {
+        const total = allScores.reduce((a, b) => a + b, 0) / allScores.length;
+        totalCell.textContent = total.toFixed(2);
+    } else {
+        totalCell.textContent = '—';
+    }
+}
+
+function getAllData() {
+    const data = {
+        programName: document.getElementById('programName').value,
+        dateCompleted: document.getElementById('dateCompleted').value,
+        selfAssessDate: document.getElementById('selfAssessDate').value,
+        assessorNotes: document.getElementById('assessorNotes').value,
+        scores: {}
+    };
+    for (let i = 1; i <= 25; i++) {
+        const input = document.getElementById(`score_${i}`);
+        data.scores[i] = input.value;
+    }
+    return data;
+}
+
+function saveData() {
+    const data = getAllData();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const confirm = document.getElementById('saveConfirm');
+    confirm.classList.add('show');
+    setTimeout(() => confirm.classList.remove('show'), 2500);
+}
+
+function loadData() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    try {
+        const data = JSON.parse(stored);
+        if (data.programName) document.getElementById('programName').value = data.programName;
+        if (data.dateCompleted) document.getElementById('dateCompleted').value = data.dateCompleted;
+        if (data.selfAssessDate) document.getElementById('selfAssessDate').value = data.selfAssessDate;
+        if (data.assessorNotes) document.getElementById('assessorNotes').value = data.assessorNotes;
+        if (data.scores) {
+            Object.keys(data.scores).forEach(key => {
+                const input = document.getElementById(`score_${key}`);
+                if (input && data.scores[key]) input.value = data.scores[key];
+            });
+        }
+        calculateAverages();
+    } catch (e) {
+        console.error('Error loading saved data:', e);
+    }
+}
+
+// Listen for score changes to auto-calculate
+document.addEventListener('input', (e) => {
+    if (e.target.matches('input[type="number"]')) {
+        // Clamp value to 1-7
+        let val = parseInt(e.target.value);
+        if (val > 7) e.target.value = 7;
+        if (val < 1 && e.target.value !== '') e.target.value = 1;
+        calculateAverages();
+    }
+});
+
+// Auto-save on any field change
+document.addEventListener('change', (e) => {
+    if (e.target.matches('input, textarea')) {
+        const data = getAllData();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+});
+
+// Initialize
+initItemTable();
+initSubscaleTable();
+loadData();
+</script>
+</body>
+</html>

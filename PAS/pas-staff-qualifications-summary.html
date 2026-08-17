@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Qualifications Summary — Children of Promise LLC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt; line-height: 1.4; color: #333;
+            padding: 0.5in 0.75in;
+        }
+        .header {
+            text-align: center; border-bottom: 2px solid #2c5282;
+            padding-bottom: 12px; margin-bottom: 20px;
+        }
+        .header h1 { font-size: 14pt; color: #2c5282; margin-bottom: 4px; }
+        .header .org-name { font-size: 11pt; color: #666; margin-bottom: 6px; }
+        .info-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px; margin-bottom: 20px;
+        }
+        .info-field {
+            display: flex; align-items: baseline; gap: 8px;
+        }
+        .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
+        .info-field input {
+            flex: 1; border: none; border-bottom: 1px solid #999;
+            font-family: inherit; font-size: 10pt; padding: 2px 4px;
+            background: transparent; min-width: 80px;
+        }
+        .info-field input:focus { outline: none; border-bottom-color: #2c5282; }
+        .section-title {
+            font-size: 11pt; font-weight: 700; color: #2c5282;
+            margin-top: 18px; margin-bottom: 10px;
+            border-bottom: 1px solid #cbd5e0; padding-bottom: 4px;
+        }
+        .quals-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        .quals-table th, .quals-table td {
+            border: 1px solid #cbd5e0; padding: 5px 6px;
+            text-align: left; font-size: 9pt; vertical-align: middle;
+        }
+        .quals-table th {
+            background-color: #2c5282; color: #fff; font-weight: 600;
+            font-size: 8.5pt; text-align: center;
+        }
+        .quals-table td { height: 2em; }
+        .quals-table input, .quals-table select {
+            width: 100%; border: none; border-bottom: 1px solid #ccc;
+            font-family: inherit; font-size: 9pt; padding: 2px 3px;
+            background: transparent;
+        }
+        .quals-table input:focus, .quals-table select:focus {
+            outline: none; border-bottom-color: #2c5282;
+        }
+        .quals-table select { cursor: pointer; }
+        .quals-table tr:nth-child(even) { background: #f8f9fa; }
+        .btn-save {
+            display: inline-block; padding: 10px 24px;
+            background: #2c5282; color: #fff; border: none;
+            border-radius: 6px; font-size: 10pt; font-weight: 600;
+            cursor: pointer; margin-top: 12px;
+        }
+        .btn-save:hover { background: #1a365d; }
+        .save-confirm {
+            display: inline-block; margin-left: 12px;
+            color: #27ae60; font-weight: 600; font-size: 10pt;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .save-confirm.show { opacity: 1; }
+        .footer {
+            margin-top: 25px; padding-top: 10px;
+            border-top: 1px solid #cbd5e0; display: flex;
+            justify-content: space-between; font-size: 9pt; color: #666;
+        }
+        @media print {
+            body { padding: 0; }
+            @page { margin: 0.4in 0.5in; size: letter landscape; }
+            .no-print { display: none; }
+            .quals-table input, .quals-table select {
+                border-bottom: none; -webkit-appearance: none;
+            }
+            .info-field input { border-bottom: none; }
+        }
+    </style>
+</head>
+<body>
+<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
+
+<div class="header">
+    <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
+    <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
+    <h1>Staff Qualifications Summary</h1>
+</div>
+
+<div class="info-grid">
+    <div class="info-field">
+        <label>Program Name:</label>
+        <input type="text" id="programName" value="Children of Promise LLC">
+    </div>
+    <div class="info-field">
+        <label>Date:</label>
+        <input type="date" id="summaryDate">
+    </div>
+    <div class="info-field">
+        <label>Assessor Name:</label>
+        <input type="text" id="assessorName">
+    </div>
+</div>
+
+<div class="section-title">Staff Qualifications</div>
+
+<table class="quals-table">
+    <thead>
+        <tr>
+            <th style="width:14%">Staff Name</th>
+            <th style="width:12%">Position/Role</th>
+            <th style="width:12%">Highest Education</th>
+            <th style="width:10%">ECE Credits/Hours</th>
+            <th style="width:12%">Gateways Credential Level</th>
+            <th style="width:10%">Years ECE Experience</th>
+            <th style="width:12%">CPR/First Aid Current</th>
+            <th style="width:14%">PD Hours (Current Year)</th>
+        </tr>
+    </thead>
+    <tbody id="staffTableBody">
+    </tbody>
+</table>
+
+<div class="no-print" style="margin-top:16px;">
+    <button class="btn-save" onclick="saveData()">💾 Save</button>
+    <span class="save-confirm" id="saveConfirm">Saved ✓</span>
+</div>
+
+<div class="footer">
+    <span>PAS Documentation — Children of Promise LLC</span>
+    <span>Staff Qualifications Summary</span>
+</div>
+
+<script>
+const STORAGE_KEY = 'pas_staff_quals';
+const ROW_COUNT = 8;
+
+function createRow(index) {
+    return `<tr>
+        <td><input type="text" data-field="name_${index}" placeholder=""></td>
+        <td><select data-field="role_${index}">
+            <option value=""></option>
+            <option value="Director">Director</option>
+            <option value="Lead Teacher">Lead Teacher</option>
+            <option value="Teacher">Teacher</option>
+            <option value="Assistant">Assistant</option>
+        </select></td>
+        <td><select data-field="education_${index}">
+            <option value=""></option>
+            <option value="HS Diploma">HS Diploma</option>
+            <option value="AA/AS">AA/AS</option>
+            <option value="BA/BS">BA/BS</option>
+            <option value="MA/MS">MA/MS</option>
+            <option value="PhD">PhD</option>
+        </select></td>
+        <td><input type="text" data-field="ece_credits_${index}" placeholder=""></td>
+        <td><input type="text" data-field="gateways_${index}" placeholder=""></td>
+        <td><input type="text" data-field="experience_${index}" placeholder=""></td>
+        <td><select data-field="cpr_${index}">
+            <option value=""></option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+        </select></td>
+        <td><input type="text" data-field="pd_hours_${index}" placeholder=""></td>
+    </tr>`;
+}
+
+function initTable() {
+    const tbody = document.getElementById('staffTableBody');
+    let html = '';
+    for (let i = 0; i < ROW_COUNT; i++) {
+        html += createRow(i);
+    }
+    tbody.innerHTML = html;
+}
+
+function getAllData() {
+    const data = {
+        programName: document.getElementById('programName').value,
+        summaryDate: document.getElementById('summaryDate').value,
+        assessorName: document.getElementById('assessorName').value,
+        fields: {}
+    };
+    document.querySelectorAll('[data-field]').forEach(el => {
+        data.fields[el.getAttribute('data-field')] = el.value;
+    });
+    return data;
+}
+
+function saveData() {
+    const data = getAllData();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const confirm = document.getElementById('saveConfirm');
+    confirm.classList.add('show');
+    setTimeout(() => confirm.classList.remove('show'), 2500);
+}
+
+function loadData() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    try {
+        const data = JSON.parse(stored);
+        if (data.programName) document.getElementById('programName').value = data.programName;
+        if (data.summaryDate) document.getElementById('summaryDate').value = data.summaryDate;
+        if (data.assessorName) document.getElementById('assessorName').value = data.assessorName;
+        if (data.fields) {
+            Object.keys(data.fields).forEach(key => {
+                const el = document.querySelector(`[data-field="${key}"]`);
+                if (el) el.value = data.fields[key];
+            });
+        }
+    } catch (e) {
+        console.error('Error loading saved data:', e);
+    }
+}
+
+// Auto-save on field change
+document.addEventListener('change', (e) => {
+    if (e.target.matches('[data-field], #programName, #summaryDate, #assessorName')) {
+        const data = getAllData();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+});
+
+// Initialize
+initTable();
+loadData();
+</script>
+</body>
+</html>
