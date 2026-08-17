@@ -521,6 +521,11 @@ async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
     loadWlBadge();
     renderAlerts();
+    // Check if should start on waiting list tab
+    if (sessionStorage.getItem('emsStartTab') === 'waitlist') {
+        sessionStorage.removeItem('emsStartTab');
+        setMode('waitlist');
+    }
     // Check if redirected from waiting list
     if (new URLSearchParams(window.location.search).get('enroll') === '1') {
         const data = sessionStorage.getItem('enrollFromWaitlist');

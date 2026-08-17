@@ -218,11 +218,9 @@
 
         /* PORTAL CARDS */
         .portal-grid {
-            display: flex;
-            flex-direction: row;
-            flex-wrap: wrap;
-            gap: 24px;
-            justify-content: center;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
             width: 100%;
             max-width: 1000px;
         }
@@ -230,7 +228,7 @@
             background: var(--card-bg);
             border: 2px solid var(--border);
             border-radius: var(--radius);
-            padding: 36px 28px;
+            padding: 32px 24px;
             text-align: center;
             text-decoration: none;
             color: var(--text);
@@ -239,9 +237,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 12px;
-            flex: 1 1 220px;
-            max-width: 260px;
+            gap: 10px;
         }        .portal-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 12px 32px rgba(37,99,235,0.18); }
         .portal-card.disabled { opacity: 0.55; pointer-events: none; filter: grayscale(0.4); }
         .card-icon { font-size: 3.4rem; line-height: 1; }
@@ -334,31 +330,37 @@
         <a class="portal-card" id="emsCard" href="/staff/ems.html">
             <div class="card-icon">📋</div>
             <h3>Enrollment Management</h3>
-            <p>Waiting list, enrollment records, room roster, and reports — all in one place.</p>
+            <p>Enrollment records, room roster, benefits, and reports — all in one place.</p>
             <span class="card-btn">Open EMS</span>
+        </a>
+        <a class="portal-card" href="/staff/ems.html" onclick="sessionStorage.setItem('emsStartTab','waitlist')">
+            <div class="card-icon">📝</div>
+            <h3>Waiting List</h3>
+            <p>View and manage pre-enrollment waiting list, scores, and enrollment status.</p>
+            <span class="card-btn">Open Waiting List</span>
         </a>
         <a class="portal-card" href="/staff/isbe.html">
             <div class="card-icon">🏛️</div>
-            <h3>ISBE PFA/PI Management</h3>
-            <p>Manage PFA and PI program compliance, documentation, and reporting for ISBE.</p>
+            <h3>ISBE PFA/PI</h3>
+            <p>PFA and PI program compliance, documentation, and reporting for ISBE.</p>
             <span class="card-btn">Open ISBE</span>
         </a>
         <a class="portal-card" href="/staff/foodreport.html">
             <div class="card-icon">🍽️</div>
             <h3>Food Program</h3>
-            <p>Meal counts, food roster, weekly menus, and F/R/P reporting for CACFP compliance.</p>
+            <p>Meal counts, food roster, weekly menus, and F/R/P reporting for CACFP.</p>
             <span class="card-btn">Open Food Program</span>
         </a>
         <a class="portal-card" href="/staff/inccra.html">
             <div class="card-icon">💰</div>
             <h3>INCCRA Grants</h3>
-            <p>Access the INCCRA – SSWG shared folder for grant documents, expenditure tracking, and reporting.</p>
+            <p>INCCRA – SSWG shared folder, grant documents, and classroom roster export.</p>
             <span class="card-btn">Open INCCRA</span>
         </a>
         <a class="portal-card" href="/staff/pas.html">
             <div class="card-icon">📊</div>
             <h3>PAS Compliance</h3>
-            <p>Program Administration Scale documentation, handbooks, salary analysis, and monitoring prep.</p>
+            <p>Program Administration Scale monitoring guide, handbooks, and ExceleRate Silver.</p>
             <span class="card-btn">Open PAS</span>
         </a>
     </div><!-- end portal-grid -->
