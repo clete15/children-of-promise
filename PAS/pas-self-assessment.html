@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAS Self-Assessment Tool — Children of Promise LLC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        .print-btn {
+            position: fixed; top: 16px; right: 16px;
+            padding: 10px 20px; background: #2c5282; color: white;
+            border: none; border-radius: 6px; font-size: 10pt;
+            font-weight: 600; cursor: pointer; z-index: 9999;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        .print-btn:hover { background: #1a365d; }
+
+        .card {
+            background: white; border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+            width: 100%; max-width: 800px;
+            overflow: hidden;
+            display: flex; flex-direction: column;
+        }
+
+        /* Header */
+        .card-header {
+            text-align: center; padding: 20px 24px 16px;
+            border-bottom: 2px solid #2c5282;
+        }
+        .card-header img { height: 50px; margin-bottom: 6px; }
+        .card-header .org-name { font-size: 10pt; color: #666; margin-bottom: 4px; }
+        .card-header h1 { font-size: 14pt; color: #2c5282; font-weight: 700; }
+
+        /* Progress section */
+        .progress-section { padding: 16px 24px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+        .progress-label {
+            font-size: 9pt; font-weight: 600; color: #64748b;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            margin-bottom: 6px;
+        }
+        .progress-bar-wrap {
+            width: 100%; height: 6px; background: #e2e8f0;
+            border-radius: 3px; overflow: hidden; margin-bottom: 8px;
+        }
+        .progress-bar-fill {
+            height: 100%; background: #2c5282; border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+        .item-title {
+            font-size: 13pt; font-weight: 700; color: #1e3a8a;
+        }
+
+        /* Body */
+        .card-body {
+            padding: 24px; flex: 1; overflow-y: auto;
+            max-height: calc(100vh - 340px);
+        }
+
+        /* Indicator sections */
+        .indicator-section {
+            background: #f8fafc; border: 1px solid #e2e8f0;
+            border-radius: 8px; padding: 16px; margin-bottom: 14px;
+        }
+        .indicator-header {
+            font-size: 10pt; font-weight: 700; color: #2c5282;
+            margin-bottom: 10px;
+        }
+        .criteria-list { list-style: none; padding: 0; }
+        .criteria-list li {
+            display: flex; align-items: flex-start; gap: 8px;
+            padding: 5px 0; font-size: 9.5pt; color: #334155;
+        }
+        .criteria-list li input[type="checkbox"] {
+            margin-top: 2px; width: 16px; height: 16px;
+            accent-color: #2c5282; cursor: pointer; flex-shrink: 0;
+        }
+        .criteria-list li label { cursor: pointer; line-height: 1.4; }
+
+        /* Score section */
+        .score-section {
+            margin-top: 18px; padding-top: 16px;
+            border-top: 1px solid #e2e8f0;
+        }
+        .score-label {
+            font-size: 9pt; font-weight: 600; color: #64748b;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            margin-bottom: 12px;
+        }
+        .score-scale {
+            display: flex; justify-content: space-between;
+            gap: 4px; max-width: 500px; margin: 0 auto;
+        }
+        .score-option {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 6px; cursor: pointer;
+        }
+        .score-circle {
+            width: 36px; height: 36px; border-radius: 50%;
+            border: 2px solid #cbd5e0; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 11pt; font-weight: 700; color: #64748b;
+            transition: all 0.2s;
+        }
+        .score-circle:hover {
+            border-color: #2c5282; color: #2c5282;
+            background: #edf2f7;
+        }
+        .score-option.selected .score-circle {
+            background: #2c5282; color: white;
+            border-color: #2c5282;
+        }
+        .score-desc {
+            font-size: 7pt; color: #94a3b8; text-align: center;
+            max-width: 60px; line-height: 1.2;
+        }
+        .score-option.selected .score-desc { color: #2c5282; font-weight: 600; }
+
+        /* Notes */
+        .notes-section { margin-top: 16px; }
+        .notes-section label {
+            font-size: 9pt; font-weight: 600; color: #64748b;
+            text-transform: uppercase; letter-spacing: 0.04em;
+            display: block; margin-bottom: 6px;
+        }
+        .notes-section textarea {
+            width: 100%; min-height: 60px; border: 1px solid #e2e8f0;
+            border-radius: 6px; padding: 10px; font-family: inherit;
+            font-size: 9.5pt; resize: vertical;
+        }
+        .notes-section textarea:focus { outline: none; border-color: #2c5282; }
+
+        /* Navigation */
+        .card-nav {
+            padding: 16px 24px; border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        .nav-buttons {
+            display: flex; justify-content: space-between;
+            align-items: center; margin-bottom: 14px;
+        }
+        .nav-btn {
+            padding: 10px 20px; border: none; border-radius: 6px;
+            font-size: 9.5pt; font-weight: 600; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .nav-btn-prev { background: #e2e8f0; color: #475569; }
+        .nav-btn-prev:hover { background: #cbd5e0; }
+        .nav-btn-prev:disabled { opacity: 0.4; cursor: not-allowed; }
+        .nav-btn-next { background: #2c5282; color: white; }
+        .nav-btn-next:hover { background: #1a365d; }
+        .nav-btn-next:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* Item dots */
+        .item-dots {
+            display: flex; flex-wrap: wrap; justify-content: center;
+            gap: 6px;
+        }
+        .item-dot {
+            width: 22px; height: 22px; border-radius: 50%;
+            border: 2px solid #cbd5e0; display: flex;
+            align-items: center; justify-content: center;
+            font-size: 7pt; font-weight: 700; color: #94a3b8;
+            cursor: pointer; transition: all 0.2s; position: relative;
+        }
+        .item-dot:hover { border-color: #2c5282; color: #2c5282; }
+        .item-dot.current {
+            border-color: #2c5282; color: #2c5282;
+            box-shadow: 0 0 0 3px rgba(44,82,130,0.2);
+        }
+        .item-dot.scored {
+            background: #2c5282; border-color: #2c5282; color: white;
+        }
+        .item-dot.scored::after {
+            content: '✓'; position: absolute;
+            font-size: 9px; color: #48bb78; font-weight: 900;
+            top: -6px; right: -4px;
+        }
+
+        /* Completion banner */
+        .completion-banner {
+            display: none; background: #f0fff4; border: 1px solid #c6f6d5;
+            border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;
+            text-align: center;
+        }
+        .completion-banner.show { display: block; }
+        .completion-banner h3 { color: #276749; font-size: 11pt; margin-bottom: 4px; }
+        .completion-banner p { color: #48bb78; font-size: 9pt; }
+
+        @media print {
+            .print-btn { display: none; }
+            body { background: white; padding: 0; }
+            .card { box-shadow: none; max-width: 100%; border-radius: 0; }
+            .card-body { max-height: none; overflow: visible; }
+            .nav-buttons { display: none; }
+            .item-dots { display: none; }
+        }
+
+        @media (max-width: 600px) {
+            .score-scale { gap: 2px; }
+            .score-circle { width: 30px; height: 30px; font-size: 10pt; }
+            .score-desc { font-size: 6pt; }
+            .card-body { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">🖨️ Print</button>
+
+<div class="card">
+    <div class="card-header">
+        <img src="/pas/logo-sm.png" alt="Children of Promise">
+        <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
+        <h1>PAS Self-Assessment Tool</h1>
+    </div>
+
+    <div class="progress-section">
+        <div class="progress-label">
+            <span id="progressLabel">Item 1 of 25</span>
+            <span style="float:right;" id="scoredCount">0 of 25 scored</span>
+        </div>
+        <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progressBar" style="width:4%;"></div>
+        </div>
+        <div class="item-title" id="itemTitle">1. Staff Orientation</div>
+    </div>
+
+    <div class="card-body" id="cardBody">
+        <!-- Dynamic content -->
+    </div>
+
+    <div class="card-nav">
+        <div id="completionBanner" class="completion-banner">
+            <h3>✅ All Items Scored!</h3>
+            <p>Scores have been synced to the PAS Item Summary Profile.</p>
+        </div>
+        <div class="nav-buttons">
+            <button class="nav-btn nav-btn-prev" id="btnPrev" onclick="navigate(-1)">← Previous</button>
+            <button class="nav-btn nav-btn-next" id="btnNext" onclick="navigate(1)">Next →</button>
+        </div>
+        <div class="item-dots" id="itemDots"></div>
+    </div>
+</div>
+
+<script>
+const PAS_ASSESSMENT = [
+  {
+    num: 1, name: "Staff Orientation",
+    indicators: [
+      { id: "1.1", theme: "Orientation policy", criteria: [
+        "Job description provided", "Employee handbook provided", "Parent handbook provided", "Personnel policies provided", "Supervisor feedback during probationary period", "Staff observe in classroom before assuming responsibilities"
+      ]},
+      { id: "1.2", theme: "Orientation procedures", criteria: [
+        "Written orientation procedures", "Timeframe for orientation process", "Activities during orientation defined", "Personnel involved in orientation identified", "Specific employment forms required listed", "Written policies/procedures provided to new staff", "Review of orientation procedures conducted"
+      ]},
+      { id: "1.3", theme: "Orientation process", criteria: [
+        "Orientation consistently implemented", "Written feedback from new staff at conclusion of introductory period"
+      ]}
+    ]
+  },
+  {
+    num: 2, name: "Supervision & Performance Appraisal",
+    indicators: [
+      { id: "2.1", theme: "Performance appraisal procedures", criteria: [
+        "Written annual performance appraisal for all teaching staff", "All teaching staff participate in appraisal process", "Written appraisal includes goals and PD activities for next year"
+      ]},
+      { id: "2.2", theme: "Performance evaluation criteria", criteria: [
+        "Criteria are objective and behavior-based", "Criteria differ by role", "Criteria tied to job description", "Appraisal includes multiple sources of evidence"
+      ]},
+      { id: "2.3", theme: "Supervision of teaching staff", criteria: [
+        "Written/oral feedback based on formal observation", "System for ongoing feedback and support"
+      ]}
+    ]
+  },
+  {
+    num: 3, name: "Staff Development",
+    indicators: [
+      { id: "3.1", theme: "Provisions for staff development", criteria: [
+        "Staff development provided on-site or paid off-site", "Development for all teaching, support, and admin staff", "Job-specific staff development provided"
+      ]},
+      { id: "3.2", theme: "Staff development policies", criteria: [
+        "Policy stating minimum annual hours required", "Individualized model of staff development used"
+      ]},
+      { id: "3.3", theme: "Publicly funded PD opportunities", criteria: [
+        "Info on publicly funded PD communicated to staff", "Systematic process for supporting career development"
+      ]}
+    ]
+  },
+  {
+    num: 4, name: "Compensation",
+    indicators: [
+      { id: "4.1", theme: "Written salary scale", criteria: [
+        "Written salary scale exists", "Staff have access to salary scale", "Salary scale reviewed for internal and external equity"
+      ]},
+      { id: "4.2", theme: "Salary scale criteria", criteria: [
+        "Based on different roles", "Based on levels of general education", "Based on levels of specialized training", "Based on years of relevant experience", "Based on professional credentials"
+      ]},
+      { id: "4.3", theme: "Salary/merit increases", criteria: [
+        "Staff salary increases provided", "Frequency of increases defined", "Merit increases available"
+      ]}
+    ]
+  },
+  {
+    num: 5, name: "Benefits",
+    indicators: [
+      { id: "5.1", theme: "Health benefits", criteria: [
+        "Full-time employees have option to purchase health insurance with employer portion"
+      ]},
+      { id: "5.2", theme: "Sick/personal benefits", criteria: [
+        "Sick/personal days for all employees"
+      ]},
+      { id: "5.3", theme: "Vacation benefits", criteria: [
+        "Vacation days for all employees"
+      ]},
+      { id: "5.4", theme: "Retirement benefits", criteria: [
+        "Retirement plan available for all full-time staff", "Employer matches/contributes percentage"
+      ]},
+      { id: "5.5", theme: "Professional development support", criteria: [
+        "Provision for professional development expenses"
+      ]}
+    ]
+  },
+  {
+    num: 6, name: "Staffing Patterns & Scheduling",
+    indicators: [
+      { id: "6.1", theme: "Consistency for children/families", criteria: [
+        "Staffing plan anticipates absences", "Coverage so children not regrouped at start/end of day"
+      ]},
+      { id: "6.2", theme: "Planning and preparation time", criteria: [
+        "Regularly scheduled paid planning time for teaching staff", "Paid curriculum planning for same-group staff", "Amount of daily planning time documented"
+      ]},
+      { id: "6.3", theme: "Staff scheduling", criteria: [
+        "Two or more staff scheduled when children present", "Two or more teaching staff in each classroom at all times"
+      ]}
+    ]
+  },
+  {
+    num: 7, name: "Facilities Management",
+    indicators: [
+      { id: "7.1", theme: "Environment and maintenance", criteria: [
+        "Routine maintenance conducted", "System to assure routine maintenance is done"
+      ]}
+    ]
+  },
+  {
+    num: 8, name: "Risk Management",
+    indicators: [
+      { id: "8.1", theme: "Risk management plan", criteria: [
+        "Written risk management plan exists", "Risk management plan is reviewed regularly"
+      ]},
+      { id: "8.2", theme: "Allergies and medical conditions", criteria: [
+        "Info on allergies/chronic conditions collected", "Method for informing staff about conditions"
+      ]},
+      { id: "8.3", theme: "Emergency drills", criteria: [
+        "Emergency drills occur regularly", "Records kept of drills", "System to ensure drills occur as planned"
+      ]},
+      { id: "8.4", theme: "CPR and First Aid", criteria: [
+        "Staff certified in CPR and First Aid", "Center provides for CPR/First Aid training"
+      ]}
+    ]
+  },
+  {
+    num: 9, name: "Internal Communications",
+    indicators: [
+      { id: "9.1", theme: "Modes of communication", criteria: [
+        "Information communicated in various ways to staff"
+      ]},
+      { id: "9.2", theme: "Staff meetings", criteria: [
+        "Regularly scheduled center-wide staff meetings", "Frequency of meetings documented", "Team meetings scheduled"
+      ]},
+      { id: "9.3", theme: "Staff involvement", criteria: [
+        "Staff involved in planning meetings", "Teaching staff lead agenda items"
+      ]},
+      { id: "9.4", theme: "Meeting records", criteria: [
+        "Minutes are kept", "Minutes reflect action plan", "Minutes distributed to staff", "Action steps revisited at subsequent meetings"
+      ]},
+      { id: "9.5", theme: "Conflict resolution", criteria: [
+        "Written policy for handling disputes", "Training in conflict resolution", "Written procedures to guide resolution"
+      ]}
+    ]
+  },
+  {
+    num: 10, name: "Screening & Identification of Special Needs",
+    indicators: [
+      { id: "10.1", theme: "Developmental screening", criteria: [
+        "All children birth-5 are screened", "Safeguards built into screening process"
+      ]},
+      { id: "10.2", theme: "Parent involvement in screening", criteria: [
+        "Parental consent obtained prior", "Parents informed of results", "Parents involved in developing plans"
+      ]},
+      { id: "10.3", theme: "Collaborations with specialists", criteria: [
+        "Children referred to specialists as needed", "System supports collaboration with specialists"
+      ]}
+    ]
+  },
+  {
+    num: 11, name: "Assessment in Support of Learning",
+    indicators: [
+      { id: "11.1", theme: "Assessment of learning/development", criteria: [
+        "Teachers assess children's learning", "Research-based assessment tools used", "Additional measures used"
+      ]},
+      { id: "11.2", theme: "Assessment and curriculum planning", criteria: [
+        "Standards-based curriculum used", "Individual results used in lesson planning", "Aggregated results used for long-range planning"
+      ]}
+    ]
+  },
+  {
+    num: 12, name: "Budget Planning",
+    indicators: [
+      { id: "12.1", theme: "Budget planning process", criteria: [
+        "Needs assessment part of budget planning", "Budget includes sufficient resources for goals"
+      ]},
+      { id: "12.2", theme: "Operating budget elements", criteria: [
+        "Budget with revenue and expenditures", "Line-item breakdowns", "Projected budget for next fiscal year"
+      ]},
+      { id: "12.3", theme: "Cash flow procedures", criteria: [
+        "Quarterly cash-flow projections", "Practices to ensure adequate cash flow", "Budget reflects deferred maintenance/capital"
+      ]}
+    ]
+  },
+  {
+    num: 13, name: "Accounting Practices",
+    indicators: [
+      { id: "13.1", theme: "Income/expense statements", criteria: [
+        "Quarterly income/expense statements", "Administrator generates/has access", "Compares to projections"
+      ]},
+      { id: "13.2", theme: "Checks and balances", criteria: [
+        "Accounting checks and balances in place"
+      ]},
+      { id: "13.3", theme: "Independent review", criteria: [
+        "Quarterly review by independent party", "Annual outside audit by CPA"
+      ]}
+    ]
+  },
+  {
+    num: 14, name: "Program Evaluation",
+    indicators: [
+      { id: "14.1", theme: "Staff evaluation of program", criteria: [
+        "Staff evaluate the program", "Frequency documented"
+      ]},
+      { id: "14.2", theme: "Parent evaluation of program", criteria: [
+        "Parents evaluate the program", "Frequency documented"
+      ]},
+      { id: "14.3", theme: "Use of evaluation information", criteria: [
+        "Data used for program improvement plan", "Feedback loop to staff and parents"
+      ]}
+    ]
+  },
+  {
+    num: 15, name: "Strategic Planning",
+    indicators: [
+      { id: "15.1", theme: "Mission and vision", criteria: [
+        "Written mission/vision statement", "Stakeholders involved in developing", "Frequency of review documented"
+      ]},
+      { id: "15.2", theme: "Business/strategic plan", criteria: [
+        "Written business/strategic plan", "Stakeholders involved", "Frequency of review"
+      ]}
+    ]
+  },
+  {
+    num: 16, name: "Family Communication",
+    indicators: [
+      { id: "16.1", theme: "Family orientation", criteria: [
+        "Orientation procedure for new families", "Check-in with new families", "Developmental history collected", "Written info provided", "Guided tour given", "Introduction to teaching staff", "Opportunity to ask questions", "Family-friendly supports shared"
+      ]},
+      { id: "16.2", theme: "Home-center consistency", criteria: [
+        "Beliefs/culture/childrearing asked at intake", "Family perspective solicited at conferences", "Procedures for consistency"
+      ]},
+      { id: "16.3", theme: "Communication methods", criteria: [
+        "Communication in family's language or resources available", "Information communicated in various ways"
+      ]},
+      { id: "16.4", theme: "Conferences/daily communication", criteria: [
+        "Formal conferencing with families", "Convenient times for working families", "Daily communication between staff and families"
+      ]}
+    ]
+  },
+  {
+    num: 17, name: "Family Support & Involvement",
+    indicators: [
+      { id: "17.1", theme: "Family supports", criteria: [
+        "Center offers support for families"
+      ]},
+      { id: "17.2", theme: "Visiting policies", criteria: [
+        "Classroom visiting policy exists"
+      ]},
+      { id: "17.3", theme: "Parent involvement", criteria: [
+        "Parents involved in center/classroom activities"
+      ]}
+    ]
+  },
+  {
+    num: 18, name: "External Communications",
+    indicators: [
+      { id: "18.1", theme: "Public relations tools", criteria: [
+        "Center utilizes different PR tools"
+      ]},
+      { id: "18.2", theme: "Professional image", criteria: [
+        "Consistent logo", "Neat/correct information", "Updated information", "PR tools reviewed"
+      ]},
+      { id: "18.3", theme: "Responding to prospective parents", criteria: [
+        "Records of inquiries and follow-up", "Written guide for staff communication"
+      ]}
+    ]
+  },
+  {
+    num: 19, name: "Community Outreach",
+    indicators: [
+      { id: "19.1", theme: "Community organizations", criteria: [
+        "Attendance/membership in community orgs"
+      ]},
+      { id: "19.2", theme: "Neighborhood relations", criteria: [
+        "Opportunities to build good relations"
+      ]},
+      { id: "19.3", theme: "ECE professional organizations", criteria: [
+        "Attendance/membership in ECE organizations", "Leadership role in ECE org"
+      ]}
+    ]
+  },
+  {
+    num: 20, name: "Technological Resources",
+    indicators: [
+      { id: "20.1", theme: "Available technology", criteria: [
+        "Functional computers for teaching and admin staff"
+      ]},
+      { id: "20.2", theme: "Internet access", criteria: [
+        "Internet accessible for teaching and admin during planning"
+      ]}
+    ]
+  },
+  {
+    num: 21, name: "Use of Technology",
+    indicators: [
+      { id: "21.1", theme: "Recordkeeping/communication", criteria: [
+        "Admin uses technology for recordkeeping", "Admin uses technology for communication", "Job-specific tech training for admin"
+      ]},
+      { id: "21.2", theme: "Technology in classroom", criteria: [
+        "Teaching staff use tech with children/families", "Job-specific tech training for teaching staff"
+      ]},
+      { id: "21.3", theme: "Technology policy", criteria: [
+        "Written policy for staff use of technology"
+      ]}
+    ]
+  },
+  {
+    num: 22, name: "Administrator",
+    indicators: [
+      { id: "22.1", theme: "Educational level", criteria: ["Evidence of highest education level"] },
+      { id: "22.2", theme: "ECE/CD coursework", criteria: ["Evidence of ECE/child development coursework"] },
+      { id: "22.3", theme: "Management coursework", criteria: ["Evidence of management coursework"] },
+      { id: "22.4", theme: "Experience", criteria: ["Evidence of management experience"] },
+      { id: "22.5", theme: "Professional contributions", criteria: ["Activities/roles in ECE organizations"] }
+    ]
+  },
+  {
+    num: 23, name: "Lead Teacher",
+    indicators: [
+      { id: "23.1", theme: "Educational level", criteria: ["Evidence of highest education; BA enrollment"] },
+      { id: "23.2", theme: "ECE coursework", criteria: ["Evidence of ECE coursework/certification"] },
+      { id: "23.3", theme: "Experience", criteria: ["Evidence of teaching experience"] }
+    ]
+  },
+  {
+    num: 24, name: "Teacher",
+    indicators: [
+      { id: "24.1", theme: "Educational level", criteria: ["Evidence of highest education; BA program"] },
+      { id: "24.2", theme: "ECE coursework", criteria: ["ECE coursework; CDA or CCP credential"] },
+      { id: "24.3", theme: "Experience", criteria: ["Evidence of teaching experience"] }
+    ]
+  },
+  {
+    num: 25, name: "Apprentice Teacher/Aide",
+    indicators: [
+      { id: "25.1", theme: "Educational level", criteria: ["Evidence of highest education level"] },
+      { id: "25.2", theme: "ECE coursework", criteria: ["ECE coursework; enrollment in program"] },
+      { id: "25.3", theme: "Experience", criteria: ["Evidence of teaching experience"] }
+    ]
+  }
+];
+
+const SCORE_LABELS = {
+    1: 'Inadequate',
+    2: '',
+    3: 'Minimally Adequate',
+    4: '',
+    5: 'Good',
+    6: '',
+    7: 'Excellent'
+};
+
+const STORAGE_KEY = 'pas_self_assessment';
+const SYNC_KEY = 'pas_item_scores';
+
+// State
+let state = {
+    currentItem: 0,
+    scores: {},
+    checks: {},
+    notes: {}
+};
+
+// Load state from localStorage
+function loadState() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+        try {
+            const parsed = JSON.parse(stored);
+            state.currentItem = parsed.currentItem || 0;
+            state.scores = parsed.scores || {};
+            state.checks = parsed.checks || {};
+            state.notes = parsed.notes || {};
+        } catch (e) {
+            console.error('Error loading state:', e);
+        }
+    }
+}
+
+// Save state to localStorage
+function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    syncToSummaryProfile();
+}
+
+// Sync scores to PAS Item Summary Profile format
+function syncToSummaryProfile() {
+    const scoredCount = Object.keys(state.scores).length;
+    if (scoredCount > 0) {
+        // Load existing summary profile data or create new
+        let profileData = {};
+        const existing = localStorage.getItem(SYNC_KEY);
+        if (existing) {
+            try { profileData = JSON.parse(existing); } catch(e) {}
+        }
+        // Update scores
+        profileData.scores = profileData.scores || {};
+        Object.keys(state.scores).forEach(key => {
+            profileData.scores[key] = String(state.scores[key]);
+        });
+        localStorage.setItem(SYNC_KEY, JSON.stringify(profileData));
+    }
+}
+
+// Render current item
+function renderItem() {
+    const item = PAS_ASSESSMENT[state.currentItem];
+    const body = document.getElementById('cardBody');
+
+    // Update progress
+    document.getElementById('progressLabel').textContent = `Item ${state.currentItem + 1} of 25`;
+    document.getElementById('progressBar').style.width = ((state.currentItem + 1) / 25 * 100) + '%';
+    document.getElementById('itemTitle').textContent = `${item.num}. ${item.name}`;
+
+    // Update scored count
+    const scoredCount = Object.keys(state.scores).length;
+    document.getElementById('scoredCount').textContent = `${scoredCount} of 25 scored`;
+
+    // Build content
+    let html = '';
+
+    // Indicators with criteria
+    item.indicators.forEach(indicator => {
+        html += `<div class="indicator-section">`;
+        html += `<div class="indicator-header">${indicator.id} — ${indicator.theme}</div>`;
+        html += `<ul class="criteria-list">`;
+        indicator.criteria.forEach((criterion, cIdx) => {
+            const checkId = `${indicator.id}_${cIdx}`;
+            const checked = state.checks[checkId] ? 'checked' : '';
+            html += `<li>
+                <input type="checkbox" id="chk_${checkId}" ${checked} onchange="toggleCheck('${checkId}', this.checked)">
+                <label for="chk_${checkId}">${criterion}</label>
+            </li>`;
+        });
+        html += `</ul></div>`;
+    });
+
+    // Score section
+    html += `<div class="score-section">`;
+    html += `<div class="score-label">Score for Item ${item.num}</div>`;
+    html += `<div class="score-scale">`;
+    for (let s = 1; s <= 7; s++) {
+        const selected = state.scores[item.num] === s ? 'selected' : '';
+        html += `<div class="score-option ${selected}" onclick="setScore(${item.num}, ${s})">
+            <div class="score-circle">${s}</div>
+            <div class="score-desc">${SCORE_LABELS[s]}</div>
+        </div>`;
+    }
+    html += `</div></div>`;
+
+    // Notes
+    const noteVal = state.notes[item.num] || '';
+    html += `<div class="notes-section">
+        <label for="itemNotes">Notes / Observations</label>
+        <textarea id="itemNotes" placeholder="Enter observations for this item..." onchange="setNotes(${item.num}, this.value)" oninput="setNotes(${item.num}, this.value)">${noteVal}</textarea>
+    </div>`;
+
+    body.innerHTML = html;
+
+    // Update navigation buttons
+    document.getElementById('btnPrev').disabled = state.currentItem === 0;
+    document.getElementById('btnNext').disabled = state.currentItem === 24;
+
+    // Update dots
+    renderDots();
+
+    // Show completion banner if all scored
+    const banner = document.getElementById('completionBanner');
+    if (scoredCount === 25) {
+        banner.classList.add('show');
+    } else {
+        banner.classList.remove('show');
+    }
+
+    // Scroll body to top
+    body.scrollTop = 0;
+}
+
+// Render navigation dots
+function renderDots() {
+    const dotsContainer = document.getElementById('itemDots');
+    let html = '';
+    for (let i = 0; i < 25; i++) {
+        const item = PAS_ASSESSMENT[i];
+        const isCurrent = i === state.currentItem ? 'current' : '';
+        const isScored = state.scores[item.num] ? 'scored' : '';
+        html += `<div class="item-dot ${isCurrent} ${isScored}" onclick="goToItem(${i})" title="Item ${item.num}: ${item.name}">${item.num}</div>`;
+    }
+    dotsContainer.innerHTML = html;
+}
+
+// Navigation
+function navigate(dir) {
+    const newIdx = state.currentItem + dir;
+    if (newIdx >= 0 && newIdx < 25) {
+        state.currentItem = newIdx;
+        saveState();
+        renderItem();
+    }
+}
+
+function goToItem(idx) {
+    state.currentItem = idx;
+    saveState();
+    renderItem();
+}
+
+// Score
+function setScore(itemNum, score) {
+    state.scores[itemNum] = score;
+    saveState();
+    renderItem();
+}
+
+// Checkbox
+function toggleCheck(checkId, isChecked) {
+    if (isChecked) {
+        state.checks[checkId] = true;
+    } else {
+        delete state.checks[checkId];
+    }
+    saveState();
+}
+
+// Notes
+let notesTimeout;
+function setNotes(itemNum, value) {
+    state.notes[itemNum] = value;
+    clearTimeout(notesTimeout);
+    notesTimeout = setTimeout(() => saveState(), 500);
+}
+
+// Keyboard navigation
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'TEXTAREA') return;
+    if (e.key === 'ArrowLeft') navigate(-1);
+    if (e.key === 'ArrowRight') navigate(1);
+});
+
+// Initialize
+loadState();
+renderItem();
+</script>
+</body>
+</html>
