@@ -143,7 +143,7 @@ function renderRoster() {
                     <td style="text-align:right;">${s.HouseholdIncome ? '$'+parseInt(s.HouseholdIncome).toLocaleString() : '—'}</td>
                     <td style="text-align:center;">${s.HouseholdSize || '—'}</td>
                     <td style="text-align:right;color:#16a34a;font-weight:600;">$${threshold.toLocaleString()}</td>
-                    <td style="text-align:center;">${s.CCAPStartDate || '—'}</td>
+                    <td style="text-align:center;"><input type="date" value="${s.CCAPStartDate || ''}" onchange="saveCCAPDate(${s.Id},this.value)" style="padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;width:130px;"></td>
                 </tr>`;
             }).join('')}</tbody>
         </table>`;
@@ -243,6 +243,18 @@ function exportCCAP() {
     a.href = URL.createObjectURL(blob);
     a.download = 'CCAP_' + activeTab + '_' + new Date().toISOString().split('T')[0] + '.csv';
     a.click();
+}
+
+async function saveCCAPDate(studentId, dateValue) {
+    try {
+        const s = students.find(x => x.Id == studentId);
+        if (!s) return;
+        await apiFetch('/api/students/' + encodeURIComponent(s.First_Name) + '/' + encodeURIComponent(s.Last_Name), {
+            method: 'PUT',
+            body: JSON.stringify({ ccapStartDate: dateValue })
+        });
+        s.CCAPStartDate = dateValue;
+    } catch(e) { console.error('Failed to save CCAP date', e); }
 }
 
 init();
