@@ -131,18 +131,19 @@ function renderRoster() {
                 <th>Room</th>
                 <th style="text-align:right;">Income</th>
                 <th style="text-align:center;">HH Size</th>
-                <th style="text-align:right;">Threshold</th>
+                <th>Threshold</th>
                 <th style="text-align:center;">Start Date</th>
             </tr></thead>
             <tbody>${ccap.map(s => {
                 const hhIdx = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
                 const threshold = CCAP_THRESHOLDS[hhIdx];
+                const roomOpts = classrooms.map(c => '<option value="'+c.RoomNumber+'"'+(String(c.RoomNumber)===String(s.RoomNumber)?' selected':'')+'>'+c.Room+'</option>').join('');
                 return `<tr>
                     <td style="font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
-                    <td>${getRoom(s.RoomNumber)}</td>
-                    <td style="text-align:right;">${s.HouseholdIncome ? '$'+parseInt(s.HouseholdIncome).toLocaleString() : '—'}</td>
-                    <td style="text-align:center;">${s.HouseholdSize || '—'}</td>
-                    <td style="text-align:right;color:#16a34a;font-weight:600;">$${threshold.toLocaleString()}</td>
+                    <td><select onchange="saveCCAPField(${s.Id},'roomNumber',this.value)" style="padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:0.72rem;width:100%;">${roomOpts}</select></td>
+                    <td style="text-align:right;"><input type="number" value="${s.HouseholdIncome||''}" onchange="saveCCAPField(${s.Id},'householdIncome',this.value)" style="width:80px;padding:2px 5px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;text-align:right;"></td>
+                    <td style="text-align:center;"><input type="number" value="${s.HouseholdSize||''}" min="1" max="15" onchange="saveCCAPField(${s.Id},'householdSize',this.value)" style="width:45px;padding:2px 5px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;text-align:center;"></td>
+                    <td style="color:#16a34a;font-weight:600;">$${threshold.toLocaleString()}</td>
                     <td style="text-align:center;"><input type="date" value="${s.CCAPStartDate || ''}" onchange="saveCCAPDate(${s.Id},this.value)" style="padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;width:130px;"></td>
                 </tr>`;
             }).join('')}</tbody>
@@ -176,7 +177,7 @@ function renderEligible() {
                 <th>Pay Type</th>
                 <th style="text-align:right;">Income</th>
                 <th style="text-align:center;">HH Size</th>
-                <th style="text-align:right;">Threshold</th>
+                <th>Threshold</th>
                 <th>Under By</th>
             </tr></thead>
             <tbody>${eligible.map(s => {
@@ -184,13 +185,14 @@ function renderEligible() {
                 const threshold = CCAP_THRESHOLDS[hhIdx];
                 const income = parseInt(s.HouseholdIncome) || 0;
                 const diff = threshold - income;
+                const roomOpts = classrooms.map(c => '<option value="'+c.RoomNumber+'"'+(String(c.RoomNumber)===String(s.RoomNumber)?' selected':'')+'>'+c.Room+'</option>').join('');
                 return `<tr>
                     <td style="font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
-                    <td>${getRoom(s.RoomNumber)}</td>
+                    <td><select onchange="saveCCAPField(${s.Id},'roomNumber',this.value)" style="padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:0.72rem;width:100%;">${roomOpts}</select></td>
                     <td>${s.Category || '—'}</td>
-                    <td style="text-align:right;">$${income.toLocaleString()}</td>
-                    <td style="text-align:center;">${s.HouseholdSize}</td>
-                    <td style="text-align:right;color:#16a34a;font-weight:600;">$${threshold.toLocaleString()}</td>
+                    <td style="text-align:right;"><input type="number" value="${s.HouseholdIncome||''}" onchange="saveCCAPField(${s.Id},'householdIncome',this.value)" style="width:80px;padding:2px 5px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;text-align:right;"></td>
+                    <td style="text-align:center;"><input type="number" value="${s.HouseholdSize||''}" min="1" max="15" onchange="saveCCAPField(${s.Id},'householdSize',this.value)" style="width:45px;padding:2px 5px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;text-align:center;"></td>
+                    <td style="color:#16a34a;font-weight:600;">$${threshold.toLocaleString()}</td>
                     <td style="color:#2563eb;font-weight:600;">$${diff.toLocaleString()}</td>
                 </tr>`;
             }).join('')}</tbody>
@@ -243,6 +245,22 @@ function exportCCAP() {
     a.href = URL.createObjectURL(blob);
     a.download = 'CCAP_' + activeTab + '_' + new Date().toISOString().split('T')[0] + '.csv';
     a.click();
+}
+
+async function saveCCAPField(studentId, field, value) {
+    try {
+        const s = students.find(x => x.Id == studentId);
+        if (!s) return;
+        const body = {};
+        body[field] = value;
+        await apiFetch('/api/students/' + encodeURIComponent(s.First_Name) + '/' + encodeURIComponent(s.Last_Name), {
+            method: 'PUT',
+            body: JSON.stringify(body)
+        });
+        if (field === 'householdIncome') s.HouseholdIncome = value;
+        if (field === 'householdSize') s.HouseholdSize = value;
+        if (field === 'roomNumber') s.RoomNumber = value;
+    } catch(e) { console.error('Failed to save', e); }
 }
 
 async function saveCCAPDate(studentId, dateValue) {
