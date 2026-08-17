@@ -29,6 +29,10 @@
         tr:hover { background:#f8fafc; }
         input[type=checkbox] { width:auto;accent-color:var(--primary);cursor:pointer; }
 
+        /* Print All row */
+        tr.print-all-row { background:#f0f7ff;border-top:2px solid #2563eb; }
+        tr.print-all-row td { padding:8px 6px; }
+
         /* Parent Interview Modal */
         .pi-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center; }
         .pi-overlay.open { display:flex; }
@@ -530,13 +534,109 @@ function renderRoster() {
             if (f === 'GrantPerfReport' && activeProgram === 'PI') {
                 return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit" target="_blank" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" title="Open PI Grant Performance Report in SharePoint">[doc]</a></td>';
             }
-            if (f === 'GrantPerfReport' && activeProgram === 'PI') {
-                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit" target="_blank" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" title="Open PI Grant Performance Report in SharePoint">[doc]</a></td>';
-            }
             return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)"></td>';
         }).join('');
         return '<tr><td class="left" style="font-weight:600;font-size:0.73rem;">' + s.Last_Name + ', ' + s.First_Name + '</td><td style="font-size:0.7rem;color:var(--text-muted);">' + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
     }).join('');
+
+    // Add "Print All" row at the bottom
+    const printAllCells = FIELDS.map(f => {
+        // Only show print all for columns that have forms
+        const hasForm = ['PermissionSlip','ParentInterview','BegASQ','BegASE','EndASQ','EndASE'].includes(f);
+        if (hasForm) {
+            const uncheckedCount = roster.filter(s => !(trackingData[s.Id] || {})[f]).length;
+            if (uncheckedCount > 0) {
+                return '<td><a href="#" onclick="event.preventDefault();printAllForColumn(\'' + f + '\')" style="font-size:0.6rem;color:#2563eb;text-decoration:none;font-weight:700;white-space:nowrap;" title="Print all unchecked forms for this column">🖨️ All (' + uncheckedCount + ')</a></td>';
+            }
+            return '<td style="font-size:0.58rem;color:#9ca3af;">✓ Done</td>';
+        }
+        return '<td></td>';
+    }).join('');
+    tbody.innerHTML += '<tr style="background:#f0f7ff;border-top:2px solid #2563eb;"><td class="left" style="font-weight:700;font-size:0.7rem;color:#2563eb;">Print All</td><td></td>' + printAllCells + '</tr>';
+}
+
+// ── Print All for Column ──
+let printAllQueue = [];
+let printAllIndex = 0;
+let printAllField = '';
+
+async function printAllForColumn(field) {
+    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'));
+    const unchecked = roster.filter(s => !(trackingData[s.Id] || {})[field]);
+    if (!unchecked.length) { alert('All forms in this column are already completed!'); return; }
+
+    printAllQueue = unchecked.map(s => s.Id);
+    printAllIndex = 0;
+    printAllField = field;
+
+    const count = printAllQueue.length;
+    if (!confirm('This will print ' + count + ' form(s) for all unchecked students in this column.\n\nAfter each print dialog, the next form will open automatically.\n\nContinue?')) return;
+
+    await printNextInQueue();
+}
+
+async function printNextInQueue() {
+    if (printAllIndex >= printAllQueue.length) {
+        // Done printing all
+        alert('All ' + printAllQueue.length + ' forms have been sent to print.');
+        printAllQueue = [];
+        printAllIndex = 0;
+        printAllField = '';
+        return;
+    }
+
+    const studentId = printAllQueue[printAllIndex];
+    const student = students.find(s => String(s.Id) === String(studentId));
+    const studentName = student ? student.First_Name + ' ' + student.Last_Name : 'Student';
+
+    if (printAllField === 'PermissionSlip') {
+        await openPermissionSlip(studentId);
+        // Small delay to let modal render
+        setTimeout(() => {
+            document.getElementById('psOverlay').setAttribute('data-printing', '1');
+            window.print();
+            document.getElementById('psOverlay').removeAttribute('data-printing');
+            closePermissionSlip();
+            printAllIndex++;
+            setTimeout(() => printNextInQueue(), 300);
+        }, 400);
+    } else if (printAllField === 'ParentInterview') {
+        await openInterview(studentId);
+        setTimeout(() => {
+            document.getElementById('piOverlay').setAttribute('data-printing', '1');
+            window.print();
+            document.getElementById('piOverlay').removeAttribute('data-printing');
+            closeInterview();
+            printAllIndex++;
+            setTimeout(() => printNextInQueue(), 300);
+        }, 400);
+    } else if (printAllField === 'BegASQ' || printAllField === 'EndASQ') {
+        const period = printAllField === 'BegASQ' ? 'Beginning' : 'End';
+        await openScreening(studentId, 'ASQ-3', period);
+        setTimeout(() => {
+            document.getElementById('scrOverlay').setAttribute('data-printing', '1');
+            window.print();
+            document.getElementById('scrOverlay').removeAttribute('data-printing');
+            closeScreening();
+            printAllIndex++;
+            setTimeout(() => printNextInQueue(), 300);
+        }, 400);
+    } else if (printAllField === 'BegASE' || printAllField === 'EndASE') {
+        const period = printAllField === 'BegASE' ? 'Beginning' : 'End';
+        await openScreening(studentId, 'ASQ:SE-2', period);
+        setTimeout(() => {
+            document.getElementById('scrOverlay').setAttribute('data-printing', '1');
+            window.print();
+            document.getElementById('scrOverlay').removeAttribute('data-printing');
+            closeScreening();
+            printAllIndex++;
+            setTimeout(() => printNextInQueue(), 300);
+        }, 400);
+    } else {
+        // Unsupported column for print all
+        printAllIndex++;
+        await printNextInQueue();
+    }
 }
 
 async function saveField(studentId, field, value) {

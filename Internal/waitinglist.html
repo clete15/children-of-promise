@@ -14,6 +14,7 @@
             align-items: center;
             gap: 12px;
             flex-wrap: wrap;
+            justify-content: flex-start;
         }
         body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
         .wl-search { background: rgba(255,255,255,0.9); }
@@ -223,10 +224,11 @@
 </header>
 
 <div class="wl-toolbar">
-    <div class="mode-toggle" style="max-width:520px;width:100%;">
-        <button class="toggle-btn active" id="tab-0-2" onclick="setTab('0-2')">🍼 Infant &amp; Toddler <span class="tab-count" id="count-0-2"></span></button>
-        <button class="toggle-btn" id="tab-2-3" onclick="setTab('2-3')">🧒 2-Year Olds <span class="tab-count" id="count-2-3"></span></button>
-        <button class="toggle-btn" id="tab-3-5" onclick="setTab('3-5')">🎨 Pre-School <span class="tab-count" id="count-3-5"></span></button>
+    <div class="mode-toggle" style="max-width:620px;width:100%;justify-content:flex-start;">
+        <button class="toggle-btn active" id="tab-infant" onclick="setTab('infant')">🍼 Infant <span class="tab-count" id="count-infant"></span><div style="font-size:0.62rem;opacity:0.7;" id="pending-infant"></div></button>
+        <button class="toggle-btn" id="tab-toddler" onclick="setTab('toddler')">👶 Toddler <span class="tab-count" id="count-toddler"></span><div style="font-size:0.62rem;opacity:0.7;" id="pending-toddler"></div></button>
+        <button class="toggle-btn" id="tab-2-3" onclick="setTab('2-3')">🧒 2-Year Olds <span class="tab-count" id="count-2-3"></span><div style="font-size:0.62rem;opacity:0.7;" id="pending-2-3"></div></button>
+        <button class="toggle-btn" id="tab-3-5" onclick="setTab('3-5')">🎨 Pre-School <span class="tab-count" id="count-3-5"></span><div style="font-size:0.62rem;opacity:0.7;" id="pending-3-5"></div></button>
     </div>
 </div>
 <div class="wl-toolbar" style="margin-top:10px;">
@@ -262,7 +264,7 @@
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 let allRows = [];
 let classrooms = [];
-let activeTab = '0-2';
+let activeTab = 'infant';
 
 async function load() {
     try {
@@ -278,25 +280,52 @@ async function load() {
 }
 
 function updateTabCounts() {
-    ['0-2','2-3','3-5'].forEach(tab => {
-        const count = allRows.filter(r => r.AgeGroup === tab && r.WaitlistStatus !== 'Declined').length;
+    ['infant','toddler','2-3','3-5'].forEach(tab => {
+        const count = getFilteredRows(tab).length;
         const el = document.getElementById(`count-${tab}`);
         if (el) el.textContent = count ? `(${count})` : '';
+        // Update pending count
+        const pendingCount = getFilteredRows(tab).filter(r => !r.WaitlistStatus || r.WaitlistStatus === 'Pending' || r.WaitlistStatus === 'NULL').length;
+        const pendEl = document.getElementById(`pending-${tab}`);
+        if (pendEl) pendEl.textContent = pendingCount > 0 ? `${pendingCount} pending` : '';
+    });
+}
+
+function getChildAgeMonths(r) {
+    // Use ChildBirthDate if available
+    const bd = r.ChildBirthDate || r.BirthDate;
+    if (!bd) return null;
+    const born = new Date(bd);
+    const now = new Date();
+    return (now.getFullYear() - born.getFullYear()) * 12 + (now.getMonth() - born.getMonth());
+}
+
+function getFilteredRows(tab) {
+    return allRows.filter(r => {
+        if (r.WaitlistStatus === 'Declined' || r.WaitlistStatus === 'Enrolled') return false;
+        if (tab === 'infant') {
+            if (r.AgeGroup !== '0-2') return false;
+            const months = getChildAgeMonths(r);
+            return months === null || months < 12;
+        }
+        if (tab === 'toddler') {
+            if (r.AgeGroup !== '0-2') return false;
+            const months = getChildAgeMonths(r);
+            return months !== null && months >= 12;
+        }
+        return r.AgeGroup === tab;
     });
 }
 
 function setTab(tab) {
     activeTab = tab;
-    ['0-2','2-3','3-5'].forEach(t => document.getElementById(`tab-${t}`).classList.toggle('active', t === tab));
+    ['infant','toddler','2-3','3-5'].forEach(t => document.getElementById(`tab-${t}`).classList.toggle('active', t === tab));
     renderTable();
 }
 
 function renderTable() {
     const q = document.getElementById('searchInput').value.toLowerCase();
-    const rows = allRows.filter(r =>
-        r.AgeGroup === activeTab &&
-        r.WaitlistStatus !== 'Declined' &&
-        r.WaitlistStatus !== 'Enrolled' &&
+    const rows = getFilteredRows(activeTab).filter(r =>
         (!q || `${r.FirstName} ${r.LastName}`.toLowerCase().includes(q) ||
          (r.Phone || '').toLowerCase().includes(q) ||
          (r.Email || '').toLowerCase().includes(q))
