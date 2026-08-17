@@ -525,6 +525,9 @@ async function init() {
     if (sessionStorage.getItem('emsStartTab') === 'waitlist') {
         sessionStorage.removeItem('emsStartTab');
         setMode('waitlist');
+    } else if (sessionStorage.getItem('emsStartTab') === 'notifications') {
+        sessionStorage.removeItem('emsStartTab');
+        setMode('notifications');
     }
     // Check if redirected from waiting list
     if (new URLSearchParams(window.location.search).get('enroll') === '1') {

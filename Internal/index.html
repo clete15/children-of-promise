@@ -239,6 +239,7 @@
         .dash-item .di-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
         .dash-item .di-arrow { color: #cbd5e0; font-size: 1rem; flex-shrink: 0; transition: color 0.12s, transform 0.12s; }
         .dash-item:hover .di-arrow { color: var(--primary); transform: translateX(2px); }
+        @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:0.7} }
 
         /* FOOTER */
         footer {
@@ -307,7 +308,10 @@
 
     <div class="dashboard">
         <div class="dash-section">
-            <div class="dash-section-title">Daily Operations</div>
+            <div class="dash-section-title" style="display:flex;align-items:center;gap:8px;">
+                Daily Operations
+                <a href="/staff/ems.html" onclick="sessionStorage.setItem('emsStartTab','notifications')" id="alertBadgePortal" style="display:none;background:#dc2626;color:white;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:10px;text-decoration:none;cursor:pointer;animation:pulse-badge 2s infinite;" title="Click to view alerts">🔔 <span id="alertCountPortal"></span></a>
+            </div>
             <div class="dash-group">
                 <a class="dash-item" href="/staff/ems.html" onclick="sessionStorage.setItem('emsStartTab','waitlist')">
                     <div class="di-icon">📝</div>
@@ -460,6 +464,44 @@ async function checkServer() {
 
 checkAuth();
 setInterval(checkServer, 10000);
+
+// Fetch alert count for the badge
+async function loadAlertCount() {
+    try {
+        const AUTH = 'Basic ' + btoa(':cofpadmin');
+        const [sRes, wRes] = await Promise.all([
+            fetch('/api/students', { headers: { 'Authorization': AUTH } }),
+            fetch('/api/waitinglist/count', { headers: { 'Authorization': AUTH } })
+        ]);
+        if (!sRes.ok) return;
+        const students = await sRes.json();
+        const wlData = await wRes.json();
+        let alertCount = 0;
+
+        // CCAP eligible
+        const CCAP_T = [35910,48690,61470,74250,87030,99810,112590,125370];
+        const ccapEligible = students.filter(s => {
+            if (!(s.Active==='Yes'||s.Active==='YES')||s.Category==='CCAP'||s.Category==='Foster') return false;
+            const inc=parseInt(s.HouseholdIncome)||0, hh=parseInt(s.HouseholdSize)||0;
+            if(!inc||!hh) return false;
+            return inc <= CCAP_T[Math.max(0,Math.min(hh-1,7))];
+        });
+        if (ccapEligible.length) alertCount++;
+
+        // CCAP renewals due
+        const ccapDue = students.filter(s => (s.Active==='Yes'||s.Active==='YES') && s.Category==='CCAP' && !s.CCAPStartDate);
+        if (ccapDue.length) alertCount++;
+
+        // Waiting list pending
+        if (wlData && wlData.Total > 0) alertCount++;
+
+        if (alertCount > 0) {
+            document.getElementById('alertBadgePortal').style.display = 'inline-flex';
+            document.getElementById('alertCountPortal').textContent = alertCount + ' alert' + (alertCount>1?'s':'');
+        }
+    } catch(e) {}
+}
+setTimeout(loadAlertCount, 1500);
 </script>
 </body>
 </html>
