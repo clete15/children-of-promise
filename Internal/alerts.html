@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alerts – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        .alerts-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
+        .alerts-wrapper { display:flex;flex-direction:column;max-height:calc(100vh - 130px);width:100%;max-width:900px; }
+        .alerts-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2); }
+        .alerts-header { padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px; }
+        .alerts-header h2 { font-size:1rem;font-weight:800;color:#1e3a8a;margin:0; }
+        .alerts-header span { font-size:0.78rem;color:#64748b; }
+        .alerts-body { overflow-y:auto;flex:1;padding:20px 24px; }
+        .alert-item { border-left:4px solid #e5e7eb;padding:14px 18px;margin-bottom:12px;background:#f8fafc;border-radius:0 8px 8px 0; }
+        .alert-item.warning { border-left-color:#f59e0b; }
+        .alert-item.info { border-left-color:#2563eb; }
+        .alert-item.error { border-left-color:#dc2626; }
+        .alert-title { font-weight:700;font-size:0.88rem;color:#1e293b;margin-bottom:6px; }
+        .alert-detail { font-size:0.78rem;color:#64748b;line-height:1.5; }
+        .alert-action { display:inline-block;margin-top:8px;font-size:0.75rem;font-weight:700;color:#2563eb;text-decoration:none; }
+        .alert-action:hover { text-decoration:underline; }
+        table { width:100%;border-collapse:collapse;font-size:0.78rem;margin-top:8px; }
+        th { text-align:left;padding:6px 8px;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:#64748b;border-bottom:1px solid #e5e7eb; }
+        td { padding:6px 8px;border-bottom:1px solid #f3f4f6; }
+        .empty-state { text-align:center;padding:48px 20px;color:#64748b; }
+        .empty-state .icon { font-size:2.5rem;margin-bottom:12px; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>System Alerts &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="alerts-layout">
+    <div class="alerts-wrapper">
+        <div class="alerts-card">
+            <div class="alerts-header">
+                <h2>🔔 Alerts</h2>
+                <span id="alertCount">Loading...</span>
+            </div>
+            <div class="alerts-body" id="alertsBody">
+                <div class="empty-state"><div class="icon">⏳</div>Loading alerts...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const AUTH = 'Basic ' + btoa(':cofpadmin');
+function apiFetch(url, opts = {}) {
+    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
+    return fetch(url, opts);
+}
+function isTruthy(v) { return v === true || v === 1 || v === '1' || (typeof v === 'string' && v.toLowerCase() === 'yes'); }
+
+const now = new Date();
+const usdaYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+const CCAP_THRESHOLDS = {
+    2025: [35213,47588,59963,72338,84713,97088,109463,121838],
+    2026: [35910,48690,61470,74250,87030,99810,112590,125370],
+}[usdaYear] || [35910,48690,61470,74250,87030,99810,112590,125370];
+
+async function init() {
+    try {
+        const [sRes, wRes] = await Promise.all([
+            apiFetch('/api/students'),
+            apiFetch('/api/waitinglist')
+        ]);
+        const students = await sRes.json();
+        const waitlist = await wRes.json();
+        renderAlerts(students, waitlist);
+    } catch(e) {
+        document.getElementById('alertsBody').innerHTML = '<div class="empty-state"><div class="icon">❌</div>Failed to load: ' + e.message + '</div>';
+    }
+}
+
+function renderAlerts(students, waitlist) {
+    const body = document.getElementById('alertsBody');
+    let html = '';
+    let count = 0;
+
+    // 1. CCAP Eligible families
+    const ccapEligible = students.filter(s => {
+        if (!isTruthy(s.Active) || s.Category === 'CCAP' || s.Category === 'Foster') return false;
+        const inc = parseInt(s.HouseholdIncome) || 0, hh = parseInt(s.HouseholdSize) || 0;
+        if (!inc || !hh) return false;
+        return inc <= CCAP_THRESHOLDS[Math.max(0, Math.min(hh-1, 7))];
+    });
+    if (ccapEligible.length) {
+        count++;
+        html += `<div class="alert-item warning">
+            <div class="alert-title">💰 ${ccapEligible.length} families may qualify for CCAP</div>
+            <div class="alert-detail">Based on 225% FPL thresholds. These families are not currently on CCAP but their income qualifies them.</div>
+            <table>
+                <thead><tr><th>Student</th><th>Room</th><th>Income</th><th>HH</th><th>Threshold</th></tr></thead>
+                <tbody>${ccapEligible.slice(0, 10).map(s => {
+                    const idx = Math.max(0, Math.min((parseInt(s.HouseholdSize)||1)-1, 7));
+                    return `<tr><td style="font-weight:600;">${s.First_Name} ${s.Last_Name}</td><td>${s.Room||''}</td><td>$${parseInt(s.HouseholdIncome).toLocaleString()}</td><td>${s.HouseholdSize}</td><td style="color:#16a34a;font-weight:600;">$${CCAP_THRESHOLDS[idx].toLocaleString()}</td></tr>`;
+                }).join('')}${ccapEligible.length > 10 ? '<tr><td colspan="5" style="color:#64748b;font-style:italic;">+ ' + (ccapEligible.length-10) + ' more...</td></tr>' : ''}</tbody>
+            </table>
+            <a class="alert-action" href="/staff/ccap.html">Open CCAP Report →</a>
+        </div>`;
+    }
+
+    // 2. CCAP Renewals due / missing start date
+    const ccapStudents = students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP');
+    const ccapDue = ccapStudents.filter(s => {
+        if (!s.CCAPStartDate) return true;
+        const start = new Date(s.CCAPStartDate);
+        const renewal = new Date(start); renewal.setMonth(renewal.getMonth() + 12);
+        return (renewal - new Date()) / (1000*60*60*24) <= 60;
+    });
+    if (ccapDue.length) {
+        count++;
+        html += `<div class="alert-item warning">
+            <div class="alert-title">🔄 ${ccapDue.length} CCAP renewal(s) due or missing start date</div>
+            <div class="alert-detail">${ccapDue.map(s => {
+                if (!s.CCAPStartDate) return s.First_Name + ' ' + s.Last_Name + ' (no start date)';
+                const start = new Date(s.CCAPStartDate); const renewal = new Date(start); renewal.setMonth(renewal.getMonth()+12);
+                const days = Math.ceil((renewal - new Date())/(1000*60*60*24));
+                return s.First_Name + ' ' + s.Last_Name + ' (' + (days<=0?'OVERDUE':days+' days') + ')';
+            }).join(', ')}</div>
+            <a class="alert-action" href="/staff/ccap.html">Open CCAP Report →</a>
+        </div>`;
+    }
+
+    // 3. Waiting list pending
+    const wlPending = waitlist.filter(r => (!r.WaitlistStatus || r.WaitlistStatus === 'Pending' || r.WaitlistStatus === 'NULL') && r.WaitlistStatus !== 'Declined' && r.WaitlistStatus !== 'Enrolled');
+    if (wlPending.length) {
+        count++;
+        html += `<div class="alert-item info">
+            <div class="alert-title">📝 ${wlPending.length} children pending on the waiting list</div>
+            <div class="alert-detail">New pre-enrollment submissions waiting to be reviewed and processed.</div>
+            <a class="alert-action" href="/staff/ems.html" onclick="sessionStorage.setItem('emsStartTab','waitlist')">Open Waiting List →</a>
+        </div>`;
+    }
+
+    // 4. Missing income/HH data for PFA/PI students
+    const missingIncome = students.filter(s => isTruthy(s.Active) && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') && (!s.HouseholdIncome || !s.HouseholdSize));
+    if (missingIncome.length) {
+        count++;
+        html += `<div class="alert-item error">
+            <div class="alert-title">⚠️ ${missingIncome.length} PFA/PI students missing income data</div>
+            <div class="alert-detail">${missingIncome.map(s => s.First_Name + ' ' + s.Last_Name).join(', ')}</div>
+            <a class="alert-action" href="/staff/ems.html">Open EMS →</a>
+        </div>`;
+    }
+
+    if (!html) {
+        html = '<div class="empty-state"><div class="icon">✅</div><p style="font-size:1rem;font-weight:600;color:#16a34a;">All clear — no alerts right now</p></div>';
+    }
+
+    document.getElementById('alertCount').textContent = count ? count + ' active alert' + (count>1?'s':'') : 'No alerts';
+    body.innerHTML = html;
+}
+
+init();
+</script>
+</body>
+</html>
