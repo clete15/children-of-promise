@@ -184,12 +184,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            padding: 48px 24px;
+            padding: 32px 24px;
         }
-        .splash-title { text-align: center; margin-bottom: 36px; }
-        .splash-title h2 { font-size: 1.7rem; font-weight: 800; color: var(--text); margin-bottom: 10px; }
-        .splash-title p  { color: var(--text-muted); font-size: 1rem; }
 
         /* OFFLINE WARNING */
         .offline-warning {
@@ -197,64 +193,52 @@
             background: #fef2f2;
             border: 1.5px solid #fecaca;
             border-radius: var(--radius);
-            padding: 18px 24px;
-            max-width: 560px;
+            padding: 14px 20px;
+            max-width: 680px;
             width: 100%;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             text-align: center;
         }
-        .offline-warning h4 { color: var(--danger); font-size: 0.95rem; margin-bottom: 6px; }
-        .offline-warning p  { color: #7f1d1d; font-size: 0.83rem; line-height: 1.55; }
-        .offline-warning code {
-            display: inline-block;
-            margin-top: 8px;
-            background: #fee2e2;
-            padding: 4px 10px;
-            border-radius: 5px;
-            font-size: 0.82rem;
-            color: #991b1b;
-            font-family: monospace;
-        }
+        .offline-warning h4 { color: var(--danger); font-size: 0.9rem; margin-bottom: 4px; }
+        .offline-warning p  { color: #7f1d1d; font-size: 0.8rem; line-height: 1.5; }
 
-        /* PORTAL CARDS */
-        .portal-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 18px;
-            width: 100%;
-            max-width: 1100px;
+        /* DASHBOARD */
+        .dashboard { width: 100%; max-width: 680px; }
+        .dash-section { margin-bottom: 20px; }
+        .dash-section-title {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            padding-left: 4px;
         }
-        .portal-card {
+        .dash-group {
             background: var(--card-bg);
-            border: 2px solid var(--border);
+            border: 1.5px solid var(--border);
             border-radius: var(--radius);
-            padding: 32px 24px;
-            text-align: center;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+        .dash-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 18px;
             text-decoration: none;
             color: var(--text);
-            box-shadow: var(--shadow);
-            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }        .portal-card:hover { transform: translateY(-5px); border-color: var(--primary); box-shadow: 0 12px 32px rgba(37,99,235,0.18); }
-        .portal-card.disabled { opacity: 0.55; pointer-events: none; filter: grayscale(0.4); }
-        .card-icon { font-size: 3.4rem; line-height: 1; }
-        .portal-card h3 { font-size: 1.3rem; color: var(--primary); font-weight: 800; }
-        .portal-card p  { font-size: 0.9rem; color: var(--text-muted); line-height: 1.6; }
-        .card-btn {
-            margin-top: 10px;
-            display: inline-block;
-            padding: 13px 36px;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            background: var(--primary);
-            color: white;
-            transition: background 0.15s, transform 0.15s;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.12s;
         }
-        .portal-card:hover .card-btn { background: var(--primary-dark); transform: translateY(-1px); }
+        .dash-item:last-child { border-bottom: none; }
+        .dash-item:hover { background: #f8fafc; }
+        .dash-item .di-icon { font-size: 1.4rem; flex-shrink: 0; width: 28px; text-align: center; }
+        .dash-item .di-content { flex: 1; min-width: 0; }
+        .dash-item .di-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
+        .dash-item .di-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
+        .dash-item .di-arrow { color: #cbd5e0; font-size: 1rem; flex-shrink: 0; transition: color 0.12s, transform 0.12s; }
+        .dash-item:hover .di-arrow { color: var(--primary); transform: translateX(2px); }
 
         /* FOOTER */
         footer {
@@ -316,60 +300,86 @@
 </header>
 
 <main>
-    <div class="splash-title">
-        <h2>Staff Portal</h2>
-        <p>Select a system below to get started.</p>
-    </div>
-
     <div class="offline-warning" id="offlineWarning">
         <h4>⚠️ Server Not Responding</h4>
         <p>The server may be restarting. Please wait a moment and refresh the page.</p>
     </div>
 
-    <div class="portal-grid">
-        <a class="portal-card" id="emsCard" href="/staff/ems.html">
-            <div class="card-icon">📋</div>
-            <h3>Enrollment Management</h3>
-            <p>Enrollment records, room roster, benefits, and reports — all in one place.</p>
-            <span class="card-btn">Open EMS</span>
-        </a>
-        <a class="portal-card" href="/staff/ems.html" onclick="sessionStorage.setItem('emsStartTab','waitlist')">
-            <div class="card-icon">📝</div>
-            <h3>Waiting List</h3>
-            <p>View and manage pre-enrollment waiting list, scores, and enrollment status.</p>
-            <span class="card-btn">Open Waiting List</span>
-        </a>
-        <a class="portal-card" href="/staff/isbe.html">
-            <div class="card-icon">🏛️</div>
-            <h3>ISBE PFA/PI</h3>
-            <p>PFA and PI program compliance, documentation, and reporting for ISBE.</p>
-            <span class="card-btn">Open ISBE</span>
-        </a>
-        <a class="portal-card" href="/staff/foodreport.html">
-            <div class="card-icon">🍽️</div>
-            <h3>Food Program</h3>
-            <p>Meal counts, food roster, weekly menus, and F/R/P reporting for CACFP.</p>
-            <span class="card-btn">Open Food Program</span>
-        </a>
-        <a class="portal-card" href="/staff/ccap.html">
-            <div class="card-icon">🏦</div>
-            <h3>CCAP</h3>
-            <p>CCAP roster, potentially eligible families, and IL income thresholds.</p>
-            <span class="card-btn">Open CCAP</span>
-        </a>
-        <a class="portal-card" href="/staff/inccra.html">
-            <div class="card-icon">💰</div>
-            <h3>INCCRA Grants</h3>
-            <p>INCCRA – SSWG shared folder, grant documents, and classroom roster export.</p>
-            <span class="card-btn">Open INCCRA</span>
-        </a>
-        <a class="portal-card" href="/staff/pas.html">
-            <div class="card-icon">📊</div>
-            <h3>PAS Compliance</h3>
-            <p>Program Administration Scale monitoring guide, handbooks, and ExceleRate Silver.</p>
-            <span class="card-btn">Open PAS</span>
-        </a>
-    </div><!-- end portal-grid -->
+    <div class="dashboard">
+        <div class="dash-section">
+            <div class="dash-section-title">Daily Operations</div>
+            <div class="dash-group">
+                <a class="dash-item" href="/staff/ems.html" onclick="sessionStorage.setItem('emsStartTab','waitlist')">
+                    <div class="di-icon">📝</div>
+                    <div class="di-content">
+                        <div class="di-title">Waiting List</div>
+                        <div class="di-desc">Pre-enrollment queue, scoring, and status management</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+                <a class="dash-item" id="emsCard" href="/staff/ems.html">
+                    <div class="di-icon">📋</div>
+                    <div class="di-content">
+                        <div class="di-title">Enrollment Management</div>
+                        <div class="di-desc">Student records, room roster, benefits, and reports</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+                <a class="dash-item" href="/staff/foodreport.html">
+                    <div class="di-icon">🍽️</div>
+                    <div class="di-content">
+                        <div class="di-title">Food Program</div>
+                        <div class="di-desc">Meal counts, roster, menus, and CACFP reporting</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <div class="dash-section-title">Compliance &amp; Programs</div>
+            <div class="dash-group">
+                <a class="dash-item" href="/staff/isbe.html">
+                    <div class="di-icon">🏛️</div>
+                    <div class="di-content">
+                        <div class="di-title">ISBE PFA / PI</div>
+                        <div class="di-desc">Program compliance, checklists, and ISBE documentation</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+                <a class="dash-item" href="/staff/ccap.html">
+                    <div class="di-icon">🏦</div>
+                    <div class="di-content">
+                        <div class="di-title">CCAP</div>
+                        <div class="di-desc">Subsidy roster, eligible families, and income thresholds</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+                <a class="dash-item" href="/staff/inccra.html">
+                    <div class="di-icon">💰</div>
+                    <div class="di-content">
+                        <div class="di-title">INCCRA Grants</div>
+                        <div class="di-desc">SSWG folder, classroom roster export, and Gateways</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="dash-section">
+            <div class="dash-section-title">Administration</div>
+            <div class="dash-group">
+                <a class="dash-item" href="/staff/pas.html">
+                    <div class="di-icon">📊</div>
+                    <div class="di-content">
+                        <div class="di-title">PAS Compliance</div>
+                        <div class="di-desc">Monitoring guide, handbooks, forms, and ExceleRate Silver</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+            </div>
+        </div>
+    </div>
 </main>
 
 
