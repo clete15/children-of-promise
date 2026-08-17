@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Staff Qualifications Summary — Children of Promise LLC</title>
+    <title>Summary of Teaching Staff Qualifications Worksheet — Children of Promise LLC</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -18,7 +18,7 @@
         .header h1 { font-size: 14pt; color: #2c5282; margin-bottom: 4px; }
         .header .org-name { font-size: 11pt; color: #666; margin-bottom: 6px; }
         .info-grid {
-            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            display: grid; grid-template-columns: 1fr 1fr;
             gap: 10px; margin-bottom: 20px;
         }
         .info-field {
@@ -38,24 +38,65 @@
         }
         .quals-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
         .quals-table th, .quals-table td {
-            border: 1px solid #cbd5e0; padding: 5px 6px;
-            text-align: left; font-size: 9pt; vertical-align: middle;
+            border: 1px solid #cbd5e0; padding: 6px 8px;
+            text-align: center; font-size: 9.5pt; vertical-align: middle;
         }
         .quals-table th {
             background-color: #2c5282; color: #fff; font-weight: 600;
-            font-size: 8.5pt; text-align: center;
+            font-size: 9pt;
         }
-        .quals-table td { height: 2em; }
-        .quals-table input, .quals-table select {
-            width: 100%; border: none; border-bottom: 1px solid #ccc;
-            font-family: inherit; font-size: 9pt; padding: 2px 3px;
-            background: transparent;
-        }
-        .quals-table input:focus, .quals-table select:focus {
-            outline: none; border-bottom-color: #2c5282;
-        }
-        .quals-table select { cursor: pointer; }
+        .quals-table td:first-child { text-align: left; }
         .quals-table tr:nth-child(even) { background: #f8f9fa; }
+        .quals-table input {
+            width: 100%; border: none; border-bottom: 1px solid #ccc;
+            font-family: inherit; font-size: 9.5pt; padding: 2px 4px;
+            background: transparent; text-align: center;
+        }
+        .quals-table td:first-child input { text-align: left; }
+        .quals-table input:focus { outline: none; border-bottom-color: #2c5282; }
+        .row-num { width: 30px; text-align: center; font-weight: 600; color: #666; }
+        .calc-section {
+            margin-top: 20px; border: 1px solid #cbd5e0; border-radius: 6px;
+            padding: 16px;
+        }
+        .calc-section h3 {
+            font-size: 10pt; color: #2c5282; margin-bottom: 12px;
+            font-weight: 700;
+        }
+        .calc-grid {
+            display: grid; grid-template-columns: 1fr 1fr 1fr;
+            gap: 12px;
+        }
+        .calc-col { text-align: center; }
+        .calc-col .col-label {
+            font-weight: 600; font-size: 9pt; color: #2c5282;
+            margin-bottom: 8px;
+        }
+        .calc-row {
+            display: flex; align-items: center; justify-content: center;
+            gap: 6px; margin-bottom: 8px; font-size: 9.5pt;
+        }
+        .calc-row label { white-space: nowrap; font-size: 9pt; }
+        .calc-row input {
+            width: 50px; border: none; border-bottom: 1px solid #999;
+            font-family: inherit; font-size: 9.5pt; padding: 2px 4px;
+            background: transparent; text-align: center;
+        }
+        .calc-row input:focus { outline: none; border-bottom-color: #2c5282; }
+        .calc-row input.auto-calc {
+            border-bottom-color: #2c5282; font-weight: 700; color: #2c5282;
+            background: #eef2ff;
+        }
+        .calc-divider { font-weight: 700; font-size: 12pt; }
+        .avg-row {
+            margin-top: 8px; padding-top: 8px; border-top: 1px solid #cbd5e0;
+            font-weight: 700; font-size: 10pt;
+        }
+        .avg-row .avg-value {
+            display: inline-block; min-width: 50px; text-align: center;
+            border-bottom: 2px solid #2c5282; padding: 2px 8px;
+            color: #2c5282; font-size: 11pt;
+        }
         .btn-save {
             display: inline-block; padding: 10px 24px;
             background: #2c5282; color: #fff; border: none;
@@ -76,12 +117,12 @@
         }
         @media print {
             body { padding: 0; }
-            @page { margin: 0.4in 0.5in; size: letter landscape; }
             .no-print { display: none; }
-            .quals-table input, .quals-table select {
-                border-bottom: none; -webkit-appearance: none;
-            }
+            @page { margin: 0.4in 0.5in; size: letter; }
+            .quals-table input { border-bottom: none; }
             .info-field input { border-bottom: none; }
+            .calc-row input { border-bottom: none; }
+            .calc-row input.auto-calc { background: transparent; }
         }
     </style>
 </head>
@@ -91,42 +132,81 @@
 <div class="header">
     <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
     <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
-    <h1>Staff Qualifications Summary</h1>
+    <h1>Summary of Teaching Staff Qualifications Worksheet</h1>
 </div>
 
 <div class="info-grid">
     <div class="info-field">
-        <label>Program Name:</label>
-        <input type="text" id="programName" value="Children of Promise LLC">
+        <label>Program:</label>
+        <input type="text" id="program" value="Children of Promise LLC">
     </div>
     <div class="info-field">
         <label>Date:</label>
-        <input type="date" id="summaryDate">
-    </div>
-    <div class="info-field">
-        <label>Assessor Name:</label>
-        <input type="text" id="assessorName">
+        <input type="date" id="formDate">
     </div>
 </div>
-
-<div class="section-title">Staff Qualifications</div>
 
 <table class="quals-table">
     <thead>
         <tr>
-            <th style="width:14%">Staff Name</th>
-            <th style="width:12%">Position/Role</th>
-            <th style="width:12%">Highest Education</th>
-            <th style="width:10%">ECE Credits/Hours</th>
-            <th style="width:12%">Gateways Credential Level</th>
-            <th style="width:10%">Years ECE Experience</th>
-            <th style="width:12%">CPR/First Aid Current</th>
-            <th style="width:14%">PD Hours (Current Year)</th>
+            <th style="width:5%">#</th>
+            <th style="width:31%">Group/Classroom Name</th>
+            <th style="width:21%">Column A<br>Lead Teacher — Item 23 Score</th>
+            <th style="width:21%">Column B<br>Teacher — Item 24 Score</th>
+            <th style="width:22%">Column C<br>Assistant Teacher — Item 25 Score</th>
         </tr>
     </thead>
-    <tbody id="staffTableBody">
+    <tbody id="scoreTableBody">
     </tbody>
 </table>
+
+<div class="calc-section">
+    <h3>Score Calculations</h3>
+    <div class="calc-grid">
+        <div class="calc-col">
+            <div class="col-label">Column A — Item 23 (Lead Teacher)</div>
+            <div class="calc-row">
+                <label>Sum of scores:</label>
+                <input type="text" id="sumA" class="auto-calc" readonly>
+            </div>
+            <div class="calc-row">
+                <label>Number of scores:</label>
+                <input type="text" id="countA" class="auto-calc" readonly>
+            </div>
+            <div class="avg-row">
+                Item 23 Average Score: <span class="avg-value" id="avgA">—</span>
+            </div>
+        </div>
+        <div class="calc-col">
+            <div class="col-label">Column B — Item 24 (Teacher)</div>
+            <div class="calc-row">
+                <label>Sum of scores:</label>
+                <input type="text" id="sumB" class="auto-calc" readonly>
+            </div>
+            <div class="calc-row">
+                <label>Number of scores:</label>
+                <input type="text" id="countB" class="auto-calc" readonly>
+            </div>
+            <div class="avg-row">
+                Item 24 Average Score: <span class="avg-value" id="avgB">—</span>
+            </div>
+        </div>
+        <div class="calc-col">
+            <div class="col-label">Column C — Item 25 (Assistant Teacher)</div>
+            <div class="calc-row">
+                <label>Sum of scores:</label>
+                <input type="text" id="sumC" class="auto-calc" readonly>
+            </div>
+            <div class="calc-row">
+                <label>Number of scores:</label>
+                <input type="text" id="countC" class="auto-calc" readonly>
+            </div>
+            <div class="avg-row">
+                Item 25 Average Score: <span class="avg-value" id="avgC">—</span>
+            </div>
+        </div>
+    </div>
+</div>
 
 <div class="no-print" style="margin-top:16px;">
     <button class="btn-save" onclick="saveData()">💾 Save</button>
@@ -135,45 +215,25 @@
 
 <div class="footer">
     <span>PAS Documentation — Children of Promise LLC</span>
-    <span>Staff Qualifications Summary</span>
+    <span>Summary of Teaching Staff Qualifications Worksheet</span>
 </div>
 
 <script>
-const STORAGE_KEY = 'pas_staff_quals';
+const STORAGE_KEY = 'pas_teaching_staff_summary';
 const ROW_COUNT = 8;
 
 function createRow(index) {
     return `<tr>
-        <td><input type="text" data-field="name_${index}" placeholder=""></td>
-        <td><select data-field="role_${index}">
-            <option value=""></option>
-            <option value="Director">Director</option>
-            <option value="Lead Teacher">Lead Teacher</option>
-            <option value="Teacher">Teacher</option>
-            <option value="Assistant">Assistant</option>
-        </select></td>
-        <td><select data-field="education_${index}">
-            <option value=""></option>
-            <option value="HS Diploma">HS Diploma</option>
-            <option value="AA/AS">AA/AS</option>
-            <option value="BA/BS">BA/BS</option>
-            <option value="MA/MS">MA/MS</option>
-            <option value="PhD">PhD</option>
-        </select></td>
-        <td><input type="text" data-field="ece_credits_${index}" placeholder=""></td>
-        <td><input type="text" data-field="gateways_${index}" placeholder=""></td>
-        <td><input type="text" data-field="experience_${index}" placeholder=""></td>
-        <td><select data-field="cpr_${index}">
-            <option value=""></option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-        </select></td>
-        <td><input type="text" data-field="pd_hours_${index}" placeholder=""></td>
+        <td class="row-num">${index + 1}</td>
+        <td><input type="text" data-field="classroom_${index}" placeholder=""></td>
+        <td><input type="number" step="0.1" min="1" max="7" data-field="scoreA_${index}" data-col="A" placeholder=""></td>
+        <td><input type="number" step="0.1" min="1" max="7" data-field="scoreB_${index}" data-col="B" placeholder=""></td>
+        <td><input type="number" step="0.1" min="1" max="7" data-field="scoreC_${index}" data-col="C" placeholder=""></td>
     </tr>`;
 }
 
 function initTable() {
-    const tbody = document.getElementById('staffTableBody');
+    const tbody = document.getElementById('scoreTableBody');
     let html = '';
     for (let i = 0; i < ROW_COUNT; i++) {
         html += createRow(i);
@@ -181,11 +241,27 @@ function initTable() {
     tbody.innerHTML = html;
 }
 
+function calculateAverages() {
+    ['A', 'B', 'C'].forEach(col => {
+        const inputs = document.querySelectorAll(`[data-col="${col}"]`);
+        let sum = 0, count = 0;
+        inputs.forEach(input => {
+            const val = parseFloat(input.value);
+            if (!isNaN(val) && input.value.trim() !== '') {
+                sum += val;
+                count++;
+            }
+        });
+        document.getElementById(`sum${col}`).value = count > 0 ? sum.toFixed(1) : '';
+        document.getElementById(`count${col}`).value = count > 0 ? count : '';
+        document.getElementById(`avg${col}`).textContent = count > 0 ? (sum / count).toFixed(2) : '—';
+    });
+}
+
 function getAllData() {
     const data = {
-        programName: document.getElementById('programName').value,
-        summaryDate: document.getElementById('summaryDate').value,
-        assessorName: document.getElementById('assessorName').value,
+        program: document.getElementById('program').value,
+        formDate: document.getElementById('formDate').value,
         fields: {}
     };
     document.querySelectorAll('[data-field]').forEach(el => {
@@ -207,23 +283,33 @@ function loadData() {
     if (!stored) return;
     try {
         const data = JSON.parse(stored);
-        if (data.programName) document.getElementById('programName').value = data.programName;
-        if (data.summaryDate) document.getElementById('summaryDate').value = data.summaryDate;
-        if (data.assessorName) document.getElementById('assessorName').value = data.assessorName;
+        if (data.program) document.getElementById('program').value = data.program;
+        if (data.formDate) document.getElementById('formDate').value = data.formDate;
         if (data.fields) {
             Object.keys(data.fields).forEach(key => {
                 const el = document.querySelector(`[data-field="${key}"]`);
                 if (el) el.value = data.fields[key];
             });
         }
+        calculateAverages();
     } catch (e) {
         console.error('Error loading saved data:', e);
     }
 }
 
-// Auto-save on field change
+// Auto-save and recalculate on input change
+document.addEventListener('input', (e) => {
+    if (e.target.matches('[data-col]')) {
+        calculateAverages();
+    }
+    if (e.target.matches('[data-field], #program, #formDate')) {
+        const data = getAllData();
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    }
+});
+
 document.addEventListener('change', (e) => {
-    if (e.target.matches('[data-field], #programName, #summaryDate, #assessorName')) {
+    if (e.target.matches('[data-field], #program, #formDate')) {
         const data = getAllData();
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
