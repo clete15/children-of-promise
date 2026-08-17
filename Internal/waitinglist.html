@@ -6,118 +6,148 @@
     <title>Waiting List – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; margin: 0; }
+
+        /* ── TOOLBAR ── */
         .wl-toolbar {
-            max-width: 1100px;
-            margin: 16px auto 0;
-            padding: 0 24px;
+            max-width: 100%;
+            margin: 12px 20px 0;
             display: flex;
             align-items: center;
             gap: 12px;
             flex-wrap: wrap;
             justify-content: flex-start;
         }
-        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
-        .wl-search { background: rgba(255,255,255,0.9); }
-        .wl-count { color: rgba(255,255,255,0.8); }
-        .tab-count { color: rgba(255,255,255,0.7); }
-        .mode-toggle { background: rgba(255,255,255,0.15) !important; }
-        .toggle-btn { color: rgba(255,255,255,0.8) !important; }
-        .toggle-btn.active { background: white !important; color: var(--primary) !important; }        .wl-search {
+        .wl-search {
             flex: 1;
-            min-width: 200px;
-            padding: 8px 12px;
+            min-width: 180px;
+            max-width: 320px;
+            padding: 7px 12px;
             border: 1px solid var(--border);
             border-radius: 6px;
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             font-family: inherit;
+            background: rgba(255,255,255,0.9);
         }
         .wl-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-        .wl-count { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+        .wl-count { font-size: 0.78rem; color: rgba(255,255,255,0.8); white-space: nowrap; }
 
+        /* ── TABS ── */
+        .mode-toggle { display:flex; background:rgba(255,255,255,0.15); border-radius:10px; padding:4px; gap:4px; }
+        .toggle-btn { padding:8px 14px; border:none; border-radius:7px; font-size:0.78rem; font-weight:700; cursor:pointer; color:rgba(255,255,255,0.8); background:transparent; transition:background 0.18s,color 0.18s; white-space:nowrap; text-align:center; line-height:1.3; }
+        .toggle-btn.active { background:white; color:var(--primary); box-shadow:0 1px 6px rgba(0,0,0,0.12); }
+        .tab-count { font-size: 0.72rem; font-weight: 600; opacity: 0.75; }
+        .tab-pending { font-size: 0.62rem; font-weight: 700; color: #fca5a5; }
+        .toggle-btn.active .tab-pending { color: #dc2626; }
+
+        /* ── TABLE CONTAINER ── */
         .wl-container {
-            max-width: 1100px;
-            margin: 14px auto 40px;
-            padding: 0 24px;
+            margin: 10px 20px 30px;
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 160px);
         }
         .wl-scroll-wrap {
-            overflow-x: auto;
+            overflow: auto;
             border-radius: var(--radius);
             box-shadow: var(--shadow);
+            flex: 1;
+            /* Show scrollbar at top via CSS */
+            direction: ltr;
         }
+        /* Top scrollbar trick */
+        .wl-scroll-top {
+            overflow-x: auto;
+            overflow-y: hidden;
+            border-radius: var(--radius) var(--radius) 0 0;
+            background: white;
+        }
+        .wl-scroll-top-inner {
+            height: 1px;
+        }
+
+        /* ── TABLE ── */
         .wl-table {
             width: 100%;
-            min-width: 1050px;
+            min-width: 1000px;
             border-collapse: collapse;
             background: white;
-            font-size: 0.8rem;
+            font-size: 0.76rem;
         }
         .wl-table thead tr {
             background: #f8fafc;
             border-bottom: 2px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 2;
         }
         .wl-table th {
-            padding: 10px 12px;
+            padding: 8px 8px;
             text-align: left;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.06em;
+            letter-spacing: 0.05em;
             color: var(--text-muted);
             white-space: nowrap;
         }
         .wl-table td {
-            padding: 10px 12px;
+            padding: 8px 8px;
             border-bottom: 1px solid var(--border);
             vertical-align: top;
         }
-        .notes-cell { min-width: 280px; }
-        .notes-input {
-            width: 100%;
-            padding: 7px 8px;
-            border: 1px solid var(--border);
-            border-radius: 5px;
-            font-size: 0.78rem;
-            font-family: inherit;
-            resize: vertical;
-            min-height: 60px;
-            color: var(--text);
-        }
-        .notes-input:focus { outline: none; border-color: var(--primary); }
-        .btn-save-notes {
-            margin-top: 4px;
-            padding: 4px 12px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 0.72rem;
-            font-weight: 700;
-            cursor: pointer;
-            transition: background 0.15s;
-        }
-        .btn-save-notes:hover { background: var(--primary-dark); }
         .wl-table tbody tr:last-child td { border-bottom: none; }
         .wl-table tbody tr:hover { background: #f8fafc; }
         .wl-table tbody tr.row-pending { background: #fffde7; }
         .wl-table tbody tr.row-pending:hover { background: #fff9c4; }
 
+        /* ── NOTES ── */
+        .notes-cell { min-width: 180px; max-width: 220px; }
+        .notes-input {
+            width: 100%;
+            padding: 5px 7px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.72rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 40px;
+            max-height: 80px;
+            color: var(--text);
+        }
+        .notes-input:focus { outline: none; border-color: var(--primary); }
+        .btn-save-notes {
+            margin-top: 3px;
+            padding: 3px 10px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .btn-save-notes:hover { background: var(--primary-dark); }
+
+        /* ── BADGES ── */
         .score-badge {
             display: inline-block;
-            padding: 3px 10px;
+            padding: 2px 8px;
             border-radius: 20px;
             font-weight: 700;
-            font-size: 0.78rem;
+            font-size: 0.72rem;
             white-space: nowrap;
         }
         .score-high   { background: #fef2f2; color: var(--danger); }
         .score-medium { background: #fffbeb; color: #b45309; }
         .score-low    { background: #f0fdf4; color: var(--success); }
 
-        .flag-list { display: flex; flex-wrap: wrap; gap: 4px; }
+        .flag-list { display: flex; flex-wrap: wrap; gap: 3px; max-width: 180px; }
         .flag {
-            padding: 2px 7px;
-            border-radius: 4px;
-            font-size: 0.68rem;
+            padding: 1px 6px;
+            border-radius: 3px;
+            font-size: 0.62rem;
             font-weight: 700;
             background: #eff6ff;
             color: var(--primary);
@@ -126,14 +156,14 @@
         .flag.high { background: #fef2f2; color: var(--danger); }
 
         .status-select {
-            padding: 6px 8px;
+            padding: 5px 6px;
             border: 1px solid var(--border);
-            border-radius: 5px;
-            font-size: 0.78rem;
+            border-radius: 4px;
+            font-size: 0.72rem;
             font-family: inherit;
             cursor: pointer;
             width: 100%;
-            min-width: 130px;
+            min-width: 100px;
         }
         .status-select:focus { outline: none; border-color: var(--primary); }
 
@@ -143,11 +173,7 @@
             color: var(--text-muted);
             font-size: 0.9rem;
         }
-        .submitted-date { font-size: 0.72rem; color: var(--text-muted); }
-        .tab-count { font-size: 0.75rem; font-weight: 600; opacity: 0.75; }
-        .mode-toggle { display:flex; background:#e2e8f0; border-radius:10px; padding:4px; gap:4px; }
-        .toggle-btn { flex:1; padding:10px 16px; border:none; border-radius:7px; font-size:0.82rem; font-weight:700; cursor:pointer; color:var(--text-muted); background:transparent; transition:background 0.18s,color 0.18s; white-space:nowrap; }
-        .toggle-btn.active { background:white; color:var(--primary); box-shadow:0 1px 6px rgba(0,0,0,0.12); }
+        .submitted-date { font-size: 0.68rem; color: var(--text-muted); }
 
         /* ── ENROLL MODAL ── */
         .modal-overlay {
@@ -171,36 +197,14 @@
             overflow-y: auto;
             box-shadow: 0 8px 32px rgba(0,0,0,0.25);
         }
-        .modal-title {
-            font-size: 1.1rem;
-            font-weight: 800;
-            color: var(--primary);
-            margin-bottom: 4px;
-        }
-        .modal-subtitle {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-bottom: 20px;
-            padding-bottom: 14px;
-            border-bottom: 1px solid var(--border);
-        }
+        .modal-title { font-size: 1.1rem; font-weight: 800; color: var(--primary); margin-bottom: 4px; }
+        .modal-subtitle { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 20px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
         .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .modal-group { display: flex; flex-direction: column; gap: 4px; }
         .modal-group.full { grid-column: 1 / -1; }
         .modal-group label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); }
-        .modal-group input, .modal-group select {
-            padding: 7px 10px;
-            border: 1px solid var(--border);
-            border-radius: 5px;
-            font-size: 0.82rem;
-            font-family: inherit;
-            color: var(--text);
-        }
-        .modal-group input:focus, .modal-group select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
-        }
+        .modal-group input, .modal-group select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 0.82rem; font-family: inherit; color: var(--text); }
+        .modal-group input:focus, .modal-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
         .modal-group input[readonly] { background: #f8fafc; color: var(--text-muted); }
         .modal-teacher-hint { font-size: 0.72rem; color: var(--danger); font-weight: 600; min-height: 1em; }
         .modal-days { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
@@ -224,39 +228,41 @@
 </header>
 
 <div class="wl-toolbar">
-    <div class="mode-toggle" style="max-width:620px;width:100%;justify-content:flex-start;">
-        <button class="toggle-btn active" id="tab-infant" onclick="setTab('infant')">🍼 Infant <span class="tab-count" id="count-infant"></span><div style="font-size:0.62rem;opacity:0.7;" id="pending-infant"></div></button>
-        <button class="toggle-btn" id="tab-toddler" onclick="setTab('toddler')">👶 Toddler <span class="tab-count" id="count-toddler"></span><div style="font-size:0.62rem;opacity:0.7;" id="pending-toddler"></div></button>
-        <button class="toggle-btn" id="tab-2-3" onclick="setTab('2-3')">🧒 2-Year Olds <span class="tab-count" id="count-2-3"></span><div style="font-size:0.62rem;opacity:0.7;" id="pending-2-3"></div></button>
-        <button class="toggle-btn" id="tab-3-5" onclick="setTab('3-5')">🎨 Pre-School <span class="tab-count" id="count-3-5"></span><div style="font-size:0.62rem;opacity:0.7;" id="pending-3-5"></div></button>
+    <div class="mode-toggle">
+        <button class="toggle-btn active" id="tab-infant" onclick="setTab('infant')">🍼 Infant <span class="tab-count" id="count-infant"></span><div class="tab-pending" id="pending-infant"></div></button>
+        <button class="toggle-btn" id="tab-toddler" onclick="setTab('toddler')">👶 Toddler <span class="tab-count" id="count-toddler"></span><div class="tab-pending" id="pending-toddler"></div></button>
+        <button class="toggle-btn" id="tab-2-3" onclick="setTab('2-3')">🧒 2-Year Olds <span class="tab-count" id="count-2-3"></span><div class="tab-pending" id="pending-2-3"></div></button>
+        <button class="toggle-btn" id="tab-3-5" onclick="setTab('3-5')">🎨 Pre-School <span class="tab-count" id="count-3-5"></span><div class="tab-pending" id="pending-3-5"></div></button>
     </div>
-</div>
-<div class="wl-toolbar" style="margin-top:10px;">
     <input class="wl-search" type="text" id="searchInput" placeholder="Search by name, phone, or email…" oninput="renderTable()">
     <span class="wl-count" id="wlCount"></span>
 </div>
 
 <div class="wl-container">
-    <div class="wl-scroll-wrap">
-    <table class="wl-table">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Contact</th>
-                <th>Children</th>
-                <th>Score</th>
-                <th>Risk Factors</th>
-                <th style="background:#fffbeb;color:#92400e;">Household Income</th>
-                <th>Submitted</th>
-                <th>Status</th>
-                <th>Notes</th>
-            </tr>
-        </thead>
-        <tbody id="wlBody">
-            <tr><td colspan="8" class="wl-empty">Loading…</td></tr>
-        </tbody>
-    </table>
+    <!-- Top scrollbar that syncs with table -->
+    <div class="wl-scroll-top" id="scrollTop" onscroll="document.getElementById('scrollMain').scrollLeft=this.scrollLeft">
+        <div class="wl-scroll-top-inner" id="scrollTopInner"></div>
+    </div>
+    <div class="wl-scroll-wrap" id="scrollMain" onscroll="document.getElementById('scrollTop').scrollLeft=this.scrollLeft">
+        <table class="wl-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Contact</th>
+                    <th>Children</th>
+                    <th>Score</th>
+                    <th>Risk Factors</th>
+                    <th style="background:#fffbeb;color:#92400e;">Income</th>
+                    <th>Submitted</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody id="wlBody">
+                <tr><td colspan="10" class="wl-empty">Loading…</td></tr>
+            </tbody>
+        </table>
     </div>
 </div>
 
@@ -265,6 +271,15 @@ const AUTH = 'Basic ' + btoa(':cofpadmin');
 let allRows = [];
 let classrooms = [];
 let activeTab = 'infant';
+
+// Sync top scrollbar width with table
+function syncScrollbar() {
+    const main = document.getElementById('scrollMain');
+    const inner = document.getElementById('scrollTopInner');
+    if (main && inner) {
+        inner.style.width = main.scrollWidth + 'px';
+    }
+}
 
 async function load() {
     try {
@@ -275,7 +290,7 @@ async function load() {
         updateTabCounts();
         renderTable();
     } catch (e) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="9" class="wl-empty">Failed to load waiting list.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="10" class="wl-empty">Failed to load waiting list.</td></tr>`;
     }
 }
 
@@ -284,7 +299,6 @@ function updateTabCounts() {
         const count = getFilteredRows(tab).length;
         const el = document.getElementById(`count-${tab}`);
         if (el) el.textContent = count ? `(${count})` : '';
-        // Update pending count
         const pendingCount = getFilteredRows(tab).filter(r => !r.WaitlistStatus || r.WaitlistStatus === 'Pending' || r.WaitlistStatus === 'NULL').length;
         const pendEl = document.getElementById(`pending-${tab}`);
         if (pendEl) pendEl.textContent = pendingCount > 0 ? `${pendingCount} pending` : '';
@@ -292,7 +306,6 @@ function updateTabCounts() {
 }
 
 function getChildAgeMonths(r) {
-    // Use ChildBirthDate if available
     const bd = r.ChildBirthDate || r.BirthDate;
     if (!bd) return null;
     const born = new Date(bd);
@@ -335,10 +348,11 @@ function renderTable() {
 
     if (!rows.length) {
         document.getElementById('wlBody').innerHTML = `<tr><td colspan="10" class="wl-empty">No records found.</td></tr>`;
+        syncScrollbar();
         return;
     }
 
-    // Sort: Pending first, then Contacted, by score descending within each group
+    // Sort: Pending first, then Contacted, by score descending
     rows.sort((a, b) => {
         const getOrder = s => (!s || s === 'Pending' || s === 'NULL') ? 0 : 1;
         const oa = getOrder(a.WaitlistStatus), ob = getOrder(b.WaitlistStatus);
@@ -356,16 +370,16 @@ function renderTable() {
         const isPending = status === 'Pending';
 
         return `<tr class="${isPending ? 'row-pending' : ''}">
-            <td>${i + 1}</td>
-            <td><strong>${r.LastName}, ${r.FirstName}</strong></td>
-            <td>
+            <td style="font-size:0.7rem;color:var(--text-muted);">${i + 1}</td>
+            <td style="white-space:nowrap;"><strong style="font-size:0.76rem;">${r.LastName}, ${r.FirstName}</strong></td>
+            <td style="font-size:0.72rem;">
                 <div>${r.Phone || '—'}</div>
-                <div style="font-size:0.72rem;color:var(--text-muted)">${r.Email || ''}</div>
+                <div style="color:var(--text-muted);font-size:0.66rem;">${r.Email || ''}</div>
             </td>
-            <td style="max-width:160px;">${r.ChildrenInfo || '—'}</td>
+            <td style="font-size:0.72rem;max-width:120px;">${r.ChildrenInfo || '—'}</td>
             <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
             <td><div class="flag-list">${flags}</div></td>
-            <td style="background:#fffbeb;font-weight:600;font-size:0.78rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
+            <td style="background:#fffbeb;font-weight:600;font-size:0.74rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td>
                 <select class="status-select" id="status-${r.Id}" onchange="handleStatusChange(${parseInt(r.Id)}, this)">
@@ -381,6 +395,8 @@ function renderTable() {
             </td>
         </tr>`;
     }).join('');
+
+    syncScrollbar();
 }
 
 function buildFlags(r) {
@@ -406,7 +422,7 @@ function buildFlags(r) {
     if (r.ActiveMilitary === 'Yes')     flags.push(lo('Military'));
     if (r.PublicBenefits)               flags.push(lo('Public Benefits'));
     if (r.LivingSituation === 'Single Parent') flags.push(lo('Single Parent'));
-    return flags.join('') || '<span style="color:var(--text-muted);font-size:0.72rem;">None</span>';
+    return flags.join('') || '<span style="color:var(--text-muted);font-size:0.68rem;">None</span>';
 }
 
 function handleStatusChange(id, selectEl) {
@@ -414,12 +430,10 @@ function handleStatusChange(id, selectEl) {
 
     if (val === 'Declined') {
         if (!confirm('Are you sure you want to remove this family from the waiting list? This cannot be undone.')) {
-            // Revert select to previous value
             const row = allRows.find(r => r.Id == id);
             selectEl.value = row ? row.WaitlistStatus : 'Pending';
             return;
         }
-        // Mark declined and remove from view
         updateStatusAPI(id, 'Declined').then(() => {
             const row = allRows.find(r => r.Id == id);
             if (row) row.WaitlistStatus = 'Declined';
@@ -430,14 +444,12 @@ function handleStatusChange(id, selectEl) {
     }
 
     if (val === 'Enroll') {
-        // Revert — enrollment only happens through EMS
         const row = allRows.find(r => r.Id == id);
         selectEl.value = row ? row.WaitlistStatus : 'Pending';
         openEnrollModal(id);
         return;
     }
 
-    // Pending or Contacted — save directly
     updateStatusAPI(id, val).then(() => {
         const row = allRows.find(r => r.Id == id);
         if (row) row.WaitlistStatus = val;
@@ -475,7 +487,6 @@ function openEnrollModal(id) {
     const r = allRows.find(x => x.Id == id);
     if (!r) return;
 
-    // Store all available pre-enrollment data in sessionStorage
     sessionStorage.setItem('enrollFromWaitlist', JSON.stringify({
         waitlistId:      r.Id,
         firstName:       r.ChildName ? r.ChildName.split(' ')[0] : r.FirstName || '',
@@ -490,7 +501,6 @@ function openEnrollModal(id) {
         fosterAdopted:   r.FosterAdopted === 'Yes',
     }));
 
-    // Redirect to EMS Add Student tab
     window.location.href = 'ems.html?enroll=1';
 }
 
