@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Program Administration Scale Profile — Children of Promise LLC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt; line-height: 1.4; color: #333;
+            padding: 0.5in 0.5in;
+        }
+        .header {
+            text-align: center; border-bottom: 2px solid #2c5282;
+            padding-bottom: 12px; margin-bottom: 20px;
+        }
+        .header img { height: 60px; margin-bottom: 8px; }
+        .header .org-name { font-size: 11pt; color: #666; margin-bottom: 6px; }
+        .header h1 { font-size: 14pt; color: #2c5282; margin-bottom: 4px; }
+        .info-row {
+            display: flex; gap: 30px; margin-bottom: 20px;
+        }
+        .info-field {
+            display: flex; align-items: baseline; gap: 8px;
+        }
+        .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
+        .info-field input {
+            border: none; border-bottom: 1px solid #999;
+            font-family: inherit; font-size: 10pt; padding: 2px 4px;
+            background: transparent; min-width: 200px;
+        }
+        .info-field input:focus { outline: none; border-bottom-color: #2c5282; }
+
+        .profile-table {
+            width: 100%; border-collapse: collapse; margin-bottom: 20px;
+            font-size: 9pt;
+        }
+        .profile-table th, .profile-table td {
+            border: 1px solid #cbd5e0; padding: 5px 6px;
+            text-align: center; vertical-align: middle;
+        }
+        .profile-table thead th {
+            background-color: #2c5282; color: #fff; font-weight: 600;
+            font-size: 9pt;
+        }
+        .profile-table .subscale-cell {
+            background: #edf2f7; font-weight: 700; font-size: 8.5pt;
+            color: #2c5282; text-align: left; padding: 5px 8px;
+            writing-mode: horizontal-tb; width: 140px;
+        }
+        .profile-table .item-num-cell {
+            width: 30px; font-weight: 600; font-size: 9pt;
+        }
+        .profile-table .item-name-cell {
+            text-align: left; padding-left: 8px; width: 220px;
+            font-size: 9pt;
+        }
+        .profile-table .score-cell {
+            width: 40px; cursor: pointer; position: relative;
+            transition: background-color 0.15s;
+        }
+        .profile-table .score-cell:hover {
+            background: #e2e8f0;
+        }
+        .profile-table .score-cell.selected {
+            background: #2c5282; color: #fff; font-weight: 700;
+        }
+        .profile-table .score-cell.selected::after {
+            content: '●';
+            font-size: 14pt;
+        }
+        .profile-table tr:nth-child(even) .item-name-cell,
+        .profile-table tr:nth-child(even) .item-num-cell {
+            background: #f8f9fa;
+        }
+        .subscale-separator td {
+            border-top: 2px solid #2c5282;
+        }
+
+        .calc-section {
+            border: 2px solid #2c5282; border-radius: 8px;
+            padding: 18px 24px; margin-bottom: 20px;
+            background: #f8fafc;
+        }
+        .calc-row {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 10px; font-size: 10.5pt;
+        }
+        .calc-row:last-child { margin-bottom: 0; }
+        .calc-row .calc-label { font-weight: 600; min-width: 200px; }
+        .calc-row .calc-value {
+            font-size: 12pt; font-weight: 700; color: #2c5282;
+            background: #fff; border: 1px solid #cbd5e0; border-radius: 4px;
+            padding: 4px 12px; min-width: 70px; text-align: center;
+        }
+        .calc-row .calc-symbol {
+            font-size: 11pt; color: #666; font-weight: 600;
+        }
+
+        .btn-row { margin-top: 16px; display: flex; align-items: center; gap: 12px; }
+        .btn-save {
+            display: inline-block; padding: 10px 24px;
+            background: #2c5282; color: #fff; border: none;
+            border-radius: 6px; font-size: 10pt; font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-save:hover { background: #1a365d; }
+        .btn-clear {
+            display: inline-block; padding: 10px 24px;
+            background: #e53e3e; color: #fff; border: none;
+            border-radius: 6px; font-size: 10pt; font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-clear:hover { background: #c53030; }
+        .save-confirm {
+            color: #27ae60; font-weight: 600; font-size: 10pt;
+            opacity: 0; transition: opacity 0.3s;
+        }
+        .save-confirm.show { opacity: 1; }
+        .footer {
+            margin-top: 25px; padding-top: 10px;
+            border-top: 1px solid #cbd5e0; display: flex;
+            justify-content: space-between; font-size: 9pt; color: #666;
+        }
+        @media print {
+            body { padding: 0.2in 0.3in; font-size: 9pt; }
+            @page { margin: 0.3in; size: letter landscape; }
+            .no-print { display: none !important; }
+            .info-field input { border-bottom: none; }
+            .profile-table .score-cell { cursor: default; }
+            .profile-table .score-cell:hover { background: transparent; }
+            .profile-table .score-cell.selected { background: #2c5282; }
+            .calc-section { border: 1.5px solid #2c5282; }
+        }
+    </style>
+</head>
+<body>
+<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
+
+<div class="header">
+    <img src="/pas/logo-sm.png" alt="Children of Promise">
+    <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
+    <h1>The Program Administration Scale Profile</h1>
+</div>
+
+<div class="info-row">
+    <div class="info-field">
+        <label>Program:</label>
+        <input type="text" id="programName" value="Children of Promise LLC">
+    </div>
+    <div class="info-field">
+        <label>Date:</label>
+        <input type="date" id="dateCompleted">
+    </div>
+</div>
+
+<table class="profile-table" id="profileTable">
+    <thead>
+        <tr>
+            <th style="width:140px;">Subscale</th>
+            <th style="width:30px;">#</th>
+            <th style="width:220px; text-align:left; padding-left:8px;">Item</th>
+            <th style="width:40px;">1</th>
+            <th style="width:40px;">2</th>
+            <th style="width:40px;">3</th>
+            <th style="width:40px;">4</th>
+            <th style="width:40px;">5</th>
+            <th style="width:40px;">6</th>
+            <th style="width:40px;">7</th>
+        </tr>
+    </thead>
+    <tbody id="profileBody">
+    </tbody>
+</table>
+
+<div class="calc-section">
+    <div class="calc-row">
+        <span class="calc-label">Total PAS Score</span>
+        <span class="calc-value" id="totalScore">—</span>
+        <span class="calc-symbol"></span>
+    </div>
+    <div class="calc-row">
+        <span class="calc-label">÷ Number of Items</span>
+        <span class="calc-value" id="itemCount">—</span>
+        <span class="calc-symbol"></span>
+    </div>
+    <div class="calc-row">
+        <span class="calc-label">= Average PAS Item Score</span>
+        <span class="calc-value" id="avgScore">—</span>
+        <span class="calc-symbol"></span>
+    </div>
+</div>
+
+<div class="btn-row no-print">
+    <button class="btn-save" onclick="saveData()">💾 Save</button>
+    <button class="btn-clear" onclick="clearAll()">🗑️ Clear All</button>
+    <span class="save-confirm" id="saveConfirm">Saved ✓</span>
+</div>
+
+<div class="footer">
+    <span>Program Administration Scale — Profile</span>
+    <span>Children of Promise LLC</span>
+</div>
+
+<script>
+const STORAGE_KEY = 'pas_profile';
+
+const SUBSCALES = [
+    {
+        name: 'Human Resources Development',
+        items: [
+            { num: 1, name: 'Staff Orientation' },
+            { num: 2, name: 'Supervision and Performance Appraisal' },
+            { num: 3, name: 'Staff Development' }
+        ]
+    },
+    {
+        name: 'Personnel Cost and Allocation',
+        items: [
+            { num: 4, name: 'Compensation' },
+            { num: 5, name: 'Benefits' },
+            { num: 6, name: 'Staffing Patterns and Scheduling' }
+        ]
+    },
+    {
+        name: 'Center Operations',
+        items: [
+            { num: 7, name: 'Facilities Management' },
+            { num: 8, name: 'Risk Management' },
+            { num: 9, name: 'Internal Communications' }
+        ]
+    },
+    {
+        name: 'Child Assessment',
+        items: [
+            { num: 10, name: 'Screening and Identification of Special Needs' },
+            { num: 11, name: 'Assessment in Support of Learning' }
+        ]
+    },
+    {
+        name: 'Fiscal Management',
+        items: [
+            { num: 12, name: 'Budget Planning' },
+            { num: 13, name: 'Accounting Practices' }
+        ]
+    },
+    {
+        name: 'Program Planning and Evaluation',
+        items: [
+            { num: 14, name: 'Program Evaluation' },
+            { num: 15, name: 'Strategic Planning' }
+        ]
+    },
+    {
+        name: 'Family Partnerships',
+        items: [
+            { num: 16, name: 'Family Communications' },
+            { num: 17, name: 'Family Support and Involvement' }
+        ]
+    },
+    {
+        name: 'Marketing and Public Relations',
+        items: [
+            { num: 18, name: 'External Communications' },
+            { num: 19, name: 'Community Outreach' }
+        ]
+    },
+    {
+        name: 'Technology',
+        items: [
+            { num: 20, name: 'Technological Resources' },
+            { num: 21, name: 'Use of Technology' }
+        ]
+    },
+    {
+        name: 'Staff Qualifications',
+        items: [
+            { num: 22, name: 'Administrator' },
+            { num: 23, name: 'Lead Teacher' },
+            { num: 24, name: 'Teacher' },
+            { num: 25, name: 'Assistant Teacher/Aide' }
+        ]
+    }
+];
+
+// Track selected scores: { itemNum: scoreValue }
+let selectedScores = {};
+
+function buildTable() {
+    const tbody = document.getElementById('profileBody');
+    let html = '';
+
+    SUBSCALES.forEach((subscale, sIdx) => {
+        subscale.items.forEach((item, iIdx) => {
+            const isFirst = iIdx === 0;
+            const rowClass = sIdx > 0 && iIdx === 0 ? ' class="subscale-separator"' : '';
+            html += `<tr${rowClass}>`;
+
+            // Subscale cell (spans rows)
+            if (isFirst) {
+                html += `<td class="subscale-cell" rowspan="${subscale.items.length}">${subscale.name}</td>`;
+            }
+
+            // Item number
+            html += `<td class="item-num-cell">${item.num}</td>`;
+            // Item name
+            html += `<td class="item-name-cell">${item.name}</td>`;
+
+            // Score cells 1-7
+            for (let s = 1; s <= 7; s++) {
+                html += `<td class="score-cell" data-item="${item.num}" data-score="${s}" onclick="selectScore(${item.num}, ${s}, this)"></td>`;
+            }
+
+            html += `</tr>`;
+        });
+    });
+
+    tbody.innerHTML = html;
+}
+
+function selectScore(itemNum, score, cell) {
+    // Get all cells for this item
+    const cells = document.querySelectorAll(`td[data-item="${itemNum}"]`);
+
+    // Check if clicking the already-selected cell (toggle off)
+    if (selectedScores[itemNum] === score) {
+        delete selectedScores[itemNum];
+        cells.forEach(c => c.classList.remove('selected'));
+    } else {
+        // Clear previous selection for this row
+        cells.forEach(c => c.classList.remove('selected'));
+        // Mark new selection
+        cell.classList.add('selected');
+        selectedScores[itemNum] = score;
+    }
+
+    calculate();
+    autoSave();
+}
+
+function calculate() {
+    const scores = Object.values(selectedScores);
+    const count = scores.length;
+    const sum = scores.reduce((a, b) => a + b, 0);
+
+    document.getElementById('totalScore').textContent = count > 0 ? sum : '—';
+    document.getElementById('itemCount').textContent = count > 0 ? count : '—';
+    document.getElementById('avgScore').textContent = count > 0 ? (sum / count).toFixed(2) : '—';
+}
+
+function getAllData() {
+    return {
+        programName: document.getElementById('programName').value,
+        dateCompleted: document.getElementById('dateCompleted').value,
+        scores: { ...selectedScores }
+    };
+}
+
+function saveData() {
+    const data = getAllData();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const confirm = document.getElementById('saveConfirm');
+    confirm.classList.add('show');
+    setTimeout(() => confirm.classList.remove('show'), 2500);
+}
+
+function autoSave() {
+    const data = getAllData();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function clearAll() {
+    if (!confirm('Clear all selections? This cannot be undone.')) return;
+    selectedScores = {};
+    document.querySelectorAll('.score-cell.selected').forEach(c => c.classList.remove('selected'));
+    calculate();
+    autoSave();
+}
+
+function loadData() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return;
+    try {
+        const data = JSON.parse(stored);
+        if (data.programName) document.getElementById('programName').value = data.programName;
+        if (data.dateCompleted) document.getElementById('dateCompleted').value = data.dateCompleted;
+        if (data.scores) {
+            selectedScores = data.scores;
+            // Restore visual selections
+            Object.keys(selectedScores).forEach(itemNum => {
+                const score = selectedScores[itemNum];
+                const cell = document.querySelector(`td[data-item="${itemNum}"][data-score="${score}"]`);
+                if (cell) cell.classList.add('selected');
+            });
+        }
+        calculate();
+    } catch (e) {
+        console.error('Error loading saved data:', e);
+    }
+}
+
+// Auto-save on field change
+document.addEventListener('change', (e) => {
+    if (e.target.matches('input')) {
+        autoSave();
+    }
+});
+
+// Initialize
+buildTable();
+loadData();
+</script>
+</body>
+</html>
