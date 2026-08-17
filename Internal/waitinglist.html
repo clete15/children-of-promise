@@ -38,13 +38,16 @@
             margin: 14px auto 40px;
             padding: 0 24px;
         }
+        .wl-scroll-wrap {
+            overflow-x: auto;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
         .wl-table {
             width: 100%;
+            min-width: 1050px;
             border-collapse: collapse;
             background: white;
-            border-radius: var(--radius);
-            overflow: hidden;
-            box-shadow: var(--shadow);
             font-size: 0.8rem;
         }
         .wl-table thead tr {
@@ -66,7 +69,7 @@
             border-bottom: 1px solid var(--border);
             vertical-align: top;
         }
-        .notes-cell { min-width: 220px; }
+        .notes-cell { min-width: 280px; }
         .notes-input {
             width: 100%;
             padding: 7px 8px;
@@ -75,7 +78,7 @@
             font-size: 0.78rem;
             font-family: inherit;
             resize: vertical;
-            min-height: 80px;
+            min-height: 60px;
             color: var(--text);
         }
         .notes-input:focus { outline: none; border-color: var(--primary); }
@@ -94,6 +97,8 @@
         .btn-save-notes:hover { background: var(--primary-dark); }
         .wl-table tbody tr:last-child td { border-bottom: none; }
         .wl-table tbody tr:hover { background: #f8fafc; }
+        .wl-table tbody tr.row-pending { background: #fffde7; }
+        .wl-table tbody tr.row-pending:hover { background: #fff9c4; }
 
         .score-badge {
             display: inline-block;
@@ -127,7 +132,7 @@
             font-family: inherit;
             cursor: pointer;
             width: 100%;
-            min-width: 120px;
+            min-width: 130px;
         }
         .status-select:focus { outline: none; border-color: var(--primary); }
 
@@ -214,7 +219,7 @@
             <p>Pre-Enrollment Waiting List &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="index.html">← Staff Portal</a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
 </header>
 
 <div class="wl-toolbar">
@@ -230,6 +235,7 @@
 </div>
 
 <div class="wl-container">
+    <div class="wl-scroll-wrap">
     <table class="wl-table">
         <thead>
             <tr>
@@ -249,6 +255,7 @@
             <tr><td colspan="8" class="wl-empty">Loading…</td></tr>
         </tbody>
     </table>
+    </div>
 </div>
 
 <script>
@@ -298,20 +305,28 @@ function renderTable() {
     document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
 
     if (!rows.length) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="9" class="wl-empty">No records found.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="10" class="wl-empty">No records found.</td></tr>`;
         return;
     }
+
+    // Sort: Pending first, then Contacted, by score descending within each group
+    rows.sort((a, b) => {
+        const getOrder = s => (!s || s === 'Pending' || s === 'NULL') ? 0 : 1;
+        const oa = getOrder(a.WaitlistStatus), ob = getOrder(b.WaitlistStatus);
+        if (oa !== ob) return oa - ob;
+        return (parseInt(b.Score)||0) - (parseInt(a.Score)||0);
+    });
 
     document.getElementById('wlBody').innerHTML = rows.map((r, i) => {
         const score = parseInt(r.Score) || 0;
         const scoreClass = score >= 50 ? 'score-high' : score >= 10 ? 'score-medium' : 'score-low';
         const flags = buildFlags(r);
         const date = r.SubmittedAt ? r.SubmittedAt.split(' ')[0] : '—';
-        // Normalize status - treat NULL string or missing as Pending
         const status = (!r.WaitlistStatus || r.WaitlistStatus === 'NULL') ? 'Pending' : r.WaitlistStatus;
         const notes = (!r.Notes || r.Notes === 'NULL') ? '' : r.Notes;
+        const isPending = status === 'Pending';
 
-        return `<tr>
+        return `<tr class="${isPending ? 'row-pending' : ''}">
             <td>${i + 1}</td>
             <td><strong>${r.LastName}, ${r.FirstName}</strong></td>
             <td>
