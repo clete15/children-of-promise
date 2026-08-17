@@ -103,11 +103,18 @@ function renderAlerts(students, waitlist) {
             <div class="alert-title">💰 ${ccapEligible.length} families may qualify for CCAP</div>
             <div class="alert-detail">Based on 225% FPL thresholds. These families are not currently on CCAP but their income qualifies them.</div>
             <table>
-                <thead><tr><th>Student</th><th>Room</th><th>Income</th><th>HH</th><th>Threshold</th></tr></thead>
-                <tbody>${ccapEligible.slice(0, 10).map(s => {
+                <thead><tr><th>Student</th><th>Room</th><th>Income</th><th>HH</th><th>Threshold</th><th></th></tr></thead>
+                <tbody>${ccapEligible.map(s => {
                     const idx = Math.max(0, Math.min((parseInt(s.HouseholdSize)||1)-1, 7));
-                    return `<tr><td style="font-weight:600;">${s.First_Name} ${s.Last_Name}</td><td>${s.Room||''}</td><td>$${parseInt(s.HouseholdIncome).toLocaleString()}</td><td>${s.HouseholdSize}</td><td style="color:#16a34a;font-weight:600;">$${CCAP_THRESHOLDS[idx].toLocaleString()}</td></tr>`;
-                }).join('')}${ccapEligible.length > 10 ? '<tr><td colspan="5" style="color:#64748b;font-style:italic;">+ ' + (ccapEligible.length-10) + ' more...</td></tr>' : ''}</tbody>
+                    return `<tr>
+                        <td style="font-weight:600;">${s.First_Name} ${s.Last_Name}</td>
+                        <td>${s.Room||''}</td>
+                        <td><input type="number" value="${s.HouseholdIncome||''}" id="inc_${s.Id}" style="width:75px;padding:2px 4px;border:1px solid #d1d5db;border-radius:3px;font-size:0.78rem;text-align:right;"></td>
+                        <td><input type="number" value="${s.HouseholdSize||''}" id="hh_${s.Id}" min="1" max="15" style="width:45px;padding:2px 4px;border:1px solid #d1d5db;border-radius:3px;font-size:0.78rem;text-align:center;"></td>
+                        <td style="color:#16a34a;font-weight:600;">$${CCAP_THRESHOLDS[idx].toLocaleString()}</td>
+                        <td><button onclick="saveAlertIncome('${s.First_Name}','${s.Last_Name}','${s.Id}')" style="padding:3px 8px;background:#2563eb;color:white;border:none;border-radius:3px;font-size:0.68rem;font-weight:600;cursor:pointer;">Save</button></td>
+                    </tr>`;
+                }).join('')}</tbody>
             </table>
             <a class="alert-action" href="/staff/ccap.html">Open CCAP Report →</a>
         </div>`;
@@ -163,6 +170,24 @@ function renderAlerts(students, waitlist) {
 
     document.getElementById('alertCount').textContent = count ? count + ' active alert' + (count>1?'s':'') : 'No alerts';
     body.innerHTML = html;
+}
+
+async function saveAlertIncome(firstName, lastName, id) {
+    const income = document.getElementById('inc_' + id).value;
+    const hh = document.getElementById('hh_' + id).value;
+    try {
+        const res = await apiFetch('/api/students/' + encodeURIComponent(firstName) + '/' + encodeURIComponent(lastName), {
+            method: 'PUT',
+            body: JSON.stringify({ householdIncome: income, householdSize: hh })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const btn = event.target;
+            btn.textContent = '✓ Saved';
+            btn.style.background = '#16a34a';
+            setTimeout(() => { btn.textContent = 'Save'; btn.style.background = '#2563eb'; }, 2000);
+        }
+    } catch(e) { alert('Failed to save'); }
 }
 
 init();
