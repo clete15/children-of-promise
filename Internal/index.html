@@ -298,6 +298,7 @@
         <div class="status-dot"></div>
         <span id="statusText">Checking server…</span>
     </div>
+    <button onclick="runDeploy()" id="deployBtn" style="padding:8px 16px;background:#16a34a;color:white;border:none;border-radius:20px;font-size:0.8rem;font-weight:700;cursor:pointer;transition:background 0.15s;margin-left:8px;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'" title="Pull latest code from GitHub and restart server">🚀 Deploy</button>
 </header>
 
 <main>
@@ -486,6 +487,34 @@ async function checkServer() {
 
 checkAuth();
 setInterval(checkServer, 10000);
+
+// ── DEPLOY ──
+async function runDeploy() {
+    if (!confirm('Pull latest code from GitHub and restart the server?')) return;
+    const btn = document.getElementById('deployBtn');
+    btn.textContent = '⏳ Deploying...';
+    btn.disabled = true;
+    btn.style.background = '#a3a3a3';
+    try {
+        const res = await fetch('/api/deploy', { method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(':cofpadmin') } });
+        const json = await res.json();
+        if (json.success) {
+            btn.textContent = '✓ Deployed!';
+            btn.style.background = '#16a34a';
+            setTimeout(() => { btn.textContent = '🚀 Deploy'; btn.disabled = false; }, 3000);
+        } else {
+            btn.textContent = '✗ Failed';
+            btn.style.background = '#dc2626';
+            alert('Deploy failed: ' + (json.error || 'Unknown error'));
+            setTimeout(() => { btn.textContent = '🚀 Deploy'; btn.disabled = false; btn.style.background = '#16a34a'; }, 3000);
+        }
+    } catch (e) {
+        btn.textContent = '✗ Failed';
+        btn.style.background = '#dc2626';
+        alert('Deploy failed: ' + e.message);
+        setTimeout(() => { btn.textContent = '🚀 Deploy'; btn.disabled = false; btn.style.background = '#16a34a'; }, 3000);
+    }
+}
 
 // Fetch alert count for the badge
 async function loadAlertCount() {
