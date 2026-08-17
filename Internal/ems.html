@@ -522,9 +522,13 @@ async function init() {
     loadWlBadge();
     renderAlerts();
     // Check if should start on waiting list tab
-    if (sessionStorage.getItem('emsStartTab') === 'waitlist') {
+    if (sessionStorage.getItem('emsStartTab') === 'waitlist' || new URLSearchParams(window.location.search).get('view') === 'waitlist') {
         sessionStorage.removeItem('emsStartTab');
         setMode('waitlist');
+        // Hide mode toggle if opened as standalone waitlist view
+        if (new URLSearchParams(window.location.search).get('view') === 'waitlist') {
+            document.querySelector('.mode-toggle-bar').style.display = 'none';
+        }
     } else if (sessionStorage.getItem('emsStartTab') === 'notifications') {
         sessionStorage.removeItem('emsStartTab');
         setMode('notifications');
