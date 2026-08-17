@@ -698,7 +698,7 @@ function buildViewSidebar() {
             onmouseover="if(!${isActive})this.style.background='rgba(255,255,255,0.1)'"
             onmouseout="if(!${isActive})this.style.background='transparent'">
             <div style="font-size:0.82rem;font-weight:700;color:white;">${label}</div>
-            <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;">${count} student${count!==1?'s':''}${needsAttn ? ' <span style="color:#fca5a5;">⚠ '+needsAttn+'</span>' : ''}</div>
+            <div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px;">${count} student${count!==1?'s':''}</div>
         </button>`;
     }).join('');
 }
