@@ -520,6 +520,8 @@ async function init() {
     } else if (new URLSearchParams(window.location.search).get('view') === 'roster') {
         setMode('roster');
         document.querySelector('.mode-toggle-bar').style.display = 'none';
+        // Auto-open settings panel
+        setTimeout(() => { const sp = document.getElementById('rosterSettingsPanel'); if (sp) sp.style.display = 'block'; }, 300);
     } else if (sessionStorage.getItem('emsStartTab') === 'notifications') {
         sessionStorage.removeItem('emsStartTab');
         window.location.href = '/staff/alerts.html';
