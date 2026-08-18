@@ -267,18 +267,19 @@
 
 <script>
 const STORAGE_KEY = 'cop_staff_cards';
+const DATA_VERSION = 2; // Bump this to force-reload defaults when data is updated
 
-// Default staff from the screenshot + Lindsey Runyon + placeholder
+// Default staff from Gateways Education Reports (report date 2/24/2025) + experience calculated to 8/17/2026
 const DEFAULT_STAFF = [
-    { name: 'Keyona Hentz', role: 'Lead Teacher', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: '', ece: 'ECE 5', gateways: 'ECE Level 5', experience: '', notes: '' },
-    { name: 'Madeline Muir', role: 'Paraprofessional', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
-    { name: 'Lindsey Runyon', role: 'Lead Teacher', program: 'INCCRA', classroom: 'Pre-School 2', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
-    { name: 'Tara Goldsmith', role: 'Lead Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
-    { name: 'Paige Turner', role: 'Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: '', ece: '', gateways: '', experience: '', notes: '' },
-    { name: 'Janell Poenitske', role: 'Lead Teacher', program: 'PI', classroom: 'Twos', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
-    { name: 'Sue Engel', role: 'Assistant Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: '', ece: '', gateways: '', experience: '', notes: '' },
-    { name: 'Renee Nier', role: 'Assistant Teacher', program: 'PI', classroom: 'Twos', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
-    { name: 'Megan Nooney', role: 'Lead/Home Visitor', program: 'PI', classroom: 'Toddlers', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'Keyona Hentz', role: 'Lead Teacher / PFA Director', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: "Bachelor's", ece: 'ECE Level 5, IT Level 4, Director Level I', gateways: 'ECE Credential - Level 5', experience: '2.5', notes: 'Bachelor\'s in ECE (Univ of Arizona Global, 2020). Associate\'s ECE (SWIC, 2016). Registry ID: N285894. Employment start: 2/29/2024.' },
+    { name: 'Madeline Muir', role: 'Paraprofessional', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: 'High School/GED', ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '0.75', notes: 'High School Diploma (Waterloo HS, 2012). ECE Level 1 awarded 2/20/2025. Registry ID: N559187. Employment start: 11/15/2024.' },
+    { name: 'Lindsey Runyon', role: 'Lead Teacher', program: 'INCCRA', classroom: 'Pre-School 2', fte: '1.0', education: "Associate's", ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '14', notes: 'Associate\'s in ECC (SWIC, 2011). Pending: ECE & IT Credentials (Missing Documents). Registry ID: N171961. Employment start: 4/2/2012.' },
+    { name: 'Tara Goldsmith', role: 'Teacher Aide', program: 'PI', classroom: 'Infant', fte: '1.0', education: 'High School/GED', ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '14', notes: 'High School Diploma (Belleville West, 2004). Pending: Director, ECE, IT Credentials (Missing Documents). Registry ID: N230823. Employment start: 10/15/2012.' },
+    { name: 'Paige Turner', role: 'Childcare Assistant', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: 'High School/GED', ece: '', gateways: '', experience: '5', notes: 'High School Diploma (Litchfield Senior HS, 2013). No Gateways credential yet. CPR/First Aid current. Registry ID: N452129. Employment start: 5/3/2021.' },
+    { name: 'Janell Poenitske', role: 'Teacher / Director', program: 'PI', classroom: 'Twos', fte: '1.0', education: 'Some College', ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '2', notes: 'High School Diploma (Providence HS, 1994). Some coursework: Bachelor\'s in Music (SIUE). Pending: Director, IT, ECE Credentials (Missing Documents). Registry ID: N147146. Employment start: 6/3/2024.' },
+    { name: 'Sue Engel', role: 'Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: 'High School/GED', ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '37', notes: 'High School Diploma (Belleville West, 1982). Pending: ECE & IT Credentials (Missing Documents). Registry ID: N278509. Employment start: 1/1/1989. Position start: 1/1/2006.' },
+    { name: 'Renee Nier', role: 'Assistant Teacher', program: 'PI', classroom: 'Twos', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: 'Not in Gateways report as of 2/24/2025.' },
+    { name: 'Megan Nooney', role: 'Teacher / Director', program: 'PI', classroom: 'Toddlers', fte: '1.0', education: "Associate's", ece: 'ECE Level 1, Gold IT2, Autism 101', gateways: 'ECE Credential - Level 1', experience: '17.5', notes: 'Associate\'s in ECE (SWIC, 2012). Pending: IT, ECE, Director Credentials (Awaiting Work Experience). Gold IT2 Interrater Reliability (1/2024). Registry ID: N179660. Employment start: 1/1/2009.' },
     { name: 'New Teacher', role: 'TBD', program: 'n/a', classroom: 'TBD', fte: '', education: '', ece: '', gateways: '', experience: '', notes: 'Placeholder for new hire' }
 ];
 
@@ -287,15 +288,20 @@ let editingIndex = -1;
 
 function loadStaff() {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
+    const storedVersion = parseInt(localStorage.getItem(STORAGE_KEY + '_version') || '0');
+    if (stored && storedVersion >= DATA_VERSION) {
         try { staffList = JSON.parse(stored); } catch(e) { staffList = [...DEFAULT_STAFF]; }
     } else {
+        // New data version — reset to updated defaults
         staffList = [...DEFAULT_STAFF];
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
+        localStorage.setItem(STORAGE_KEY + '_version', String(DATA_VERSION));
     }
 }
 
 function saveAllStaff() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
+    localStorage.setItem(STORAGE_KEY + '_version', String(DATA_VERSION));
 }
 
 function getInitials(name) {
@@ -332,6 +338,7 @@ function renderCards() {
                 <div class="card-field"><span class="cf-label">Education</span><span class="cf-value ${!s.education ? 'empty' : ''}">${s.education || '—'}</span></div>
                 <div class="card-field"><span class="cf-label">Gateways / ECE</span><span class="cf-value ${!s.gateways && !s.ece ? 'empty' : ''}">${s.gateways || s.ece || '—'}</span></div>
                 <div class="card-field"><span class="cf-label">Experience</span><span class="cf-value ${!s.experience ? 'empty' : ''}">${s.experience ? s.experience + ' yrs' : '—'}</span></div>
+                ${s.notes ? '<div class="card-field" style="flex-direction:column;align-items:flex-start;gap:2px;"><span class="cf-label">Notes</span><span class="cf-value" style="text-align:left;font-size:0.72rem;color:#64748b;">' + s.notes + '</span></div>' : ''}
             </div>
             <div class="card-footer">
                 <button class="card-btn" onclick="event.stopPropagation();openEdit(${i})">✏️ Edit</button>
