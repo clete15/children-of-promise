@@ -220,12 +220,17 @@
 
 <script>
 const STORAGE_KEY = 'pas_teaching_staff_summary';
-const ROW_COUNT = 8;
+const CLASSROOMS = [
+    'Infant', 'Infants / Toddlers', 'Toddlers',
+    '2 Year Olds / Toddlers', '2 Year Olds',
+    'Pre-School', 'Pre-School 2', 'Before and Afterschool'
+];
+const ROW_COUNT = CLASSROOMS.length;
 
 function createRow(index) {
     return `<tr>
         <td class="row-num">${index + 1}</td>
-        <td><input type="text" data-field="classroom_${index}" placeholder=""></td>
+        <td><input type="text" data-field="classroom_${index}" placeholder="" value="${CLASSROOMS[index] || ''}"></td>
         <td><input type="number" step="0.1" min="1" max="7" data-field="scoreA_${index}" data-col="A" placeholder=""></td>
         <td><input type="number" step="0.1" min="1" max="7" data-field="scoreB_${index}" data-col="B" placeholder=""></td>
         <td><input type="number" step="0.1" min="1" max="7" data-field="scoreC_${index}" data-col="C" placeholder=""></td>

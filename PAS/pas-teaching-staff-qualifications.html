@@ -30,12 +30,37 @@
             display: flex; align-items: baseline; gap: 8px;
         }
         .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
-        .info-field input {
+        .info-field input, .info-field select {
             flex: 1; border: none; border-bottom: 1px solid #999;
             font-family: inherit; font-size: 10pt; padding: 2px 4px;
             background: transparent; min-width: 80px;
         }
-        .info-field input:focus { outline: none; border-bottom-color: #2c5282; }
+        .info-field select { cursor: pointer; }
+        .info-field input:focus, .info-field select:focus { outline: none; border-bottom-color: #2c5282; }
+
+        /* Classroom selector bar */
+        .classroom-selector {
+            display: flex; align-items: center; gap: 12px;
+            margin-bottom: 20px; padding: 12px 16px;
+            background: #eef2ff; border: 1.5px solid #c7d2fe;
+            border-radius: 8px;
+        }
+        .classroom-selector label {
+            font-weight: 700; font-size: 10pt; color: #2c5282;
+            white-space: nowrap;
+        }
+        .classroom-selector select {
+            flex: 1; padding: 6px 10px; border: 1.5px solid #cbd5e0;
+            border-radius: 6px; font-size: 10pt; font-family: inherit;
+            background: white; cursor: pointer;
+        }
+        .classroom-selector select:focus { outline: none; border-color: #2c5282; }
+        .classroom-selector .status-text {
+            font-size: 9pt; color: #16a34a; font-weight: 600;
+            white-space: nowrap;
+        }
+        .classroom-selector .status-text.empty { color: #64748b; }
+
         .roles-ref {
             background: #f7fafc; border: 1px solid #e2e8f0;
             border-radius: 6px; padding: 12px 16px;
@@ -110,13 +135,24 @@
         .inline-field .cb-inline input[type="checkbox"] {
             width: 14px; height: 14px; accent-color: #2c5282; cursor: pointer;
         }
+        .btn-row {
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+            margin-top: 16px;
+        }
         .btn-save {
             display: inline-block; padding: 10px 24px;
             background: #2c5282; color: #fff; border: none;
             border-radius: 6px; font-size: 10pt; font-weight: 600;
-            cursor: pointer; margin-top: 12px;
+            cursor: pointer;
         }
         .btn-save:hover { background: #1a365d; }
+        .btn-clear {
+            display: inline-block; padding: 10px 20px;
+            background: #fee2e2; color: #991b1b; border: 1px solid #fecaca;
+            border-radius: 6px; font-size: 9.5pt; font-weight: 600;
+            cursor: pointer;
+        }
+        .btn-clear:hover { background: #fecaca; }
         .save-confirm {
             display: inline-block; margin-left: 12px;
             color: #27ae60; font-weight: 600; font-size: 10pt;
@@ -128,20 +164,38 @@
             border-top: 1px solid #cbd5e0; display: flex;
             justify-content: space-between; font-size: 9pt; color: #666;
         }
+        /* Saved classrooms overview */
+        .saved-overview {
+            margin-bottom: 20px; padding: 10px 16px;
+            background: #f0fdf4; border: 1px solid #bbf7d0;
+            border-radius: 6px; font-size: 9pt;
+        }
+        .saved-overview h4 { font-size: 9.5pt; color: #166534; margin-bottom: 6px; }
+        .saved-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+        .saved-pill {
+            padding: 3px 10px; background: #dcfce7; color: #166534;
+            border-radius: 12px; font-weight: 600; font-size: 8.5pt;
+        }
+        .saved-pill.current { background: #2c5282; color: white; }
         @media print {
             body { padding: 0; }
             .no-print { display: none; }
             @page { margin: 0.4in 0.5in; size: letter; }
-            .info-field input { border-bottom: none; }
+            .info-field input, .info-field select { border-bottom: none; }
             .inline-field input { border-bottom: none; }
             .staff-block-header .inline-field input,
             .staff-block-header .inline-field select { border-bottom: none; }
             .staff-block { border-color: #999; }
+            .classroom-selector { background: transparent; border: none; padding: 0; }
+            .classroom-selector select { border: none; -webkit-appearance: none; appearance: none; }
+            .saved-overview { display: none; }
         }
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
+<div class="no-print" style="position:fixed;top:16px;right:16px;display:flex;gap:8px;z-index:9999;">
+    <button onclick="window.print()" style="padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
+</div>
 
 <div class="header">
     <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
@@ -154,6 +208,28 @@
     Please complete one worksheet for each group/classroom (see instructions on pages 54, 56, and 58).
 </div>
 
+<!-- Classroom Selector -->
+<div class="classroom-selector no-print">
+    <label>📚 Classroom:</label>
+    <select id="classroomSelect">
+        <option value="infant">Infant (Tara / Sue)</option>
+        <option value="infants-toddlers">Infants / Toddlers (Paige / Sue)</option>
+        <option value="toddlers">Toddlers (Megan / New Teacher)</option>
+        <option value="2yr-toddlers">2 Year Olds / Toddlers (Renee / Raquel)</option>
+        <option value="2yr">2 Year Olds (Janelle / Renee)</option>
+        <option value="preschool">Pre-School (Keyona / Maddie)</option>
+        <option value="preschool2">Pre-School 2 (Lindsey)</option>
+        <option value="afterschool">Before and Afterschool (Pam / Jeremy / Sara)</option>
+    </select>
+    <span class="status-text empty" id="classroomStatus">Not yet saved</span>
+</div>
+
+<!-- Saved classrooms overview -->
+<div class="saved-overview no-print" id="savedOverview" style="display:none;">
+    <h4>✓ Saved Classrooms</h4>
+    <div class="saved-pills" id="savedPills"></div>
+</div>
+
 <div class="info-grid">
     <div class="info-field">
         <label>Program:</label>
@@ -161,7 +237,7 @@
     </div>
     <div class="info-field">
         <label>Group/classroom:</label>
-        <input type="text" id="classroom" data-field="classroom">
+        <input type="text" id="classroom" data-field="classroom" readonly>
     </div>
 </div>
 
@@ -173,8 +249,9 @@
 
 <div id="staffBlocks"></div>
 
-<div class="no-print" style="margin-top:16px;">
-    <button class="btn-save" onclick="saveData()">💾 Save</button>
+<div class="no-print btn-row">
+    <button class="btn-save" onclick="saveData()">💾 Save This Classroom</button>
+    <button class="btn-clear" onclick="clearCurrent()">🗑️ Clear This Classroom</button>
     <span class="save-confirm" id="saveConfirm">Saved ✓</span>
 </div>
 
@@ -184,8 +261,23 @@
 </div>
 
 <script>
-const STORAGE_KEY = 'pas_teaching_staff_quals';
+const CLASSROOMS = [
+    { key: 'infant', name: 'Infant', teacher: 'Tara / Sue' },
+    { key: 'infants-toddlers', name: 'Infants / Toddlers', teacher: 'Paige / Sue' },
+    { key: 'toddlers', name: 'Toddlers', teacher: 'Megan / New Teacher' },
+    { key: '2yr-toddlers', name: '2 Year Olds / Toddlers', teacher: 'Renee / Raquel' },
+    { key: '2yr', name: '2 Year Olds', teacher: 'Janelle / Renee' },
+    { key: 'preschool', name: 'Pre-School', teacher: 'Keyona / Maddie' },
+    { key: 'preschool2', name: 'Pre-School 2', teacher: 'Lindsey' },
+    { key: 'afterschool', name: 'Before and Afterschool', teacher: 'Pam / Jeremy / Sara' }
+];
+
+const STORAGE_PREFIX = 'pas_teaching_staff_quals_';
 const STAFF_COUNT = 4;
+
+function getStorageKey(classroomKey) {
+    return STORAGE_PREFIX + classroomKey;
+}
 
 function createStaffBlock(index) {
     const i = index;
@@ -208,7 +300,6 @@ function createStaffBlock(index) {
             </div>
         </div>
 
-        <!-- 1. Highest Education Level -->
         <div class="staff-section">
             <div class="staff-section-title">1. Highest Education Level</div>
             <div class="checkbox-group">
@@ -220,7 +311,6 @@ function createStaffBlock(index) {
             </div>
         </div>
 
-        <!-- 2. General Education -->
         <div class="staff-section">
             <div class="staff-section-title">2. General Education</div>
             <div class="inline-field">
@@ -230,7 +320,6 @@ function createStaffBlock(index) {
             </div>
         </div>
 
-        <!-- 3. Specialized Coursework -->
         <div class="staff-section">
             <div class="staff-section-title">3. Specialized Coursework</div>
             <div class="inline-field">
@@ -240,7 +329,6 @@ function createStaffBlock(index) {
             </div>
         </div>
 
-        <!-- 4. Credentials -->
         <div class="staff-section">
             <div class="staff-section-title">4. Credentials</div>
             <div class="checkbox-group">
@@ -249,7 +337,6 @@ function createStaffBlock(index) {
             </div>
         </div>
 
-        <!-- 5. Teaching Experience -->
         <div class="staff-section">
             <div class="staff-section-title">5. Teaching Experience</div>
             <div class="inline-field">
@@ -269,6 +356,14 @@ function initBlocks() {
     container.innerHTML = html;
 }
 
+function getCurrentClassroom() {
+    return document.getElementById('classroomSelect').value;
+}
+
+function getClassroomInfo(key) {
+    return CLASSROOMS.find(c => c.key === key);
+}
+
 function getAllData() {
     const data = { fields: {} };
     document.querySelectorAll('[data-field]').forEach(el => {
@@ -281,20 +376,31 @@ function getAllData() {
     return data;
 }
 
-function saveData() {
-    const data = getAllData();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    const confirm = document.getElementById('saveConfirm');
-    confirm.classList.add('show');
-    setTimeout(() => confirm.classList.remove('show'), 2500);
+function clearForm() {
+    document.querySelectorAll('[data-field]').forEach(el => {
+        if (el.type === 'checkbox') {
+            el.checked = false;
+        } else if (el.id !== 'program') {
+            el.value = '';
+        }
+    });
 }
 
-function loadData() {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return;
+function loadData(classroomKey) {
+    clearForm();
+    const info = getClassroomInfo(classroomKey);
+    if (info) {
+        document.getElementById('classroom').value = info.name;
+    }
+
+    const stored = localStorage.getItem(getStorageKey(classroomKey));
+    if (!stored) {
+        updateStatus(false);
+        return;
+    }
     try {
         const data = JSON.parse(stored);
-        if (!data.fields) return;
+        if (!data.fields) { updateStatus(false); return; }
         Object.keys(data.fields).forEach(key => {
             const el = document.querySelector(`[data-field="${key}"]`);
             if (!el) return;
@@ -304,29 +410,120 @@ function loadData() {
                 el.value = data.fields[key];
             }
         });
+        updateStatus(true);
     } catch (e) {
         console.error('Error loading saved data:', e);
+        updateStatus(false);
     }
 }
 
+function saveData() {
+    const classroomKey = getCurrentClassroom();
+    const data = getAllData();
+    localStorage.setItem(getStorageKey(classroomKey), JSON.stringify(data));
+    const confirm = document.getElementById('saveConfirm');
+    confirm.classList.add('show');
+    setTimeout(() => confirm.classList.remove('show'), 2500);
+    updateStatus(true);
+    updateSavedOverview();
+}
+
+function clearCurrent() {
+    const classroomKey = getCurrentClassroom();
+    const info = getClassroomInfo(classroomKey);
+    if (!confirm(`Clear all data for "${info.name}"? This cannot be undone.`)) return;
+    localStorage.removeItem(getStorageKey(classroomKey));
+    loadData(classroomKey);
+    updateSavedOverview();
+}
+
+function updateStatus(hasSave) {
+    const el = document.getElementById('classroomStatus');
+    if (hasSave) {
+        el.textContent = '✓ Saved';
+        el.className = 'status-text';
+    } else {
+        el.textContent = 'Not yet saved';
+        el.className = 'status-text empty';
+    }
+}
+
+function updateSavedOverview() {
+    const container = document.getElementById('savedOverview');
+    const pills = document.getElementById('savedPills');
+    const currentKey = getCurrentClassroom();
+    let savedKeys = [];
+
+    CLASSROOMS.forEach(c => {
+        if (localStorage.getItem(getStorageKey(c.key))) {
+            savedKeys.push(c);
+        }
+    });
+
+    if (savedKeys.length === 0) {
+        container.style.display = 'none';
+        return;
+    }
+
+    container.style.display = 'block';
+    pills.innerHTML = savedKeys.map(c =>
+        `<span class="saved-pill ${c.key === currentKey ? 'current' : ''}">${c.name}</span>`
+    ).join('');
+}
+
+// Classroom selector change
+document.getElementById('classroomSelect').addEventListener('change', function() {
+    loadData(this.value);
+    updateSavedOverview();
+});
+
 // Auto-save on change
 document.addEventListener('change', (e) => {
-    if (e.target.matches('[data-field]')) {
+    if (e.target.matches('[data-field]') && e.target.id !== 'classroomSelect') {
         const data = getAllData();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        localStorage.setItem(getStorageKey(getCurrentClassroom()), JSON.stringify(data));
+        updateStatus(true);
+        updateSavedOverview();
     }
 });
 
 document.addEventListener('input', (e) => {
     if (e.target.matches('[data-field]') && e.target.type !== 'checkbox') {
         const data = getAllData();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        localStorage.setItem(getStorageKey(getCurrentClassroom()), JSON.stringify(data));
+        updateStatus(true);
+        updateSavedOverview();
     }
 });
 
+// Migrate old single-save data to the first classroom
+function migrateOldData() {
+    const oldKey = 'pas_teaching_staff_quals';
+    const oldData = localStorage.getItem(oldKey);
+    if (!oldData) return;
+    // Check if any new-format data exists
+    const hasNewData = CLASSROOMS.some(c => localStorage.getItem(getStorageKey(c.key)));
+    if (!hasNewData) {
+        // Migrate old data to whichever classroom was saved
+        try {
+            const parsed = JSON.parse(oldData);
+            const classroomName = parsed.fields && parsed.fields.classroom;
+            let targetKey = CLASSROOMS[0].key;
+            if (classroomName) {
+                const match = CLASSROOMS.find(c => c.name.toLowerCase() === classroomName.toLowerCase());
+                if (match) targetKey = match.key;
+            }
+            localStorage.setItem(getStorageKey(targetKey), oldData);
+        } catch(e) {}
+    }
+    localStorage.removeItem(oldKey);
+}
+
 // Initialize
+migrateOldData();
 initBlocks();
-loadData();
+loadData(getCurrentClassroom());
+updateSavedOverview();
 </script>
 </body>
 </html>
