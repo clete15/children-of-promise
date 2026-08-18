@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Cards – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+
+        .staff-layout { display:flex;min-height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
+        .staff-wrapper { width:100%;max-width:1100px; }
+
+        .page-title-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .page-title-bar h2 { color: white; font-size: 1.3rem; font-weight: 800; }
+        .page-title-bar .subtitle { color: rgba(255,255,255,0.7); font-size: 0.82rem; margin-top: 2px; }
+
+        .staff-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 16px;
+        }
+
+        .staff-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+            overflow: hidden;
+            transition: transform 0.15s, box-shadow 0.15s;
+            cursor: pointer;
+        }
+        .staff-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.18); }
+
+        .card-header {
+            padding: 16px 20px;
+            display: flex; align-items: center; gap: 14px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .card-avatar {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: #2563eb; color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 800; font-size: 1rem; flex-shrink: 0;
+        }
+        .card-avatar.vacant { background: #94a3b8; }
+        .card-name-block { flex: 1; min-width: 0; }
+        .card-name { font-size: 0.95rem; font-weight: 700; color: #1e293b; }
+        .card-role { font-size: 0.78rem; color: #64748b; margin-top: 1px; }
+        .card-badge {
+            padding: 3px 10px; border-radius: 12px;
+            font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.04em; white-space: nowrap;
+        }
+        .badge-pfa { background: #dbeafe; color: #1d4ed8; }
+        .badge-pi { background: #fef3c7; color: #92400e; }
+        .badge-inccra { background: #dcfce7; color: #166534; }
+        .badge-na { background: #f1f5f9; color: #64748b; }
+
+        .card-body { padding: 14px 20px; }
+        .card-field {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 6px 0; border-bottom: 1px solid #f1f5f9;
+            font-size: 0.8rem;
+        }
+        .card-field:last-child { border-bottom: none; }
+        .card-field .cf-label { color: #64748b; font-weight: 600; }
+        .card-field .cf-value { color: #1e293b; font-weight: 500; text-align: right; }
+        .card-field .cf-value.empty { color: #cbd5e1; font-style: italic; }
+
+        .card-footer {
+            padding: 12px 20px; background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            display: flex; gap: 8px;
+        }
+        .card-btn {
+            flex: 1; padding: 7px 12px;
+            border: 1.5px solid #e2e8f0; border-radius: 6px;
+            background: white; color: #475569;
+            font-size: 0.75rem; font-weight: 600;
+            cursor: pointer; text-align: center;
+            transition: background 0.12s, border-color 0.12s;
+        }
+        .card-btn:hover { background: #f1f5f9; border-color: #2563eb; color: #2563eb; }
+
+        /* Edit modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            display: none; align-items: center; justify-content: center;
+            z-index: 9999; padding: 20px;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: white; border-radius: 12px; width: 100%; max-width: 520px;
+            max-height: 90vh; overflow-y: auto; box-shadow: 0 16px 48px rgba(0,0,0,0.3);
+        }
+        .modal-header {
+            padding: 18px 24px; border-bottom: 1px solid #e2e8f0;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .modal-header h3 { font-size: 1rem; font-weight: 700; color: #1e293b; }
+        .modal-close {
+            background: none; border: none; font-size: 1.3rem;
+            cursor: pointer; color: #64748b; padding: 4px;
+        }
+        .modal-close:hover { color: #1e293b; }
+        .modal-body { padding: 20px 24px; }
+        .modal-body .form-group { margin-bottom: 14px; }
+        .modal-body .form-group label {
+            display: block; font-size: 0.75rem; font-weight: 600;
+            color: #64748b; margin-bottom: 4px; text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .modal-body .form-group input,
+        .modal-body .form-group select {
+            width: 100%; padding: 8px 12px; border: 1.5px solid #e2e8f0;
+            border-radius: 6px; font-size: 0.88rem; font-family: inherit;
+            color: #1e293b;
+        }
+        .modal-body .form-group input:focus,
+        .modal-body .form-group select:focus {
+            outline: none; border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+        }
+        .modal-body .form-row { display: flex; gap: 12px; }
+        .modal-body .form-row .form-group { flex: 1; }
+        .modal-footer {
+            padding: 14px 24px; border-top: 1px solid #e2e8f0;
+            display: flex; gap: 10px; justify-content: flex-end;
+        }
+        .modal-footer .btn-cancel {
+            padding: 9px 20px; background: #f1f5f9; color: #475569;
+            border: 1px solid #e2e8f0; border-radius: 6px;
+            font-size: 0.85rem; font-weight: 600; cursor: pointer;
+        }
+        .modal-footer .btn-cancel:hover { background: #e2e8f0; }
+        .modal-footer .btn-save {
+            padding: 9px 24px; background: #2563eb; color: white;
+            border: none; border-radius: 6px;
+            font-size: 0.85rem; font-weight: 700; cursor: pointer;
+        }
+        .modal-footer .btn-save:hover { background: #1d4ed8; }
+
+        /* Add staff button */
+        .add-staff-card {
+            background: white; border-radius: 12px;
+            border: 2px dashed #cbd5e1;
+            display: flex; align-items: center; justify-content: center;
+            min-height: 200px; cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .add-staff-card:hover { border-color: #2563eb; background: #f8fafc; }
+        .add-staff-card span { font-size: 0.9rem; font-weight: 700; color: #64748b; }
+        .add-staff-card:hover span { color: #2563eb; }
+
+        @media (max-width: 680px) {
+            .staff-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Staff Cards &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="staff-layout">
+    <div class="staff-wrapper">
+        <div class="page-title-bar">
+            <div>
+                <h2>👩‍🏫 Staff Cards</h2>
+                <div class="subtitle">Click a card to view or edit staff details</div>
+            </div>
+        </div>
+
+        <div class="staff-grid" id="staffGrid">
+            <!-- Cards rendered by JS -->
+        </div>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3 id="modalTitle">Edit Staff</h3>
+            <button class="modal-close" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="editName" placeholder="e.g. Keyona Hentz">
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Role / Title</label>
+                    <input type="text" id="editRole" placeholder="e.g. Lead Teacher">
+                </div>
+                <div class="form-group">
+                    <label>Program</label>
+                    <select id="editProgram">
+                        <option value="PFA">PFA</option>
+                        <option value="PI">PI</option>
+                        <option value="INCCRA">INCCRA</option>
+                        <option value="n/a">N/A</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Classroom</label>
+                    <input type="text" id="editClassroom" placeholder="e.g. Pre-School">
+                </div>
+                <div class="form-group">
+                    <label>FTE</label>
+                    <input type="text" id="editFTE" placeholder="e.g. 1.0">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Education Level</label>
+                    <select id="editEducation">
+                        <option value="">—</option>
+                        <option value="High School/GED">High School/GED</option>
+                        <option value="Some College">Some College</option>
+                        <option value="Associate's">Associate's</option>
+                        <option value="Bachelor's">Bachelor's</option>
+                        <option value="Master's">Master's</option>
+                        <option value="Doctorate">Doctorate</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>ECE Credits (SH)</label>
+                    <input type="text" id="editECE" placeholder="e.g. 30">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Gateways Credential</label>
+                    <input type="text" id="editGateways" placeholder="e.g. ECE Level 5">
+                </div>
+                <div class="form-group">
+                    <label>Years Experience</label>
+                    <input type="text" id="editExperience" placeholder="e.g. 8">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Notes</label>
+                <input type="text" id="editNotes" placeholder="Additional notes...">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="btn-save" onclick="saveStaff()">Save</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'cop_staff_cards';
+
+// Default staff from the screenshot + Lindsey Runyon + placeholder
+const DEFAULT_STAFF = [
+    { name: 'Keyona Hentz', role: 'Lead Teacher', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: '', ece: 'ECE 5', gateways: 'ECE Level 5', experience: '', notes: '' },
+    { name: 'Madeline Muir', role: 'Paraprofessional', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'Lindsey Runyon', role: 'Lead Teacher', program: 'INCCRA', classroom: 'Pre-School 2', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'Tara Goldsmith', role: 'Lead Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'Paige Turner', role: 'Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'Janell Poenitske', role: 'Lead Teacher', program: 'PI', classroom: 'Twos', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'Sue Engel', role: 'Assistant Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'Renee Nier', role: 'Assistant Teacher', program: 'PI', classroom: 'Twos', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'Megan Nooney', role: 'Lead/Home Visitor', program: 'PI', classroom: 'Toddlers', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' },
+    { name: 'New Teacher', role: 'TBD', program: 'n/a', classroom: 'TBD', fte: '', education: '', ece: '', gateways: '', experience: '', notes: 'Placeholder for new hire' }
+];
+
+let staffList = [];
+let editingIndex = -1;
+
+function loadStaff() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+        try { staffList = JSON.parse(stored); } catch(e) { staffList = [...DEFAULT_STAFF]; }
+    } else {
+        staffList = [...DEFAULT_STAFF];
+    }
+}
+
+function saveAllStaff() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
+}
+
+function getInitials(name) {
+    if (!name) return '?';
+    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+function getBadgeClass(program) {
+    const p = (program || '').toLowerCase();
+    if (p === 'pfa') return 'badge-pfa';
+    if (p === 'pi') return 'badge-pi';
+    if (p === 'inccra') return 'badge-inccra';
+    return 'badge-na';
+}
+
+function renderCards() {
+    const grid = document.getElementById('staffGrid');
+    let html = '';
+
+    staffList.forEach((s, i) => {
+        const isVacant = s.name === 'New Teacher' || s.name.toLowerCase().includes('tbd');
+        html += `
+        <div class="staff-card" onclick="openEdit(${i})">
+            <div class="card-header">
+                <div class="card-avatar ${isVacant ? 'vacant' : ''}">${getInitials(s.name)}</div>
+                <div class="card-name-block">
+                    <div class="card-name">${s.name}</div>
+                    <div class="card-role">${s.role}${s.fte ? ' · ' + s.fte + ' FTE' : ''}</div>
+                </div>
+                <span class="card-badge ${getBadgeClass(s.program)}">${s.program || 'N/A'}</span>
+            </div>
+            <div class="card-body">
+                <div class="card-field"><span class="cf-label">Classroom</span><span class="cf-value ${!s.classroom ? 'empty' : ''}">${s.classroom || '—'}</span></div>
+                <div class="card-field"><span class="cf-label">Education</span><span class="cf-value ${!s.education ? 'empty' : ''}">${s.education || '—'}</span></div>
+                <div class="card-field"><span class="cf-label">Gateways / ECE</span><span class="cf-value ${!s.gateways && !s.ece ? 'empty' : ''}">${s.gateways || s.ece || '—'}</span></div>
+                <div class="card-field"><span class="cf-label">Experience</span><span class="cf-value ${!s.experience ? 'empty' : ''}">${s.experience ? s.experience + ' yrs' : '—'}</span></div>
+            </div>
+            <div class="card-footer">
+                <button class="card-btn" onclick="event.stopPropagation();openEdit(${i})">✏️ Edit</button>
+                <button class="card-btn" onclick="event.stopPropagation();deleteStaff(${i})" style="color:#dc2626;">🗑️ Remove</button>
+            </div>
+        </div>`;
+    });
+
+    // Add new staff card
+    html += `
+    <div class="add-staff-card" onclick="addNewStaff()">
+        <span>+ Add Staff Member</span>
+    </div>`;
+
+    grid.innerHTML = html;
+}
+
+function openEdit(index) {
+    editingIndex = index;
+    const s = staffList[index];
+    document.getElementById('modalTitle').textContent = index >= staffList.length ? 'Add Staff' : 'Edit – ' + s.name;
+    document.getElementById('editName').value = s.name || '';
+    document.getElementById('editRole').value = s.role || '';
+    document.getElementById('editProgram').value = s.program || 'n/a';
+    document.getElementById('editClassroom').value = s.classroom || '';
+    document.getElementById('editFTE').value = s.fte || '';
+    document.getElementById('editEducation').value = s.education || '';
+    document.getElementById('editECE').value = s.ece || '';
+    document.getElementById('editGateways').value = s.gateways || '';
+    document.getElementById('editExperience').value = s.experience || '';
+    document.getElementById('editNotes').value = s.notes || '';
+    document.getElementById('editModal').classList.add('active');
+}
+
+function closeModal() {
+    document.getElementById('editModal').classList.remove('active');
+    editingIndex = -1;
+}
+
+function saveStaff() {
+    const s = {
+        name: document.getElementById('editName').value.trim() || 'Unnamed',
+        role: document.getElementById('editRole').value.trim(),
+        program: document.getElementById('editProgram').value,
+        classroom: document.getElementById('editClassroom').value.trim(),
+        fte: document.getElementById('editFTE').value.trim(),
+        education: document.getElementById('editEducation').value,
+        ece: document.getElementById('editECE').value.trim(),
+        gateways: document.getElementById('editGateways').value.trim(),
+        experience: document.getElementById('editExperience').value.trim(),
+        notes: document.getElementById('editNotes').value.trim()
+    };
+
+    if (editingIndex >= 0 && editingIndex < staffList.length) {
+        staffList[editingIndex] = s;
+    } else {
+        staffList.push(s);
+    }
+
+    saveAllStaff();
+    renderCards();
+    closeModal();
+}
+
+function addNewStaff() {
+    staffList.push({ name: '', role: '', program: 'n/a', classroom: '', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' });
+    openEdit(staffList.length - 1);
+}
+
+function deleteStaff(index) {
+    const name = staffList[index].name || 'this staff member';
+    if (!confirm(`Remove "${name}" from staff cards?`)) return;
+    staffList.splice(index, 1);
+    saveAllStaff();
+    renderCards();
+}
+
+// Close modal on backdrop click
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+
+// Init
+loadStaff();
+renderCards();
+</script>
+</body>
+</html>
