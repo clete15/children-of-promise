@@ -155,7 +155,7 @@
             <th class="item-num">Item</th>
             <th class="item-name">Item Name</th>
             <th class="item-score">Score</th>
-            <th class="item-na">N/A</th>
+            <th class="item-na">Comments</th>
         </tr>
     </thead>
     <tbody id="itemTableBody">
@@ -235,7 +235,8 @@ function initTable() {
                 <input type="number" id="score_${item.num}" min="1" max="7" step="1" placeholder="—" oninput="calculate()">
             </td>
             <td class="item-na">
-                ${item.allowNA ? `<input type="checkbox" id="na_${item.num}" onchange="toggleNA(${item.num})">` : ''}
+                <input type="text" id="comment_${item.num}" placeholder="" style="width:100%;border:1px solid #ddd;padding:4px;font-size:0.8rem;">
+                ${item.allowNA ? `<input type="checkbox" id="na_${item.num}" onchange="toggleNA(${item.num})" style="display:none">` : ''}
             </td>
         </tr>`;
     });
@@ -279,11 +280,14 @@ function getAllData() {
         programName: document.getElementById('programName').value,
         dateCompleted: document.getElementById('dateCompleted').value,
         scores: {},
+        comments: {},
         naItems: []
     };
     PAS_ITEMS.forEach(item => {
         const input = document.getElementById(`score_${item.num}`);
         data.scores[item.num] = input.value;
+        const comment = document.getElementById(`comment_${item.num}`);
+        if (comment) data.comments[item.num] = comment.value;
         if (item.allowNA) {
             const cb = document.getElementById(`na_${item.num}`);
             if (cb && cb.checked) data.naItems.push(item.num);
@@ -326,6 +330,14 @@ function loadData() {
                 const input = document.getElementById(`score_${key}`);
                 if (input && data.scores[key] && !input.disabled) {
                     input.value = data.scores[key];
+                }
+            });
+        }
+        if (data.comments) {
+            Object.keys(data.comments).forEach(key => {
+                const comment = document.getElementById(`comment_${key}`);
+                if (comment && data.comments[key]) {
+                    comment.value = data.comments[key];
                 }
             });
         }
