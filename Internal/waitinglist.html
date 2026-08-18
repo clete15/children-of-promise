@@ -102,17 +102,17 @@
         .wl-table tbody tr.row-pending:hover { background: #fff9c4; }
 
         /* ── NOTES ── */
-        .notes-cell { min-width: 180px; max-width: 220px; }
+        .notes-cell { min-width: 180px; max-width: 220px; height: 100%; }
         .notes-input {
             width: 100%;
+            height: calc(100% - 24px);
             padding: 5px 7px;
             border: 1px solid var(--border);
             border-radius: 4px;
             font-size: 0.72rem;
             font-family: inherit;
-            resize: vertical;
-            min-height: 40px;
-            max-height: 80px;
+            resize: none;
+            min-height: 60px;
             color: var(--text);
         }
         .notes-input:focus { outline: none; border-color: var(--primary); }
