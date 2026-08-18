@@ -212,14 +212,7 @@
 <div class="classroom-selector no-print">
     <label>📚 Classroom:</label>
     <select id="classroomSelect">
-        <option value="infant">Infant (Tara / Sue)</option>
-        <option value="infants-toddlers">Infants / Toddlers (Paige / Sue)</option>
-        <option value="toddlers">Toddlers (Megan / New Teacher)</option>
-        <option value="2yr-toddlers">2 Year Olds / Toddlers (Renee / Raquel)</option>
-        <option value="2yr">2 Year Olds (Janelle / Renee)</option>
-        <option value="preschool">Pre-School (Keyona / Maddie)</option>
-        <option value="preschool2">Pre-School 2 (Lindsey)</option>
-        <option value="afterschool">Before and Afterschool (Pam / Jeremy / Sara)</option>
+        <option value="">Loading classrooms...</option>
     </select>
     <span class="status-text empty" id="classroomStatus">Not yet saved</span>
 </div>
@@ -261,22 +254,56 @@
 </div>
 
 <script>
-const CLASSROOMS = [
-    { key: 'infant', name: 'Infant', teacher: 'Tara / Sue' },
-    { key: 'infants-toddlers', name: 'Infants / Toddlers', teacher: 'Paige / Sue' },
-    { key: 'toddlers', name: 'Toddlers', teacher: 'Megan / New Teacher' },
-    { key: '2yr-toddlers', name: '2 Year Olds / Toddlers', teacher: 'Renee / Raquel' },
-    { key: '2yr', name: '2 Year Olds', teacher: 'Janelle / Renee' },
-    { key: 'preschool', name: 'Pre-School', teacher: 'Keyona / Maddie' },
-    { key: 'preschool2', name: 'Pre-School 2', teacher: 'Lindsey' },
-    { key: 'afterschool', name: 'Before and Afterschool', teacher: 'Pam / Jeremy / Sara' }
-];
+// Classrooms loaded from API
+let CLASSROOMS = [];
 
 const STORAGE_PREFIX = 'pas_teaching_staff_quals_';
 const STAFF_COUNT = 4;
+const AUTH = 'Basic ' + btoa(':cofpadmin');
 
 function getStorageKey(classroomKey) {
     return STORAGE_PREFIX + classroomKey;
+}
+
+// Fetch classrooms from the server API
+async function loadClassrooms() {
+    try {
+        const res = await fetch('/api/classrooms', { headers: { 'Authorization': AUTH } });
+        if (!res.ok) throw new Error('API error');
+        const rooms = await res.json();
+        CLASSROOMS = rooms.map(r => ({
+            key: 'room_' + r.RoomNumber,
+            name: r.Room,
+            teacher: r.TeacherDescription || ''
+        }));
+    } catch (e) {
+        console.warn('Could not fetch classrooms from API, using fallback:', e);
+        // Fallback if API unavailable
+        CLASSROOMS = [
+            { key: 'room_1', name: 'Infant', teacher: '' },
+            { key: 'room_2', name: 'Infants / Toddlers', teacher: '' },
+            { key: 'room_3', name: 'Toddlers', teacher: '' },
+            { key: 'room_4', name: '2 Year Olds / Toddlers', teacher: '' },
+            { key: 'room_5', name: '2 Year Olds', teacher: '' },
+            { key: 'room_6', name: 'Pre-School', teacher: '' },
+            { key: 'room_7', name: 'Pre-School 2', teacher: '' },
+            { key: 'room_8', name: 'Before and Afterschool', teacher: '' }
+        ];
+    }
+
+    // Populate selector
+    const select = document.getElementById('classroomSelect');
+    select.innerHTML = CLASSROOMS.map(c =>
+        `<option value="${c.key}">${c.name}${c.teacher ? ' (' + c.teacher + ')' : ''}</option>`
+    ).join('');
+
+    // Migrate old data formats
+    migrateOldData();
+
+    // Init
+    initBlocks();
+    loadData(getCurrentClassroom());
+    updateSavedOverview();
 }
 
 function createStaffBlock(index) {
@@ -496,34 +523,40 @@ document.addEventListener('input', (e) => {
     }
 });
 
-// Migrate old single-save data to the first classroom
+// Migrate old single-save data and old key format
 function migrateOldData() {
+    // Migrate very old single-key format
     const oldKey = 'pas_teaching_staff_quals';
     const oldData = localStorage.getItem(oldKey);
-    if (!oldData) return;
-    // Check if any new-format data exists
-    const hasNewData = CLASSROOMS.some(c => localStorage.getItem(getStorageKey(c.key)));
-    if (!hasNewData) {
-        // Migrate old data to whichever classroom was saved
-        try {
-            const parsed = JSON.parse(oldData);
-            const classroomName = parsed.fields && parsed.fields.classroom;
-            let targetKey = CLASSROOMS[0].key;
-            if (classroomName) {
-                const match = CLASSROOMS.find(c => c.name.toLowerCase() === classroomName.toLowerCase());
-                if (match) targetKey = match.key;
-            }
-            localStorage.setItem(getStorageKey(targetKey), oldData);
-        } catch(e) {}
+    if (oldData) {
+        const hasNewData = CLASSROOMS.some(c => localStorage.getItem(getStorageKey(c.key)));
+        if (!hasNewData && CLASSROOMS.length > 0) {
+            localStorage.setItem(getStorageKey(CLASSROOMS[0].key), oldData);
+        }
+        localStorage.removeItem(oldKey);
     }
-    localStorage.removeItem(oldKey);
+
+    // Migrate old named-key format (infant, toddlers, etc.) to room_N format
+    const OLD_KEY_MAP = {
+        'infant': 'room_1', 'infants-toddlers': 'room_2', 'toddlers': 'room_3',
+        '2yr-toddlers': 'room_4', '2yr': 'room_5', 'preschool': 'room_6',
+        'preschool2': 'room_7', 'afterschool': 'room_8'
+    };
+    Object.keys(OLD_KEY_MAP).forEach(oldK => {
+        const oldStorageKey = STORAGE_PREFIX + oldK;
+        const saved = localStorage.getItem(oldStorageKey);
+        if (saved) {
+            const newK = OLD_KEY_MAP[oldK];
+            if (!localStorage.getItem(STORAGE_PREFIX + newK)) {
+                localStorage.setItem(STORAGE_PREFIX + newK, saved);
+            }
+            localStorage.removeItem(oldStorageKey);
+        }
+    });
 }
 
-// Initialize
-migrateOldData();
-initBlocks();
-loadData(getCurrentClassroom());
-updateSavedOverview();
+// Initialize — fetch classrooms then set up
+loadClassrooms();
 </script>
 </body>
 </html>

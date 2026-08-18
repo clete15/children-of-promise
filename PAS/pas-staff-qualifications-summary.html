@@ -220,12 +220,28 @@
 
 <script>
 const STORAGE_KEY = 'pas_teaching_staff_summary';
-const CLASSROOMS = [
-    'Infant', 'Infants / Toddlers', 'Toddlers',
-    '2 Year Olds / Toddlers', '2 Year Olds',
-    'Pre-School', 'Pre-School 2', 'Before and Afterschool'
-];
-const ROW_COUNT = CLASSROOMS.length;
+const AUTH = 'Basic ' + btoa(':cofpadmin');
+let CLASSROOMS = [];
+let ROW_COUNT = 8;
+
+async function loadClassroomNames() {
+    try {
+        const res = await fetch('/api/classrooms', { headers: { 'Authorization': AUTH } });
+        if (!res.ok) throw new Error('API error');
+        const rooms = await res.json();
+        CLASSROOMS = rooms.map(r => r.Room);
+        ROW_COUNT = CLASSROOMS.length;
+    } catch (e) {
+        CLASSROOMS = [
+            'Infant', 'Infants / Toddlers', 'Toddlers',
+            '2 Year Olds / Toddlers', '2 Year Olds',
+            'Pre-School', 'Pre-School 2', 'Before and Afterschool'
+        ];
+        ROW_COUNT = CLASSROOMS.length;
+    }
+    initTable();
+    loadData();
+}
 
 function createRow(index) {
     return `<tr>
@@ -321,8 +337,7 @@ document.addEventListener('change', (e) => {
 });
 
 // Initialize
-initTable();
-loadData();
+loadClassroomNames();
 </script>
 </body>
 </html>
