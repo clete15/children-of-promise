@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Benefits Roster – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        .bn-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
+        .bn-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1000px; }
+        .bn-sidebar { width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .bn-sidebar button { display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;background:transparent;transition:background 0.15s; }
+        .bn-sidebar button.active { background:rgba(255,255,255,0.2); }
+        .bn-sidebar button:hover:not(.active) { background:rgba(255,255,255,0.1); }
+        .bn-room { font-size:0.82rem;font-weight:700;color:white; }
+        .bn-attn { font-size:0.65rem;color:#fca5a5; }
+        .bn-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
+        .bn-header { padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px; }
+        .bn-title { font-size:1rem;font-weight:800;color:var(--text); }
+        .bn-count { font-size:0.72rem;color:var(--text-muted); }
+        .btn-recalc { padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.7rem;font-weight:700;cursor:pointer; }
+        .bn-grid { overflow:auto;flex:1; }
+        .bn-grid table { width:100%;border-collapse:collapse;font-size:0.75rem; }
+        .bn-grid thead tr { background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1; }
+        .bn-grid th { padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted); }
+        .bn-grid th.left { padding:8px 10px;text-align:left; }
+        .bn-grid tbody tr { border-bottom:1px solid var(--border); }
+        .bn-grid tbody tr:hover { background:#f8fafc; }
+        .bn-grid td { padding:4px 4px; }
+        .bn-grid td.name { padding:6px 10px;font-weight:600;white-space:nowrap; }
+        .bn-grid td.ctr { text-align:center; }
+        .bn-grid td.notes { padding:5px 6px;font-size:0.68rem; }
+        .bn-grid select { padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.7rem;width:100%; }
+        .bn-grid input[type=number] { padding:2px 4px;border:1px solid var(--border);border-radius:3px;font-size:0.68rem;text-align:center; }
+        .bn-grid input[type=checkbox] { width:auto;accent-color:var(--primary); }
+        .btn-row-save { padding:3px 6px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.65rem;font-weight:700;cursor:pointer;opacity:0.3; }
+        .bn-empty { padding:32px;text-align:center;color:var(--text-muted); }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Benefits Roster &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="bn-layout">
+    <div class="bn-wrapper">
+        <div class="bn-sidebar" id="benefitsSidebar"></div>
+        <div class="bn-card">
+            <div class="bn-header">
+                <div class="bn-title" id="benefitsRoomTitle"></div>
+                <div style="flex:1;"></div>
+                <button class="btn-recalc" onclick="recalculateAllFRP()" title="Recalculate Free/Reduced/Paid for all students">🔄 Recalculate F/R/P</button>
+                <span class="bn-count" id="benefitsCount"></span>
+            </div>
+            <div class="bn-grid" id="benefitsGrid"></div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let activeBenefitsRoom = null;
+const BENEFIT_KEYS = ['WIC','Medicaid','SNAP','TANF'];
+
+async function init() {
+    await Promise.all([loadClassrooms(), loadStudents()]);
+    buildBenefitsRoster();
+}
+
+// Active students in a room, alphabetical.
+function roomRoster(rn) {
+    return students
+        .filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active))
+        .sort(sortByName);
+}
+
+// A student needs attention when income/HH is missing or they look CCAP eligible.
+function needsAttention(s) {
+    const income = parseInt(s.HouseholdIncome) || 0;
+    const hhSize = parseInt(s.HouseholdSize) || 0;
+    if (!income || !hhSize) return true;
+    return isCCAPEligible(s);
+}
+
+function buildBenefitsRoster() {
+    const sidebar = document.getElementById('benefitsSidebar');
+    const rooms = classrooms.map(r => r.RoomNumber);
+    if (!activeBenefitsRoom && rooms.length) activeBenefitsRoom = rooms[0];
+    sidebar.innerHTML = rooms.map(rn => {
+        const cr = getClassroom(rn);
+        const isActive = String(activeBenefitsRoom) === String(rn);
+        const attn = roomRoster(rn).filter(needsAttention).length;
+        return `<button class="${isActive ? 'active' : ''}" onclick="selectBenefitsRoom('${rn}')">
+            <div class="bn-room">${cr ? cr.Room : rn}${attn ? ' <span style="color:#fca5a5;">*</span>' : ''}</div>
+            ${attn ? `<div class="bn-attn">${attn} need attention</div>` : ''}
+        </button>`;
+    }).join('');
+    renderBenefitsRoom();
+}
+
+function selectBenefitsRoom(rn) {
+    activeBenefitsRoom = rn;
+    buildBenefitsRoster();
+}
+
+function renderBenefitsRoom() {
+    const rn = activeBenefitsRoom;
+    const cr = getClassroom(rn);
+    document.getElementById('benefitsRoomTitle').textContent = cr ? cr.Room : (rn || '');
+
+    const roomStudents = roomRoster(rn);
+    document.getElementById('benefitsCount').textContent = `${roomStudents.length} students`;
+
+    const grid = document.getElementById('benefitsGrid');
+    if (!roomStudents.length) {
+        grid.innerHTML = '<div class="bn-empty">No active students.</div>';
+        return;
+    }
+
+    const payOpts = '<option value="">--</option><option value="Paid">Paid</option><option value="CCAP">CCAP</option>'
+                  + '<option value="Half Price">Half Price</option><option value="Free">Free</option><option value="Foster">Foster</option>';
+
+    grid.innerHTML = `<table>
+        <thead><tr>
+            <th class="left">Student</th>
+            <th style="width:75px;" title="Pay Type: Paid (full tuition), CCAP (IL Child Care Assistance Program - 225% FPL), Half Price, Free (staff/scholarship), Foster (DCFS ward)">Pay</th>
+            <th style="width:60px;" title="Annual gross household income before deductions">Income</th>
+            <th style="width:30px;" title="Number of people living in the household">HH</th>
+            ${BENEFIT_KEYS.map(b => `<th style="width:42px;">${b}</th>`).join('')}
+            <th style="width:36px;">Save</th>
+            <th class="left" style="min-width:140px;">Notes</th>
+        </tr></thead>
+        <tbody>${roomStudents.map((s, i) => {
+            const ben = s.PublicBenefits || '';
+            const income = parseInt(s.HouseholdIncome) || 0;
+            const hhSize = parseInt(s.HouseholdSize) || 0;
+            return `<tr>
+                <td class="name">${s.Last_Name}, ${s.First_Name}</td>
+                <td><select id="benPay_${i}" onchange="markBenefitChanged(${i})">${payOpts}</select></td>
+                <td><input type="number" id="benIncome_${i}" value="${income || ''}" onchange="markBenefitChanged(${i})" style="width:60px;"></td>
+                <td><input type="number" id="benHH_${i}" value="${hhSize || ''}" min="1" max="15" onchange="markBenefitChanged(${i})" style="width:36px;"></td>
+                ${BENEFIT_KEYS.map(b => `<td class="ctr">
+                    <input type="checkbox" id="ben_${i}_${b}" ${ben.includes(b) ? 'checked' : ''} onchange="markBenefitChanged(${i})">
+                </td>`).join('')}
+                <td class="ctr">
+                    <button class="btn-row-save" id="benSave_${i}" onclick="saveBenefitRow(${i})" disabled>Save</button>
+                </td>
+                <td class="notes">${eligibilityNotes(s).join(' · ')}</td>
+            </tr>`;
+        }).join('')}</tbody>
+    </table>`;
+
+    // Pay dropdowns get their value after render (legacy values are normalized).
+    roomStudents.forEach((s, i) => {
+        const sel = document.getElementById(`benPay_${i}`);
+        if (sel) sel.value = normalizePayType(s.Category);
+    });
+}
+
+// Inline hints: CCAP eligibility, food-program qualification, missing data.
+function eligibilityNotes(s) {
+    const notes = [];
+    const income = parseInt(s.HouseholdIncome) || 0;
+    const hhSize = parseInt(s.HouseholdSize) || 0;
+    const frp = s.F_R_P_Food || '';
+    if (income && hhSize) {
+        const idx = Math.max(1, Math.min(hhSize, 8)) - 1;
+        if (isCCAPEligible(s)) notes.push('<span style="color:var(--danger);font-weight:700;">CCAP eligible</span>');
+        if (income <= USDA_FREE_THRESHOLDS[idx] && frp !== 'Free') notes.push('<span style="color:#16a34a;">Qualifies Free</span>');
+        else if (income <= USDA_REDUCED_THRESHOLDS[idx] && frp === 'Paid') notes.push('<span style="color:#d97706;">Qualifies Reduced</span>');
+    } else {
+        notes.push('<span style="color:var(--text-muted);">Missing income/HH data</span>');
+    }
+    return notes;
+}
+
+function markBenefitChanged(i) {
+    const btn = document.getElementById(`benSave_${i}`);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+}
+
+async function saveBenefitRow(i) {
+    const s = roomRoster(activeBenefitsRoom)[i];
+    if (!s) return;
+
+    const benefits = BENEFIT_KEYS.filter(b => document.getElementById(`ben_${i}_${b}`)?.checked).join(', ');
+    const newCategory = document.getElementById(`benPay_${i}`)?.value || s.Category || '';
+    const newIncome   = document.getElementById(`benIncome_${i}`)?.value || '';
+    const newHHSize   = document.getElementById(`benHH_${i}`)?.value || '';
+    const btn = document.getElementById(`benSave_${i}`);
+    btn.disabled = true; btn.textContent = '…';
+
+    try {
+        const body = {
+            publicBenefits: benefits,
+            category: newCategory,
+            householdIncome: newIncome,
+            householdSize: newHHSize,
+        };
+        const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
+            method: 'PUT', body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            Object.assign(s, {
+                PublicBenefits: benefits,
+                Category: newCategory,
+                HouseholdIncome: newIncome,
+                HouseholdSize: newHHSize,
+            });
+            showNotification(`${s.First_Name} ${s.Last_Name} updated`, 'success');
+            btn.style.opacity = '0.3';
+            // Re-render so notes and the sidebar attention counts stay accurate.
+            buildBenefitsRoster();
+        } else {
+            showNotification('Update failed', 'error');
+            btn.disabled = false; btn.style.opacity = '1';
+        }
+    } catch (e) {
+        showNotification('Network error', 'error');
+        btn.disabled = false; btn.style.opacity = '1';
+    } finally {
+        btn.textContent = 'Save';
+    }
+}
+
+async function recalculateAllFRP() {
+    if (!confirm('Recalculate Free/Reduced/Paid for all active students based on current thresholds?')) return;
+    try {
+        const res = await apiFetch('/api/recalculate-frp', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('All F/R/P values recalculated successfully', 'success');
+            await loadStudents();
+            buildBenefitsRoster();
+        } else {
+            showNotification('Error: ' + (data.error || ''), 'error');
+        }
+    } catch (e) { showNotification('Network error', 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

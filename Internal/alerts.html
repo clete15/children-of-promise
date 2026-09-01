@@ -154,7 +154,7 @@ function renderAlerts(students, waitlist) {
         html += `<div class="alert-item info">
             <div class="alert-title">📝 ${wlPending.length} children pending on the waiting list</div>
             <div class="alert-detail">New pre-enrollment submissions waiting to be reviewed and processed.</div>
-            <a class="alert-action" href="/staff/ems.html" onclick="sessionStorage.setItem('emsStartTab','waitlist')">Open Waiting List →</a>
+            <a class="alert-action" href="/staff/waitinglist.html">Open Waiting List →</a>
         </div>`;
     }
 
@@ -165,7 +165,7 @@ function renderAlerts(students, waitlist) {
         html += `<div class="alert-item error">
             <div class="alert-title">⚠️ ${missingIncome.length} PFA/PI students missing income data</div>
             <div class="alert-detail">${missingIncome.map(s => s.First_Name + ' ' + s.Last_Name).join(', ')}</div>
-            <a class="alert-action" href="/staff/ems.html">Open EMS →</a>
+            <a class="alert-action" href="/staff/benefits.html">Open Benefits Roster →</a>
         </div>`;
     }
 

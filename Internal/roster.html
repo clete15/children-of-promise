@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Roster – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        .rr-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
+        .rr-wrapper { display:flex;max-height:calc(100vh - 130px); }
+        .rr-sidebar { width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .rr-sidebar button { display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;background:transparent;transition:background 0.15s; }
+        .rr-sidebar button.active { background:rgba(255,255,255,0.2); }
+        .rr-sidebar button:hover:not(.active) { background:rgba(255,255,255,0.1); }
+        .rr-sidebar button div { font-size:0.82rem;font-weight:700;color:white; }
+        .rr-card { background:white;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
+        .rr-header { padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px; }
+        .rr-title { font-size:1rem;font-weight:800;color:var(--text); }
+        .rr-teacher { font-size:0.75rem;color:var(--danger);font-weight:600;flex:1; }
+        .rr-toggle { display:flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;color:var(--text-muted);cursor:pointer;white-space:nowrap; }
+        .rr-toggle input { width:auto;accent-color:var(--primary); }
+        .rr-gear { background:none;border:none;cursor:pointer;font-size:1.2rem;padding:4px 8px;border-radius:6px;transition:background 0.15s; }
+        .rr-gear:hover { background:#f1f5f9; }
+        .rr-grid { overflow:auto; }
+
+        /* Room settings panel */
+        .rr-settings { display:none;padding:16px 20px;border-bottom:1px solid var(--border);background:#f8fafc; }
+        .rr-settings-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px; }
+        .rr-settings-title { font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
+        .btn-mini { padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.72rem;font-weight:700;cursor:pointer; }
+        .rr-settings table { width:100%;border-collapse:collapse;font-size:0.8rem; }
+        .rr-settings th { padding:6px 8px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted); }
+        .rr-settings input { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem; }
+
+        /* Roster table */
+        .rr-grid table { border-collapse:collapse;font-size:0.78rem; }
+        .rr-grid thead tr { border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;background:white; }
+        .rr-grid th { padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted); }
+        .rr-grid th.student { padding:8px 12px;text-align:left;min-width:140px;max-width:180px; }
+        .rr-grid th.day { text-align:center;width:38px; }
+        .rr-grid tbody tr { border-bottom:1px solid var(--border); }
+        .rr-grid tbody tr:hover { background:#f8fafc; }
+        .rr-grid td { padding:5px 6px; }
+        .rr-grid td.day { padding:7px 8px;text-align:center; }
+        .rr-grid td.day input { width:auto;accent-color:var(--primary); }
+        .rr-grid td.student { padding:7px 12px;max-width:180px;overflow:hidden;text-overflow:ellipsis; }
+        .rr-name { font-weight:600;color:var(--text);white-space:nowrap; }
+        .rr-age { font-size:0.68rem;color:var(--text-muted); }
+        .rr-grid select { padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.72rem;color:var(--text);background:white;width:100%; }
+        .btn-row-save { padding:3px 8px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.7rem;font-weight:700;cursor:pointer;opacity:0.3; }
+        .rr-grid tfoot tr { background:#f8fafc;border-top:2px solid var(--border); }
+        .rr-total-label { padding:7px 12px;font-size:0.65rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:0.05em; }
+        .rr-total { padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--primary); }
+        .rr-empty { padding:24px;color:var(--text-muted);font-size:0.88rem; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Room Roster &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="rr-layout">
+    <div class="rr-wrapper">
+        <div class="rr-sidebar" id="rosterSidebar"></div>
+
+        <div class="rr-card">
+            <div class="rr-header">
+                <div class="rr-title" id="rosterRoomTitle"></div>
+                <div class="rr-teacher" id="rosterRoomTeacher"></div>
+                <label class="rr-toggle">
+                    <input type="checkbox" id="rosterActiveOnly" checked onchange="renderRosterRoom()">
+                    Active only
+                </label>
+                <button class="rr-gear" onclick="toggleRoomSettings()" title="Room Settings">⚙️</button>
+            </div>
+
+            <div class="rr-settings" id="rosterSettingsPanel">
+                <div class="rr-settings-head">
+                    <div class="rr-settings-title">Room Settings</div>
+                    <button class="btn-mini" onclick="addNewRoom()">+ Add Room</button>
+                </div>
+                <table>
+                    <thead><tr style="border-bottom:1px solid var(--border);">
+                        <th style="width:40px;">#</th>
+                        <th>Room Name</th>
+                        <th>Teacher</th>
+                        <th style="width:70px;">Capacity</th>
+                        <th style="width:90px;">Age Range</th>
+                        <th style="width:50px;text-align:center;">Save</th>
+                    </tr></thead>
+                    <tbody id="rosterSettingsBody"></tbody>
+                </table>
+            </div>
+
+            <div class="rr-grid" id="rosterStudentGrid"></div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let rosterStudents = [];
+let activeRosterRoomNum = null;
+
+async function init() {
+    await Promise.all([loadClassrooms(), loadStudents()]);
+    buildRoster();
+    // Deep link: ?settings=1 opens the room settings panel (used by the portal Settings card).
+    if (new URLSearchParams(window.location.search).get('settings') === '1') {
+        toggleRoomSettings();
+    }
+}
+
+// ── SIDEBAR ──
+function buildRoster() {
+    const sidebar = document.getElementById('rosterSidebar');
+    const rooms = classrooms.map(r => r.RoomNumber);
+    if (!activeRosterRoomNum && rooms.length) activeRosterRoomNum = rooms[0];
+    sidebar.innerHTML = rooms.map(rn => {
+        const cr = getClassroom(rn);
+        const isActive = String(activeRosterRoomNum) === String(rn);
+        return `<button class="${isActive ? 'active' : ''}" onclick="selectRosterRoom('${rn}')">
+            <div>${cr ? cr.Room : rn}</div>
+        </button>`;
+    }).join('');
+    renderRosterRoom();
+}
+
+function selectRosterRoom(rn) {
+    activeRosterRoomNum = rn;
+    buildRoster();
+}
+
+// ── ROSTER TABLE ──
+function renderRosterRoom() {
+    const rn = activeRosterRoomNum;
+    const cr = getClassroom(rn);
+    document.getElementById('rosterRoomTitle').textContent = cr ? cr.Room : (rn || '');
+    document.getElementById('rosterRoomTeacher').textContent = cr ? cr.TeacherDescription : '';
+
+    const activeOnly = document.getElementById('rosterActiveOnly')?.checked !== false;
+    rosterStudents = students
+        .filter(s => String(s.RoomNumber) === String(rn) && (!activeOnly || isTruthy(s.Active)))
+        .sort(sortByName);
+
+    const grid = document.getElementById('rosterStudentGrid');
+    if (!rosterStudents.length) {
+        grid.innerHTML = '<div class="rr-empty">No students found.</div>';
+        return;
+    }
+
+    const roomOpts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.Room}</option>`).join('');
+    const dayKeys = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
+
+    grid.innerHTML = `
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:160px;">Room</th>
+                    <th class="student">Student</th>
+                    ${dayLabels.map(d => `<th class="day">${d}</th>`).join('')}
+                    <th style="width:80px;">Program</th>
+                    <th style="width:52px;">Active</th>
+                    <th style="width:44px;text-align:center;">Save</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rosterStudents.map((s, i) => {
+                    const dd = (id, opts) => `<select id="${id}" onchange="markRosterChanged(${i})">${opts}</select>`;
+                    const dayChecks = dayKeys.map((k, di) =>
+                        `<td class="day"><input type="checkbox" id="rDay${i}_${di}" ${isTruthy(s[k]) ? 'checked' : ''} onchange="markRosterChanged(${i})"></td>`
+                    ).join('');
+                    return `<tr>
+                        <td>${dd('rosterRoom' + i, roomOpts)}</td>
+                        <td class="student">
+                            <div class="rr-name">${s.Last_Name}, ${s.First_Name}</div>
+                            <div class="rr-age">${ageInMonthsDays(s.Birth_date)}</div>
+                        </td>
+                        ${dayChecks}
+                        <td>${dd('rosterPfaPiNa' + i,
+                            '<option value="">--</option>' +
+                            `<option value="PFA" ${s.PFA_PI_na === 'PFA' ? 'selected' : ''}>PFA</option>` +
+                            `<option value="PI" ${s.PFA_PI_na === 'PI' ? 'selected' : ''}>PI</option>` +
+                            `<option value="INCCRA" ${s.PFA_PI_na === 'INCCRA' ? 'selected' : ''}>INCCRA</option>`)}</td>
+                        <td>${dd('rosterActive' + i,
+                            `<option value="Yes" ${isTruthy(s.Active) ? 'selected' : ''}>Yes</option>` +
+                            `<option value="No" ${!isTruthy(s.Active) ? 'selected' : ''}>No</option>`)}</td>
+                        <td style="text-align:center;">
+                            <button class="btn-row-save" id="rosterSave${i}" onclick="saveRosterRow(${i})" disabled>Save</button>
+                        </td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td></td>
+                    <td class="rr-total-label">Daily Total</td>
+                    ${dayKeys.map((k, di) => {
+                        const total = rosterStudents.filter(s => isTruthy(s[k])).length;
+                        return `<td class="rr-total" id="dayTotal${di}">${total}</td>`;
+                    }).join('')}
+                    <td colspan="3"></td>
+                </tr>
+            </tfoot>
+        </table>`;
+
+    // Selects need their value set after render (option lists are built from data).
+    rosterStudents.forEach((s, i) => {
+        const sel = document.getElementById(`rosterRoom${i}`);
+        if (sel) sel.value = s.RoomNumber || '';
+    });
+}
+
+function ageInMonthsDays(birthDate) {
+    if (!birthDate) return '';
+    const bd = new Date(birthDate);
+    if (isNaN(bd)) return '';
+    const now = new Date();
+    let months = (now.getFullYear() - bd.getFullYear()) * 12 + (now.getMonth() - bd.getMonth());
+    let days = now.getDate() - bd.getDate();
+    if (days < 0) {
+        months--;
+        const prev = new Date(now.getFullYear(), now.getMonth(), 0);
+        days += prev.getDate();
+    }
+    return `${months}m ${days}d`;
+}
+
+function markRosterChanged(i) {
+    const btn = document.getElementById(`rosterSave${i}`);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    // Recompute daily totals from the live checkboxes.
+    ['Monday','Tuesday','Wednesday','Thursday','Friday'].forEach((k, di) => {
+        let total = 0;
+        rosterStudents.forEach((s, si) => {
+            const cb = document.getElementById(`rDay${si}_${di}`);
+            total += cb ? (cb.checked ? 1 : 0) : (isTruthy(s[k]) ? 1 : 0);
+        });
+        const cell = document.getElementById(`dayTotal${di}`);
+        if (cell) cell.textContent = total;
+    });
+}
+
+async function saveRosterRow(i) {
+    const s = rosterStudents[i];
+    const newRoom    = document.getElementById(`rosterRoom${i}`)?.value || s.RoomNumber || '';
+    const newPayType = s.Category || '';
+    const newPfaPiNa = document.getElementById(`rosterPfaPiNa${i}`)?.value || s.PFA_PI_na || '';
+    const newActive  = document.getElementById(`rosterActive${i}`)?.value || s.Active || 'Yes';
+    const btn = document.getElementById(`rosterSave${i}`);
+    btn.disabled = true; btn.textContent = '…';
+
+    const frpFood = computeFRP({
+        income: s.HouseholdIncome,
+        householdSize: s.HouseholdSize,
+        benefits: s.PublicBenefits || '',
+        isFoster: newPayType === 'Foster',
+        isMilitary: isTruthy(s.Military),
+        isPFA: newPfaPiNa === 'PFA',
+    });
+
+    const body = {
+        firstName: s.First_Name, lastName: s.Last_Name,
+        birthDate: s.Birth_date, startDate: s.Start_Date,
+        cityTown: s.City_Town, daysOld: s.Days_Old,
+        roomNumber: newRoom,
+        active: newActive, category: newPayType,
+        monday:    document.getElementById(`rDay${i}_0`)?.checked || false,
+        tuesday:   document.getElementById(`rDay${i}_1`)?.checked || false,
+        wednesday: document.getElementById(`rDay${i}_2`)?.checked || false,
+        thursday:  document.getElementById(`rDay${i}_3`)?.checked || false,
+        friday:    document.getElementById(`rDay${i}_4`)?.checked || false,
+        pfaPiNa: newPfaPiNa, frpFood: frpFood,
+        iep: isTruthy(s.IEP), military: isTruthy(s.Military),
+        householdIncome: s.HouseholdIncome || '',
+        householdSize: s.HouseholdSize || '',
+        publicBenefits: s.PublicBenefits || '',
+    };
+
+    try {
+        const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
+            method: 'PUT', body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+            Object.assign(rosterStudents[i], {
+                RoomNumber: newRoom, Category: newPayType,
+                PFA_PI_na: newPfaPiNa, Active: newActive, F_R_P_Food: frpFood,
+            });
+            btn.style.opacity = '0.4';
+            showNotification(`${s.First_Name} ${s.Last_Name} updated`, 'success');
+        } else {
+            showNotification('Update failed: ' + (data.error || ''), 'error');
+            btn.disabled = false;
+        }
+    } catch (e) {
+        showNotification('Network error', 'error');
+        btn.disabled = false;
+    } finally {
+        btn.textContent = 'Save';
+    }
+}
+
+// ── ROOM SETTINGS ──
+function toggleRoomSettings() {
+    const panel = document.getElementById('rosterSettingsPanel');
+    if (panel.style.display === 'block') {
+        panel.style.display = 'none';
+    } else {
+        panel.style.display = 'block';
+        renderSettings();
+    }
+}
+
+function renderSettings() {
+    const tbody = document.getElementById('rosterSettingsBody');
+    if (!classrooms.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No classrooms loaded.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = classrooms.map((r, i) => `
+        <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px 8px;font-weight:700;color:var(--text-muted);">${r.RoomNumber}</td>
+            <td style="padding:6px 8px;"><input type="text" id="setRoom${i}" value="${r.Room || ''}" oninput="markSettingsChanged(${i})"></td>
+            <td style="padding:6px 8px;"><input type="text" id="setTeacher${i}" value="${r.TeacherDescription || ''}" oninput="markSettingsChanged(${i})"></td>
+            <td style="padding:6px 8px;"><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" oninput="markSettingsChanged(${i})"></td>
+            <td style="padding:6px 8px;"><input type="text" id="setAge${i}" value="${r.AgeRange || ''}" oninput="markSettingsChanged(${i})"></td>
+            <td style="padding:6px 8px;text-align:center;">
+                <button class="btn-row-save" id="setSave${i}" onclick="saveRoom(${i})" disabled>Save</button>
+            </td>
+        </tr>`).join('');
+}
+
+function markSettingsChanged(i) {
+    const btn = document.getElementById(`setSave${i}`);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+}
+
+async function addNewRoom() {
+    const nextNum = classrooms.length ? Math.max(...classrooms.map(r => parseInt(r.RoomNumber) || 0)) + 1 : 1;
+    const name = prompt('Room name (e.g., "Pre-School 3"):');
+    if (!name) return;
+    const teacher = prompt('Teacher description (e.g., "Ms. Smith"):') || '';
+    try {
+        const res = await apiFetch('/api/classrooms', {
+            method: 'POST',
+            body: JSON.stringify({ roomNumber: nextNum, room: name, teacher: teacher, capacity: 10, ageRange: '' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotification(`Room "${name}" added`, 'success');
+            await loadClassrooms();
+            renderSettings();
+            buildRoster();
+        } else {
+            showNotification('Failed: ' + (data.error || ''), 'error');
+        }
+    } catch (e) { showNotification('Network error', 'error'); }
+}
+
+async function saveRoom(i) {
+    const r = classrooms[i];
+    const room     = document.getElementById(`setRoom${i}`).value.trim();
+    const teacher  = document.getElementById(`setTeacher${i}`).value.trim();
+    const capacity = document.getElementById(`setCap${i}`).value;
+    const ageRange = document.getElementById(`setAge${i}`).value.trim();
+    try {
+        const res = await apiFetch(`/api/classrooms/${r.RoomNumber}`, {
+            method: 'PUT',
+            body: JSON.stringify({ room, teacher, capacity, ageRange })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotification(`Room ${r.RoomNumber} updated`, 'success');
+            await loadClassrooms();
+            renderSettings();
+            buildRoster();
+        } else {
+            showNotification('Update failed: ' + (data.error || ''), 'error');
+        }
+    } catch (e) { showNotification('Network error', 'error'); }
+}
+
+init();
+</script>
+</body>
+</html>

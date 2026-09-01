@@ -7,277 +7,680 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
-        .reports-container { max-width: 1100px; margin: 24px auto 48px; padding: 0 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .report-card { background: white; border-radius: var(--radius); padding: 20px 24px; box-shadow: var(--shadow-md); }
-        .report-card.full { grid-column: 1 / -1; }
-        .report-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--primary); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-        .stat-grid { display: flex; flex-wrap: wrap; gap: 12px; }
-        .stat-box { flex: 1 1 100px; background: #f8fafc; border-radius: 8px; padding: 14px 16px; text-align: center; border: 1px solid var(--border); }
-        .stat-value { font-size: 1.8rem; font-weight: 800; color: var(--primary); line-height: 1; }
-        .stat-label { font-size: 0.72rem; color: var(--text-muted); margin-top: 4px; font-weight: 600; }
-        .stat-box.danger .stat-value { color: var(--danger); }
-        .stat-box.success .stat-value { color: var(--success); }
-        .stat-box.warning .stat-value { color: #b45309; }
-        .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .bar-label { font-size: 0.8rem; font-weight: 600; color: var(--text); min-width: 120px; }
-        .bar-track { flex: 1; background: #e2e8f0; border-radius: 4px; height: 18px; overflow: hidden; }
-        .bar-fill { height: 100%; border-radius: 4px; background: var(--primary); transition: width 0.4s ease; display: flex; align-items: center; justify-content: flex-end; padding-right: 6px; }
-        .bar-fill span { font-size: 0.68rem; font-weight: 700; color: white; white-space: nowrap; }
-        .bar-fill.green { background: var(--success); }
-        .bar-fill.amber { background: #f59e0b; }
-        .bar-fill.red   { background: var(--danger); }
-        .room-charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 4px; }
-        .room-chart-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
-        .room-chart-title { font-size: 0.82rem; font-weight: 700; color: var(--text); margin-bottom: 12px; text-align: center; }
-        .day-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-        .day-name { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); width: 36px; flex-shrink: 0; }
-        .capacity-track { flex: 1; background: #fecaca; border-radius: 5px; height: 22px; position: relative; overflow: hidden; }
-        .attendance-fill { height: 100%; background: var(--primary); border-radius: 5px; transition: width 0.4s ease; }
-        .day-label { font-size: 0.72rem; font-weight: 700; color: var(--text); white-space: nowrap; min-width: 60px; text-align: right; }
-        @media (max-width: 680px) { .reports-container { grid-template-columns: 1fr; } .report-card.full { grid-column: 1; } }
+        .rp-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
+        .rp-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1100px; }
+        .rp-sidebar { width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .rp-sidebar button, .rp-sidebar a { display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;transition:background 0.15s;text-decoration:none; }
+        .rp-sidebar button.active { background:rgba(255,255,255,0.2); }
+        .rp-sidebar button:hover:not(.active), .rp-sidebar a:hover { background:rgba(255,255,255,0.1); }
+        .rp-sidebar .label { font-size:0.82rem;font-weight:700;color:white; }
+        .rp-sidebar .sub { padding:10px 16px 10px 28px; }
+        .rp-sidebar .sub .label { font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.8); }
+        .rp-divider { border-top:1px solid rgba(255,255,255,0.15);margin:8px 0; }
+        .rp-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
+        .rp-body { overflow-y:auto;flex:1;padding:20px 24px; }
+        .rp-title { font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border); }
+        .rp-btn { padding:6px 14px;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer; }
+        .rp-btn.green { background:#16a34a; }
+        .rp-btn.blue { background:var(--primary); }
     </style>
 </head>
 <body>
 
 <header class="site-header">
-    <a class="brand-link" href="index.html">
+    <a class="brand-link" href="/staff/">
         <img src="logo-sm.png" alt="Children Of Promise">
         <div class="brand-text">
             <h1>Children Of Promise</h1>
-            <p>Management Reports &nbsp;·&nbsp; Millstadt, IL</p>
+            <p>Reports &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="index.html">← Staff Portal</a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
 </header>
 
-<div class="reports-container">
+<div class="rp-layout">
+    <div class="rp-wrapper">
+        <div class="rp-sidebar">
+            <button class="active" id="rptBtn-attendance" onclick="selectReport('attendance')"><div class="label">📊 Attendance</div></button>
+            <button id="rptBtn-program" onclick="selectReport('program')"><div class="label">📋 Program Type</div></button>
+            <button id="rptBtn-paytype" onclick="selectReport('paytype')"><div class="label">💳 Pay Type</div></button>
+            <button id="rptBtn-ccap" onclick="selectReport('ccap')"><div class="label">💰 CCAP</div></button>
+            <button id="rptBtn-summer" onclick="selectReport('summer')"><div class="label">☀️ Summer Program</div></button>
+            <div class="rp-divider"></div>
+            <button id="rptBtn-food" onclick="selectReport('food')"><div class="label">🍽️ Food Program</div></button>
+            <button class="sub" onclick="toggleFoodDetail()"><div class="label">✏️ Income Detail</div></button>
+            <button class="sub" onclick="toggleFoodRoster()"><div class="label">📋 Full Roster</div></button>
+            <button class="sub" onclick="printFoodCountSheets()"><div class="label">🖨️ Monthly Count Sheets</div></button>
+            <a class="sub" href="/staff/menus.html"><div class="label">🍽️ Weekly Menus</div></a>
+        </div>
 
-    <div class="report-card full" id="cardEnrollment">
-        <div class="report-title">Projected Attendance by Room</div>
-        <div style="display:flex;gap:0;min-height:320px;">
-            <div id="roomSidebar" style="width:180px;flex-shrink:0;border-right:1px solid var(--border);padding-right:0;overflow-y:auto;"></div>
-            <div id="roomChartArea" style="flex:1;padding:16px 20px;">
-                <div class="loading">Loading…</div>
+        <div class="rp-card">
+            <div class="rp-body">
+                <div id="rptEnrollment">
+                    <div class="rp-title">Projected Attendance by Room</div>
+                    <div style="display:flex;gap:0;min-height:320px;">
+                        <div id="rptRoomSidebar" style="width:180px;flex-shrink:0;border-right:1px solid var(--border);overflow-y:auto;"></div>
+                        <div id="rptRoomChartArea" style="flex:1;padding:16px 20px;"><div>Loading…</div></div>
+                    </div>
+                </div>
+                <div id="rptFood" style="display:none;"><div class="rp-title">Food Program</div><div>Loading…</div></div>
+                <div id="rptProgram" style="display:none;"><div class="rp-title">Program Type</div><div>Loading…</div></div>
+                <div id="rptPayType" style="display:none;"><div class="rp-title">Pay Type</div><div>Loading…</div></div>
+                <div id="rptCcap" style="display:none;"><div class="rp-title">CCAP</div><div>Loading…</div></div>
+                <div id="rptSummer" style="display:none;"><div class="rp-title">☀️ Summer Program Sign-Ups</div><div>Loading…</div></div>
             </div>
         </div>
     </div>
-
-    <div class="report-card" id="cardFood">
-        <div class="report-title">Food Program Breakdown <a href="foodreport.html" style="float:right;font-size:0.7rem;font-weight:600;color:var(--primary);text-decoration:none;">View Full Report →</a></div>
-        <div class="loading">Loading…</div>
-    </div>
-
-    <div class="report-card" id="cardProgram">
-        <div class="report-title">Program Type Breakdown</div>
-        <div class="loading">Loading…</div>
-    </div>
-
-    <div class="report-card" id="cardPayType">
-        <div class="report-title">Pay Type Breakdown</div>
-        <div class="loading">Loading…</div>
-    </div>
-
-    <div class="report-card" id="cardBenefits">
-        <div class="report-title">Public Benefits (Active Students)</div>
-        <div class="loading">Loading…</div>
-    </div>
-
-    <div class="report-card" id="cardIncome">
-        <div class="report-title">Proof of Income Status</div>
-        <div class="loading">Loading…</div>
-    </div>
-
-    <div class="report-card" id="cardFlags">
-        <div class="report-title">Special Flags</div>
-        <div class="loading">Loading…</div>
-    </div>
-
-    <div class="report-card" id="cardWaitlist">
-        <div class="report-title">Waiting List Summary</div>
-        <div class="loading">Loading…</div>
-    </div>
-
 </div>
 
+<script src="app.js"></script>
 <script>
-const AUTH = 'Basic ' + btoa(':cofpadmin');
+let rptDailyData = [];
+let rptActiveRoom = 0;
+let activeReport = 'attendance';
+let foodDetailData = [];
 
-let allDailyData = [];
+const REPORT_IDS = {
+    attendance: 'rptEnrollment', food: 'rptFood', program: 'rptProgram',
+    paytype: 'rptPayType', ccap: 'rptCcap', summer: 'rptSummer',
+};
 
-function renderEnrollment(rows, daily) {
-    if (!daily || !daily.length) {
-        document.getElementById('roomChartArea').innerHTML = '<div class="loading">No data.</div>';
-        return;
+const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
+
+async function init() {
+    await Promise.all([loadClassrooms(), loadStudents()]);
+    await loadReports();
+}
+
+function selectReport(name) {
+    activeReport = name;
+    Object.entries(REPORT_IDS).forEach(([key, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = key === name ? 'block' : 'none';
+        const btn = document.getElementById('rptBtn-' + key);
+        if (btn) btn.classList.toggle('active', key === name);
+    });
+}
+
+async function loadReports() {
+    try {
+        const res = await apiFetch('/api/reports');
+        const data = await res.json();
+        renderRptEnrollment(data.byRoomDaily);
+        renderRptBars('rptFood', 'Food Program', data.byFood, ['Free','Reduced','Paid','Unknown']);
+        foodDetailData = data.foodDetail || [];
+        renderRptBars('rptProgram', 'Program Type', data.byProgram, null);
+        renderRptBars('rptPayType', 'Pay Type', data.byPayType, null);
+        renderRptCcap(data.ccapEligible);
+        renderRptSummer(data.summerProgram);
+    } catch (e) {
+        Object.values(REPORT_IDS).forEach(id => {
+            const el = document.getElementById(id);
+            const loading = el && el.querySelector('div:last-child');
+            if (loading) loading.textContent = 'Failed to load.';
+        });
     }
-    allDailyData = daily;
+}
 
-    // Build sidebar
-    const sidebar = document.getElementById('roomSidebar');
-    sidebar.innerHTML = daily.map((r, i) =>
-        `<button onclick="showRoomChart(${i})" id="rsBtn${i}"
-            style="display:block;width:100%;text-align:left;padding:10px 14px;border:none;background:none;cursor:pointer;font-size:0.8rem;font-weight:600;color:var(--text);border-left:3px solid transparent;transition:background 0.15s;"
-            onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=activeRoom===${i}?'#eff6ff':'none'">
+// ── ATTENDANCE ──
+function renderRptEnrollment(daily) {
+    if (!daily || !daily.length) { document.getElementById('rptRoomChartArea').innerHTML = 'No data.'; return; }
+    rptDailyData = daily;
+    document.getElementById('rptRoomSidebar').innerHTML = daily.map((r, i) =>
+        `<button onclick="showRptRoomChart(${i})" id="rptRsBtn${i}"
+            style="display:block;width:100%;text-align:left;padding:10px 14px;border:none;background:none;cursor:pointer;font-size:0.8rem;font-weight:600;color:var(--text);border-left:3px solid transparent;transition:background 0.15s;">
             ${r[0] || 'Unknown'}
         </button>`
     ).join('');
-
-    showRoomChart(0);
+    showRptRoomChart(0);
 }
 
-let activeRoom = 0;
-
-function showRoomChart(idx) {
-    activeRoom = idx;
-    // Update sidebar active state
-    allDailyData.forEach((_, i) => {
-        const btn = document.getElementById(`rsBtn${i}`);
+function showRptRoomChart(idx) {
+    rptActiveRoom = idx;
+    rptDailyData.forEach((_, i) => {
+        const btn = document.getElementById(`rptRsBtn${i}`);
         if (!btn) return;
-        btn.style.background = i === idx ? '#eff6ff' : 'none';
-        btn.style.borderLeftColor = i === idx ? 'var(--primary)' : 'transparent';
-        btn.style.color = i === idx ? 'var(--primary)' : 'var(--text)';
+        const on = i === idx;
+        btn.style.background = on ? '#eff6ff' : 'none';
+        btn.style.borderLeftColor = on ? 'var(--primary)' : 'transparent';
+        btn.style.color = on ? 'var(--primary)' : 'var(--text)';
     });
-
-    const r = allDailyData[idx];
-    const room     = r[0] || 'Unknown';
+    const r = rptDailyData[idx];
+    const room = r[0] || 'Unknown';
     const capacity = parseInt(r[1] || 1);
-    const days     = ['Mon','Tue','Wed','Thu','Fri'];
-    const counts   = [parseInt(r[2]||0), parseInt(r[3]||0), parseInt(r[4]||0), parseInt(r[5]||0), parseInt(r[6]||0)];
-    const chartH   = 220;
-
-    // For rooms with dual capacity (2 Year Olds / Toddlers), show toggle
-    const isDualCap = room.toLowerCase().includes('2 year') && room.toLowerCase().includes('toddler');
-    const altCap = isDualCap ? (capacity === 5 ? 8 : 5) : null;
-    const toggleHtml = isDualCap ? `
-        <div style="display:flex;align-items:center;gap:8px;justify-content:center;margin-bottom:12px;">
-            <span style="font-size:0.75rem;color:var(--text-muted);">Capacity:</span>
-            <button onclick="toggleCapacity(${idx},5)" id="cap5btn"
-                style="padding:4px 12px;border-radius:5px;border:1.5px solid var(--border);font-size:0.78rem;font-weight:700;cursor:pointer;background:${capacity===5?'var(--primary)':'white'};color:${capacity===5?'white':'var(--text)'};">5</button>
-            <button onclick="toggleCapacity(${idx},8)" id="cap8btn"
-                style="padding:4px 12px;border-radius:5px;border:1.5px solid var(--border);font-size:0.78rem;font-weight:700;cursor:pointer;background:${capacity===8?'var(--primary)':'white'};color:${capacity===8?'white':'var(--text)'};">8</button>
-        </div>` : '';
-
+    const days = ['Mon','Tue','Wed','Thu','Fri'];
+    const counts = [parseInt(r[2]||0), parseInt(r[3]||0), parseInt(r[4]||0), parseInt(r[5]||0), parseInt(r[6]||0)];
+    const chartH = 200;
     const cols = days.map((day, i) => {
         const count = counts[i];
-        const fillPct = Math.min(count / capacity, 1);
-        const fillH = Math.round(fillPct * chartH);
-        const capH  = chartH;
+        const fillH = Math.round(Math.min(count / capacity, 1) * chartH);
         return `<div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;">
             <div style="font-size:0.78rem;font-weight:700;color:var(--text);">${count}/${capacity}</div>
-            <div style="position:relative;width:100%;height:${capH}px;background:#fecaca;border-radius:6px 6px 0 0;display:flex;align-items:flex-end;">
+            <div style="position:relative;width:100%;height:${chartH}px;background:#fecaca;border-radius:6px 6px 0 0;display:flex;align-items:flex-end;">
                 <div style="width:100%;height:${fillH}px;background:var(--primary);border-radius:6px 6px 0 0;transition:height 0.4s;"></div>
             </div>
             <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);">${day}</div>
         </div>`;
     }).join('');
-
-    document.getElementById('roomChartArea').innerHTML = `
+    document.getElementById('rptRoomChartArea').innerHTML = `
         <div style="font-size:0.9rem;font-weight:800;color:var(--text);margin-bottom:12px;text-align:center;">${room}</div>
-        ${toggleHtml}
-        <div style="display:flex;align-items:flex-end;gap:12px;height:${chartH + 60}px;padding:0 8px;">
-            ${cols}
-        </div>
+        <div style="display:flex;align-items:flex-end;gap:12px;height:${chartH + 50}px;padding:0 8px;">${cols}</div>
         <div style="display:flex;gap:16px;margin-top:12px;justify-content:center;">
             <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;"><div style="width:14px;height:14px;background:#fecaca;border-radius:3px;"></div> Capacity (${capacity})</div>
             <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;"><div style="width:14px;height:14px;background:var(--primary);border-radius:3px;"></div> Projected</div>
         </div>`;
 }
 
-function renderBars(cardId, rows, order, colors) {
+// ── BAR CHARTS (Food / Program / Pay Type) ──
+function renderRptBars(cardId, title, rows, order) {
     const card = document.getElementById(cardId);
-    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
-    const total = rows.reduce((s, r) => s + parseInt(r[1] || 0), 0);
+    if (!rows || !rows.length) {
+        card.innerHTML = `<div class="rp-title">${title}</div><div style="color:var(--text-muted);font-size:0.85rem;">No data.</div>`;
+        return;
+    }
     const sorted = order ? order.map(o => rows.find(r => r[0] === o) || [o, 0]) : rows;
     const max = Math.max(...sorted.map(r => parseInt(r[1] || 0)));
-    const titleEl = card.querySelector('.report-title');
-    const titleHtml = titleEl ? titleEl.innerHTML : '';
-    card.innerHTML = `<div class="report-title">${titleHtml}</div>` +
-        sorted.map((r, i) => {
-            const label = r[0] || 'Unknown';
-            const val = parseInt(r[1] || 0);
-            const pct = max ? Math.round(val / max * 100) : 0;
-            const cls = colors[i] || 'primary';
-            return `<div class="bar-row">
-                <div class="bar-label">${label}</div>
-                <div class="bar-track"><div class="bar-fill ${cls}" style="width:${Math.max(pct,4)}%"><span>${val}</span></div></div>
-            </div>`;
-        }).join('');
-}
-
-function renderBenefits(rows) {
-    const card = document.getElementById('cardBenefits');
-    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
-    const r = rows[0];
-    const labels = ['WIC','Medicaid','SNAP','TANF','CCAP'];
-    card.innerHTML = `<div class="report-title">Public Benefits (Active Students)</div>
-        <div class="stat-grid">${labels.map((l, i) => `
-            <div class="stat-box">
-                <div class="stat-value">${r[i] || 0}</div>
-                <div class="stat-label">${l}</div>
-            </div>`).join('')}
+    card.innerHTML = `<div class="rp-title">${title}</div>` + sorted.map(r => {
+        const label = r[0] || 'Unknown';
+        const val = parseInt(r[1] || 0);
+        const pct = max ? Math.round(val / max * 100) : 0;
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="font-size:0.8rem;font-weight:600;color:var(--text);min-width:100px;">${label}</div>
+            <div style="flex:1;background:#e2e8f0;border-radius:4px;height:18px;overflow:hidden;">
+                <div style="height:100%;width:${Math.max(pct,4)}%;background:var(--primary);border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;">
+                    <span style="font-size:0.68rem;font-weight:700;color:white;">${val}</span>
+                </div>
+            </div>
         </div>`;
+    }).join('');
 }
 
-function renderIncome(rows) {
-    const card = document.getElementById('cardIncome');
-    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
-    const r = rows[0];
-    const uploaded = parseInt(r[0] || 0);
-    const missing  = parseInt(r[1] || 0);
-    card.innerHTML = `<div class="report-title">Proof of Income Status</div>
-        <div class="stat-grid">
-            <div class="stat-box success"><div class="stat-value">${uploaded}</div><div class="stat-label">Uploaded</div></div>
-            <div class="stat-box danger"><div class="stat-value">${missing}</div><div class="stat-label">Missing ⚠</div></div>
-        </div>`;
+// ── FOOD PROGRAM: editable income detail ──
+function toggleFoodDetail() {
+    selectReport('food');
+    const existing = document.getElementById('foodDetailTable');
+    if (existing) { existing.remove(); return; }
+    if (!foodDetailData.length) return;
+    window._foodRooms = [...new Set(foodDetailData.map(r => r[0] || 'Unknown'))];
+    window._foodFilterRoom = 'All';
+    renderFoodDetailTable();
 }
 
-function renderFlags(rows) {
-    const card = document.getElementById('cardFlags');
-    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No data.'; return; }
-    const r = rows[0];
-    card.innerHTML = `<div class="report-title">Special Flags</div>
-        <div class="stat-grid">
-            <div class="stat-box warning"><div class="stat-value">${r[0] || 0}</div><div class="stat-label">IEP</div></div>
-            <div class="stat-box"><div class="stat-value">${r[1] || 0}</div><div class="stat-label">Military</div></div>
-        </div>`;
+function renderFoodDetailTable() {
+    const card = document.getElementById('rptFood');
+    const existing = document.getElementById('foodDetailTable');
+    if (existing) existing.remove();
+    const rooms = window._foodRooms || [];
+    const filterRoom = window._foodFilterRoom || 'All';
+    const filtered = filterRoom === 'All' ? foodDetailData : foodDetailData.filter(r => (r[0] || 'Unknown') === filterRoom);
+    const chip = (label, on, action) =>
+        `<button onclick="${action}" style="padding:4px 10px;border-radius:5px;border:none;font-size:0.72rem;cursor:pointer;background:${on?'var(--primary)':'#e2e8f0'};color:${on?'white':'var(--text)'};font-weight:600;white-space:nowrap;">${label}</button>`;
+
+    const table = document.createElement('div');
+    table.id = 'foodDetailTable';
+    table.style.cssText = 'margin-top:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+    table.innerHTML = `
+        <div style="padding:10px 14px;border-bottom:1px solid var(--border);background:#f8fafc;display:flex;align-items:center;gap:8px;overflow-x:auto;">
+            ${chip(`All (${foodDetailData.length})`, filterRoom === 'All', `window._foodFilterRoom='All';renderFoodDetailTable()`)}
+            ${rooms.map(rm => {
+                const cnt = foodDetailData.filter(r => (r[0]||'Unknown') === rm).length;
+                return chip(`${rm} (${cnt})`, filterRoom === rm, `window._foodFilterRoom='${rm}';renderFoodDetailTable()`);
+            }).join('')}
+        </div>
+        <div style="max-height:350px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+                <th style="padding:8px 12px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);min-width:140px;">Room</th>
+                <th style="padding:8px 12px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);min-width:130px;">Name</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:80px;">Income</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:45px;">HH</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:55px;">F/R/P</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Benefits</th>
+                <th style="padding:8px 6px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);width:40px;">Save</th>
+            </tr></thead>
+            <tbody>${filtered.map((r, i) => `<tr style="border-bottom:1px solid var(--border);white-space:nowrap;">
+                <td style="padding:6px 12px;font-size:0.73rem;">${r[0] || '—'}</td>
+                <td style="padding:6px 12px;font-weight:600;font-size:0.73rem;">${r[1]}, ${r[2]}</td>
+                <td style="padding:4px 6px;"><input type="number" id="fdInc_${i}" value="${r[3] || ''}" onchange="markFoodDetailChanged(${i})" style="width:70px;padding:3px 5px;border:1px solid var(--border);border-radius:3px;font-size:0.7rem;"></td>
+                <td style="padding:4px 6px;"><input type="number" id="fdHH_${i}" value="${r[4] || ''}" min="1" max="15" onchange="markFoodDetailChanged(${i})" style="width:36px;padding:3px 5px;border:1px solid var(--border);border-radius:3px;font-size:0.7rem;"></td>
+                <td style="padding:6px 8px;font-weight:700;color:${frpColor(r[5])};">${r[5] || '—'}</td>
+                <td style="padding:6px 8px;font-size:0.7rem;">${r[6] || '—'}</td>
+                <td style="padding:4px 6px;text-align:center;"><button id="fdSave_${i}" onclick="saveFoodDetailRow(${i})" disabled style="padding:3px 6px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.63rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button></td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+    card.appendChild(table);
 }
 
-function renderWaitlist(rows) {
-    const card = document.getElementById('cardWaitlist');
-    if (!rows || !rows.length) { card.querySelector('.loading').textContent = 'No pending records.'; return; }
-    const labels = { '0-2': 'Infant & Toddler', '2-3': '2-Year Olds', '3-5': 'Pre-School' };
-    card.innerHTML = `<div class="report-title">Waiting List Summary</div>
-        <div class="stat-grid">${rows.map(r => `
-            <div class="stat-box">
-                <div class="stat-value">${r[1] || 0}</div>
-                <div class="stat-label">${labels[r[0]] || r[0]}</div>
-                <div style="font-size:0.68rem;color:var(--text-muted);margin-top:2px;">Avg score: ${parseFloat(r[2] || 0).toFixed(0)}</div>
-            </div>`).join('')}
-        </div>`;
+function markFoodDetailChanged(i) {
+    const btn = document.getElementById('fdSave_' + i);
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
 }
 
-load();
-
-function toggleCapacity(idx, cap) {
-    allDailyData[idx][1] = cap;
-    showRoomChart(idx);
-}
-
-async function load() {
+async function saveFoodDetailRow(i) {
+    const filterRoom = window._foodFilterRoom || 'All';
+    const filtered = filterRoom === 'All' ? foodDetailData : foodDetailData.filter(r => (r[0] || 'Unknown') === filterRoom);
+    const r = filtered[i];
+    if (!r) return;
+    const newIncome = document.getElementById('fdInc_' + i)?.value || '';
+    const newHH = document.getElementById('fdHH_' + i)?.value || '';
+    const btn = document.getElementById('fdSave_' + i);
+    btn.disabled = true; btn.textContent = '…';
     try {
-        const res = await fetch('/api/reports', { headers: { 'Authorization': AUTH } });
+        // foodDetail columns: [Room, Last_Name, First_Name, Income, HHSize, FRP, Benefits]
+        const res = await apiFetch('/api/students/' + encodeURIComponent(r[2]) + '/' + encodeURIComponent(r[1]), {
+            method: 'PUT', body: JSON.stringify({ householdIncome: newIncome, householdSize: newHH })
+        });
         const data = await res.json();
-        renderEnrollment(data.byRoom, data.byRoomDaily);
-        renderBars('cardFood', data.byFood, ['Free','Reduced','Paid','Unknown'], ['green','amber','primary','red']);
-        renderBars('cardProgram', data.byProgram, null, []);
-        renderBars('cardPayType', data.byPayType, null, []);
-        renderBenefits(data.benefits);
-        renderIncome(data.incomeProof);
-        renderFlags(data.flags);
-        renderWaitlist(data.waitlistSummary);
+        if (data.success) {
+            r[3] = newIncome;
+            r[4] = newHH;
+            showNotification(r[2] + ' ' + r[1] + ' updated', 'success');
+            btn.style.opacity = '0.3';
+        } else {
+            showNotification('Update failed', 'error');
+            btn.disabled = false; btn.style.opacity = '1';
+        }
     } catch (e) {
-        document.querySelectorAll('.loading').forEach(el => el.textContent = 'Failed to load.');
-    }
+        showNotification('Network error', 'error');
+        btn.disabled = false; btn.style.opacity = '1';
+    } finally { btn.textContent = 'Save'; }
 }
+
+// ── FOOD PROGRAM: read-only full roster ──
+function toggleFoodRoster() {
+    selectReport('food');
+    const card = document.getElementById('rptFood');
+    const existing = document.getElementById('foodRosterTable');
+    if (existing) { existing.remove(); return; }
+    const activeStudents = students.filter(s => isTruthy(s.Active)).sort(sortByRoomThenName);
+    const div = document.createElement('div');
+    div.id = 'foodRosterTable';
+    div.style.cssText = 'margin-top:14px;border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+    div.innerHTML = `<div style="max-height:450px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+                <th style="padding:8px 12px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">First Name</th>
+                <th style="padding:8px 12px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Last Name</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">PFA/PI</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                <th style="padding:8px 8px;text-align:left;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">F/R/P</th>
+                <th style="padding:8px 8px;text-align:right;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+                <th style="padding:8px 8px;text-align:center;font-size:0.63rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+            </tr></thead>
+            <tbody>${activeStudents.map(s => `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:6px 12px;font-size:0.73rem;">${s.First_Name}</td>
+                <td style="padding:6px 12px;font-weight:600;font-size:0.73rem;">${s.Last_Name}</td>
+                <td style="padding:6px 8px;font-size:0.73rem;">${s.PFA_PI_na || '—'}</td>
+                <td style="padding:6px 8px;font-size:0.73rem;">${s.Room || s.RoomNumber || '—'}</td>
+                <td style="padding:6px 8px;font-weight:700;color:${frpColor(s.F_R_P_Food)};">${s.F_R_P_Food || '—'}</td>
+                <td style="padding:6px 8px;text-align:right;font-size:0.73rem;">${s.HouseholdIncome ? '$' + Number(s.HouseholdIncome).toLocaleString() : '—'}</td>
+                <td style="padding:6px 8px;text-align:center;font-size:0.73rem;">${s.HouseholdSize || '—'}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+    card.appendChild(div);
+}
+
+// ── FOOD PROGRAM: monthly ISBE count sheets (print) ──
+function printFoodCountSheets() {
+    const now = new Date();
+    const defaultMonth = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const input = prompt('Enter month (YYYY-MM):', defaultMonth);
+    if (!input) return;
+    const parts = input.split('-');
+    const year = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1;
+    if (isNaN(year) || isNaN(month) || month < 0 || month > 11) { alert('Invalid month format. Use YYYY-MM'); return; }
+
+    const activeStudents = students.filter(s => isTruthy(s.Active));
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const monthYear = monthNames[month] + ' ' + year;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const meals = ['Breakfast', 'Lunch', 'PM Snack'];
+
+    const weekendDays = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+        const dow = new Date(year, month, d).getDay();
+        if (dow === 0 || dow === 6) weekendDays.push(d);
+    }
+
+    const roomGroups = {};
+    activeStudents.forEach(s => {
+        const room = s.Room || 'Room ' + s.RoomNumber;
+        if (!roomGroups[room]) roomGroups[room] = [];
+        roomGroups[room].push(s);
+    });
+
+    let html = '<!DOCTYPE html><html><head><title>Meal Participation Records - ' + monthYear + '</title><style>';
+    html += '@page { size: landscape; margin: 0.2in; }';
+    html += 'body { font-family: Arial, sans-serif; margin: 0; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }';
+    html += '.sheet { page-break-after: always; padding: 6px; }';
+    html += '.sheet:last-child { page-break-after: auto; }';
+    html += '.header { text-align: center; margin-bottom: 4px; }';
+    html += '.header h2 { margin: 0; font-size: 14px; }';
+    html += '.meta { display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 3px; padding: 0 4px; }';
+    html += '.meta span { font-weight: bold; }';
+    html += 'table { border-collapse: collapse; width: 100%; font-size: 9px; }';
+    html += 'th, td { border: 1px solid #000; padding: 3px 2px; text-align: center; }';
+    html += 'th { background: #d9d9d9; font-size: 8px; font-weight: bold; }';
+    html += '.name-col { text-align: left; min-width: 140px; font-size: 9px; white-space: nowrap; padding-left: 4px; font-weight: bold; }';
+    html += '.frp-col { font-weight: bold; width: 20px; background: #f0f0f0; }';
+    html += '.day-col { width: 18px; min-width: 18px; }';
+    html += '.day-col.weekend { background: #808080 !important; }';
+    html += '.total-col { width: 30px; background: #d9d9d9; font-weight: bold; }';
+    html += '.total-col-free { width: 30px; background: #d9d9d9; font-weight: bold; border-left: 3px solid #000; }';
+    html += '.totals-row td { font-weight: bold; font-size: 8px; background: #e8e8e8; }';
+    html += '.totals-row .name-col { background: #d0d0d0; }';
+    html += '.frp-totals-row td { font-weight: bold; font-size: 8px; background: #f5f5f5; }';
+    html += '.frp-totals-row .name-col { font-weight: bold; }';
+    html += '.separator-row td { border-top: 3px solid #000; }';
+    html += '</style></head><body>';
+
+    const dayCells = (extraClass) => {
+        let out = '';
+        for (let d = 1; d <= daysInMonth; d++) {
+            const we = weekendDays.includes(d) ? ' weekend' : '';
+            out += '<td class="' + (extraClass ? extraClass + we : we.trim()) + '"></td>';
+        }
+        return out;
+    };
+    const dayHeaders = () => {
+        let out = '';
+        for (let d = 1; d <= daysInMonth; d++) {
+            out += '<th class="day-col' + (weekendDays.includes(d) ? ' weekend' : '') + '">' + d + '</th>';
+        }
+        return out;
+    };
+
+    Object.keys(roomGroups).sort().forEach(room => {
+        // ISBE meal sheets group by F/R/P (Free, Reduced, Paid), then by last name.
+        const order = { 'free': 0, 'reduced': 1, 'paid': 2 };
+        const rank = s => {
+            const v = order[(s.F_R_P_Food || '').trim().toLowerCase()];
+            return v !== undefined ? v : 2;
+        };
+        const roomStudents = [...roomGroups[room]].sort((a, b) => {
+            const d = rank(a) - rank(b);
+            return d !== 0 ? d : (a.Last_Name || '').localeCompare(b.Last_Name || '');
+        });
+
+        // Daily attendance sheet
+        html += '<div class="sheet">';
+        html += '<div class="header"><h2>DAILY ATTENDANCE RECORD</h2></div>';
+        html += '<div class="meta"><span>Site: Children of Promise</span><span>Month/Year: ' + monthYear + '</span></div>';
+        html += '<div class="meta"><span>Classroom: ' + room + '</span></div>';
+        html += '<table><thead><tr><th class="name-col">Child\'s Full Name</th>' + dayHeaders();
+        html += '<th class="total-col-free">Total</th></tr></thead><tbody>';
+        roomStudents.forEach((s, i) => {
+            html += '<tr><td class="name-col">' + (i+1) + '. ' + s.Last_Name + ', ' + s.First_Name + '</td>';
+            html += dayCells('day-col') + '<td class="total-col-free"></td></tr>';
+        });
+        for (let e = roomStudents.length; e < 19; e++) {
+            html += '<tr><td class="name-col">' + (e+1) + '.</td>' + dayCells('day-col') + '<td class="total-col-free"></td></tr>';
+        }
+        html += '<tr class="totals-row separator-row"><td class="name-col"><strong>Daily Total</strong></td>';
+        html += dayCells('') + '<td class="total-col-free"></td></tr>';
+        html += '</tbody></table></div>';
+
+        // One meal participation sheet per meal service
+        meals.forEach(meal => {
+            html += '<div class="sheet">';
+            html += '<div class="header"><h2>MEAL PARTICIPATION RECORD</h2></div>';
+            html += '<div class="meta"><span>Site: Children of Promise</span><span>Month/Year: ' + monthYear + '</span></div>';
+            html += '<div class="meta"><span>Classroom: ' + room + '</span><span>Program: ☑ Child Care Center</span><span>Meal Service: ☑ ' + meal + '</span></div>';
+            html += '<table><thead><tr><th class="name-col">Child\'s Full Name</th><th class="frp-col">F/R/P</th>' + dayHeaders();
+            html += '<th class="total-col-free">Free</th><th class="total-col">Red</th><th class="total-col">Paid</th></tr></thead><tbody>';
+            roomStudents.forEach((s, i) => {
+                const frp = (s.F_R_P_Food || 'P').charAt(0).toUpperCase();
+                html += '<tr><td class="name-col">' + (i+1) + '. ' + s.Last_Name + ', ' + s.First_Name + '</td>';
+                html += '<td class="frp-col">' + frp + '</td>' + dayCells('day-col');
+                html += '<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+            });
+            for (let e = roomStudents.length; e < 19; e++) {
+                html += '<tr><td class="name-col">' + (e+1) + '.</td><td class="frp-col"></td>' + dayCells('day-col');
+                html += '<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+            }
+            html += '<tr class="totals-row separator-row"><td class="name-col"><strong>Daily Totals</strong></td><td></td>';
+            html += dayCells('') + '<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+            ['Free Daily Totals','Reduced Daily Totals','Paid Daily Totals'].forEach(label => {
+                html += '<tr class="frp-totals-row"><td class="name-col">' + label + '</td><td></td>';
+                html += dayCells('') + '<td class="total-col-free"></td><td class="total-col"></td><td class="total-col"></td></tr>';
+            });
+            html += '</tbody></table>';
+            html += '<div style="font-size:7px;text-align:right;margin-top:3px;color:#666;">ISBE 68-75 (9/13)</div>';
+            html += '</div>';
+        });
+    });
+
+    html += '</body></html>';
+
+    // Print through a hidden iframe so pop-up blockers don't interfere.
+    let frame = document.getElementById('foodPrintFrame');
+    if (frame) frame.remove();
+    frame = document.createElement('iframe');
+    frame.id = 'foodPrintFrame';
+    frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:0;height:0;';
+    document.body.appendChild(frame);
+    frame.contentDocument.open();
+    frame.contentDocument.write(html);
+    frame.contentDocument.close();
+    setTimeout(() => { frame.contentWindow.print(); }, 500);
+}
+
+// ── CCAP ──
+function renderRptCcap(rows) {
+    const card = document.getElementById('rptCcap');
+    const effectiveDate = 'July 1, ' + _usdaYear;
+    let html = `<div class="rp-title">CCAP Report</div>`;
+
+    if (rows && rows.length) {
+        html += `<div style="margin-bottom:16px;">
+            <div onclick="toggleCollapse('ccapEligibleBody', this)" style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;cursor:pointer;user-select:none;">
+                <span class="arrow">▼</span> Families Potentially Eligible (Not Currently on CCAP)
+                <span style="background:#fef2f2;color:var(--danger);padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:6px;">${rows.length}</span>
+            </div>
+            <div id="ccapEligibleBody">
+                <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+                    <thead><tr style="border-bottom:2px solid var(--border);background:#f8fafc;">
+                        <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Parent</th>
+                        <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Phone</th>
+                        <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Threshold</th>
+                        <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+                        <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH</th>
+                    </tr></thead>
+                    <tbody>${rows.map(r => {
+                        const threshold = CCAP_THRESHOLDS[Math.max(1, Math.min(parseInt(r[4])||1, 8)) - 1];
+                        return `<tr style="border-bottom:1px solid var(--border);">
+                            <td style="padding:6px 10px;font-weight:600;">${r[0]} ${r[1]}</td>
+                            <td style="padding:6px 10px;">${r[2] || '—'}</td>
+                            <td style="padding:6px 10px;">${r[5] || '—'}</td>
+                            <td style="padding:6px 10px;font-size:0.72rem;">${r[6] || '—'}</td>
+                            <td style="padding:6px 10px;text-align:right;color:var(--success);font-weight:600;">$${threshold.toLocaleString()}</td>
+                            <td style="padding:6px 10px;text-align:right;">$${parseInt(r[3] || 0).toLocaleString()}</td>
+                            <td style="padding:6px 10px;text-align:center;">${r[4] || '—'}</td>
+                        </tr>`;
+                    }).join('')}</tbody>
+                </table>
+            </div>
+        </div>`;
+    } else {
+        html += `<div style="color:var(--success);font-weight:600;font-size:0.85rem;margin-bottom:16px;">✓ All eligible families are already on CCAP</div>`;
+    }
+
+    html += `<div style="margin-bottom:20px;">
+        <div onclick="toggleCollapse('ccapThresholdsBody', this)" style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;cursor:pointer;user-select:none;">
+            <span class="arrow">▶</span> IL CCAP Income Thresholds (225% FPL — Annual)
+            <span style="font-size:0.7rem;font-weight:400;color:var(--text-muted);margin-left:6px;">Effective ${effectiveDate}</span>
+        </div>
+        <div id="ccapThresholdsBody" style="display:none;">
+            <table style="width:auto;border-collapse:collapse;font-size:0.78rem;margin-bottom:10px;">
+                <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);">
+                    <th style="padding:6px 14px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH Size</th>
+                    <th style="padding:6px 14px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Max Annual Income</th>
+                    <th style="padding:6px 14px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Max Monthly</th>
+                </tr></thead>
+                <tbody>${CCAP_THRESHOLDS.map((t, i) => `<tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:5px 14px;text-align:center;font-weight:600;">${i + 1}</td>
+                    <td style="padding:5px 14px;text-align:right;">$${t.toLocaleString()}</td>
+                    <td style="padding:5px 14px;text-align:right;color:var(--text-muted);">$${Math.round(t/12).toLocaleString()}</td>
+                </tr>`).join('')}</tbody>
+            </table>
+        </div>
+    </div>`;
+
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button class="rp-btn green" onclick="exportCCAPReport()">📥 Export CCAP Report</button>
+        <button class="rp-btn blue" onclick="toggleCCAPRoster()">📋 Full CCAP Roster</button>
+    </div>`;
+
+    card.innerHTML = html;
+}
+
+function toggleCollapse(bodyId, headerEl) {
+    const body = document.getElementById(bodyId);
+    if (!body) return;
+    const hidden = body.style.display === 'none';
+    body.style.display = hidden ? 'block' : 'none';
+    const arrow = headerEl.querySelector('.arrow');
+    if (arrow) arrow.textContent = hidden ? '▼' : '▶';
+}
+
+function exportCCAPReport() {
+    let csv = 'CCAP INCOME THRESHOLDS (225% FPL)\nHH Size\tMax Annual Income\tMax Monthly\n';
+    CCAP_THRESHOLDS.forEach((t, i) => { csv += (i+1) + '\t' + t + '\t' + Math.round(t/12) + '\n'; });
+    csv += '\nCCAP ELIGIBLE STUDENTS (Not Currently on CCAP)\nFirst Name\tLast Name\tRoom\tIncome\tHH Size\tThreshold\n';
+    students.filter(isCCAPEligible).sort(sortByName).forEach(s => {
+        const idx = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
+        csv += s.First_Name + '\t' + s.Last_Name + '\t' + (s.Room||'') + '\t' + (s.HouseholdIncome||'') + '\t' + (s.HouseholdSize||'') + '\t' + CCAP_THRESHOLDS[idx] + '\n';
+    });
+    const blob = new Blob([csv], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'CCAP_Report_' + new Date().toISOString().split('T')[0] + '.xls';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function toggleCCAPRoster() {
+    const card = document.getElementById('rptCcap');
+    const existing = document.getElementById('ccapFullRoster');
+    if (existing) { existing.remove(); return; }
+
+    const ccapStudents = students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP').sort(sortByName);
+    const div = document.createElement('div');
+    div.id = 'ccapFullRoster';
+    div.style.cssText = 'margin-top:16px;border:1px solid var(--border);border-radius:8px;overflow:hidden;';
+    div.innerHTML = `<div style="padding:10px 14px;background:#f8fafc;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:0.8rem;font-weight:700;color:var(--text);">Current CCAP Students (${ccapStudents.length})</span>
+    </div>
+    <div style="max-height:350px;overflow:auto;">
+    <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+        <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Student</th>
+            <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Room</th>
+            <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Eligibility Date</th>
+            <th style="padding:7px 10px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Income</th>
+            <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">HH</th>
+            <th style="padding:7px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Renewal Status</th>
+        </tr></thead>
+        <tbody>${ccapStudents.map(s => `<tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:6px 10px;font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
+            <td style="padding:6px 10px;">${s.Room || s.RoomNumber || '—'}</td>
+            <td style="padding:6px 10px;text-align:center;"><input type="date" value="${s.CCAPStartDate || ''}" onchange="saveCCAPDate('${s.First_Name}','${s.Last_Name}',this.value)" style="padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.72rem;"></td>
+            <td style="padding:6px 10px;text-align:right;">${s.HouseholdIncome ? '$'+Number(s.HouseholdIncome).toLocaleString() : '—'}</td>
+            <td style="padding:6px 10px;text-align:center;">${s.HouseholdSize || '—'}</td>
+            <td style="padding:6px 10px;text-align:center;">${ccapRenewalStatus(s.CCAPStartDate)}</td>
+        </tr>`).join('')}</tbody>
+    </table></div>`;
+    card.appendChild(div);
+}
+
+// CCAP eligibility runs 12 months from the start date; warn inside 60 days.
+function ccapRenewalStatus(startDate) {
+    if (!startDate) return '<span style="color:#dc2626;font-weight:700;">No date set</span>';
+    const renewal = new Date(startDate);
+    renewal.setMonth(renewal.getMonth() + 12);
+    const daysUntil = Math.ceil((renewal - new Date()) / (1000*60*60*24));
+    if (daysUntil <= 0) return '<span style="color:#dc2626;font-weight:700;">OVERDUE</span>';
+    if (daysUntil <= 60) return `<span style="color:#d97706;font-weight:700;">${daysUntil} days</span>`;
+    return `<span style="color:#16a34a;">${daysUntil} days</span>`;
+}
+
+async function saveCCAPDate(firstName, lastName, dateValue) {
+    try {
+        const res = await apiFetch('/api/students/' + encodeURIComponent(firstName) + '/' + encodeURIComponent(lastName), {
+            method: 'PUT', body: JSON.stringify({ ccapStartDate: dateValue })
+        });
+        const data = await res.json();
+        if (data.success) {
+            const s = students.find(x => x.First_Name === firstName && x.Last_Name === lastName);
+            if (s) s.CCAPStartDate = dateValue;
+            showNotification('CCAP date saved for ' + firstName + ' ' + lastName, 'success');
+        } else { showNotification('Failed to save', 'error'); }
+    } catch (e) { showNotification('Network error', 'error'); }
+}
+
+// ── SUMMER PROGRAM ──
+function renderRptSummer(rows) {
+    const card = document.getElementById('rptSummer');
+    const baStudents = students
+        .filter(s => isTruthy(s.Active) && (s.Room || '').toLowerCase().includes('before and after'))
+        .sort(sortByName);
+
+    let html = `<div class="rp-title">☀️ Summer Program</div>`;
+
+    html += `<div style="margin-bottom:20px;">
+        <div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">📋 Before & Afterschool Program (Year-Round) <span style="background:#eff6ff;color:var(--primary);padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:6px;">${baStudents.length} children</span></div>
+        <div style="max-height:250px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Child</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">F/R/P</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Category</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Days</th>
+            </tr></thead>
+            <tbody>${baStudents.length ? baStudents.map(s => {
+                const days = ['Monday','Tuesday','Wednesday','Thursday','Friday']
+                    .filter(d => isTruthy(s[d])).map(d => d.substring(0,3)).join(', ');
+                return `<tr style="border-bottom:1px solid var(--border);">
+                    <td style="padding:6px 10px;font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
+                    <td style="padding:6px 10px;font-weight:700;color:${frpColor(s.F_R_P_Food)};">${s.F_R_P_Food || '—'}</td>
+                    <td style="padding:6px 10px;">${s.Category || '—'}</td>
+                    <td style="padding:6px 10px;font-size:0.72rem;">${days || 'All'}</td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="4" style="padding:12px;color:var(--text-muted);text-align:center;">No students in Before & Afterschool</td></tr>'}</tbody>
+        </table></div></div>`;
+
+    html += `<div style="font-size:0.8rem;font-weight:700;color:var(--text);margin-bottom:8px;">📝 Additional Summer Sign-Ups <span style="background:#fffbeb;color:#92400e;padding:2px 8px;border-radius:10px;font-size:0.7rem;margin-left:6px;">${(rows||[]).length} children</span></div>`;
+    if (!rows || !rows.length) {
+        html += `<div style="color:var(--text-muted);font-size:0.85rem;">No additional summer sign-ups yet.</div>`;
+    } else {
+        html += `<div style="max-height:250px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.78rem;">
+            <thead><tr style="background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Child</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Age</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">F/R/P</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Days</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Parent</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:var(--text-muted);">Phone</th>
+            </tr></thead>
+            <tbody>${rows.map(r => `<tr style="border-bottom:1px solid var(--border);">
+                <td style="padding:6px 10px;font-weight:600;">${r[0]}, ${r[1]}</td>
+                <td style="padding:6px 10px;">${r[2]}</td>
+                <td style="padding:6px 10px;font-weight:700;color:${frpColor(r[3])};">${r[3]}</td>
+                <td style="padding:6px 10px;font-size:0.72rem;">${r[4]}</td>
+                <td style="padding:6px 10px;">${r[5]}, ${r[6]}</td>
+                <td style="padding:6px 10px;font-size:0.72rem;">${r[7] || ''}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>`;
+    }
+    card.innerHTML = html;
+}
+
+init();
 </script>
 </body>
 </html>
