@@ -85,6 +85,11 @@ async function init() {
     }
 }
 
+function sortByName(a, b) {
+    const cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
+    return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
+}
+
 function renderAlerts(students, waitlist) {
     const body = document.getElementById('alertsBody');
     let html = '';
@@ -96,7 +101,7 @@ function renderAlerts(students, waitlist) {
         const inc = parseInt(s.HouseholdIncome) || 0, hh = parseInt(s.HouseholdSize) || 0;
         if (!inc || !hh) return false;
         return inc <= CCAP_THRESHOLDS[Math.max(0, Math.min(hh-1, 7))];
-    });
+    }).sort(sortByName);
     if (ccapEligible.length) {
         count++;
         html += `<div class="alert-item warning">
@@ -127,7 +132,7 @@ function renderAlerts(students, waitlist) {
         const start = new Date(s.CCAPStartDate);
         const renewal = new Date(start); renewal.setMonth(renewal.getMonth() + 12);
         return (renewal - new Date()) / (1000*60*60*24) <= 60;
-    });
+    }).sort(sortByName);
     if (ccapDue.length) {
         count++;
         html += `<div class="alert-item warning">
@@ -154,7 +159,7 @@ function renderAlerts(students, waitlist) {
     }
 
     // 4. Missing income/HH data for PFA/PI students
-    const missingIncome = students.filter(s => isTruthy(s.Active) && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') && (!s.HouseholdIncome || !s.HouseholdSize));
+    const missingIncome = students.filter(s => isTruthy(s.Active) && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') && (!s.HouseholdIncome || !s.HouseholdSize)).sort(sortByName);
     if (missingIncome.length) {
         count++;
         html += `<div class="alert-item error">

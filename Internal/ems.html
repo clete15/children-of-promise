@@ -817,6 +817,11 @@ function isTruthy(v) {
     return false;
 }
 
+function sortByName(a, b) {
+    const cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
+    return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
+}
+
 function formatDateInput(val) {
     if (!val) return '';
     const d = new Date(val);
@@ -994,7 +999,7 @@ function renderRosterRoom() {
     document.getElementById('rosterRoomTeacher').textContent = cr ? cr.TeacherDescription : '';
 
     const activeOnly = document.getElementById('rosterActiveOnly')?.checked !== false;
-    rosterStudents = students.filter(s => String(s.RoomNumber) === String(rn) && (!activeOnly || isTruthy(s.Active)));
+    rosterStudents = students.filter(s => String(s.RoomNumber) === String(rn) && (!activeOnly || isTruthy(s.Active))).sort(sortByName);
 
     const grid = document.getElementById('rosterStudentGrid');
     if (!rosterStudents.length) {

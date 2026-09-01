@@ -105,6 +105,10 @@ async function init() {
 }
 
 function getRoom(rn) { const c = classrooms.find(r => String(r.RoomNumber) === String(rn)); return c ? c.Room : ''; }
+function sortByName(a, b) {
+    const cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
+    return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
+}
 
 function showTab(tab) {
     activeTab = tab;
@@ -118,7 +122,7 @@ function showTab(tab) {
 
 function renderRoster() {
     document.getElementById('ccapTitle').textContent = 'Full CCAP Roster';
-    const ccap = students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP');
+    const ccap = students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP').sort(sortByName);
     document.getElementById('rosterCount').textContent = ccap.length + ' students';
     document.getElementById('ccapSubtitle').textContent = ccap.length + ' active CCAP students';
     document.getElementById('exportBtn').style.display = '';
@@ -165,7 +169,7 @@ function renderEligible() {
         if (!income || !hhSize) return false;
         const idx = Math.max(1, Math.min(hhSize, 8)) - 1;
         return income <= CCAP_THRESHOLDS[idx];
-    });
+    }).sort(sortByName);
 
     document.getElementById('eligibleCount').textContent = eligible.length + ' families';
     document.getElementById('ccapSubtitle').textContent = eligible.length + ' families under 225% FPL not currently on CCAP';
@@ -231,7 +235,7 @@ function printEligible() {
         const income = parseInt(s.HouseholdIncome) || 0, hh = parseInt(s.HouseholdSize) || 0;
         if (!income || !hh) return false;
         return income <= CCAP_THRESHOLDS[Math.max(0, Math.min(hh - 1, 7))];
-    });
+    }).sort(sortByName);
     if (!eligible.length) { alert('No families are currently flagged as potentially eligible.'); return; }
     const printedOn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const bodyRows = eligible.map(s => {
@@ -285,7 +289,7 @@ function exportCCAP() {
     let csv = '';
     if (activeTab === 'roster') {
         csv = 'Last Name,First Name,Room,Income,HH Size,Start Date\n';
-        students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP').forEach(s => {
+        students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP').sort(sortByName).forEach(s => {
             csv += ['"'+s.Last_Name+'"','"'+s.First_Name+'"','"'+getRoom(s.RoomNumber)+'"',s.HouseholdIncome||'',s.HouseholdSize||'','"'+(s.CCAPStartDate||'')+'"'].join(',') + '\n';
         });
     } else {
@@ -295,7 +299,7 @@ function exportCCAP() {
             const income = parseInt(s.HouseholdIncome)||0, hh = parseInt(s.HouseholdSize)||0;
             if (!income || !hh) return false;
             return income <= CCAP_THRESHOLDS[Math.max(0,Math.min(hh-1,7))];
-        }).forEach(s => {
+        }).sort(sortByName).forEach(s => {
             const idx = Math.max(0,Math.min((parseInt(s.HouseholdSize)||1)-1,7));
             csv += ['"'+s.Last_Name+'"','"'+s.First_Name+'"','"'+getRoom(s.RoomNumber)+'"','"'+(s.Category||'')+'"',s.HouseholdIncome||'',s.HouseholdSize||'',CCAP_THRESHOLDS[idx]].join(',') + '\n';
         });
