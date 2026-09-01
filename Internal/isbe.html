@@ -531,8 +531,16 @@ function sortByName(a, b) {
     return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
 }
 
+// Roster order: by room number, then alphabetical by name within each room.
+function sortByRoomThenName(a, b) {
+    const ra = parseInt(a.RoomNumber), rb = parseInt(b.RoomNumber);
+    const aNum = isNaN(ra) ? Infinity : ra, bNum = isNaN(rb) ? Infinity : rb;
+    if (aNum !== bNum) return aNum - bNum;
+    return sortByName(a, b);
+}
+
 function renderRoster() {
-    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByName);
+    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByRoomThenName);
     document.getElementById('isbeCount').textContent = roster.length + ' students';
     const tbody = document.getElementById('isbeBody');
     if (!roster.length) { tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
@@ -611,7 +619,7 @@ function serializeModalForPrint(modalEl) {
 }
 
 async function printAllForColumn(field) {
-    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByName);
+    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByRoomThenName);
     const unchecked = roster.filter(s => !(trackingData[s.Id] || {})[field]);
     if (!unchecked.length) { alert('All forms in this column are already completed!'); return; }
 
