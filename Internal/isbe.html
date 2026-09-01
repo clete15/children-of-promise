@@ -72,6 +72,8 @@
             html, body { background: white !important; background-image: none !important; }
             /* Minimize browser header/footer space (URL, page numbers, title, date) */
             @page { margin: 0.5in; }
+            /* Collapse all page content (not just hide it) so it reserves no blank page */
+            body > * { display:none !important; }
             body * { visibility:hidden; }
             /* Only the overlay actively being printed is shown, so print produces a single copy. */
             .pi-overlay:not([data-printing]) { display:none !important; }
