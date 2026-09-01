@@ -469,7 +469,21 @@ async function updateStatusAPI(id, status) {
 }
 
 async function saveNotes(id) {
-    const notes = document.getElementById(`notes-${id}`).value;
+    const el = document.getElementById(`notes-${id}`);
+    let notes = el.value.trim();
+    // Append a timestamp to the end of the note when there's content to stamp.
+    // Skip if the note already ends with a timestamp line (avoids duplicate stamps on re-save).
+    if (notes) {
+        const stampRe = /—\s*\d{1,2}\/\d{1,2}\/\d{4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)\s*$/i;
+        if (!stampRe.test(notes)) {
+            const now = new Date().toLocaleString('en-US', {
+                month: 'numeric', day: 'numeric', year: 'numeric',
+                hour: 'numeric', minute: '2-digit'
+            });
+            notes = notes + '\n— ' + now;
+            el.value = notes;
+        }
+    }
     try {
         const res = await fetch(`/api/waitinglist/${id}`, {
             method: 'PUT',
