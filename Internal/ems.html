@@ -1185,6 +1185,24 @@ function setMode(mode) {
     if (mode === 'notifications') renderAlerts();
 }
 
+// Set only the visible mode (no data building) — runs synchronously before first
+// paint so deep-links like ?view=roster don't briefly flash the EMS view.
+function setInitialModeDisplay() {
+    const view = new URLSearchParams(window.location.search).get('view');
+    const modeByView = { roster: 'roster', benefits: 'benefits', waitlist: 'waitlist', reports: 'reports' };
+    const mode = modeByView[view] || 'ems';
+    const ids = { ems:'emsMode', roster:'rosterMode', benefits:'benefitsMode', waitlist:'waitlistMode', reports:'reportsMode', notifications:'notificationsMode' };
+    Object.entries(ids).forEach(([m, id]) => {
+        const el = document.getElementById(id);
+        if (el) el.style.display = (m === mode) ? 'block' : 'none';
+    });
+    // Deep-linked single views hide the mode toggle bar (matches init() behavior).
+    if (view === 'roster' || view === 'waitlist') {
+        const bar = document.querySelector('.mode-toggle-bar');
+        if (bar) bar.style.display = 'none';
+    }
+}
+
 function showNotification(msg, type = 'info') {
     const el = document.createElement('div');
     el.className = `notification ${type}`;
@@ -2606,6 +2624,7 @@ async function saveRoom(i) {
     } catch (e) { showNotification('Network error', 'error'); }
 }
 
+setInitialModeDisplay();
 init();
 </script>
 </body>
