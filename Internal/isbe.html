@@ -65,12 +65,13 @@
         /* Print styles for the form */
         @media print {
             body * { visibility:hidden; }
+            /* Only the overlay actively being printed is shown, so print produces a single copy. */
+            .pi-overlay:not([data-printing]) { display:none !important; }
             .pi-overlay[data-printing] .pi-modal, .pi-overlay[data-printing] .pi-modal * { visibility:visible; }
-            .pi-overlay.open .pi-modal, .pi-overlay.open .pi-modal * { visibility:visible; }
-            .pi-modal { position:fixed;left:0;top:0;width:100%;max-width:100%;max-height:none;overflow:visible;box-shadow:none;border-radius:0; }
+            .pi-overlay[data-printing] { display:block !important;position:static;background:none; }
+            .pi-overlay[data-printing] .pi-modal { position:static;width:100%;max-width:100%;max-height:none;overflow:visible;box-shadow:none;border-radius:0;margin:0; }
             .pi-modal-footer { display:none; }
             .pi-modal-header .pi-close { display:none; }
-            .pi-overlay.open { display:flex !important;position:fixed; }
         }
     </style>
 </head>
