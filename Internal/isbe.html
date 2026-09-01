@@ -62,6 +62,10 @@
         .pi-btn:disabled { opacity:0.5;cursor:not-allowed; }
         .pi-saved-badge { display:inline-flex;align-items:center;gap:4px;font-size:0.72rem;color:#059669;font-weight:600; }
 
+        /* Print All container is hidden on screen; only used to build the print job */
+        #printAllContainer { display:none; }
+        .print-value { display:inline-block;min-height:1em; }
+
         /* Print styles for the form */
         @media print {
             body * { visibility:hidden; }
@@ -77,6 +81,15 @@
             .pi-overlay[data-printing] textarea::placeholder { color:transparent !important; opacity:0 !important; }
             .pi-overlay[data-printing] input::-webkit-input-placeholder,
             .pi-overlay[data-printing] textarea::-webkit-input-placeholder { color:transparent !important; opacity:0 !important; }
+
+            /* Print All: single job, one form per page */
+            #printAllContainer[data-printing] { display:block !important;position:static;visibility:visible; }
+            #printAllContainer[data-printing] * { visibility:visible; }
+            #printAllContainer[data-printing] .print-page { page-break-after:always;break-after:page; }
+            #printAllContainer[data-printing] .print-page:last-child { page-break-after:auto;break-after:auto; }
+            #printAllContainer[data-printing] .pi-modal { position:static;width:100%;max-width:100%;box-shadow:none;border-radius:0;margin:0; }
+            /* Render captured values with the same underline styling as signature/date fields */
+            #printAllContainer[data-printing] .print-value { border-bottom:1px solid #9ca3af;min-width:120px;padding:2px 4px;font-weight:600; }
         }
     </style>
 </head>
@@ -445,6 +458,9 @@
     </div>
 </div>
 
+<!-- Hidden container used to build a single multi-form print job (Print All) -->
+<div id="printAllContainer"></div>
+
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 function apiFetch(url, opts = {}) {
@@ -567,87 +583,77 @@ function renderRoster() {
 }
 
 // ── Print All for Column ──
-let printAllQueue = [];
-let printAllIndex = 0;
-let printAllField = '';
+// Serialize a populated .pi-modal into static HTML with input/textarea/select
+// values baked in (so typed and saved values print correctly, empties print blank).
+function serializeModalForPrint(modalEl) {
+    const clone = modalEl.cloneNode(true);
+    // Drop the footer (buttons) and the close button from the print copy.
+    clone.querySelectorAll('.pi-modal-footer, .pi-close').forEach(el => el.remove());
+    // Replace live form controls with their current values as static text.
+    const liveControls = modalEl.querySelectorAll('input, textarea, select');
+    const cloneControls = clone.querySelectorAll('input, textarea, select');
+    cloneControls.forEach((cEl, i) => {
+        const live = liveControls[i];
+        let val = '';
+        if (live) {
+            if (live.tagName === 'SELECT') {
+                val = live.options[live.selectedIndex] ? live.options[live.selectedIndex].text : '';
+            } else {
+                val = live.value || '';
+            }
+        }
+        const span = document.createElement('span');
+        span.className = 'print-value';
+        span.textContent = val;
+        cEl.replaceWith(span);
+    });
+    return clone.outerHTML;
+}
 
 async function printAllForColumn(field) {
     const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByName);
     const unchecked = roster.filter(s => !(trackingData[s.Id] || {})[field]);
     if (!unchecked.length) { alert('All forms in this column are already completed!'); return; }
 
-    printAllQueue = unchecked.map(s => s.Id);
-    printAllIndex = 0;
-    printAllField = field;
+    const count = unchecked.length;
+    if (!confirm('This will build a single print preview with ' + count + ' form(s) — one per page — for all unchecked students in this column.\n\nContinue?')) return;
 
-    const count = printAllQueue.length;
-    if (!confirm('This will print ' + count + ' form(s) for all unchecked students in this column.\n\nAfter each print dialog, the next form will open automatically.\n\nContinue?')) return;
-
-    await printNextInQueue();
-}
-
-async function printNextInQueue() {
-    if (printAllIndex >= printAllQueue.length) {
-        // Done printing all
-        alert('All ' + printAllQueue.length + ' forms have been sent to print.');
-        printAllQueue = [];
-        printAllIndex = 0;
-        printAllField = '';
+    // Map the column to the open function + overlay used to populate a form.
+    let openFn, overlayId, closeFn;
+    if (field === 'PermissionSlip') {
+        openFn = id => openPermissionSlip(id); overlayId = 'psOverlay'; closeFn = closePermissionSlip;
+    } else if (field === 'ParentInterview') {
+        openFn = id => openInterview(id); overlayId = 'piOverlay'; closeFn = closeInterview;
+    } else if (field === 'BegASQ' || field === 'EndASQ') {
+        const period = field === 'BegASQ' ? 'Beginning' : 'End';
+        openFn = id => openScreening(id, 'ASQ-3', period); overlayId = 'scrOverlay'; closeFn = closeScreening;
+    } else if (field === 'BegASE' || field === 'EndASE') {
+        const period = field === 'BegASE' ? 'Beginning' : 'End';
+        openFn = id => openScreening(id, 'ASQ:SE-2', period); overlayId = 'scrOverlay'; closeFn = closeScreening;
+    } else {
+        alert('This column does not support Print All.');
         return;
     }
 
-    const studentId = printAllQueue[printAllIndex];
-    const student = students.find(s => String(s.Id) === String(studentId));
-    const studentName = student ? student.First_Name + ' ' + student.Last_Name : 'Student';
+    const overlay = document.getElementById(overlayId);
+    const modalEl = overlay.querySelector('.pi-modal');
 
-    if (printAllField === 'PermissionSlip') {
-        await openPermissionSlip(studentId);
-        // Small delay to let modal render
-        setTimeout(() => {
-            document.getElementById('psOverlay').setAttribute('data-printing', '1');
-            window.print();
-            document.getElementById('psOverlay').removeAttribute('data-printing');
-            closePermissionSlip();
-            printAllIndex++;
-            setTimeout(() => printNextInQueue(), 300);
-        }, 400);
-    } else if (printAllField === 'ParentInterview') {
-        await openInterview(studentId);
-        setTimeout(() => {
-            document.getElementById('piOverlay').setAttribute('data-printing', '1');
-            window.print();
-            document.getElementById('piOverlay').removeAttribute('data-printing');
-            closeInterview();
-            printAllIndex++;
-            setTimeout(() => printNextInQueue(), 300);
-        }, 400);
-    } else if (printAllField === 'BegASQ' || printAllField === 'EndASQ') {
-        const period = printAllField === 'BegASQ' ? 'Beginning' : 'End';
-        await openScreening(studentId, 'ASQ-3', period);
-        setTimeout(() => {
-            document.getElementById('scrOverlay').setAttribute('data-printing', '1');
-            window.print();
-            document.getElementById('scrOverlay').removeAttribute('data-printing');
-            closeScreening();
-            printAllIndex++;
-            setTimeout(() => printNextInQueue(), 300);
-        }, 400);
-    } else if (printAllField === 'BegASE' || printAllField === 'EndASE') {
-        const period = printAllField === 'BegASE' ? 'Beginning' : 'End';
-        await openScreening(studentId, 'ASQ:SE-2', period);
-        setTimeout(() => {
-            document.getElementById('scrOverlay').setAttribute('data-printing', '1');
-            window.print();
-            document.getElementById('scrOverlay').removeAttribute('data-printing');
-            closeScreening();
-            printAllIndex++;
-            setTimeout(() => printNextInQueue(), 300);
-        }, 400);
-    } else {
-        // Unsupported column for print all
-        printAllIndex++;
-        await printNextInQueue();
+    // Build all forms into the print container (one page each).
+    const pages = [];
+    for (const s of unchecked) {
+        await openFn(s.Id);          // populates the live modal + loads saved data
+        pages.push(serializeModalForPrint(modalEl));
     }
+    closeFn();
+
+    const container = document.getElementById('printAllContainer');
+    container.innerHTML = pages
+        .map(html => '<div class="print-page">' + html + '</div>')
+        .join('');
+    container.setAttribute('data-printing', '1');
+    window.print();
+    container.removeAttribute('data-printing');
+    container.innerHTML = '';
 }
 
 async function saveField(studentId, field, value) {
