@@ -72,6 +72,11 @@
             .pi-overlay[data-printing] .pi-modal { position:static;width:100%;max-width:100%;max-height:none;overflow:visible;box-shadow:none;border-radius:0;margin:0; }
             .pi-modal-footer { display:none; }
             .pi-modal-header .pi-close { display:none; }
+            /* Hide input/textarea placeholder helper text on print (e.g. "Type full name as signature") */
+            .pi-overlay[data-printing] input::placeholder,
+            .pi-overlay[data-printing] textarea::placeholder { color:transparent !important; opacity:0 !important; }
+            .pi-overlay[data-printing] input::-webkit-input-placeholder,
+            .pi-overlay[data-printing] textarea::-webkit-input-placeholder { color:transparent !important; opacity:0 !important; }
         }
     </style>
 </head>
