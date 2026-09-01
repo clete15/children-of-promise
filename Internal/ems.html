@@ -16,7 +16,10 @@
         .em-room { font-size:0.82rem;font-weight:700;color:white; }
         .em-room-count { font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:2px; }
         .em-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
-        .em-navbar { padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px; }
+        .em-navbar { padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:8px;position:relative; }
+        .em-active-toggle { position:absolute;right:20px;display:flex;align-items:center;gap:6px;font-size:0.72rem;font-weight:600;color:var(--text-muted);cursor:pointer;white-space:nowrap; }
+        .em-active-toggle input { width:auto;accent-color:var(--primary); }
+        .em-inactive-badge { display:inline-block;margin-left:8px;padding:2px 8px;border-radius:10px;background:#fef2f2;color:var(--danger);font-size:0.65rem;font-weight:700;vertical-align:middle; }
         .em-form-scroll { overflow-y:auto;padding:16px 20px;flex:1; }
 
         .student-nav-arrow {
@@ -60,6 +63,10 @@
                 <button class="student-nav-arrow" id="btnNext" onclick="navigate(1)" disabled>
                     <span class="arrow-icon">▶</span>
                 </button>
+                <label class="em-active-toggle" title="Uncheck to include withdrawn/inactive students">
+                    <input type="checkbox" id="emsActiveOnly" checked onchange="onActiveOnlyChange()">
+                    Active only
+                </label>
             </div>
 
             <div class="em-form-scroll">
@@ -237,18 +244,42 @@ function buildRoomNav() {
     updateRoomNavDisplay();
 }
 
+// True when the "Active only" toggle is on (the default).
+function activeOnly() {
+    return document.getElementById('emsActiveOnly')?.checked !== false;
+}
+
+// Students in a room, honoring the Active-only toggle, alphabetical.
+function roomStudents(rn) {
+    return students
+        .filter(s => String(s.RoomNumber) === String(rn) && (!activeOnly() || isTruthy(s.Active)))
+        .sort(sortByName);
+}
+
+function onActiveOnlyChange() {
+    buildViewSidebar();
+    applyFilter();
+}
+
 function buildViewSidebar() {
     const sidebar = document.getElementById('viewSidebar');
     if (!sidebar) return;
     const rooms = classrooms.map(r => r.RoomNumber);
     if ((!activeRoom || activeRoom === 'All') && rooms.length) { activeRoom = rooms[0]; activeRoomIndex = 0; }
+    const hideInactive = activeOnly();
     sidebar.innerHTML = rooms.map(rn => {
         const cr = getClassroom(rn);
-        const count = students.filter(s => String(s.RoomNumber) === String(rn)).length;
+        const inRoom = students.filter(s => String(s.RoomNumber) === String(rn));
+        const activeCount = inRoom.filter(s => isTruthy(s.Active)).length;
+        const inactiveCount = inRoom.length - activeCount;
+        const count = hideInactive ? activeCount : inRoom.length;
         const isActive = String(activeRoom) === String(rn);
+        // When showing everyone, call out how many of them are inactive.
+        const note = (!hideInactive && inactiveCount)
+            ? ` <span style="color:#fca5a5;">(${inactiveCount} inactive)</span>` : '';
         return `<button class="${isActive ? 'active' : ''}" onclick="setRoomFilter('${rn}')">
             <div class="em-room">${cr ? cr.Room : rn}</div>
-            <div class="em-room-count">${count} student${count !== 1 ? 's' : ''}</div>
+            <div class="em-room-count">${count} student${count !== 1 ? 's' : ''}${note}</div>
         </button>`;
     }).join('');
 }
@@ -268,15 +299,22 @@ function updateRoomNavDisplay() {
     if (filtered.length > 0 && filtered[currentIndex]) {
         const s = filtered[currentIndex];
         nameEl.textContent = `${s.First_Name} ${s.Last_Name}`;
+        // Flag inactive records so a withdrawn student is never mistaken for enrolled.
+        if (!isTruthy(s.Active)) {
+            const badge = document.createElement('span');
+            badge.className = 'em-inactive-badge';
+            badge.textContent = 'Inactive';
+            nameEl.appendChild(badge);
+        }
         counterEl.textContent = `${currentIndex + 1} of ${filtered.length}`;
     } else {
-        nameEl.textContent = 'No students';
+        nameEl.textContent = activeOnly() ? 'No active students' : 'No students';
         counterEl.textContent = '';
     }
 }
 
 function applyFilter() {
-    filtered = students.filter(s => String(s.RoomNumber) === String(activeRoom)).sort(sortByName);
+    filtered = roomStudents(activeRoom);
     currentIndex = 0;
     if (filtered.length > 0 && !isNewMode) loadRecord(0);
     else if (!isNewMode) clearForm();
