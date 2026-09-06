@@ -56,21 +56,9 @@
     </div>
 </div>
 
+<script src="app.js"></script>
 <script>
-const AUTH = 'Basic ' + btoa(':cofpadmin');
-function apiFetch(url, opts = {}) {
-    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
-    return fetch(url, opts);
-}
-function isTruthy(v) { return v === true || v === 1 || v === '1' || (typeof v === 'string' && v.toLowerCase() === 'yes'); }
-
-const now = new Date();
-const usdaYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-const CCAP_THRESHOLDS = {
-    2025: [35213,47588,59963,72338,84713,97088,109463,121838],
-    2026: [35910,48690,61470,74250,87030,99810,112590,125370],
-}[usdaYear] || [35910,48690,61470,74250,87030,99810,112590,125370];
-
+// AUTH, apiFetch, isTruthy, sortByName and CCAP_THRESHOLDS come from app.js.
 async function init() {
     try {
         const [sRes, wRes] = await Promise.all([
@@ -83,11 +71,6 @@ async function init() {
     } catch(e) {
         document.getElementById('alertsBody').innerHTML = '<div class="empty-state"><div class="icon">❌</div>Failed to load: ' + e.message + '</div>';
     }
-}
-
-function sortByName(a, b) {
-    const cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
-    return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
 }
 
 function renderAlerts(students, waitlist) {

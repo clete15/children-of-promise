@@ -66,15 +66,9 @@
 
 <div id="foodPrintFrame" style="display:none;"></div>
 
+<script src="app.js"></script>
 <script>
-const AUTH = 'Basic ' + btoa(':cofpadmin');
-function apiFetch(url, opts = {}) {
-    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
-    return fetch(url, opts);
-}
-
-let students = [];
-let classrooms = [];
+// AUTH, apiFetch, isTruthy, students and classrooms come from app.js.
 let currentPanel = 'food';
 
 async function init() {
@@ -89,12 +83,6 @@ async function init() {
     } catch (e) {
         document.getElementById('fpBody').innerHTML = '<div style="color:red;padding:20px;">Error loading data: ' + e.message + '</div>';
     }
-}
-
-function isTruthy(v) {
-    if (v === true || v === 1 || v === '1') return true;
-    if (typeof v === 'string') return v.toLowerCase() === 'yes';
-    return false;
 }
 
 function showPanel(panel) {

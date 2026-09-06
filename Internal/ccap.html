@@ -72,25 +72,10 @@
     </div>
 </div>
 
+<script src="app.js"></script>
 <script>
-const AUTH = 'Basic ' + btoa(':cofpadmin');
-function apiFetch(url, opts = {}) {
-    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
-    return fetch(url, opts);
-}
-function isTruthy(v) { return v === true || v === 1 || v === '1' || (typeof v === 'string' && v.toLowerCase() === 'yes'); }
-
-// IL CCAP thresholds (225% FPL) - effective July 1
-const now = new Date();
-const usdaYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-const CCAP_GUIDELINES = {
-    2025: [35213,47588,59963,72338,84713,97088,109463,121838],
-    2026: [35910,48690,61470,74250,87030,99810,112590,125370],
-};
-const CCAP_THRESHOLDS = CCAP_GUIDELINES[usdaYear] || CCAP_GUIDELINES[Object.keys(CCAP_GUIDELINES).pop()];
-
-let students = [];
-let classrooms = [];
+// AUTH, apiFetch, isTruthy, sortByName, students, classrooms and the CCAP
+// thresholds (as the flat array CCAP_THRESHOLDS) all come from app.js.
 let activeTab = 'roster';
 
 async function init() {
@@ -104,11 +89,8 @@ async function init() {
     }
 }
 
-function getRoom(rn) { const c = classrooms.find(r => String(r.RoomNumber) === String(rn)); return c ? c.Room : ''; }
-function sortByName(a, b) {
-    const cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
-    return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
-}
+// Local alias; app.js exposes the same lookup as getRoomName.
+function getRoom(rn) { return getRoomName(rn); }
 
 function showTab(tab) {
     activeTab = tab;

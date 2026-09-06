@@ -272,10 +272,11 @@
     </div>
 </div>
 
+<script src="app.js"></script>
 <script>
-const AUTH = 'Basic ' + btoa(':cofpadmin');
+// AUTH and apiFetch come from app.js. This page has its own data model
+// (allRows from /api/waitinglist), so it does not use app.js's students list.
 let allRows = [];
-let classrooms = [];
 let activeTab = 'infant';
 // Every tab shown in the toolbar. 'other' catches unrecognized/missing programs
 // so a real submission can never be invisible to staff.
@@ -293,7 +294,7 @@ function syncScrollbar() {
 async function load() {
     try {
         const [wlRes] = await Promise.all([
-            fetch('/api/waitinglist', { headers: { 'Authorization': AUTH } }),
+            apiFetch('/api/waitinglist'),
         ]);
         allRows = await wlRes.json();
         updateTabCounts();
@@ -352,9 +353,8 @@ async function handleProgramChange(id, selectEl) {
     if (!newGroup) return; // placeholder chosen, nothing to save
     selectEl.disabled = true;
     try {
-        const res = await fetch(`/api/waitinglist/${id}`, {
+        const res = await apiFetch(`/api/waitinglist/${id}`, {
             method: 'PUT',
-            headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
             body: JSON.stringify({ ageGroup: newGroup })
         });
         const data = await res.json();
@@ -521,9 +521,8 @@ function handleStatusChange(id, selectEl) {
 
 async function updateStatusAPI(id, status) {
     try {
-        await fetch(`/api/waitinglist/${id}`, {
+        await apiFetch(`/api/waitinglist/${id}`, {
             method: 'PUT',
-            headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
             body: JSON.stringify({ status })
         });
     } catch (e) { alert('Failed to update status'); }
@@ -548,9 +547,8 @@ async function saveNotes(id) {
     }
     el.value = notes;
     try {
-        const res = await fetch(`/api/waitinglist/${id}`, {
+        const res = await apiFetch(`/api/waitinglist/${id}`, {
             method: 'PUT',
-            headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
             body: JSON.stringify({ notes })
         });
         const data = await res.json();
