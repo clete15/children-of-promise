@@ -126,11 +126,16 @@ function render() {
         // difference is obvious instead of being guessed at.
         let why;
         if (INDEX.noRoot) {
-            why = '<p>The document library folder could not be found on the server. '
-                + 'OneDrive syncs it under the signed-in user\u2019s profile, so the server '
-                + 'account may not have it.</p>'
-                + '<p style="margin-top:8px;">Either sync the library for the account the server '
-                + 'runs as, or set <code>COFP_DOC_ROOT</code> to its path and restart.</p>'
+            why = '<p><strong>The document library is not on this server yet.</strong></p>'
+                + '<p style="margin-top:8px;">OneDrive syncs per signed-in profile, and the server runs '
+                + 'as a service account with no OneDrive. Rather than run a sync client on a server, '
+                + 'copy the library here once and let the server own it:</p>'
+                + '<p style="margin-top:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;'
+                + 'padding:10px;font-family:monospace;font-size:0.72rem;">'
+                + 'robocopy "C:\\Users\\&lt;you&gt;\\Children Of Promise\\Children Of Promise - Documents\\Operations" '
+                + '"C:\\app\\documents\\Operations" /E /R:1 /W:1</p>'
+                + '<p style="margin-top:8px;">Run that on the server, then reload this page \u2014 no restart '
+                + 'needed. Alternatively set <code>COFP_DOC_ROOT</code> to a path it can already reach.</p>'
                 + (INDEX.rootCandidates && INDEX.rootCandidates.length
                     ? '<p style="margin-top:8px;font-size:0.72rem;color:#94a3b8;">Looked in:<br>'
                       + INDEX.rootCandidates.map(esc).join('<br>') + '</p>' : '');

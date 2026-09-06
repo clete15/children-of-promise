@@ -718,6 +718,23 @@ function findDocRoot() {
         ['Children Of Promise - Documents', 'Operations'],
         ['OneDrive', 'Children Of Promise - Documents', 'Operations']
     ];
+    /* Checked first: the library's own home on this server.
+
+       OneDrive syncs per signed-in profile, which is why nothing was found here —
+       the server runs as a service account with no OneDrive at all. Rather than
+       run a sync client as a service, the library lives on the server and the
+       server owns it. That is also the point of retiring SharePoint: one copy, in
+       the place the application can actually read and write. */
+    const SERVER_HOMES = [
+        'C:\\app\\documents\\Operations',
+        'C:\\CofP-Docs\\Operations',
+        'D:\\CofP-Docs\\Operations'
+    ];
+    for (const p of SERVER_HOMES) {
+        DOC_ROOT_CANDIDATES.push(p);
+        if (fs.existsSync(p)) { DOC_ROOT_CACHE = p; return p; }
+    }
+    // Then a workstation's synced copy, which is where it lives before migration.
     const bases = [];
     try {
         fs.readdirSync('C:\\Users', { withFileTypes: true })
