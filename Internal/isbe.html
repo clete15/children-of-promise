@@ -199,6 +199,23 @@
         .sy-overdue { background:#fef2f2;color:#b91c1c; }
         .sy-due { background:#fffbeb;color:#92400e; }
         .sy-done { padding:14px 15px;font-size:0.76rem;color:#166534;background:#f0fdf4; }
+        .sy-license { padding:12px 15px;font-size:0.8rem;font-weight:600; }
+        .sy-license.sy-overdue { background:#fef2f2;color:#b91c1c; }
+        .sy-license.sy-due { background:#fffbeb;color:#92400e; }
+        .sy-license a { margin-left:8px;font-weight:700; }
+
+        /* DCFS license panel inside CB2 */
+        .lic-panel { border:1px solid #e5e7eb;border-radius:8px;padding:11px 13px;margin-top:10px;background:#f8fafc; }
+        .lic-head { font-size:0.78rem;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:9px; }
+        .lic-pill { font-size:0.66rem;font-weight:700;padding:3px 9px;border-radius:11px; }
+        .lic-ok { background:#f0fdf4;color:#166534; }
+        .lic-expiring { background:#fffbeb;color:#92400e; }
+        .lic-expired { background:#fef2f2;color:#b91c1c; }
+        .lic-unknown { background:#f1f5f9;color:#64748b; }
+        .lic-fields { display:flex;flex-wrap:wrap;gap:12px; }
+        .lic-fields label { display:flex;flex-direction:column;gap:3px;font-size:0.68rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.03em; }
+        .lic-fields input { padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.8rem;font-weight:500;font-family:inherit; }
+        .lic-fields input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
 
         /* School year picker in the roster header */
         .year-picker { margin-left:auto;display:flex;align-items:center;gap:7px;flex-shrink:0; }
@@ -788,11 +805,14 @@ let currentInterviewStudentId = null;
 async function init() {
     try {
         renderYearPicker();
+        // Site-level facts (DCFS license). Awaited so the CB2 status and the
+        // license alert are correct on first render, including via a deep link.
         const [sRes, cRes, tRes, scrRes] = await Promise.all([
             apiFetch('/api/students'),
             apiFetch('/api/classrooms'),
             apiFetch(yearQS('/api/isbe-tracking')),
-            apiFetch(yearQS('/api/screening-summary'))
+            apiFetch(yearQS('/api/screening-summary')),
+            loadSiteSettings()
         ]);
         students = await sRes.json();
         classrooms = await cRes.json();
@@ -2059,7 +2079,10 @@ const PICC_ITEMS = [
             'C. Working toward the next advanced ExceleRate level',
             'D. Description of the evidence of that work'
         ],
-        evidence: 'DCFS license, ExceleRate award letter and report dates, Early Head Start federal monitoring report if applicable.'
+        evidence: 'DCFS license, ExceleRate award letter and report dates, Early Head Start federal monitoring report if applicable.',
+        // Renders the site-level DCFS license panel (number + effective/expiry +
+        // countdown) inside this item. The license is not a per-year value.
+        licensePanel: true
     },
     {
         num: 'CB3', title: 'Research-based curriculum aligned to the IELG',
@@ -2514,6 +2537,18 @@ function renderStartYear() {
         + '<div class="sy-year-sub">' + pfa + ' active PFA &middot; ' + pi + ' active PI. '
         + 'Everything below is for this school year only.</div></div></div>';
 
+    // License alert first — an expired or soon-to-expire DCFS license is a hard
+    // monitoring finding and is not tied to the school year.
+    const ls = licenseStatus();
+    if (ls.state === 'expired' || ls.state === 'expiring') {
+        const num = siteSettings[LICENSE_KEYS.number] || '';
+        html += syBlock('DCFS license ' + (ls.state === 'expired' ? 'EXPIRED' : 'expiring'),
+            'Update the license on the CB2 item once the renewal arrives.',
+            '<div class="sy-license sy-' + (ls.state === 'expired' ? 'overdue' : 'due') + '">'
+            + (num ? 'License ' + num + ' \u2014 ' : '') + ls.text
+            + ' <a href="#" onclick="event.preventDefault();setProgram(\'piCompliance\')">open CB2</a></div>');
+    }
+
     // 1. Regulatory clocks.
     const sixMonth = sixMonthWatch();
 
@@ -2661,6 +2696,65 @@ function updateStartYearCount() {
 
 // ── PICC checklist ──
 
+/* Site-level settings (DCFS license, etc.). Loaded once and cached; not scoped
+   to a school year the way the rest of the compliance data is. */
+let siteSettings = {};
+
+async function loadSiteSettings() {
+    try {
+        const res = await apiFetch('/api/site-settings');
+        siteSettings = await res.json();
+    } catch (e) { console.error('Failed to load site settings', e); siteSettings = {}; }
+    return siteSettings;
+}
+
+async function saveSiteSetting(key, value) {
+    siteSettings[key] = value;
+    try {
+        await apiFetch('/api/site-settings', {
+            method: 'POST',
+            body: JSON.stringify({ key: key, value: value })
+        });
+    } catch (e) { console.error('Save site setting failed', e); }
+}
+
+// The DCFS license as three stored settings.
+const LICENSE_KEYS = { number: 'dcfsLicenseNumber', effective: 'dcfsLicenseEffective', expires: 'dcfsLicenseExpires' };
+
+// License status from the stored expiry, with escalating urgency. 60 days is the
+// window worth acting on since a DCFS renewal takes time to process.
+function licenseStatus() {
+    const expires = siteSettings[LICENSE_KEYS.expires];
+    if (!expires) return { state: 'unknown', text: 'no expiration on file' };
+    const left = daysBetween(new Date().toISOString().split('T')[0], expires);
+    if (left === null) return { state: 'unknown', text: 'expiration date unreadable' };
+    if (left < 0) return { state: 'expired', text: 'expired ' + Math.abs(left) + ' days ago', left: left };
+    if (left <= 60) return { state: 'expiring', text: left + ' days until expiration', left: left };
+    return { state: 'ok', text: 'current \u2014 ' + left + ' days remaining', left: left };
+}
+
+// The DCFS license panel shown inside CB2. Reads and writes site settings.
+function licensePanelHtml() {
+    const num = (siteSettings[LICENSE_KEYS.number] || '').replace(/"/g, '&quot;');
+    const eff = siteSettings[LICENSE_KEYS.effective] || '';
+    const exp = siteSettings[LICENSE_KEYS.expires] || '';
+    const st = licenseStatus();
+    return '<div class="lic-panel">'
+        + '<div class="lic-head">DCFS License <span class="lic-pill lic-' + st.state + '">' + st.text + '</span></div>'
+        + '<div class="lic-fields">'
+        + '<label>License #<input type="text" value="' + num + '" onchange="saveLicenseField(\'number\',this.value)" placeholder="e.g. 190206-13"></label>'
+        + '<label>Effective<input type="date" value="' + eff + '" onchange="saveLicenseField(\'effective\',this.value)"></label>'
+        + '<label>Expires<input type="date" value="' + exp + '" onchange="saveLicenseField(\'expires\',this.value)"></label>'
+        + '</div></div>';
+}
+
+function saveLicenseField(which, value) {
+    saveSiteSetting(LICENSE_KEYS[which], value);
+    // Re-render so the status pill and any What-Needs-Doing flag update at once.
+    if (activeComplianceProgram === 'piCompliance') loadCompliance();
+    updateStartYearCount();
+}
+
 // Live per-child evidence roll-up for an item backed by roster columns. Counts a
 // child as complete only when every backing column is ticked, so the number
 // answers "how many files would pass" rather than "how many boxes are ticked".
@@ -2716,12 +2810,17 @@ function renderPiccItem(item, data) {
     var notes = data[key + 'Notes'] || '';
     var savedLink = data[key + 'Link'] || '';
 
-    // Status: derived for per-child items, manual for program-level ones.
+    // Status: derived for per-child items, license-driven for CB2, manual otherwise.
     var status;
     if (stats) {
         if (!stats.total) status = statusPill('none', 'no active PI children');
         else if (stats.complete === stats.total) status = statusPill('ok', stats.total + ' of ' + stats.total + ' files complete');
         else status = statusPill('open', stats.complete + ' of ' + stats.total + ' files complete');
+    } else if (item.licensePanel) {
+        // CB2 status comes from the license expiry, not a manual checkbox.
+        var ls = licenseStatus();
+        var pill = ls.state === 'ok' ? 'ok' : ls.state === 'expiring' ? 'open' : ls.state === 'expired' ? 'expired' : 'none';
+        status = statusPill(pill, 'License ' + ls.text);
     } else {
         status = data[key] ? statusPill('ok', 'evidence recorded') : statusPill('open', 'not recorded');
     }
@@ -2778,6 +2877,7 @@ function renderPiccItem(item, data) {
         + (item.guidance ? '<div class="picc-guidance">' + item.guidance + '</div>' : '')
         + (item.evidence ? '<div class="picc-evidence-hint"><strong>Evidence:</strong> ' + item.evidence + '</div>' : '')
         + (item.na ? '<div class="picc-na"><strong>Not applicable:</strong> ' + item.na + '</div>' : '')
+        + (item.licensePanel ? licensePanelHtml() : '')
         + '<div class="picc-actions">' + evidence + jumps + '</div>'
         + '<div class="picc-controls">'
         + (stats ? '' : '<label class="picc-check"><input type="checkbox" ' + checked

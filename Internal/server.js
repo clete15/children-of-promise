@@ -404,6 +404,21 @@ function parentInterviewEnsureSQL() {
 // rebuilding that constraint; item keys are validated against 50 instead.
 const COMPLIANCE_FIELD_NAME_MAX = 50;
 
+// ── SiteSettings schema ──
+// Key/value store for facts that are true of the site regardless of school year:
+// the DCFS license, ExceleRate level, and similar. Deliberately has no
+// SchoolYear column, which is what distinguishes it from ProgramCompliance.
+function siteSettingsEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='SiteSettings')
+    CREATE TABLE SiteSettings (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        SettingKey NVARCHAR(60) NOT NULL UNIQUE,
+        SettingValue NVARCHAR(MAX),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+}
+
 function complianceEnsureSQL() {
     return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ProgramCompliance')
     CREATE TABLE ProgramCompliance (
@@ -1547,6 +1562,46 @@ ELSE
                 if (name) data[name] = raw === '1' ? true : raw === '0' ? false : raw;
             });
         return sendJSON(res, 200, data);
+    }
+
+    // GET site-level settings (internal - protected)
+    // Facts that span school years live here rather than in ProgramCompliance,
+    // which is keyed per year. First use is the DCFS license.
+    if (req.method === 'GET' && url === '/api/site-settings') {
+        if (!checkAuth(req, res)) return;
+        const sql = siteSettingsEnsureSQL()
+            + `SELECT SettingKey,${txCol('SettingValue')} FROM SiteSettings`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const data = {};
+        r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
+            .forEach(l => {
+                const i = l.indexOf('|');
+                if (i === -1) return;
+                const k = l.slice(0, i).trim();
+                if (k) data[k] = txDecode(l.slice(i + 1).trim());
+            });
+        return sendJSON(res, 200, data);
+    }
+
+    // POST save one site-level setting (internal - protected)
+    if (req.method === 'POST' && url === '/api/site-settings') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const key = String(d.key || '').trim();
+            if (!key || key.length > 60) return sendJSON(res, 400, { error: 'Key required, max 60 chars' });
+            const sql = siteSettingsEnsureSQL()
+                + `IF EXISTS (SELECT 1 FROM SiteSettings WHERE SettingKey=${esc(key)})
+    UPDATE SiteSettings SET SettingValue=${esc(String(d.value == null ? '' : d.value))},UpdatedAt=GETDATE() WHERE SettingKey=${esc(key)}
+ELSE
+    INSERT INTO SiteSettings (SettingKey,SettingValue) VALUES (${esc(key)},${esc(String(d.value == null ? '' : d.value))})`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
     }
 
     // POST save program compliance field (internal - protected)
