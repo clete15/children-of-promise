@@ -193,6 +193,8 @@
     <span>Children of Promise LLC</span>
 </div>
 
+<!-- Worksheet answers persist to the database via this store. -->
+<script src="pas-store.js"></script>
 <script>
 const STORAGE_KEY = 'pas_item_summary';
 
@@ -298,7 +300,7 @@ function getAllData() {
 
 function saveData() {
     const data = getAllData();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
     const confirm = document.getElementById('saveConfirm');
     confirm.classList.add('show');
     setTimeout(() => confirm.classList.remove('show'), 2500);
@@ -306,11 +308,11 @@ function saveData() {
 
 function autoSave() {
     const data = getAllData();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
 function loadData() {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = PasStore.storage.getItem(STORAGE_KEY);
     if (!stored) return;
     try {
         const data = JSON.parse(stored);
@@ -363,9 +365,8 @@ document.addEventListener('input', (e) => {
     }
 });
 
-// Initialize
-initTable();
-loadData();
+// Initialize once saved answers have arrived from the server.
+PasStore.ready.then(function () { initTable(); loadData(); });
 </script>
 </body>
 </html>

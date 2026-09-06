@@ -255,6 +255,8 @@
     <span>Administrator Qualifications Worksheet</span>
 </div>
 
+<!-- Worksheet answers persist to the database via this store. -->
+<script src="pas-store.js"></script>
 <script>
 const STORAGE_KEY = 'pas_admin_quals';
 
@@ -276,14 +278,14 @@ function getAllData() {
 
 function saveData() {
     const data = getAllData();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
     const confirm = document.getElementById('saveConfirm');
     confirm.classList.add('show');
     setTimeout(() => confirm.classList.remove('show'), 2500);
 }
 
 function loadData() {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = PasStore.storage.getItem(STORAGE_KEY);
     if (!stored) return;
     try {
         const data = JSON.parse(stored);
@@ -315,19 +317,19 @@ function loadData() {
 document.addEventListener('change', (e) => {
     if (e.target.matches('[data-field], input[name="adminCredential"]')) {
         const data = getAllData();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
 });
 
 document.addEventListener('input', (e) => {
     if (e.target.matches('[data-field]') && e.target.type !== 'checkbox' && e.target.type !== 'radio') {
         const data = getAllData();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
 });
 
-// Initialize
-loadData();
+// Initialize once saved answers have arrived from the server.
+PasStore.ready.then(loadData);
 </script>
 </body>
 </html>

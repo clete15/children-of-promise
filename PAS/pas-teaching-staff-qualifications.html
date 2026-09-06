@@ -253,6 +253,8 @@
     <span>Teaching Staff Qualifications Worksheet</span>
 </div>
 
+<!-- Worksheet answers persist to the database via this store. -->
+<script src="pas-store.js"></script>
 <script>
 // Classrooms loaded from API
 let CLASSROOMS = [];
@@ -420,7 +422,7 @@ function loadData(classroomKey) {
         document.getElementById('classroom').value = info.name;
     }
 
-    const stored = localStorage.getItem(getStorageKey(classroomKey));
+    const stored = PasStore.storage.getItem(getStorageKey(classroomKey));
     if (!stored) {
         updateStatus(false);
         return;
@@ -447,7 +449,7 @@ function loadData(classroomKey) {
 function saveData() {
     const classroomKey = getCurrentClassroom();
     const data = getAllData();
-    localStorage.setItem(getStorageKey(classroomKey), JSON.stringify(data));
+    PasStore.storage.setItem(getStorageKey(classroomKey), JSON.stringify(data));
     const confirm = document.getElementById('saveConfirm');
     confirm.classList.add('show');
     setTimeout(() => confirm.classList.remove('show'), 2500);
@@ -459,7 +461,7 @@ function clearCurrent() {
     const classroomKey = getCurrentClassroom();
     const info = getClassroomInfo(classroomKey);
     if (!confirm(`Clear all data for "${info.name}"? This cannot be undone.`)) return;
-    localStorage.removeItem(getStorageKey(classroomKey));
+    PasStore.storage.removeItem(getStorageKey(classroomKey));
     loadData(classroomKey);
     updateSavedOverview();
 }
@@ -482,7 +484,7 @@ function updateSavedOverview() {
     let savedKeys = [];
 
     CLASSROOMS.forEach(c => {
-        if (localStorage.getItem(getStorageKey(c.key))) {
+        if (PasStore.storage.getItem(getStorageKey(c.key))) {
             savedKeys.push(c);
         }
     });
@@ -508,7 +510,7 @@ document.getElementById('classroomSelect').addEventListener('change', function()
 document.addEventListener('change', (e) => {
     if (e.target.matches('[data-field]') && e.target.id !== 'classroomSelect') {
         const data = getAllData();
-        localStorage.setItem(getStorageKey(getCurrentClassroom()), JSON.stringify(data));
+        PasStore.storage.setItem(getStorageKey(getCurrentClassroom()), JSON.stringify(data));
         updateStatus(true);
         updateSavedOverview();
     }
@@ -517,7 +519,7 @@ document.addEventListener('change', (e) => {
 document.addEventListener('input', (e) => {
     if (e.target.matches('[data-field]') && e.target.type !== 'checkbox') {
         const data = getAllData();
-        localStorage.setItem(getStorageKey(getCurrentClassroom()), JSON.stringify(data));
+        PasStore.storage.setItem(getStorageKey(getCurrentClassroom()), JSON.stringify(data));
         updateStatus(true);
         updateSavedOverview();
     }
@@ -527,13 +529,13 @@ document.addEventListener('input', (e) => {
 function migrateOldData() {
     // Migrate very old single-key format
     const oldKey = 'pas_teaching_staff_quals';
-    const oldData = localStorage.getItem(oldKey);
+    const oldData = PasStore.storage.getItem(oldKey);
     if (oldData) {
-        const hasNewData = CLASSROOMS.some(c => localStorage.getItem(getStorageKey(c.key)));
+        const hasNewData = CLASSROOMS.some(c => PasStore.storage.getItem(getStorageKey(c.key)));
         if (!hasNewData && CLASSROOMS.length > 0) {
-            localStorage.setItem(getStorageKey(CLASSROOMS[0].key), oldData);
+            PasStore.storage.setItem(getStorageKey(CLASSROOMS[0].key), oldData);
         }
-        localStorage.removeItem(oldKey);
+        PasStore.storage.removeItem(oldKey);
     }
 
     // Migrate old named-key format (infant, toddlers, etc.) to room_N format
@@ -544,19 +546,20 @@ function migrateOldData() {
     };
     Object.keys(OLD_KEY_MAP).forEach(oldK => {
         const oldStorageKey = STORAGE_PREFIX + oldK;
-        const saved = localStorage.getItem(oldStorageKey);
+        const saved = PasStore.storage.getItem(oldStorageKey);
         if (saved) {
             const newK = OLD_KEY_MAP[oldK];
-            if (!localStorage.getItem(STORAGE_PREFIX + newK)) {
-                localStorage.setItem(STORAGE_PREFIX + newK, saved);
+            if (!PasStore.storage.getItem(STORAGE_PREFIX + newK)) {
+                PasStore.storage.setItem(STORAGE_PREFIX + newK, saved);
             }
-            localStorage.removeItem(oldStorageKey);
+            PasStore.storage.removeItem(oldStorageKey);
         }
     });
 }
 
 // Initialize — fetch classrooms then set up
-loadClassrooms();
+// Initialize once saved answers have arrived from the server.
+PasStore.ready.then(loadClassrooms);
 </script>
 </body>
 </html>

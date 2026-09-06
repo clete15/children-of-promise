@@ -1297,17 +1297,24 @@
     <p>Prepared June 2026 | Status Key: <span class="status-have">✓ HAVE</span> | <span class="status-partial">◐ PARTIAL</span> | <span class="status-need">✗ NEED</span></p>
 </footer>
 
+<!-- Worksheet answers persist to the database via this store. -->
+<script src="pas-store.js"></script>
 <script>
+// Everything below reads saved state as it runs, so it waits for the store to
+// finish loading from the server. Without this the checkboxes and notes would
+// render blank on a fresh page load and then be overwritten by the first edit.
+PasStore.ready.then(function () {
+
 // Convert ☐ characters to interactive checkboxes and save/restore state
 (function() {
     const STORAGE_KEY = 'pas_criteria_checks';
 
     function loadState() {
-        try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch(e) { return {}; }
+        try { return JSON.parse(PasStore.storage.getItem(STORAGE_KEY)) || {}; } catch(e) { return {}; }
     }
 
     function saveState(state) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 
     // Find all table cells in Criteria column (3rd column) and replace ☐ with checkboxes
@@ -1343,8 +1350,8 @@
 // Convert status cells to interactive dropdowns
 (function() {
     const STATUS_KEY = 'pas_status_selections';
-    function loadStatus() { try { return JSON.parse(localStorage.getItem(STATUS_KEY)) || {}; } catch(e) { return {}; } }
-    function saveStatus(s) { localStorage.setItem(STATUS_KEY, JSON.stringify(s)); }
+    function loadStatus() { try { return JSON.parse(PasStore.storage.getItem(STATUS_KEY)) || {}; } catch(e) { return {}; } }
+    function saveStatus(s) { PasStore.storage.setItem(STATUS_KEY, JSON.stringify(s)); }
 
     const saved = loadStatus();
     const statusCells = document.querySelectorAll('td[class^="status-"]');
@@ -1387,8 +1394,8 @@
 // Make comments cells editable and save to localStorage
 (function() {
     const COMMENTS_KEY = 'pas_comments';
-    function loadComments() { try { return JSON.parse(localStorage.getItem(COMMENTS_KEY)) || {}; } catch(e) { return {}; } }
-    function saveComments(c) { localStorage.setItem(COMMENTS_KEY, JSON.stringify(c)); }
+    function loadComments() { try { return JSON.parse(PasStore.storage.getItem(COMMENTS_KEY)) || {}; } catch(e) { return {}; } }
+    function saveComments(c) { PasStore.storage.setItem(COMMENTS_KEY, JSON.stringify(c)); }
 
     const saved = loadComments();
     const commentCells = document.querySelectorAll('td.comments-cell');
@@ -1407,6 +1414,8 @@
         cell.appendChild(textarea);
     });
 })();
+
+});   // end PasStore.ready
 </script>
 
 </body>

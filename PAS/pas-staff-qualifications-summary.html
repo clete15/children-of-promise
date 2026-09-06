@@ -218,6 +218,8 @@
     <span>Summary of Teaching Staff Qualifications Worksheet</span>
 </div>
 
+<!-- Worksheet answers persist to the database via this store. -->
+<script src="pas-store.js"></script>
 <script>
 const STORAGE_KEY = 'pas_teaching_staff_summary';
 const AUTH = 'Basic ' + btoa(':cofpadmin');
@@ -293,14 +295,14 @@ function getAllData() {
 
 function saveData() {
     const data = getAllData();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
     const confirm = document.getElementById('saveConfirm');
     confirm.classList.add('show');
     setTimeout(() => confirm.classList.remove('show'), 2500);
 }
 
 function loadData() {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = PasStore.storage.getItem(STORAGE_KEY);
     if (!stored) return;
     try {
         const data = JSON.parse(stored);
@@ -325,19 +327,20 @@ document.addEventListener('input', (e) => {
     }
     if (e.target.matches('[data-field], #program, #formDate')) {
         const data = getAllData();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
 });
 
 document.addEventListener('change', (e) => {
     if (e.target.matches('[data-field], #program, #formDate')) {
         const data = getAllData();
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
 });
 
 // Initialize
-loadClassroomNames();
+// Initialize once saved answers have arrived from the server.
+PasStore.ready.then(loadClassroomNames);
 </script>
 </body>
 </html>

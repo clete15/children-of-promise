@@ -526,6 +526,31 @@ function silverAssessmentEnsureSQL() {
 `;
 }
 
+// ── PasWorksheets schema ──
+// The PAS self-assessment and its supporting worksheets are filled in across
+// seven pages that each kept their answers in browser localStorage, under keys
+// like pas_teaching_staff_quals_<classroom>. That meant the artifact being
+// prepared for submission existed only in whichever browser typed it, could not
+// be reviewed by anyone else, and vanished with a cleared cache.
+//
+// One row per (worksheet, scope). Scope is the classroom key for the per-room
+// worksheets and empty for program-level ones. The answers are stored as the
+// same JSON object the pages already build from their [data-field] inputs, so
+// each page keeps its own shape and no schema change is needed to add a field.
+function pasWorksheetEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='PasWorksheets')
+    CREATE TABLE PasWorksheets (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        WorksheetKey NVARCHAR(60) NOT NULL,
+        ScopeKey NVARCHAR(60) NOT NULL,
+        Payload NVARCHAR(MAX),
+        UpdatedBy NVARCHAR(200),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+}
+
 // ── SiteSettings schema ──
 // Key/value store for facts that are true of the site regardless of school year:
 // the DCFS license, ExceleRate level, and similar. Deliberately has no
@@ -1857,6 +1882,67 @@ ELSE
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true, cleared: isEmpty });
+        });
+        return;
+    }
+
+    // GET PAS worksheet answers (internal - protected)
+    // Returns every saved worksheet. The pages need the full set anyway to show
+    // which classrooms have been completed, and the row count is small.
+    if (req.method === 'GET' && url === '/api/pas-worksheets') {
+        if (!checkAuth(req, res)) return;
+        const sql = pasWorksheetEnsureSQL() + 'GO\n'
+            + `SELECT Id,${txCol('WorksheetKey')},${txCol('ScopeKey')},${txCol('Payload')},${txCol('UpdatedBy')},CONVERT(NVARCHAR(20),UpdatedAt,120) AS UpdatedAt FROM PasWorksheets`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => /^\s*\d+\s*\|/.test(l))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                let payload = {};
+                try { payload = JSON.parse(txDecode(v[3]) || '{}'); } catch (e) { payload = {}; }
+                return {
+                    Id: v[0], WorksheetKey: txDecode(v[1]), ScopeKey: txDecode(v[2]),
+                    Payload: payload, UpdatedBy: txDecode(v[4]), UpdatedAt: v[5]
+                };
+            });
+        return sendJSON(res, 200, rows);
+    }
+
+    // POST save or clear one PAS worksheet (internal - protected)
+    // An empty payload deletes the row, which is what the pages' "clear" action
+    // means; that keeps "no row" as the single meaning of not started.
+    if (req.method === 'POST' && url === '/api/pas-worksheets') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const worksheet = String(d.worksheet || '').trim();
+            if (!worksheet || worksheet.length > 60) return sendJSON(res, 400, { error: 'worksheet key required, max 60 chars' });
+            const scope = String(d.scope || '').trim().slice(0, 60);
+
+            const payloadObj = d.payload && typeof d.payload === 'object' ? d.payload : null;
+            const hasAnswers = payloadObj && Object.keys(payloadObj).some(k => {
+                const v = payloadObj[k];
+                return v !== '' && v !== false && v !== null && v !== undefined;
+            });
+            const where = `WorksheetKey=${esc(worksheet)} AND ScopeKey=${esc(scope)}`;
+
+            if (!hasAnswers) {
+                const r0 = runSQL(pasWorksheetEnsureSQL() + 'GO\n' + `DELETE FROM PasWorksheets WHERE ${where}`);
+                if (!r0.ok) return sendJSON(res, 500, { error: r0.error });
+                return sendJSON(res, 200, { success: true, cleared: true });
+            }
+
+            const payload = JSON.stringify(payloadObj);
+            const by = String(d.updatedBy || '').trim();
+            const sql = pasWorksheetEnsureSQL() + 'GO\n'
+                + `IF EXISTS (SELECT 1 FROM PasWorksheets WHERE ${where})
+    UPDATE PasWorksheets SET Payload=${esc(payload)},UpdatedBy=${esc(by)},UpdatedAt=GETDATE() WHERE ${where}
+ELSE
+    INSERT INTO PasWorksheets (WorksheetKey,ScopeKey,Payload,UpdatedBy) VALUES (${esc(worksheet)},${esc(scope)},${esc(payload)},${esc(by)})`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
         });
         return;
     }

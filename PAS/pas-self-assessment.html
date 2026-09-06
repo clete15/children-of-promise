@@ -252,6 +252,8 @@
     </div>
 </div>
 
+<!-- Worksheet answers persist to the database via this store. -->
+<script src="pas-store.js"></script>
 <script>
 const PAS_ASSESSMENT = [
   {
@@ -610,7 +612,7 @@ let state = {
 
 // Load state from localStorage
 function loadState() {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = PasStore.storage.getItem(STORAGE_KEY);
     if (stored) {
         try {
             const parsed = JSON.parse(stored);
@@ -626,7 +628,7 @@ function loadState() {
 
 // Save state to localStorage
 function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(state));
     syncToSummaryProfile();
 }
 
@@ -636,7 +638,7 @@ function syncToSummaryProfile() {
     if (scoredCount > 0) {
         // Load existing summary profile data or create new
         let profileData = {};
-        const existing = localStorage.getItem(SYNC_KEY);
+        const existing = PasStore.storage.getItem(SYNC_KEY);
         if (existing) {
             try { profileData = JSON.parse(existing); } catch(e) {}
         }
@@ -645,7 +647,7 @@ function syncToSummaryProfile() {
         Object.keys(state.scores).forEach(key => {
             profileData.scores[key] = String(state.scores[key]);
         });
-        localStorage.setItem(SYNC_KEY, JSON.stringify(profileData));
+        PasStore.storage.setItem(SYNC_KEY, JSON.stringify(profileData));
     }
 }
 
@@ -784,9 +786,8 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') navigate(1);
 });
 
-// Initialize
-loadState();
-renderItem();
+// Initialize once saved answers have arrived from the server.
+PasStore.ready.then(function () { loadState(); renderItem(); });
 </script>
 </body>
 </html>
