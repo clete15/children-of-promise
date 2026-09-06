@@ -122,9 +122,28 @@ function render() {
     const body = document.getElementById('dlBody');
     if (!INDEX) { body.innerHTML = '<div class="dl-empty">Nothing loaded.</div>'; return; }
     if (INDEX.missing) {
-        body.innerHTML = '<div class="dl-empty">No folder found at<br><code>' + esc(INDEX.folder)
-            + '</code><br>under <code>' + esc(INDEX.root) + '</code>.<br><br>'
-            + 'Either the year has not been set up yet, or the folder is named differently.</div>';
+        // Say exactly what was looked for and what was found, so a naming or path
+        // difference is obvious instead of being guessed at.
+        let why;
+        if (INDEX.noRoot) {
+            why = '<p>The document library folder could not be found on the server. '
+                + 'OneDrive syncs it under the signed-in user\u2019s profile, so the server '
+                + 'account may not have it.</p>'
+                + '<p style="margin-top:8px;">Either sync the library for the account the server '
+                + 'runs as, or set <code>COFP_DOC_ROOT</code> to its path and restart.</p>'
+                + (INDEX.rootCandidates && INDEX.rootCandidates.length
+                    ? '<p style="margin-top:8px;font-size:0.72rem;color:#94a3b8;">Looked in:<br>'
+                      + INDEX.rootCandidates.map(esc).join('<br>') + '</p>' : '');
+        } else {
+            why = '<p>No folder named<br><code>' + esc(INDEX.folder) + '</code><br>under<br><code>'
+                + esc(INDEX.root) + '</code></p>'
+                + (INDEX.siblings && INDEX.siblings.length
+                    ? '<p style="margin-top:10px;">These folders are there instead \u2014 pick the matching '
+                      + 'year, or the folder may be named differently:</p>'
+                      + '<p style="font-size:0.75rem;color:#475569;">' + INDEX.siblings.map(esc).join('<br>') + '</p>'
+                    : '<p style="margin-top:8px;">The year may not be set up yet.</p>');
+        }
+        body.innerHTML = '<div class="dl-empty" style="text-align:left;max-width:70ch;margin:0 auto;">' + why + '</div>';
         return;
     }
     const keys = Object.keys(INDEX.items).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));

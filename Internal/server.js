@@ -697,9 +697,43 @@ const DEVGOAL_COLUMNS = [
 
    The trailing "- M" / "- C" is the owner: Megan or Clete.                     */
 
-// Where the evidence lives. Overridable so a different machine can point elsewhere.
-const DOC_ROOT = process.env.COFP_DOC_ROOT
-    || 'C:\\Users\\child\\Children Of Promise\\Children Of Promise - Documents\\Operations';
+/* Where the evidence lives.
+
+   OneDrive syncs the library under the signed-in user's profile, and the server
+   runs as a different account from any workstation, so a hardcoded path works on
+   one machine and silently fails on the other. This searches the profiles for the
+   synced library instead, and caches the answer.
+
+   COFP_DOC_ROOT overrides it outright if the folder ever moves somewhere unusual. */
+const DOC_ROOT_CANDIDATES = [];
+let DOC_ROOT_CACHE = null;
+
+function findDocRoot() {
+    if (process.env.COFP_DOC_ROOT) return process.env.COFP_DOC_ROOT;
+    if (DOC_ROOT_CACHE && fs.existsSync(DOC_ROOT_CACHE)) return DOC_ROOT_CACHE;
+    DOC_ROOT_CANDIDATES.length = 0;
+    const tails = [
+        ['Children Of Promise', 'Children Of Promise - Documents', 'Operations'],
+        ['OneDrive - Children Of Promise', 'Children Of Promise - Documents', 'Operations'],
+        ['Children Of Promise - Documents', 'Operations'],
+        ['OneDrive', 'Children Of Promise - Documents', 'Operations']
+    ];
+    const bases = [];
+    try {
+        fs.readdirSync('C:\\Users', { withFileTypes: true })
+            .filter(d => d.isDirectory() && !/^(All Users|Default|Public|Default User)$/i.test(d.name))
+            .forEach(d => bases.push(path.join('C:\\Users', d.name)));
+    } catch (e) { /* fall through to the fixed candidates below */ }
+    bases.push('C:\\', 'C:\\app');
+    for (const b of bases) {
+        for (const t of tails) {
+            const p = path.join(b, ...t);
+            DOC_ROOT_CANDIDATES.push(p);
+            if (fs.existsSync(p)) { DOC_ROOT_CACHE = p; return p; }
+        }
+    }
+    return null;
+}
 
 /* Pulls the PICC/PIQUET item number out of a folder name.
      "CB2.D - DCFS License and Evidence of Excelrate"  -> CB2.D
@@ -756,9 +790,11 @@ function docMetaEnsureSQL() {
    anything that escapes, which callers treat as 404 rather than explaining why. */
 function resolveDocPath(rel) {
     if (!rel) return null;
+    const docRoot = findDocRoot();
+    if (!docRoot) return null;
     const decoded = String(rel).replace(/\\/g, '/');
     if (decoded.includes('\0')) return null;
-    const root = path.resolve(DOC_ROOT);
+    const root = path.resolve(docRoot);
     const full = path.resolve(root, decoded);
     const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep;
     if (full !== root && !full.startsWith(rootWithSep)) return null;
@@ -767,9 +803,21 @@ function resolveDocPath(rel) {
 
 // Walks a year's evidence folder and groups the files by item number.
 function indexYearFolder(programFolder, yearFolder) {
+    const DOC_ROOT = findDocRoot();
+    if (!DOC_ROOT) return { items: {}, childFiles: [], missing: true, noRoot: true };
     const base = path.join(DOC_ROOT, programFolder, yearFolder);
     const out = { items: {}, childFiles: [], missing: !fs.existsSync(base) };
-    if (out.missing) return out;
+    if (out.missing) {
+        // List what IS there, so a naming difference is obvious rather than guessed at.
+        const parent = path.join(DOC_ROOT, programFolder);
+        try {
+            if (fs.existsSync(parent)) {
+                out.siblings = fs.readdirSync(parent, { withFileTypes: true })
+                    .filter(d => d.isDirectory()).map(d => d.name);
+            }
+        } catch (e) { /* nothing more to report */ }
+        return out;
+    }
     // PICC and PIQUET sit under the visit folder; tolerate either being absent.
     ['PICC', 'PIQUET', ''].forEach(section => {
         const dir = section ? path.join(base, section) : base;
@@ -2121,7 +2169,10 @@ ELSE
             });
         }
         return sendJSON(res, 200, {
-            root: DOC_ROOT, program, year, folder,
+            root: findDocRoot(), program, year, folder,
+            // Reported so a wrong path is diagnosable from the page itself.
+            rootCandidates: findDocRoot() ? undefined : DOC_ROOT_CANDIDATES.slice(0, 12),
+            siblings: idx.siblings, noRoot: idx.noRoot,
             missing: idx.missing, items: idx.items,
             childFolder: idx.childFolder || null,
             childFileCount: (idx.childFiles || []).length,
