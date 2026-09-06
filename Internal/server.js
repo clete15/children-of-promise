@@ -434,6 +434,7 @@ function staffEnsureSQL() {
         ReviewedBy NVARCHAR(200),
         ReviewedDate NVARCHAR(20),
         StaffGroup NVARCHAR(40),
+        SecondaryClassroom NVARCHAR(100),
         CreatedAt DATETIME DEFAULT GETDATE(),
         UpdatedAt DATETIME DEFAULT GETDATE()
     );
@@ -444,6 +445,16 @@ GO
    counting owners and administrators in that denominator would understate them. */
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='StaffGroup')
     ALTER TABLE Staff ADD StaffGroup NVARCHAR(40);
+GO
+/* A second room the person is SCHEDULED to teach in part time, distinct from the
+   irregular fill-in cover that is deliberately not tracked. It has to be a real
+   place on the schedule, because that is what lets a credential be counted: the
+   ExceleRate infant/toddler requirement is about staff working with infants and
+   toddlers, and unscheduled cover would not support the claim.
+
+   Staff appear on the PAS teaching worksheet for both rooms. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='SecondaryClassroom')
+    ALTER TABLE Staff ADD SecondaryClassroom NVARCHAR(100);
 `;
 }
 
@@ -454,7 +465,7 @@ const STAFF_COLUMNS = [
     ['Fte', 'fte'], ['Education', 'education'], ['EceCredentials', 'eceCredentials'],
     ['Gateways', 'gateways'], ['ExperienceYears', 'experienceYears'], ['RegistryId', 'registryId'],
     ['Notes', 'notes'], ['ReviewedBy', 'reviewedBy'], ['ReviewedDate', 'reviewedDate'],
-    ['StaffGroup', 'staffGroup']
+    ['StaffGroup', 'staffGroup'], ['SecondaryClassroom', 'secondaryClassroom']
 ];
 
 /* One-time migration payload: the staff list that used to be hardcoded in

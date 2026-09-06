@@ -786,9 +786,16 @@ async function prefillFromStaff() {
             return;
         }
 
-        const active = (staff || []).filter(s => s.Active === undefined || s.Active === true || s.Active === 1);
+        /* Ownership and administration are excluded: the ExceleRate credential
+           percentages are proportions of teaching staff, and Genni confirmed the
+           ownership group is left out of the totals. */
+        const active = (staff || []).filter(s => s.Active === undefined || s.Active === true || s.Active === 1)
+            .filter(s => (s.StaffGroup || '') !== 'Ownership');
         const target = canonicalRoom(info.name);
-        const matched = active.filter(s => canonicalRoom(s.Classroom) === target);
+        // A part-time second classroom counts as well: someone scheduled into two
+        // rooms belongs on both worksheets.
+        const matched = active.filter(s => canonicalRoom(s.Classroom) === target
+            || canonicalRoom(s.SecondaryClassroom) === target);
 
         if (!matched.length) {
             // Say WHY nothing matched and what to do, rather than just "no results".
@@ -798,7 +805,7 @@ async function prefillFromStaff() {
             const unplaced = active
                 .filter(s => (s.Classroom || '').trim())
                 .filter(s => !CLASSROOMS.some(c => canonicalRoom(c.name) === canonicalRoom(s.Classroom)))
-                .map(s => `<li>${s.Name} — classroom recorded as “<strong>${s.Classroom}</strong>”</li>`)
+                .map(s => `<li>${s.Name} — classroom recorded as \u201c<strong>${s.Classroom}</strong>\u201d</li>`)
                 .join('');
             showPrefillReport(
                 `<h4>No staff are assigned to ${info.name}</h4>`
@@ -855,6 +862,12 @@ async function prefillFromStaff() {
 
             setField(`initials_${i}`, initialsFrom(s.Name));
             got.push('initials');
+
+            // Make it visible when someone is only here part of the week.
+            if (canonicalRoom(s.SecondaryClassroom) === target && canonicalRoom(s.Classroom) !== target) {
+                miss.push(`part time in this room \u2014 assigned to ${s.Classroom || 'no other room'}; `
+                    + 'confirm the hours support counting them here');
+            }
 
             const role = row.role;
             if (role) {

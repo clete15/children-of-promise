@@ -323,6 +323,19 @@
             </div>
             <div class="form-row">
                 <div class="form-group" style="flex:1 1 100%;">
+                    <label>Second classroom (scheduled part time)</label>
+                    <!-- A second room the person is actually scheduled into, not
+                         irregular fill-in cover. They appear on the PAS teaching
+                         staff worksheet for both rooms, and their credentials
+                         count toward both rooms' requirements. Leave blank unless
+                         it is really on the schedule. -->
+                    <select id="editSecondaryClassroom" style="max-width:340px;">
+                        <option value="">— none —</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1 1 100%;">
                     <label>Other credentials</label>
                     <!-- Anything not covered by the levels above (Gold IT2,
                          Autism 101, and so on) is kept here verbatim so nothing
@@ -459,6 +472,7 @@ function cardHtml(s) {
             <div class="card-body">
                 <div class="card-field"><span class="cf-label">Review</span><span class="cf-value">${reviewBadge}</span></div>
                 <div class="card-field"><span class="cf-label">Classroom</span><span class="cf-value ${!s.Classroom ? 'empty' : ''}">${s.Classroom || '—'}</span></div>
+                ${s.SecondaryClassroom ? '<div class="card-field"><span class="cf-label">Also teaches</span><span class="cf-value" style="color:#7c3aed;">' + s.SecondaryClassroom + ' <span style="color:#94a3b8;">(part time)</span></span></div>' : ''}
                 <div class="card-field"><span class="cf-label">Education</span><span class="cf-value ${!s.Education ? 'empty' : ''}">${s.Education || '—'}</span></div>
                 <div class="card-field"><span class="cf-label">Gateways / ECE</span><span class="cf-value ${!s.Gateways && !s.EceCredentials ? 'empty' : ''}">${s.Gateways || s.EceCredentials || '—'}</span></div>
                 <div class="card-field"><span class="cf-label">Experience</span><span class="cf-value ${!s.ExperienceYears ? 'empty' : ''}">${s.ExperienceYears ? s.ExperienceYears + ' yrs' : '—'}</span></div>
@@ -491,6 +505,7 @@ function openEdit(id) {
     setSelectPreserving('editRole', s.Role || '');
     populateClassroomOptions();
     setSelectPreserving('editClassroom', s.Classroom || '', true);
+    setSelectPreserving('editSecondaryClassroom', s.SecondaryClassroom || '', true);
 
     // Split the stored credential text into the level dropdowns.
     const creds = parseCredentials(s.EceCredentials || s.Gateways || '');
@@ -527,13 +542,16 @@ function setSelectPreserving(selectId, value, flagUnknown) {
     sel.value = value;
 }
 
-// Room list comes from the classroom table, so it stays right when rooms change.
+// Room lists come from the classroom table, so they stay right when rooms change.
 function populateClassroomOptions() {
-    const sel = document.getElementById('editClassroom');
-    const current = sel.value;
-    sel.innerHTML = '<option value="">— none (no assigned room) —</option>'
-        + (window.CLASSROOM_LIST || []).map(c => `<option value="${c}">${c}</option>`).join('');
-    sel.value = current;
+    [['editClassroom', '— none (no assigned room) —'], ['editSecondaryClassroom', '— none —']]
+        .forEach(([id, blank]) => {
+            const sel = document.getElementById(id);
+            const current = sel.value;
+            sel.innerHTML = `<option value="">${blank}</option>`
+                + (window.CLASSROOM_LIST || []).map(c => `<option value="${c}">${c}</option>`).join('');
+            sel.value = current;
+        });
 }
 
 async function loadClassroomList() {
@@ -598,6 +616,7 @@ async function saveStaff() {
         role: document.getElementById('editRole').value.trim(),
         program: document.getElementById('editProgram').value,
         staffGroup: document.getElementById('editStaffGroup').value,
+        secondaryClassroom: document.getElementById('editSecondaryClassroom').value,
         classroom: document.getElementById('editClassroom').value.trim(),
         fte: document.getElementById('editFTE').value.trim(),
         education: document.getElementById('editEducation').value,
