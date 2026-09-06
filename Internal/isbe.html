@@ -198,6 +198,7 @@
             <!-- Program Compliance Panel -->
             <div id="compliancePanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
                 <div style="max-width:600px;margin:0 auto;">
+                    <div id="piMonitoringBanner" style="display:none;"></div>
                     <p style="font-size:0.78rem;color:#6b7280;margin-bottom:20px;">These are program-level compliance items tracked once per school year for the entire site.</p>
                     <div id="complianceList" style="display:flex;flex-direction:column;gap:12px;"></div>
                     <div style="margin-top:20px;display:flex;gap:10px;align-items:center;">
@@ -1368,7 +1369,34 @@ const PFA_COMPLIANCE_ITEMS = [
     { key: 'PFACalendar', label: 'PFA Calendar', description: 'PFA program calendar submitted and approved for the school year' },
 ];
 
+// FY27 PI monitoring context, per the IDEC notification letter dated 8/31/2026.
+// IDEC contracted The Vander Weele Group LLC to conduct PI monitoring.
+const PI_FY27_MONITORING = {
+    window: 'September 1, 2026 – May 31, 2027',
+    monitor: 'The Vander Weele Group, LLC (contracted by IDEC)',
+    contact: 'DEC.EarlyChi@Illinois.gov',
+    notifiedVia: 'primary contact on the EUNA PI application',
+    // The PICC assesses compliance against these four sources.
+    basis: [
+        '23 Ill. Admin. Code Part 2050',
+        'PI Request for Proposals (RFP)',
+        'Fiscal year electronic grant',
+        'Illinois Birth to Five Program Standards',
+    ],
+    // Instruments listed for CENTER-BASED monitoring. Home-visiting tools
+    // (HOVRS-3) are intentionally excluded: they do not apply to a center.
+    tools: [
+        { name: 'EC Block Grant PI Compliance Checklist (PICC)', note: 'Assesses program compliance against Part 2050, the RFP, the electronic grant, and the Birth to Five Program Standards.' },
+        { name: 'ITERS-3', note: 'Infant/Toddler Environment Rating Scale, 3rd ed. Environmental provisions plus teacher–child interactions affecting language, cognitive, social-emotional and physical development, and health & safety. Harms, Cryer, Clifford & Yazejian (2017).' },
+        { name: 'PIQET-3', note: 'Prevention Initiative Quality Evaluation Tool-3. Measures program quality across PI programs. Abbruzzese, Pouw, Reed & Viecelli (2026), Vander Weele Group LLC.' },
+        { name: 'FCCERS-3', note: 'Family Child Care Environment Rating Scale, 3rd ed. Applies only to family child care homes — confirm with IDEC whether it applies to this site.', conditional: true },
+    ],
+};
+
 const PI_COMPLIANCE_ITEMS = [
+    { key: 'PICC', label: 'PI Compliance Checklist (PICC)', description: 'Full PICC reviewed and supporting evidence assembled for the FY27 monitoring visit' },
+    { key: 'ITERS3Observation', label: 'ITERS-3 Classroom Observation', description: 'ITERS-3 observation completed for each infant/toddler classroom' },
+    { key: 'PIQET3', label: 'PIQET-3 Quality Evaluation', description: 'Prevention Initiative Quality Evaluation Tool-3 completed' },
     { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', link: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?FolderCTID=0x01200055A06E3FB2FE0E4BB767F725C99B70FF&id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EA%20written%20Annual%20Self%2DAssessment%20%2D%20Completed%20after%20Monitoring%20Visit' },
     { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', link: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EB%20Written%20CQIP%20%2D%20Completed%20afer%20Monitoring%20Visit%2F2025%2D26%20CQIP%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EB%20Written%20CQIP%20%2D%20Completed%20afer%20Monitoring%20Visit' },
     { key: 'ITERS3CQIP', label: 'ITERS-3 CQIP', description: 'ITERS-3 infant/toddler environment assessment and quality improvement plan' },
@@ -1380,6 +1408,47 @@ let activeComplianceProgram = 'pfaCompliance';
 function getComplianceYear() {
     var sel = document.getElementById('complianceYear');
     return sel ? sel.value : '';
+}
+
+// Shows the FY27 monitoring window, who is monitoring, and which instruments
+// apply. Only relevant on the PI panel; hidden for PFA.
+function renderPIMonitoringBanner() {
+    const el = document.getElementById('piMonitoringBanner');
+    if (!el) return;
+    if (activeComplianceProgram !== 'piCompliance') { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+
+    const m = PI_FY27_MONITORING;
+    // Days remaining in the monitoring window; the visit can land any time inside it.
+    const end = new Date('2027-05-31');
+    const daysLeft = Math.ceil((end - new Date()) / 86400000);
+
+    el.innerHTML = `
+        <div style="border-left:4px solid #2563eb;background:#eff6ff;border-radius:0 8px 8px 0;padding:14px 18px;margin-bottom:18px;">
+            <div style="font-size:0.85rem;font-weight:800;color:#1e3a8a;margin-bottom:6px;">
+                FY27 PI Monitoring Visit — window is open
+            </div>
+            <div style="font-size:0.75rem;color:#334155;line-height:1.6;">
+                <strong>Window:</strong> ${m.window}${daysLeft > 0 ? ` · <span style="color:#b45309;font-weight:700;">${daysLeft} days remain</span>` : ''}<br>
+                <strong>Monitor:</strong> ${m.monitor}<br>
+                <strong>Questions:</strong> ${m.contact} · notified via ${m.notifiedVia}
+            </div>
+            <div style="font-size:0.72rem;color:#334155;margin-top:10px;">
+                <strong>PICC assesses compliance against:</strong> ${m.basis.join(' · ')}
+            </div>
+            <details style="margin-top:10px;">
+                <summary style="font-size:0.74rem;font-weight:700;color:#1e3a8a;cursor:pointer;">Center-based monitoring instruments (${m.tools.length})</summary>
+                <ul style="margin:8px 0 0 18px;padding:0;font-size:0.72rem;color:#475569;line-height:1.6;">
+                    ${m.tools.map(t => `<li style="margin-bottom:6px;">
+                        <strong>${t.name}</strong>${t.conditional ? ' <span style="color:#b45309;font-weight:700;">(verify applicability)</span>' : ''}
+                        <div style="color:#64748b;">${t.note}</div>
+                    </li>`).join('')}
+                </ul>
+                <div style="font-size:0.7rem;color:#64748b;margin-top:8px;">
+                    HOVRS-3 is a home-visiting instrument and does not apply to a center-based program.
+                </div>
+            </details>
+        </div>`;
 }
 
 async function loadCompliance(prog) {
@@ -1404,6 +1473,8 @@ async function loadCompliance(prog) {
         var res = await apiFetch('/api/compliance?year=' + encodeURIComponent(year));
         data = await res.json();
     } catch (e) { console.error('Failed to load compliance', e); }
+
+    renderPIMonitoringBanner();
 
     var list = document.getElementById('complianceList');
     list.innerHTML = items.map(function(item) {
