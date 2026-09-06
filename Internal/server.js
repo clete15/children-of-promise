@@ -433,9 +433,17 @@ function staffEnsureSQL() {
         Active BIT DEFAULT 1,
         ReviewedBy NVARCHAR(200),
         ReviewedDate NVARCHAR(20),
+        StaffGroup NVARCHAR(40),
         CreatedAt DATETIME DEFAULT GETDATE(),
         UpdatedAt DATETIME DEFAULT GETDATE()
     );
+GO
+/* Added after the table shipped, so existing databases need the column too.
+   Separates the ownership group from classroom staff. It matters beyond display:
+   the ExceleRate credential thresholds are proportions of TEACHING staff, and
+   counting owners and administrators in that denominator would understate them. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='StaffGroup')
+    ALTER TABLE Staff ADD StaffGroup NVARCHAR(40);
 `;
 }
 
@@ -445,7 +453,8 @@ const STAFF_COLUMNS = [
     ['Name', 'name'], ['Role', 'role'], ['Program', 'program'], ['Classroom', 'classroom'],
     ['Fte', 'fte'], ['Education', 'education'], ['EceCredentials', 'eceCredentials'],
     ['Gateways', 'gateways'], ['ExperienceYears', 'experienceYears'], ['RegistryId', 'registryId'],
-    ['Notes', 'notes'], ['ReviewedBy', 'reviewedBy'], ['ReviewedDate', 'reviewedDate']
+    ['Notes', 'notes'], ['ReviewedBy', 'reviewedBy'], ['ReviewedDate', 'reviewedDate'],
+    ['StaffGroup', 'staffGroup']
 ];
 
 /* One-time migration payload: the staff list that used to be hardcoded in
@@ -469,15 +478,14 @@ const STAFF_SEED = [
        her qualifications belong on the Administrator Qualifications worksheet. */
     { name: 'Megan Nooney', role: 'Director', program: 'PI', classroom: '', fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1, Gold IT2, Autism 101', gateways: 'ECE Credential - Level 1', experienceYears: '17.5', registryId: 'N179660', notes: "Director only as of 2026-2027, no assigned classroom. Associate's ECE (SWIC, 2012). At CofP since 01/2009. Prior teaching: 40hrs/wk x 15+ yrs = 31,200+ hrs - lead teacher preschool, curriculum, schedules. Admin: Director since 01/2009 - staff, files, admin, filling classrooms. Pending: IT, ECE, Director (Awaiting Work Exp). Gold IT2 (1/2024)." },
     { name: 'Molly Ellis', role: 'Teacher', program: 'PI', classroom: '2 Year Olds', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'New teacher for 2026-2027, took over the 2 Year Olds room from Janell Poenitske. Qualifications not yet gathered — needs education, Gateways ECE level, credentials and prior experience before the PAS worksheets can be completed.' },
-    /* Before and Afterschool staff. These three were on the room chart but had
-       no staff record, which left room 8 invisible to the PAS worksheets and
-       excluded them from the ExceleRate credential counts. Role is left blank
-       rather than guessed at: the worksheet flags a blank role so the director
-       fills in teacher or assistant, instead of the form looking complete with
-       an invented answer. Last names and qualifications still to gather. */
-    { name: 'Pam', role: '', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Before/Afterschool staff. Needs last name, teacher-or-assistant role, education, Gateways ECE level, credentials and prior experience.' },
-    { name: 'Jeremy', role: '', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Before/Afterschool staff. Needs last name, teacher-or-assistant role, education, Gateways ECE level, credentials and prior experience.' },
-    { name: 'Sara', role: '', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Before/Afterschool staff. Needs last name, teacher-or-assistant role, education, Gateways ECE level, credentials and prior experience.' },
+    /* Ownership group. Taken from the Gateways Staff Education and Credentials
+       report of 9/6/2026, which is the source of truth for names, degrees and
+       credential levels. Grouped separately from classroom staff because the
+       ExceleRate credential thresholds are proportions of teaching staff. */
+    { name: 'Pamela Holliday', role: 'Director', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: "Master's", eceCredentials: 'ECE Level 5', gateways: 'ECE Credential - Level 5', experienceYears: '21', registryId: 'N52689', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Director/Early Childhood Teacher, position code 16 Director/Administrator (multi site), serves School-Age, at CofP since 1/3/2005. HS (Collinsville 1967), Bachelor\u2019s Special Education (SIU Carbondale 1971), Master\u2019s Special Education (SIUE 1976). ECE Level 1 (9/13/2017), ECE Level 5 (3/25/2025). Pending: Illinois Director Credential (Awaiting Work Experience).' },
+    { name: 'Clete Holliday', role: 'Director', program: 'n/a', classroom: '', fte: '', education: "Bachelor's", eceCredentials: '', gateways: '', experienceYears: '', registryId: 'N297190', staffGroup: 'Ownership', notes: 'Ownership group, no classroom assignment. Gateways 9/6/2026: Manager LLC, position code 1 Director/Administrator (one site), age served Not Applicable, since 1/1/2025. Associate\u2019s and Bachelor\u2019s Electrical Engineering. No Gateways credentials. REGISTRY MEMBERSHIP EXPIRED \u2014 needs renewal.' },
+    { name: 'Jeremy Holliday', role: 'Assistant Teacher', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '11', registryId: 'N279427', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Assistant Child Care Worker, position code 5 Assistant Teacher, serves Preschool, at CofP since 1/5/2015. HS (Belleville West 2001). ECE Level 1 (10/13/2017).' },
+    { name: 'Sara Holliday', role: 'Teacher', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: 'Some College', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '26', registryId: 'N236163', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Early Childhood Teacher, position code 4 Teacher, serves Infants and Preschool, at CofP since 5/1/2000 (position since 5/1/2008). HS (Belleville West 2000), coursework toward Associate\u2019s and Bachelor\u2019s (no degree awarded). ECE Level 1 (12/4/2017). Pending: ECE Credential and Infant Toddler Credential (both Awaiting Additional Coursework).' },
     { name: 'New Teacher', role: 'TBD', program: 'n/a', classroom: 'TBD', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Placeholder for new hire' }
 ];
 

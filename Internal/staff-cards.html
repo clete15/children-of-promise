@@ -189,7 +189,9 @@
             </div>
         </div>
 
-        <div class="staff-grid" id="staffGrid">
+        <!-- Wrapper, not the grid itself: the grid is rendered per section so
+             teaching staff and the ownership group are listed separately. -->
+        <div id="staffGrid">
             <!-- Cards rendered by JS -->
         </div>
     </div>
@@ -218,6 +220,16 @@
                         <option value="Teacher">Teacher</option>
                         <option value="Assistant Teacher">Assistant Teacher</option>
                         <option value="Director">Director</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Group</label>
+                    <!-- Ownership is kept separate from classroom staff because the
+                         ExceleRate credential thresholds are proportions of
+                         teaching staff, not of everyone on the payroll. -->
+                    <select id="editStaffGroup">
+                        <option value="">Teaching staff</option>
+                        <option value="Ownership">Ownership group</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -389,16 +401,44 @@ function getBadgeClass(program) {
 
 function renderCards() {
     const grid = document.getElementById('staffGrid');
-    let html = '';
 
     // Unreviewed records first: this data was extracted from Gateways PDFs and
     // needs the director to confirm it before it backs a compliance claim.
-    const ordered = staffList.slice().sort((a, b) => {
+    const byReviewThenName = (a, b) => {
         const ar = a.ReviewedBy ? 1 : 0, br = b.ReviewedBy ? 1 : 0;
         return ar !== br ? ar - br : (a.Name || '').localeCompare(b.Name || '');
-    });
+    };
+    const isOwner = s => (s.StaffGroup || '') === 'Ownership';
+    const teaching = staffList.filter(s => !isOwner(s)).sort(byReviewThenName);
+    const owners = staffList.filter(isOwner).sort(byReviewThenName);
 
-    ordered.forEach(s => {
+    grid.innerHTML =
+        sectionHtml('Teaching Staff', teaching,
+            'Assigned to classrooms. These are the staff the PAS worksheets and the '
+            + 'ExceleRate credential thresholds are calculated from.', true)
+        + (owners.length ? sectionHtml('Ownership Group', owners,
+            'Owners and administrators. Listed separately because the ExceleRate '
+            + 'credential percentages are proportions of teaching staff.', false) : '');
+}
+
+function sectionHtml(title, list, blurb, withAddButton) {
+    let html = `<h3 style="margin:22px 0 4px;font-size:1rem;color:#1f3f66;">${title}`
+        + `<span style="font-weight:normal;color:#64748b;font-size:0.8rem;"> — ${list.length}</span></h3>`
+        + `<p style="margin:0 0 12px;font-size:0.78rem;color:#64748b;max-width:70ch;">${blurb}</p>`
+        + '<div class="staff-grid">';
+    html += list.map(cardHtml).join('');
+    if (withAddButton) {
+        html += `
+    <div class="add-staff-card" onclick="addNewStaff()">
+        <span>+ Add Staff Member</span>
+    </div>`;
+    }
+    return html + '</div>';
+}
+
+function cardHtml(s) {
+    let html = '';
+    [s].forEach(s => {
         const name = s.Name || '';
         const isVacant = name === 'New Teacher' || name.toLowerCase().includes('tbd');
         const reviewed = !!(s.ReviewedBy || '').trim();
@@ -431,14 +471,7 @@ function renderCards() {
             </div>
         </div>`;
     });
-
-    // Add new staff card
-    html += `
-    <div class="add-staff-card" onclick="addNewStaff()">
-        <span>+ Add Staff Member</span>
-    </div>`;
-
-    grid.innerHTML = html;
+    return html;
 }
 
 // id === null opens a blank form for a new record.
@@ -448,6 +481,7 @@ function openEdit(id) {
     document.getElementById('modalTitle').textContent = id === null ? 'Add Staff' : 'Edit \u2013 ' + (s.Name || '');
     document.getElementById('editName').value = s.Name || '';
     document.getElementById('editProgram').value = s.Program || 'n/a';
+    document.getElementById('editStaffGroup').value = s.StaffGroup || '';
     document.getElementById('editFTE').value = s.Fte || '';
     document.getElementById('editEducation').value = s.Education || '';
     document.getElementById('editExperience').value = s.ExperienceYears || '';
@@ -563,6 +597,7 @@ async function saveStaff() {
         name: name,
         role: document.getElementById('editRole').value.trim(),
         program: document.getElementById('editProgram').value,
+        staffGroup: document.getElementById('editStaffGroup').value,
         classroom: document.getElementById('editClassroom').value.trim(),
         fte: document.getElementById('editFTE').value.trim(),
         education: document.getElementById('editEducation').value,
