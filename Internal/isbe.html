@@ -1383,13 +1383,17 @@ const PI_FY27_MONITORING = {
         'Fiscal year electronic grant',
         'Illinois Birth to Five Program Standards',
     ],
-    // Instruments listed for CENTER-BASED monitoring. Home-visiting tools
-    // (HOVRS-3) are intentionally excluded: they do not apply to a center.
+    // Instruments that apply to this site (center-based, birth to three).
     tools: [
         { name: 'EC Block Grant PI Compliance Checklist (PICC)', note: 'Assesses program compliance against Part 2050, the RFP, the electronic grant, and the Birth to Five Program Standards.' },
         { name: 'ITERS-3', note: 'Infant/Toddler Environment Rating Scale, 3rd ed. Environmental provisions plus teacher–child interactions affecting language, cognitive, social-emotional and physical development, and health & safety. Harms, Cryer, Clifford & Yazejian (2017).' },
         { name: 'PIQET-3', note: 'Prevention Initiative Quality Evaluation Tool-3. Measures program quality across PI programs. Abbruzzese, Pouw, Reed & Viecelli (2026), Vander Weele Group LLC.' },
-        { name: 'FCCERS-3', note: 'Family Child Care Environment Rating Scale, 3rd ed. Applies only to family child care homes — confirm with IDEC whether it applies to this site.', conditional: true },
+    ],
+    // Instruments named in the IDEC letter that do not apply to this site.
+    // Recorded so the exclusion is a documented decision, not an oversight.
+    notApplicable: [
+        { name: 'FCCERS-3', why: 'Family Child Care Environment Rating Scale — scores care delivered in a provider\'s home. ITERS-3 is the center-based equivalent.' },
+        { name: 'HOVRS-3', why: 'Home Visit Rating Scale — scored on observed home visits. Listed under PI Home Visiting monitoring, not center-based.' },
     ],
 };
 
@@ -1437,15 +1441,18 @@ function renderPIMonitoringBanner() {
                 <strong>PICC assesses compliance against:</strong> ${m.basis.join(' · ')}
             </div>
             <details style="margin-top:10px;">
-                <summary style="font-size:0.74rem;font-weight:700;color:#1e3a8a;cursor:pointer;">Center-based monitoring instruments (${m.tools.length})</summary>
+                <summary style="font-size:0.74rem;font-weight:700;color:#1e3a8a;cursor:pointer;">Instruments that apply to this site (${m.tools.length})</summary>
                 <ul style="margin:8px 0 0 18px;padding:0;font-size:0.72rem;color:#475569;line-height:1.6;">
                     ${m.tools.map(t => `<li style="margin-bottom:6px;">
-                        <strong>${t.name}</strong>${t.conditional ? ' <span style="color:#b45309;font-weight:700;">(verify applicability)</span>' : ''}
+                        <strong>${t.name}</strong>
                         <div style="color:#64748b;">${t.note}</div>
                     </li>`).join('')}
                 </ul>
-                <div style="font-size:0.7rem;color:#64748b;margin-top:8px;">
-                    HOVRS-3 is a home-visiting instrument and does not apply to a center-based program.
+                <div style="font-size:0.7rem;color:#64748b;margin-top:10px;padding-top:8px;border-top:1px solid #dbeafe;">
+                    <strong>Named in the IDEC letter but not applicable here:</strong>
+                    <ul style="margin:4px 0 0 16px;padding:0;">
+                        ${m.notApplicable.map(t => `<li style="margin-bottom:3px;"><strong>${t.name}</strong> — ${t.why}</li>`).join('')}
+                    </ul>
                 </div>
             </details>
         </div>`;
