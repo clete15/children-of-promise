@@ -1,0 +1,1822 @@
+FY2027
+ILLINOIS
+DEPARTMENT OF EARLY CHILDHOOD
+PREVENTION INITIATIVE
+MONITORING GUIDE
+A
+G
+UIDE FOR
+P
+REVENTION
+I
+NITIATIVE
+-
+F
+UNDED
+G
+RANTEES
+Page
+2
+of
+27
+Table of Contents
+WELCOME TO PREVENTION INITIATIVE MONITORING
+.............................................................................................................
+3 SECTION 1: PI MONITORING PROCESS
+..............................................................................................................................................
+4 MONITORING PROCESS OVERVIEW
+................................................................................................................................................................................
+5 Data Survey
+...............................................................................................................................................................................................................
+5 Scheduling Email
+.....................................................................................................................................................................................................
+5 Preparation Meeting and SharePoint Window
+...........................................................................................................................................
+5 Compliance and Quality
+........................................................................................................................................................................................
+5 Exit Meeting
+...............................................................................................................................................................................................................
+5 What Happens After Monitoring is Complete?
+............................................................................................................................................
+6 SECTION 2: COMPLIANCE MONITORING FOR ALL GRANTEE PROGRAMS
+............................................................................
+7 PREVENTION INITIATIVE COMPLIANCE CHECKLIST
+....................................................................................................................................................
+8 PICC Documentation
+..............................................................................................................................................................................................
+8 PICC Child/Family File Review and Documentation
+.................................................................................................................................
+9 Child/Family File Review Protocol
+...................................................................................................................................................................
+9 SECTION 3: QUALITY EVALUATION FOR ALL GRANTEE PROGRAMS
+...................................................................................
+10 PREVENTION INITIATIVE
+QUALITY EVALUATION TOOL, THIRD EDITION (PIQET-
+3)
+......................................................................................
+11 What is the PIQET-
+3?
+...........................................................................................................................................................................................
+11 SECTION 4: QUALITY ASSESSMENT FOR GRANTEES WITH CENTER
+-BASED PROGRAMS AND FAMILY CHILD
+CARE HOMES
+............................................................................................................................................................................................
+12 INFANT/TODDLER ENVIRONMENT RATING SCALE (ITERS-
+3)
+............................................................................................................................
+13 What is the ITERS
+-
+3?
+...........................................................................................................................................................................................
+13 FAMILY CHILD CARE ENVIRONMENT RATING SCALE (FCCERS
+-
+3)
+.....................................................................................................................
+13 What is the FCCERS
+-
+3?
+........................................................................................................................................................................................
+13 SECTION 5: QUALITY ASSESSMENT FOR GRANTEES WITH HOME VISITING PROGRAMS
+............................................
+15 HOME VISIT RATING SCALES (HOVRS
+-
+3)
+...............................................................................................................................................................
+16
+What is the HOVRS
+-
+3?
+..........................................................................................................................................................................................
+16 Recording Equipment
+..........................................................................................................................................................................................
+16 HOVRS
+-
+3 Scales and Subscales
+.........................................................................................................................................................................
+18 Preparing to Record Your Home Visit Observation
+.................................................................................................................................
+19 Obtaining Consent for Home Visit Recordings
+...........................................................................................................................................
+19 PREPARING FOR MONITORING AND ACCESSING SHAREPOINT
+...............................................................................................................................
+20 Before Your Monitoring Visit
+............................................................................................................................................................................
+20 Accessing SharePoint
+...........................................................................................................................................................................................
+20 Organizing Your Documents in SharePoint
+................................................................................................................................................
+21 Tips for Uploading Documents and Videos to SharePoint
+....................................................................................................................
+23 ADDENDUM
+...............................................................................................................................................................................................
+25 HOVRS
+-
+3 CONSENT FORMS
+........................................................................................................................................................................................
+25 Home Visitor Acknowledgment/Authorization
+.........................................................................................................................................
+26 Consentimiento De Los Padres Para La Observación Grabada Digitalmente
+...............................................................................
+27 Reconocimiento y Autorización Del Visitante Domiciliario
+.................................................................................................................
+27
+Page
+3
+of
+27
+Welcome to Prevention Initiative Monitoring
+Starting July 1, 2026, the Illinois Department of Early Childhood (IDEC)
+officially became the lead agency
+for Early Childhood Block Grant
+(ECBG)
+Prevention
+Initiative (
+PI)
+, and a range of other early childhood
+support to families, providers
+,
+and educators.
+IDEC
+provides funding to grantees through the ECBG
+to deliver high
+-
+quality
+PI
+education and support
+services. Monitoring is a key component of this process
+and fulfills
+the state's obligation to ensure effective
+oversight and continuous improvement in both compliance and program quality.
+I
+DEC
+is committed to upholding the Illinois Administrative Rules for monitoring, supporting quality
+improvement, and maintaining compliance with Early Childhood Block Grant Administrative Rules
+(
+Part
+2050
+, Subpart A
+) and the current fiscal year PI Request for Proposals (RFP). To conduct these monitoring
+visits, I
+DEC
+has partnered with the Vander Weele Group (VWG), a national grants monitoring firm
+.
+For
+inquiries
+related to th
+e
+transition
+of
+PI
+to IDEC, please refer to the
+Transition FAQ
+.
+For further support
+,
+visit IDECs
+Contact Page
+to
+submit questions.
+Page
+4
+of
+27
+Section 1: PI Monitoring Process
+Page
+5
+of
+27
+Monitoring Process Overview
+Data Survey
+To make the upcoming monitoring process smoother and more convenient, VWG will
+send
+a brief survey to
+all selected programs.
+You can expect to receive the survey at the start of the monitoring season.
+This
+survey gathers key information about your program, including languages spoken, program type, recording
+equipment needs, and any special circumstances affecting your program. This information helps us
+optimize assessor assignments, plan efficient travel, and minimize disruptions to your program.
+Scheduling
+Email
+The VWG lead
+assessor
+will
+email you t
+o schedule your program
+
+s monitoring. While all
+compliance and
+quality assessments are generally scheduled to be completed within the monitoring period
+, additional time
+to conduct the
+Infant/Toddler Environment Rating Scale (ITERS
+-
+3)
+and
+Family Child Care Environment
+Rating Scale
+(FCCERS
+-
+3)
+observations may be required, depending upon individual
+program
+characteristics.
+Preparation
+Meeting
+and SharePoint Window
+To begin the monitoring process, you will
+participate in a virtual preparation meeting
+with
+a
+VWG
+assessor.
+You will join the meeting
+via Microsoft Teams (no account needed!). This meeting
+help
+s
+you get
+comfortable with the monitoring process quickly and efficiently. The
+assessor
+will
+walk
+you through the
+monitoring expectations and timeline, provide
+a link to your secure Microsoft SharePoint folder, and
+show
+you how to upload documentation.
+The assessor will
+also
+explain
+how the SharePoint subfolders are
+organized,
+review documentation options
+,
+and
+confirm
+deadline
+s.
+This
+virtual
+meeting typically takes about
+an hour. You
+must
+submit all required documentation electronically through your SharePoint folder for a
+secure and efficient process.
+To protect
+sensitive
+data
+and
+Personally Identifiable Information
+(PII)
+,
+d
+ocumentation cannot be sent via email or taken as hard copies.
+Compliance and Quality
+See the following sections of this
+guide
+for more information on compliance and quality assessment
+s
+and
+protocol
+:
+Section 2: Compliance Monitoring for All Grantee Program
+s
+Section 3:
+Quality Evaluation for All Grantee Program
+s
+Section 4:
+Quality Assessment for Grantees with Center
+-
+Based Programs and Family Child Care
+Homes
+Section 5:
+Quality Assessment for Grantees with Home Visiting Programs
+Exit
+Meeting
+An in-
+person
+site visit is required for each grantee
+, which may include a
+n
+ERSI tool
+quality observation, a
+PIQET
+-
+3
+Supervisor
+interview
+,
+and/
+or
+a meeting to review the Exit Form.
+During
+the
+E
+xit
+Meeting
+, the
+assessor
+will
+note
+outstanding items
+on the Exit Form
+and allow
+a final
+opportunity for submission
+.
+To conclude the visit, both the assessor and the designated official (typically
+the person who uploaded the documentation) will
+review and sign
+the
+E
+xit
+F
+orm
+to
+indicate
+agreement o
+n
+compliance and quality items that had no documents submitted, and
+confirm
+other information such as the
+program type and model,
+number of Full
+-
+Time Equivalent (
+FTE)
+staff, etc.
+It is
+important to note that the assessor does
+not provide detailed feedback on compliance during the Exit
+Meeting
+.
+Once the monitoring period ends, the assessor conducts a comprehensive review of all
+documentation and completes a final summary report
+. This final
+report
+contains
+detailed information
+about compliance and non
+-
+compliance, as well as any other final assessment outcomes.
+Page
+6
+of
+27
+What Happens After Monitoring is Complete?
+After the monitoring
+period
+, VWG assessors objectively analyze all gathered information and compile a
+comprehensive report. Our assessors are rigorously trained to ensure reliability and follow a standardized
+approach for all assessments. The report, which includes both
+compliance and
+quality
+result
+s.
+This summary report identifies any areas where your program
+s documented practices do not fully comply
+with the
+Illinois Department of Early Childhood
+
+s Prevention Initiative Compliance Checklist.
+While your program may adhere to the guidelines of a specific program model
+,
+it is
+essential to prioritize
+meeting
+IDEC
+'s requirements as outlined in the Prevention Initiative Compliance Checklist (PICC)
+. In cases
+where there are discrepancies, the stricter rule takes precedence to ensure compliance with both the
+funding source and your chosen program model.
+Please remember that IDEC
+has the final authority on
+determining compliance for all items detailed in th
+e final report.
+An
+IDEC
+Grant Program Specialist will
+follow up
+with each grantee to share the monitoring
+r
+eport
+.
+IDEC
+also provides technical assistance through a third
+-
+party vendor. Once monitoring is complete, your main
+contact shift
+s
+from
+the
+Vander Weele Group
+to
+IDEC
+.
+For the most up
+-
+to
+-
+date information on Prevention Initiative m
+onitoring, please refer to the resources
+available on the
+IDEC Early Childhood Prevention Initiative website
+.
+Email contact
+s for IDEC:
+For genera
+l
+questions, contact your assigned Grant Program Specialist
+(see
+IDEC Early Childhood
+Prevention Initiative
+)
+, or reach out to
+dec.earlychi@illinois.gov
+.
+For questions about the Continuous Quality
+Improvement Plan (CQIP), contact dec.picqip@illinois.gov
+.
+Page
+7
+of
+27
+Section
+2: Compliance
+Monitoring
+for All
+Grantee
+Program
+s
+Page
+8
+of
+27
+Prevention Initiative Compliance Checklist
+The
+Prevention Initiative Compliance Checklist (
+PICC
+)
+is
+the official monitoring instrument used by IDEC
+for
+all Prevention Initiative
+-
+funded Birth to Three programs. Programs
+are required to
+meet PICC criteria
+derived
+from
+the following standards:
+Early Childhood Block Grant Administrative Rules, Part 2
+050
+, Subpart A
+The
+PI
+Request
+for
+Proposal
+(RFP)
+and
+the
+fiscal
+year
+electronic
+grant
+Illinois Birth to Five Program Standards
+The
+Illinois
+Early
+Learning
+Guidelines
+VWG
+assessors
+review
+documentation
+submitted
+during
+the
+grantees
+scheduled monitoring period
+.
+Documentation includes items such as the program mission statement, the policies and procedures manual,
+annual self-
+assessments and evaluations, Continuous Quality Improvement Plans (CQIP), and professional
+development plans. Assessors also review child/
+family files randomly selected from program caseloads to
+perform the PICC monitoring review.
+The PICC is divided into four
+different tables with compliance requirements that apply depending on the
+types of programs the grantee operates with PI funding
+:
+P
+revention Initiative
+Home Visiting
+Supplemental Doula Services
+(may not apply to all home visiting programs)
+Department of Children and Family Services (
+DCFS
+)
+Licensed
+Center
+-
+Based
+and DCFS Licensed
+Family Child Care Homes
+PICC Documentation
+The PICC is updated annual
+ly and posted
+on the IDEC
+Prevention Initiative website
+by September
+1
+of each
+monitoring year. Review the FY27
+PICC for documentation requirements
+.
+Documentation for the PICC is uploaded to SharePoint during the scheduled window. See the uploading
+instructions
+in
+Section 6: Documentation Uploading to SharePoint
+.
+SharePoint folders are organized
+accord
+i
+ng
+t
+o
+a
+structure
+reflecting
+the
+PICC
+requirements
+for
+documentation,
+but
+the
+order
+may be
+reorganized and grouped according to documentation types. The VWG assessor reviews the folder
+structure and documentation requirements during the
+preparation
+meeting
+.
+Review the PICC for a
+complete list of
+documentation options.
+Page
+9
+of
+27
+PICC Child/Family File Review and Documentation
+Child/family f
+iles are randomly
+selected
+by assessors
+from currently enrolled children
+/clients
+and those
+that have exited within the current fiscal year (July 1, 202
+6, to June 30, 202
+7).
+Grantees upload
+documentation for
+the selected child/family files to SharePoint for compliance review during the scheduled
+SharePoint
+window.
+On the day of the E
+xit
+Meeting
+, your assessor also randomly selects
+a few active files,
+depending on your caseload size, if
+possible. The maximum number of files required for review per site is
+12
+. See the table below for an estimate
+of selection methods for child/family files.
+Total Files per Site
+Uploaded
+On
+-
+Site
+Active
+Active
+Exited
+12
+8
+2
+*
+2
+*More exited files may be selected if the site does not have enough active enrollment at the time of monitoring.
+Child/Family File Review Protocol
+Caseload
+/Enrollment
+Lists
+During
+the
+p
+reparation meeting
+, VWG assessors
+will
+request caseload
+/enrollment
+lists of currently active
+children/families and those w
+h
+o
+exited within the current fiscal year. Prenata
+l
+clients are also subject to
+file review.
+A spreadsheet is provided to g
+rantees
+prior to the
+preparation meeting
+for submitting lists of enrolled and
+exited children. The SharePoint folders are secure for storing sensitive information.
+Note: Files
+from the current fiscal year are
+reviewed
+unless additional information is required
+. Child files are
+selected randomly from both currently enrolled children/families and any child/family with
+an exit date of
+July 1, 202
+6,
+or later.
+If any PICC documentation is
+Not Applicable due to the random selection
+process
+,
+additional documents must be submitted
+. This includes
+,
+but
+is
+not limited to
+,
+program policies, signed
+statements from a PI supervisor, and/or additional child files from any fiscal year. If staff
+serve
+children/families identified as Prevention Initiative, they are subject to PI monitoring regardless of the
+ir
+funding stream.
+Child/Family File Documentation
+Grantees submit child/family file documents, including
+,
+but not limited to
+,
+the following
+categor
+ies
+: *
+Home
+visit plan
+Developmental
+s
+creenings, consent, and results summary forms
+Evidence that screening results are shared
+Proof of eligibility, such as income verification
+Parent Interview Form
+Individualized Family Goal Plan
+Transition Plan
+Referrals
+*
+Review the PICC for
+a complete list of
+child
+/family
+file documentation options.
+Multisite Grantees
+Twelve files are
+selected at random per site as
+caseload
+/enrollment
+allows.
+Page
+10
+of
+27
+Section 3: Quality Evaluation for All Grantee Programs
+Page
+11
+of
+27
+P
+revention Initiative
+Quality Evaluation Tool
+,
+Third
+Edition
+(
+PIQET
+-
+3
+)
+What is the
+PIQET
+-
+3
+?
+Developed, updated, and maintained by Vander Weele Group on behalf of the Illinois Department of Early
+Childhood, t
+he PIQET
+-
+3
+supports
+the administration and monitoring of the Prevention Initiative Early
+Childhood Block Grant program.
+This tool provides valuable insights into the effective operation of high
+-
+quality programs, going beyond basic compliance to examine key organizational factors that contribute to
+success.
+A copy of the PIQET
+-
+3
+and scoring information can be found on the IDEC Prevention Initiative
+website
+.
+T
+he PIQET
+-
+3
+utilizes a multi-
+method
+approach to data collection:
+Supervisor
+Interviews:
+Interviews with program administrators provide qualitative information
+on leadership, organizational climate, and program implementation.
+Staff Surveys:
+Brief
+,
+online
+,
+anonymous
+surveys distributed to staff members gather qualitative
+data on their perspectives and experiences within the program.
+Documentation:
+Review of some documents provided for compliance review and a few more
+documents specifically for the PIQET-
+3
+.
+The
+PIQET
+-
+3
+examines four critical areas:
+Functional Organizational Climate:
+Evaluating the effectiveness of data systems, financial
+management, and program planning.
+Curriculum and Service Delivery:
+Assessing fidelity to the chosen curriculum or program model
+and how well programs meet the individual needs of children and families.
+Family and Community Engagement:
+Examining family participation, referral processes, and
+collaborative relationships within the community.
+Implementation Leadership:
+Analyzing the effectiveness of leadership, staff support, performance
+assessment, and employee morale and retention.
+The PIQET
+-
+3 report highlights key strengths and opportunities for growth, helping programs identify
+targeted areas for quality improvement
+.
+Page
+12
+of
+27
+Section 4: Quality Assessment for
+Grantees with
+Center
+-
+Based
+Programs
+and Family Child Care Homes
+Page
+13
+of
+27
+Infant/Toddler
+Environment Rating Scale
+(ITERS-
+3
+)
+What is
+the ITERS
+-
+3
+?
+The ITERS
+-
+3
+is an observation-
+based tool from the Environment Rating Scale (ERS) family of research
+-
+based tools designed to assess the quality of early childhood programs. Assessors use the
+ITERS
+-
+3
+to
+measure environmental provisions and teacher
+-
+child interactions that affect the broad developmental
+milestones of infants and toddlers.
+Additional information about the ITERS
+-
+3, including scale
+information
+about the 33 items organized into
+six subscales
+, can be found by navigating to the following website: https://ERS/ITERS
+-
+3
+Center
+-
+Based Program Quality
+The ITERS
+-
+3
+provides information about the quality of center
+-
+based programs and guides program leaders
+and practitioners toward creating high
+-
+quality programs for the children, families, and communities they
+serve
+.
+ITERS
+-
+3
+Observations
+Protocol
+Classrooms are randomly selected
+when the assessor arrives
+, and observations occur during the
+monitoring period as time allows.
+If this is not possible
+, the monitoring period will be lengthened, and
+grantees will be notified. Grantees are not given exact dates for the classroom observations. Observations
+can only occur during the required designated PI classroom hours
+,
+capped at a maximum of three hours. At
+least one PI
+-
+funded classroom will be observed per site. Personal Care Routines will not be scored.
+ITERS
+-
+3
+Scoring
+The scoring details will be separated into Not Applicable Items, Strengths: Items W
+ith Scores of 5 and Above
+,
+and Areas of Potential Growth: Items
+W
+ith Scores Less than 5
+.
+For
+A
+reas of Potential Growth, a
+brief
+explanation of the indicator and reason for the lower score will be provided.
+Family Child Care Environment
+Rating Scale
+(FCCERS-
+3
+)
+What is the FCCERS
+-
+3
+?
+The
+FCCERS
+-
+3
+is an observation
+-
+based tool from the Environment Rating Scale (ERS) family of research
+-
+based tools created to assess the quality of early childhood programs. The FCCERS
+-
+3
+measures the quality
+aspects of family child
+care homes
+serving infants through school
+-
+aged children.
+Additional information about the FCCERS
+-
+3, including scale information about the 33 items organized into
+six subscales, can be found by navigating to the following website: https://ERS/FCCERS
+-
+3
+Family Child Care Homes Program Quality
+The FCCERS
+-
+3
+provides information about the quality of
+family child care homes and guides program
+leaders and practitioners toward creating high
+-
+quality programs for the children, families, and
+communities they serve.
+Page
+14
+of
+27
+FCCERS-
+3
+Observations Protocol
+Each
+of the
+grantees family child care homes is
+considered a separate site, and every site receives an
+observation. Observations occur during the monitoring period as time allows. I
+f
+this is not possible
+, the
+monitoring period will be lengthened, and grantees will be notified. Grantees
+will not be
+given exact dates
+for the observations. The observation must occur during the designated PI hours, capped at a maximum of
+three hours. Personal Care Routines will not be scored.
+FCCERS-
+3
+Scoring
+The scoring details will be separated into Not Applicable Items, Strengths: Items W
+ith Scores of 5 and Above
+,
+and Areas of Potential Growth: Items
+W
+ith Scores Less than 5
+.
+For
+A
+reas of Potential Growth, a
+brief
+explanation of the indicator and the
+reason for the lower score will be provided.
+Page
+15
+of
+27
+Section
+5
+:
+Quality Assessment for
+Grantees with
+Home
+Visiting Programs
+Page
+16
+of
+27
+Home Visit Rating Scales (HOVRS
+-
+3)
+What is the HOVRS
+-
+3?
+The Home Visit Rating Scales
+-
+3 (HOVRS
+-
+3) is a valuable tool designed to assess and enhance the
+quality of home visiting programs. It provides critical feedback to both home visitors and their
+supervisors, enabling them to identify areas of strength and are
+as for improvement.1
+The HOVRS
+-
+3 is grounded in the developmental parenting approach, which emphasizes building
+strong parent
+-
+child relationships and supporting parents' understanding of child development. For
+more information on this approach, refer to Developmental parenting: A guide for early childhood
+practitioners
+.2 HOVRS
+-
+3 Observation Protocol
+During scheduling, grantees will be instructed that
+all home visitors should obtain family consent
+(using V
+W
+G consent forms found in the addendum of this guide)
+and record at least one home visit
+for submission.
+This includes home visitors who have been employed for 90 calendar
+days as of the
+preparation meeting for monitoring and supervisors who have an active caseload.
+VWG a
+ssessors
+will randomly select a percentage of videos
+to collect adequate
+data
+.
+Grantees will upload home visit recordings to a secure SharePoint folder (unless another method is
+needed). Recorded observations will be randomly selected
+for assessment from those submitted and across
+all
+home
+visitors.
+Other methods, such as in
+-
+person observations, can be arranged as needed.
+HOVRS
+-
+3 videos can be submitted
+in any language
+. Grantees will have until the
+exit meeting
+to submit the
+ir
+required videos
+. If more time is needed to submit videos
+,
+please inform your assessor
+for approval
+.
+The tool
+is designed for in
+-
+person visits that are at least 60 minutes in length
+.
+Recording Equipment
+Grantees may use their own equipment for recording and submitting video observations for this
+requirement.
+Grantees that need to borrow recording equipment should
+notify their assessor if they did not
+respond
+yes
+to the question about recording equipment on the Data Survey sent at the beginning of the
+monitoring year (
+see
+Data Survey
+,
+p. 5).
+Home Visiting Program Quality
+Th
+e final report
+summarizes the quality of your home visiting services based on a review of randomly
+selected home visit observations. It provides a general overview of your program
+
+s performance and
+highlights key trends.
+1
+Citation: Roggman, L., Cook, G., Innocenti, M., Jump Norman, V., Boyce, L., Christiansen, K., Olson, T. (2018). The Home
+Visit Rating Scales
+-
+3.
+2
+Citation:
+Roggman, L. A., Boyce, L. K., & Innocenti, M. S. (2008). Developmental parenting: A guide for early childhood
+practitioners.
+Paul H. Brookes Pub. Co.
+Baltimore, MD.
+Page
+17
+of
+27
+Key Points:
+The focus is on program
+-
+wide trends, not individual home visitor performance.
+Individual home visitor information is kept confidential.
+Use this information to identify areas of strength and areas for program improvement.
+HOVRS
+-
+3 Scoring
+Subscales are scored using the following key. In the final monitoring report, s
+cores above 4.50 are
+considered strengths and scores below 4.49 are considered areas of potential growth.
+HOVRS
+-3 Subscale Score Key:
+Needs support
+= 1
+Adequat
+e
+= 3
+Good
+= 5
+Excellent
+= 7
+HOVRS
+-
+3 and HOVRS A+ Crosswalk
+The VWG
+PI
+assessment team maintains
+reliability
+on the HOVRS
+-
+3. Due to licensing restrictions, other
+versions
+of the tool are not available for training or practice unless expressly granted by the tool
+developers
+.
+Because
+some programs may not have access to HOVRS
+-
+3,
+a crosswalk document
+compares
+the
+HOVRS
+-
+3 to the readily available HOVRS A+.
+This
+crosswalk outlines
+the key differences between the two
+versions, including scale title changes, item rearrangements, and wording updates. The crosswalk is
+available
+on the
+IDEC Prevention Initiative
+website.
+Page
+18
+of
+27
+HOVRS
+-
+3 Scales and Subscales
+The HOVRS
+-
+3 includes seven rating scales: four for h
+ome
+v
+isiting practices and three for family engagement
+and interaction during home visits. The first four scales on practices are used for PI monitoring. Each scale
+has a set of subscales, as shown below.
+Scale
+1:
+Relationship
+Building
+With
+Family
+1.1
+To Show Respect and Acceptance of the Family System
+1.2
+To Interact Sociably W
+ith Caregivers, Focusing on Child Development
+1.3
+To Set the Tone for Positive Interactions
+1.4
+To Express Positive Emotions A
+bout the Home Visit
+1.5
+To Engage O
+ther Family Members W
+ho Interact
+W
+ith the Child if Present D
+uring the Home Visit
+1.6
+To Reflect
+W
+ith Family A
+bout
+T
+heir Life and Activities in Relation to
+Childs Development
+1.7
+To Discuss Possibly Sensitive Issues Respectfully and Reflectively
+Scale
+2:
+Responsiveness
+to
+Family
+Strengths
+and
+Cultures
+2.1
+To Plan Activities and Topics of
+T
+his or
+a
+Future Home Visit
+W
+ith the Caregiver
+2.2
+To Prepare for the Home Visit Using Caregiver
+-
+Selected Activities
+2.3
+To Respond to Family Input for the Agenda and Activities of t
+h
+e
+Home Visit
+2.4
+To Adapt Activities to the Family
+
+s Interests and Needs
+2.5
+To Get Information A
+bout the Family
+s Strengths and Childs Development
+2.6
+To Provide Feedback to the Caregiver on Family Strengths for Supporting Child Development
+Scale
+3:
+Facilitation
+of
+Caregiver
+-Child
+Interaction
+3.1
+To Engage the Caregiver and the Child Together
+3.2
+To Elicit O
+ngoing Caregiver
+-
+Child Interactions D
+uring
+t
+h
+e
+Home Visit
+3.3
+To Directly Encourage Generally Positive Caregiver
+-
+Child Interactions D
+uring
+This
+Home Visit
+3.4
+To Support Caregiver
+Responsiveness to Child Cues
+3.5
+To Promote Developmentally Supportive Interactions D
+uring
+This
+Home Visit
+3.6
+To
+H
+elp
+Caregivers
+Use
+the Familys Routines, Activities, or Available Materials to Support Child
+Development
+D
+uring
+T
+h
+is
+Home Visit
+Scale
+4:
+Collaboration
+with
+Caregivers
+as
+Partners
+4.1
+To Encourage the Caregivers Ideas and Interests for Interactions or Activities With the Child
+During This Home Visit
+4.2
+To Keep the Caregiver
+in the Teacher Role
+4.3
+To Follow the Lead of the
+Caregiver
+and Child in Pace and Activities
+4.4
+To Avoid Intruding on or Ignoring Caregiver
+-
+Child Interactions
+During This
+Home Visit
+4.5
+To Allow Caregiver
+-
+Child Interactions to Continue Uninterrupted
+Page
+19
+of
+27
+Preparing
+to
+R
+ecord
+Your Home Visit Observation
+To prepare for your home visit observation, please review the following guidelines:
+Visits to Avoid: Do not submit recordings of first visits, prenatal visits, or visits where a
+developmental screening, Individualized Family Service Plan review, or similar activity is
+planned.
+Recording and Submission:
+Each home visitor (employed 90 calendar
+days as of the prep
+aration
+meeting
+/start of the monitoring period)
+record
+s
+and submit
+s
+one home visit observation.
+This
+includes supervisors with an active caseload.
+Consent:
+Written consent forms must be obtained and submitted for each participating family and
+the home visitor. VWG provides these forms at the end of this document; only these forms can be
+accepted.
+Virtual Visits:
+Recordings of virtual home visits are acceptable for submission if they adhere to the
+guidelines in this document.
+Previously Recorded Visits:
+You may use a previously recorded home visit if it was recorded
+within the last six months
+of the preparation meeting
+,
+if the family has given consent, and if
+the
+home visitor is still
+employed.
+Recording Length:
+The recording should capture the entire home visit from start to finish and be
+at least 60 minutes long to ensure assessors can observe significant events during greeting and
+departure.
+Uploading a shorter video is at the Grantees discretion.
+Focus on Interaction:
+The purpose of the observation is to see how the home visitor interacts with
+the family. The home visitor, child(ren), and caregiver(s) should all be visible in the recording.
+Supervisor Review:
+Before submitting the recording, have a supervisor review it to ensure it
+meets the guidelines and has no technical issues with sound or video.
+Typical Visit:
+Choose a typical home visit that shows the parent and child interacting with each
+other and the home visitor. Obtaining Consent for Home Visit Recordings
+Before recording a home visit for your monitoring observation, you must obtain written consent from both
+the family and the home visitor.
+Use the 
+Parent or Guardian Consent for the Use of Recorded
+Observations
+
+form provided by VWG
+in the
+Addendum
+at the end of this document. Program-
+specific consent forms cannot be accepted.
+When discussing consent with families, emphasize that the recording focuses on the quality of the home
+visit, not on evaluating the family. Explain that the recording helps home visitors and supervisors reflect on
+their practices and ensure they are implementing best practices to improve outcomes for the family and
+child.
+If obtaining consent is challenging, alternative options are available to fulfill this monitoring requirement.
+Contact
+Laura@vanderweelegroup.net
+to discuss alternatives, such as an in
+-
+person observation.
+Page
+20
+of
+27
+Preparing for Monitoring and Accessing SharePoint
+Before Your Monitoring Visit
+To ensure a smooth and efficient monitoring experience, we highly recommend taking these steps to
+prepare your documentation for SharePoint:
+1.
+Organize
+E
+lectronically
+:
+Prepare all documentation in an electronic format for easy upload to
+SharePoint. Remember that Google Drive is not directly compatible with SharePoint (see
+instructions for uploading files from Google Drive below).
+2.
+Organize
+Child Files
+:
+Organize all active and exited child files from the current fiscal year (July 1,
+202
+6, to June 30, 2027
+). Ensure all required documentation is readily available to upload
+within
+each file for random selection.
+3.
+Final
+R
+eview
+:
+Before the end of the monitoring window, designate one person to review all
+grantee folders in SharePoint. This review should ensure that each folder contains the correct
+documentation, the information is clearly presented, and no files are corrupted.
+4.
+Address
+M
+issing
+D
+ocumentation
+:
+If any PICC requirement is missing from a child's folder or other
+documentation folder, upload a statement explaining what is missing and why. Do not leave any
+folders empty. This ensures a more accurate review. Accessing SharePoint
+You will receive access to the VWG SharePoint portal on the day of your p
+reparation
+m
+eeting
+.
+A
+personalized link will be emailed to the designated
+person(s) responsible for uploading
+.
+This link can only
+be used by individuals with permission to access the folder.
+To
+Access SharePoint
+1.
+Click the L
+ink
+:
+Click on the link sent via email. The folder will open in your browser unless
+your computer has certain security blocking software. You may need
+assistance from your
+organization in allowing SharePoint
+access if you experience trouble in this step.
+2.
+Important Notes
+:
+o
+Your VWG assessor provides
+complete instructions and guidance on accessing and using
+SharePoint during the preparation meeting
+. They are available to support you
+throughout the process.
+Page
+21
+of
+27
+Organizing Your Documents in SharePoint
+Your SharePoint folder is organized into subfolders for your convenience. Each folder includes helpful
+comments to guide you on what to upload
+,
+and
+some folders contain due dates
+.
+Reference
+Materials:
+This folder contains helpful resources like a copy of the monitoring guide,
+the PICC, and other support materials.
+PICC:
+Upload all compliance documentation into the corresponding subfolders within the PICC
+folder.
+PIQET
+Documentation
+:
+Upload the required PIQET
+-
+3
+documentation into this folder.
+HOVRS (Home
+-Visiting Programs Only):
+If you are a home
+-
+visiting program, upload your
+recorded home visit observations into this folder.
+Select
+Files
+to
+Upload
+To upload PICC documentation, click
+on
+the
+PICC
+folder,
+then
+select
+the
+appropriate
+folder
+or
+subfolder
+labeled with the PICC item number and description
+.
+Page
+22
+of
+27
+Next, select the C
+reate or U
+pload
+button
+. A
+drop
+-
+down
+menu
+opens
+.
+Select the applicable document type or
+Files upload
+.
+Another window opens for the
+location of your documents
+,
+such
+a
+s
+Desktop or OneDrive.
+Navigate to the
+folder
+, choose the file you would like to upload,
+and click Open.
+The upload status is indicated at
+the
+bottom
+of the SharePoint screen.
+Use the
+Re
+load this page
+icon
+on the top left of
+the screen
+to
+ensure the upload was successful,
+then open the document to confirm it is legible and that everything was uploaded
+correctly
+.
+Page
+23
+of
+27
+Tips for Uploading Documents and Videos to SharePoint
+Uploading Documents
+If
+your documents are stored
+electronically on your computer or Microsoft OneDrive, you
+can upload them directly to SharePoint.
+There
+i
+s no need to print and scan! Scanning is only
+necessary for paper documents that do
+not
+have an electronic copy.
+If you use Google Drive, you
+wi
+ll need to download the files to your computer first.
+SharePoint
+and Google Drive are
+n
+o
+t directly compatible. Download the files from Google Drive to your
+computer, then upload them to SharePoint.
+Here
+i
+s
+how to download files from Google Drive and upload them to SharePoint:
+1.
+Download:
+In Google Drive, select the file(s) you want to upload to SharePoint, then click
+the download icon. Choose a location on your computer to save the file(s) (e.g., your
+Desktop).
+2.
+Upload:
+Once the download is complete, go to the SharePoint folder (you
+will
+receive access
+at the start of monitoring) and click 
+Upload.
+
+Choose the downloaded file(s) from your
+computer and click
+
+Open
+
+to start the upload.
+Uploading Recorded Home Visits
+Internet
+S
+peed and
+C
+omputer
+S
+pace
+C
+an
+Affect
+U
+pload
+S
+peed.
+For optimal performance, use a
+location with a high
+-
+speed internet
+connection (like your main office).
+Free
+U
+p
+S
+pace:
+Empty the Trash/Recycle
+Bin on your computer and in Microsoft OneDrive (if
+applicable).
+Close
+U
+nnecessary
+P
+rograms:
+To avoid slowing down the upload, close any unnecessary tabs and
+programs, including email.
+Need help?
+Your assessor will support you throughout the monitoring period. Do
+n
+o
+t hesitate to contact
+them if you have any technology issues.
+Technology issues related to
+your own internet or computer may
+require you to contact someone
+with
+in your organization.
+Page
+24
+of
+27
+Thank You and Next Steps
+Thank you for review
+ing
+this guide as you prepare for FY27
+m
+onitoring. We look forward to working with
+you this year! To help us ensure a positive monitoring experience, we will send you a satisfaction survey at
+the conclusion of your monitoring
+process.
+Remember, for the most up
+-
+to
+-
+date information on Prevention Initiative m
+onitoring, please visit the IDEC
+Prevention Initiative
+website.
+Page
+25
+of
+27
+Addendum HOVRS
+-
+3 Consent Forms
+The following page contains the Home Visitor and Family Consent forms. Please complete these
+forms
+before
+recording the home visit and return them to your supervisor. All consent forms are
+due on the first day of your monitoring window
+.
+Page
+26
+of
+27
+Parent or Guardian Consent for the Use of Recorded Observations
+This form gives consent to digitally record a home visit with you and your child. This is part of the
+Illinois Department of Early Childhood
+(
+IDEC
+) Prevention Initiative (PI) monitoring process, which
+helps improve services and outcomes for families.
+The recording focuses on the home visit itself, not you or your family. Your participation is
+voluntary and will not affect your home visiting services.
+Key Information
+Purpose: The recording is for internal use by the PI program and the Vander Weele Group
+(VWG) to provide feedback and help home visitors improve their skills.
+Confidentiality: Recordings will not be shared publicly.
+What's recorded: The recording may include your home and other family members.
+Separate consent is needed for anyone who actively participates in the visit. Others in the
+background may be recorded without consent.
+By signing below, I voluntarily give permission to the ame of PI program
+]
+and the Vander Weele
+Group (VWG) to digitally record a home visit. I understand the recording is for program
+improvement and will be kept confidential.
+Parent
+/guardian
+consent
+form
+Child's
+n
+ame:
+Date
+of
+c
+onsent:
+Parent/
+guardian
+signature:
+Printed
+n
+ame:
+Relationship
+to
+c
+hild:
+Optional
+-
+C
+hilds
+gender
+and
+date
+of
+birth:
+Home Visitor Acknowledgment/Authorization
+I have read and understood the description of the monitoring process and the following:
+I will submit a recording of a home visit to be scored using the HOVRS
+-3 observation
+-
+based assessment
+.
+My name and any identifying information will remain confidential.
+Not submitting a recording could result in an in
+-
+person observation.
+Home
+visitor consent form
+Home
+visitor
+first
+and
+last
+name:
+Date
+of
+consent:
+Home
+visitor
+signature
+:
+Page
+27
+of
+27
+Consentimiento De Los Padres Para La Observación Grabada Digitalmente
+Este formulario da el consentimiento para grabar digitalmente una visita domiciliaria con usted y su hijo.
+Esto es parte de un proceso de monitoreo de la Iniciativa de Prevención (PI) de la Junta de Educación
+del Estado de Illinois (
+IDEC
+)
+, que ayuda a mejorar los servicios y los resultados para las familias.
+La grabación se centra en la visita domiciliaria en sí, no en usted o su familia. Su participación es
+voluntaria
+y no afectará sus servicios de visitas domiciliarias.
+Información clave
+Propósito:
+La grabación es para uso interno del programa PI y el Vander Weele Group (VWG) para
+dar retroalimentación y ayudar a los visitantes domiciliarios a mejorar sus habilidades.
+Confidencialidad:
+Las grabaciones no se compartirán públicamente.
+Qué se graba:
+La grabación puede incluir su hogar y otros miembros de la familia. Se necesita un
+consentimiento por separado para cualquier persona que participe activamente, mientras que otras
+personas en el segundo plano pueden ser grabadas sin consentimiento.
+Al firmar a continuación, doy mi consentimiento voluntario al
+y al Vander
+Weele Group (VWG)
+para grabar digitalmente una visita domiciliaria. Entiendo que la grabación es para la
+mejora del programa y se mantendrá confidencial.
+Group (VWG) para grabar digitalmente una visita domiciliaria. Entiendo que la grabación es para la mejora
+del programa y se mantendrá confidencial.
+Consentimiento
+de
+los
+padres
+para
+la
+observación
+grabada
+digitalmente
+Nombre
+de
+niño
+:
+Fecha
+de
+consentimiento:
+Firma
+del
+padre/cuidador:
+Nombre
+impreso:
+Relación
+con
+el
+niño:
+Información
+opcional
+-
+proporcione el sexo y la fecha
+de nacimiento del niño:
+Reconocimiento
+y
+Autorización Del Visitante Domiciliario
+He leído y comprendido la descripción del proceso de monitoreo, así como los siguientes puntos:
+Enviaré la grabación de una visita al hogar para que sea evaluada mediante la herramienta de
+observación HOVRS
+-
+3.
+Tanto mi nombre como cualquier otro dato personal se mantendrán bajo estricta confidencialidad.
+Entiendo que no enviar la grabación puede resultar en una observación en persona.
+Formulario de consentimiento del visitante domiciliario
+Nombre y apellido del visitante domiciliario:
+Fecha de consentimiento:
+Firma del visitante domiciliario:
