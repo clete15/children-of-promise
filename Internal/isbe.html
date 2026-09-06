@@ -2479,8 +2479,41 @@ function addDays(iso, n) {
     return d.toISOString().split('T')[0];
 }
 
+/* Nothing is chased in the opening weeks of a school year.
+
+   Rosters move for the first month or so, and documents raised against a child
+   who has only just started, or who is still being placed, are noise the director
+   learns to scroll past. Notices therefore stay quiet until 45 days after the
+   school year begins, the same 45-day mark the screening batch uses.
+
+   This suppresses the REMINDER, not the requirement: a document that is genuinely
+   late is still late, and shows the moment the window opens. */
+const NOTICE_GRACE_DAYS = 45;
+
+function noticesOpenDate(year) {
+    const start = schoolYearStartDate(year);
+    return start ? addDays(start, NOTICE_GRACE_DAYS) : null;
+}
+
+function noticesSuppressed(year) {
+    const open = noticesOpenDate(year);
+    if (!open) return false;
+    return new Date().toISOString().split('T')[0] < open;
+}
+
+// Shown in place of a list while the grace period is running, so it is obvious
+// the list is quiet by design rather than empty because nothing is outstanding.
+function noticeGraceNote(year) {
+    const open = noticesOpenDate(year);
+    return '<p style="font-size:0.8rem;color:#64748b;margin:0;">Reminders open on <strong>'
+        + open + '</strong>, 45 days after the school year starts. Rosters are still settling '
+        + 'before then, so nothing is chased yet. Anything genuinely overdue will appear that day.</p>';
+}
+
 // PI6 documents are due within 6 months of enrollment.
 function sixMonthWatch() {
+    // Held during the opening 45 days of the school year.
+    if (noticesSuppressed(activeSchoolYear)) return [];
     const WINDOW = 182;
     const today = new Date().toISOString().split('T')[0];
     const items = [
@@ -2587,6 +2620,11 @@ function renderStartYear() {
                 + rows + '</tbody></table>');
         }
     });
+
+    // Say why the list is quiet, rather than showing nothing at all.
+    if (noticesSuppressed(activeSchoolYear)) {
+        html += syBlock('Reminders are on hold', null, noticeGraceNote(activeSchoolYear));
+    }
 
     if (sixMonth.length) {
         const rows = sixMonth.map(w =>

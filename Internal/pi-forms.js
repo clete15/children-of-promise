@@ -50,7 +50,12 @@
     // Tools the PICC names as acceptable published, research-based family
     // assessments for PI6.A. "Other" stays available because the checklist
     // allows it with a description.
+    /* ASQ first and selected by default: it is the tool this program uses for the
+       Family Centered Assessment. PI6.A guidance allows the LSP child portion to
+       be replaced by the ASQ or another child developmental tool. The published
+       alternatives stay on the list so a different choice can still be recorded. */
     const ASSESSMENT_TOOLS = [
+        'Ages & Stages Questionnaire (ASQ)',
         '',
         'Life Skills Progression (LSP)',
         'Baby TALK Family Centered Assessment',
@@ -266,7 +271,7 @@
                     fields: [
                         { key: 'assessmentDate', label: 'Assessment Date', type: 'date', default: todayISO },
                         { key: 'enrollmentDate', label: 'Enrollment Date', type: 'date', default: s => s.Start_Date || '' },
-                        { key: 'assessmentTool', label: 'Assessment Tool Used', type: 'select', options: ASSESSMENT_TOOLS, full: true },
+                        { key: 'assessmentTool', label: 'Assessment Tool Used', type: 'select', options: ASSESSMENT_TOOLS, full: true, default: 'Ages & Stages Questionnaire (ASQ)' },
                         { key: 'toolOther', label: 'If Other, describe the tool', type: 'text', full: true },
                         { key: 'completedBy', label: 'Completed By (staff)', type: 'text' }
                     ]
