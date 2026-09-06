@@ -61,22 +61,104 @@
 // AUTH, apiFetch, isTruthy, sortByName and CCAP_THRESHOLDS come from app.js.
 async function init() {
     try {
-        const [sRes, wRes] = await Promise.all([
+        // Staff is fetched too, for the ExceleRate credential alert. It is allowed
+        // to fail on its own so a staff problem never blanks the whole page.
+        const [sRes, wRes, stRes] = await Promise.all([
             apiFetch('/api/students'),
-            apiFetch('/api/waitinglist')
+            apiFetch('/api/waitinglist'),
+            apiFetch('/api/staff').catch(() => null)
         ]);
         const students = await sRes.json();
         const waitlist = await wRes.json();
-        renderAlerts(students, waitlist);
+        let staff = [];
+        try { if (stRes) staff = await stRes.json(); } catch (e) { staff = []; }
+        renderAlerts(students, waitlist, staff);
     } catch(e) {
         document.getElementById('alertsBody').innerHTML = '<div class="empty-state"><div class="icon">❌</div>Failed to load: ' + e.message + '</div>';
     }
 }
 
-function renderAlerts(students, waitlist) {
+/* ExceleRate 4B(ii): at least 30% of infant and toddler staff must hold a Gateways
+   Infant Toddler Credential at Level 2 or above.
+
+   Written as a live calculation rather than a fixed reminder, so it disappears by
+   itself once the requirement is comfortably met instead of becoming noise. It
+   also carries the coursework leads, because the shortfall here cannot be fixed
+   by paperwork: staff without infant and toddler coursework need a course.
+
+   Ownership and administration are excluded from the count, per Genni. */
+function infantToddlerCredentialAlert(staff) {
+    const IT_ROOMS = ['Infant', 'Infants / Toddlers', '2 Year Olds / Toddlers'];
+    const norm = s => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+        .map(w => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).join('/');
+    const serves = (p, room) => norm(p.Classroom) === norm(room) || norm(p.SecondaryClassroom) === norm(room);
+    const itLv = p => { const m = (p.EceCredentials || '').match(/IT Level (\d)/i); return m ? +m[1] : 0; };
+
+    const teaching = staff.filter(p => (p.StaffGroup || '') !== 'Ownership')
+        .filter(p => /teacher|assistant/i.test(p.Role || ''));
+    const inIt = teaching.filter(p => IT_ROOMS.some(r => serves(p, r)));
+    if (!inIt.length) return '';
+
+    const holders = inIt.filter(p => itLv(p) >= 2);
+    const needed = Math.ceil(inIt.length * 0.3);
+    const pct = Math.round(holders.length / inIt.length * 100);
+    const short = needed - holders.length;
+
+    // Nothing to say once there is margin above the threshold.
+    if (short <= 0 && holders.length > needed) return '';
+
+    const partTime = p => IT_ROOMS.some(r => norm(p.SecondaryClassroom) === norm(r))
+        && !IT_ROOMS.some(r => norm(p.Classroom) === norm(r));
+    const candidates = inIt.filter(p => itLv(p) < 2);
+
+    const met = short <= 0;
+    return `<div class="alert-item ${met ? 'warning' : 'danger'}">
+        <div class="alert-title">🎓 Infant/toddler credential: ${holders.length} of ${inIt.length} staff (${pct}%) — ExceleRate 4B needs 30%</div>
+        <div class="alert-detail">
+            ${met
+                ? `Currently met, but with no margin: ${needed} of ${inIt.length} required and ${holders.length} held.
+                   ${holders.some(partTime)
+                        ? 'It rests on a part-time assignment, so a single schedule change would drop you below the threshold.'
+                        : ''}`
+                : `<strong>Short by ${short}.</strong> This cannot be closed by submitting paperwork —
+                   staff without infant and toddler coursework need to take a course.`}
+        </div>
+        <table>
+            <thead><tr><th>Infant/toddler staff</th><th>Room</th><th>IT credential</th></tr></thead>
+            <tbody>${inIt.map(p => `<tr>
+                <td style="font-weight:600;">${p.Name || ''}${partTime(p) ? ' <span style="font-weight:400;color:#7c3aed;">(part time)</span>' : ''}</td>
+                <td>${p.Classroom || p.SecondaryClassroom || ''}</td>
+                <td style="${itLv(p) >= 2 ? 'color:#16a34a;font-weight:600;' : 'color:#b45309;'}">${itLv(p) ? 'Level ' + itLv(p) : 'none'}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+        <div class="alert-detail" style="margin-top:10px;">
+            <strong>Self-paced / online coursework to look into</strong>
+            ${candidates.length ? ` — for ${candidates.map(p => (p.Name || '').split(' ')[0]).join(', ')}` : ''}:
+            <ul style="margin:6px 0 0 18px;">
+                <li><strong>SWIC first.</strong> Tara, Paige and Sue already have records there, so credits and
+                    transcripts stay in one place. Ask specifically for an infant/toddler course, not another
+                    general early childhood one.</li>
+                <li><a href="https://www.clcillinois.edu/programs/bssdv/early-childhood-education/infant-toddler-level-ii-career-certificate" target="_blank" rel="noopener">College of Lake County — Infant/Toddler Level 2 Certificate</a>.
+                    Built so the coursework prepares you for the Gateways Level 2 credential. Check whether
+                    credits transfer, since it is a different college.</li>
+                <li><a href="https://acesonline.illinois.edu/program/infant-toddler-development-care-providers-certificate" target="_blank" rel="noopener">University of Illinois ACES Online — Infant Toddler Development for Care Providers</a>.
+                    Online, includes an infant/toddler development course at Level 2.</li>
+                <li>Confirm with <strong>credentials@ilgateways.com</strong> that a chosen course counts toward
+                    the Infant Toddler Credential before anyone enrols and pays.</li>
+            </ul>
+        </div>
+        <a class="alert-action" href="/staff/staff-cards.html">Open Staff Cards →</a>
+    </div>`;
+}
+
+function renderAlerts(students, waitlist, staff) {
     const body = document.getElementById('alertsBody');
     let html = '';
     let count = 0;
+
+    // 0. ExceleRate 4B infant/toddler credential shortfall
+    const itAlert = infantToddlerCredentialAlert(staff || []);
+    if (itAlert) { count++; html += itAlert; }
 
     // 1. CCAP Eligible families
     const ccapEligible = students.filter(s => {
