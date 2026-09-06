@@ -70,6 +70,13 @@
         .card-field .cf-value { color: #1e293b; font-weight: 500; text-align: right; }
         .card-field .cf-value.empty { color: #cbd5e1; font-style: italic; }
 
+        /* Director review state. The seed data was extracted from Gateways
+           reports, so unreviewed is the honest default and is made obvious. */
+        .review-chip { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+        .review-chip.reviewed { background: #f0fdf4; color: #166534; }
+        .review-chip.unreviewed { background: #fffbeb; color: #92400e; }
+        .staff-card.needs-review { border-left: 3px solid #f59e0b; }
+
         .card-footer {
             padding: 12px 20px; background: #f8fafc;
             border-top: 1px solid #e2e8f0;
@@ -253,6 +260,20 @@
                     <input type="text" id="editExperience" placeholder="e.g. 8">
                 </div>
             </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Gateways Registry ID</label>
+                    <input type="text" id="editRegistryId" placeholder="e.g. N285894">
+                </div>
+                <div class="form-group">
+                    <label>Reviewed By</label>
+                    <input type="text" id="editReviewedBy" placeholder="Director confirming accuracy">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Date Reviewed</label>
+                <input type="date" id="editReviewedDate">
+            </div>
             <div class="form-group">
                 <label>Notes</label>
                 <input type="text" id="editNotes" placeholder="Additional notes...">
@@ -265,43 +286,34 @@
     </div>
 </div>
 
+<!-- Shared auth + apiFetch. -->
+<script src="app.js"></script>
 <script>
-const STORAGE_KEY = 'cop_staff_cards';
-const DATA_VERSION = 5; // Bump this to force-reload defaults when data is updated
+/* Staff records come from the database via /api/staff.
+   They used to live in localStorage with a DATA_VERSION constant that reset the
+   list to hardcoded defaults whenever it was bumped — meaning any edit made here
+   could be silently discarded. The seed list now lives on the server and is
+   inserted once, when the table is first empty.
 
-// Default staff from Gateways Education Reports (report date 2/24/2025) + experience calculated to 8/17/2026
-const DEFAULT_STAFF = [
-    { name: 'Keyona Hentz', role: 'Lead Teacher / PFA Director', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: "Bachelor's", ece: 'ECE Level 5, IT Level 4, Director Level I', gateways: 'ECE Credential - Level 5', experience: '9.5', notes: 'Bachelor\'s ECE (Univ of Arizona Global, 2020). Associate\'s ECE (SWIC, 2016). Prior: Toddle Town Inc IT (5/2015-5/2018, 6,240 hrs) + Preschool (3/2020-5/2022, 4,160 hrs), Belleville PS Dist 118 IT (08/22-08/24, 2,340 hrs). Current: CofP since 2/2024 — PFA Teacher + Director (teaching 520 hrs + admin 2,050 hrs thru 03/2025, continuing). Total ~9.5 yrs as of 08/2026. Registry ID: N285894.' },
-    { name: 'Madeline Muir', role: 'Paraprofessional', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: 'High School/GED', ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '3.5', notes: 'HS Diploma (Waterloo HS, 2012). ECE Level 1 (2/20/2025). Prior: Together We Grow — Asst Teacher Infant room (01/2023-05/2023, 4,160 hrs). Current: CofP since 01/2024. Registry ID: N559187.' },
-    { name: 'Lindsey Runyon', role: 'Lead Teacher', program: 'INCCRA', classroom: 'Pre-School 2', fte: '1.0', education: "Associate's", ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '14', notes: 'Associate\'s ECC (SWIC, 2011). At CofP since 4/2/2012. Current position: Pre-School Teacher since 11/2024. 40hrs/wk. Pending: ECE & IT (Missing Documents). Registry ID: N171961.' },
-    { name: 'Tara Goldsmith', role: 'Infant Room Teacher / Floater', program: 'PI', classroom: 'Infant', fte: '1.0', education: 'High School/GED', ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '14', notes: 'HS Diploma (Belleville West, 2004). At CofP since 10/15/2012. 40hrs/wk x 12+ yrs = 24,900+ hrs. Responsible for care of children all ages, cleaning, covering areas. Pending: Director, ECE, IT. Registry ID: N230823.' },
-    { name: 'Paige Turner', role: 'Infant/Toddler Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: 'High School/GED', ece: '', gateways: '', experience: '10', notes: 'HS Diploma (Litchfield Senior HS, 2013). At CofP since 1/2016 as Infant/Toddler Teacher. 32hrs/wk x 8+ yrs = 13,312+ hrs. Verified by Megan Nooney 12/16/2024. No Gateways credential yet. Registry ID: N452129.' },
-    { name: 'Janell Poenitske', role: 'Teacher / Director', program: 'PI', classroom: 'Twos', fte: '1.0', education: 'Some College', ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '12', notes: 'HS Diploma (Providence HS, 1994). Coursework: Bachelor\'s Music (SIUE). Prior: Together We Grow (9/2023, 1,040 hrs), Magic Building Blocks (9/09-12/2010, 4,640 hrs), First Baptist/Early Years (10/2015-2/2023, 15,184 hrs). Current: CofP since 6/3/2024. Pending: Director, IT, ECE. Registry ID: N147146.' },
-    { name: 'Sue Engel', role: 'Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: 'High School/GED', ece: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experience: '37', notes: 'HS Diploma (Belleville West, 1982). At CofP since 5/1988. 30hrs/wk x 36+ yrs = 56,160+ total hrs. Preschool/Toddler — care, feed, daily activities. Pending: ECE & IT. Registry ID: N278509.' },
-    { name: 'Renee Nier', role: 'Assistant Teacher', program: 'PI', classroom: 'Twos', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: 'Not in Gateways report as of 2/24/2025.' },
-    { name: 'Megan Nooney', role: 'Teacher / Director', program: 'PI', classroom: 'Toddlers', fte: '1.0', education: "Associate's", ece: 'ECE Level 1, Gold IT2, Autism 101', gateways: 'ECE Credential - Level 1', experience: '17.5', notes: 'Associate\'s ECE (SWIC, 2012). At CofP since 01/2009. Teaching: 40hrs/wk x 15+ yrs = 31,200+ hrs — lead teacher preschool, curriculum, schedules. Admin: Director since 01/2009 — staff, files, admin, filling classrooms. Pending: IT, ECE, Director (Awaiting Work Exp). Gold IT2 (1/2024). Registry ID: N179660.' },
-    { name: 'New Teacher', role: 'TBD', program: 'n/a', classroom: 'TBD', fte: '', education: '', ece: '', gateways: '', experience: '', notes: 'Placeholder for new hire' }
-];
+   Records are shared by the PAS qualification worksheets, PICC CB6/PI9, the
+   ExceleRate training thresholds and CB4 ratios, so this is the single copy. */
 
+// Loaded from the server. Field names match the Staff table columns so there is
+// no mapping layer to keep in step.
 let staffList = [];
-let editingIndex = -1;
+let editingId = null;   // null = adding a new record
 
-function loadStaff() {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const storedVersion = parseInt(localStorage.getItem(STORAGE_KEY + '_version') || '0');
-    if (stored && storedVersion >= DATA_VERSION) {
-        try { staffList = JSON.parse(stored); } catch(e) { staffList = [...DEFAULT_STAFF]; }
-    } else {
-        // New data version — reset to updated defaults
-        staffList = [...DEFAULT_STAFF];
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
-        localStorage.setItem(STORAGE_KEY + '_version', String(DATA_VERSION));
+async function loadStaff() {
+    try {
+        const res = await apiFetch('/api/staff');
+        staffList = await res.json();
+        if (!Array.isArray(staffList)) staffList = [];
+    } catch (e) {
+        console.error('Failed to load staff', e);
+        staffList = [];
+        const grid = document.getElementById('staffGrid');
+        if (grid) grid.innerHTML = '<div style="padding:20px;color:#dc2626;">Could not load staff records: ' + e.message + '</div>';
     }
-}
-
-function saveAllStaff() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(staffList));
-    localStorage.setItem(STORAGE_KEY + '_version', String(DATA_VERSION));
 }
 
 function getInitials(name) {
@@ -321,28 +333,43 @@ function renderCards() {
     const grid = document.getElementById('staffGrid');
     let html = '';
 
-    staffList.forEach((s, i) => {
-        const isVacant = s.name === 'New Teacher' || s.name.toLowerCase().includes('tbd');
+    // Unreviewed records first: this data was extracted from Gateways PDFs and
+    // needs the director to confirm it before it backs a compliance claim.
+    const ordered = staffList.slice().sort((a, b) => {
+        const ar = a.ReviewedBy ? 1 : 0, br = b.ReviewedBy ? 1 : 0;
+        return ar !== br ? ar - br : (a.Name || '').localeCompare(b.Name || '');
+    });
+
+    ordered.forEach(s => {
+        const name = s.Name || '';
+        const isVacant = name === 'New Teacher' || name.toLowerCase().includes('tbd');
+        const reviewed = !!(s.ReviewedBy || '').trim();
+        const reviewBadge = reviewed
+            ? '<span class="review-chip reviewed" title="Confirmed by ' + s.ReviewedBy
+                + (s.ReviewedDate ? ' on ' + s.ReviewedDate : '') + '">✓ Reviewed</span>'
+            : '<span class="review-chip unreviewed" title="Extracted from Gateways reports; not yet confirmed by the director">Needs review</span>';
         html += `
-        <div class="staff-card" onclick="openEdit(${i})">
+        <div class="staff-card ${reviewed ? '' : 'needs-review'}" onclick="openEdit(${s.Id})">
             <div class="card-header">
-                <div class="card-avatar ${isVacant ? 'vacant' : ''}">${getInitials(s.name)}</div>
+                <div class="card-avatar ${isVacant ? 'vacant' : ''}">${getInitials(name)}</div>
                 <div class="card-name-block">
-                    <div class="card-name">${s.name}</div>
-                    <div class="card-role">${s.role}${s.fte ? ' · ' + s.fte + ' FTE' : ''}</div>
+                    <div class="card-name">${name}</div>
+                    <div class="card-role">${s.Role || ''}${s.Fte ? ' · ' + s.Fte + ' FTE' : ''}</div>
                 </div>
-                <span class="card-badge ${getBadgeClass(s.program)}">${s.program || 'N/A'}</span>
+                <span class="card-badge ${getBadgeClass(s.Program)}">${s.Program || 'N/A'}</span>
             </div>
             <div class="card-body">
-                <div class="card-field"><span class="cf-label">Classroom</span><span class="cf-value ${!s.classroom ? 'empty' : ''}">${s.classroom || '—'}</span></div>
-                <div class="card-field"><span class="cf-label">Education</span><span class="cf-value ${!s.education ? 'empty' : ''}">${s.education || '—'}</span></div>
-                <div class="card-field"><span class="cf-label">Gateways / ECE</span><span class="cf-value ${!s.gateways && !s.ece ? 'empty' : ''}">${s.gateways || s.ece || '—'}</span></div>
-                <div class="card-field"><span class="cf-label">Experience</span><span class="cf-value ${!s.experience ? 'empty' : ''}">${s.experience ? s.experience + ' yrs' : '—'}</span></div>
-                ${s.notes ? '<div class="card-field" style="flex-direction:column;align-items:flex-start;gap:2px;"><span class="cf-label">Notes</span><span class="cf-value" style="text-align:left;font-size:0.72rem;color:#64748b;">' + s.notes + '</span></div>' : ''}
+                <div class="card-field"><span class="cf-label">Review</span><span class="cf-value">${reviewBadge}</span></div>
+                <div class="card-field"><span class="cf-label">Classroom</span><span class="cf-value ${!s.Classroom ? 'empty' : ''}">${s.Classroom || '—'}</span></div>
+                <div class="card-field"><span class="cf-label">Education</span><span class="cf-value ${!s.Education ? 'empty' : ''}">${s.Education || '—'}</span></div>
+                <div class="card-field"><span class="cf-label">Gateways / ECE</span><span class="cf-value ${!s.Gateways && !s.EceCredentials ? 'empty' : ''}">${s.Gateways || s.EceCredentials || '—'}</span></div>
+                <div class="card-field"><span class="cf-label">Experience</span><span class="cf-value ${!s.ExperienceYears ? 'empty' : ''}">${s.ExperienceYears ? s.ExperienceYears + ' yrs' : '—'}</span></div>
+                <div class="card-field"><span class="cf-label">Registry ID</span><span class="cf-value ${!s.RegistryId ? 'empty' : ''}">${s.RegistryId || '—'}</span></div>
+                ${s.Notes ? '<div class="card-field" style="flex-direction:column;align-items:flex-start;gap:2px;"><span class="cf-label">Notes</span><span class="cf-value" style="text-align:left;font-size:0.72rem;color:#64748b;">' + s.Notes + '</span></div>' : ''}
             </div>
             <div class="card-footer">
-                <button class="card-btn" onclick="event.stopPropagation();openEdit(${i})">✏️ Edit</button>
-                <button class="card-btn" onclick="event.stopPropagation();deleteStaff(${i})" style="color:#dc2626;">🗑️ Remove</button>
+                <button class="card-btn" onclick="event.stopPropagation();openEdit(${s.Id})">✏️ Edit</button>
+                <button class="card-btn" onclick="event.stopPropagation();deleteStaff(${s.Id})" style="color:#dc2626;">🗑️ Remove</button>
             </div>
         </div>`;
     });
@@ -356,64 +383,93 @@ function renderCards() {
     grid.innerHTML = html;
 }
 
-function openEdit(index) {
-    editingIndex = index;
-    const s = staffList[index];
-    document.getElementById('modalTitle').textContent = index >= staffList.length ? 'Add Staff' : 'Edit – ' + s.name;
-    document.getElementById('editName').value = s.name || '';
-    document.getElementById('editRole').value = s.role || '';
-    document.getElementById('editProgram').value = s.program || 'n/a';
-    document.getElementById('editClassroom').value = s.classroom || '';
-    document.getElementById('editFTE').value = s.fte || '';
-    document.getElementById('editEducation').value = s.education || '';
-    document.getElementById('editECE').value = s.ece || '';
-    document.getElementById('editGateways').value = s.gateways || '';
-    document.getElementById('editExperience').value = s.experience || '';
-    document.getElementById('editNotes').value = s.notes || '';
+// id === null opens a blank form for a new record.
+function openEdit(id) {
+    editingId = id === null ? null : String(id);
+    const s = (id === null ? null : staffList.find(x => String(x.Id) === String(id))) || {};
+    document.getElementById('modalTitle').textContent = id === null ? 'Add Staff' : 'Edit \u2013 ' + (s.Name || '');
+    document.getElementById('editName').value = s.Name || '';
+    document.getElementById('editRole').value = s.Role || '';
+    document.getElementById('editProgram').value = s.Program || 'n/a';
+    document.getElementById('editClassroom').value = s.Classroom || '';
+    document.getElementById('editFTE').value = s.Fte || '';
+    document.getElementById('editEducation').value = s.Education || '';
+    document.getElementById('editECE').value = s.EceCredentials || '';
+    document.getElementById('editGateways').value = s.Gateways || '';
+    document.getElementById('editExperience').value = s.ExperienceYears || '';
+    document.getElementById('editRegistryId').value = s.RegistryId || '';
+    document.getElementById('editReviewedBy').value = s.ReviewedBy || '';
+    document.getElementById('editReviewedDate').value = s.ReviewedDate || '';
+    document.getElementById('editNotes').value = s.Notes || '';
     document.getElementById('editModal').classList.add('active');
 }
 
 function closeModal() {
     document.getElementById('editModal').classList.remove('active');
-    editingIndex = -1;
+    editingId = null;
 }
 
-function saveStaff() {
-    const s = {
-        name: document.getElementById('editName').value.trim() || 'Unnamed',
+async function saveStaff() {
+    const name = document.getElementById('editName').value.trim();
+    if (!name) { alert('A name is required.'); return; }
+
+    const reviewedBy = document.getElementById('editReviewedBy').value.trim();
+    const body = {
+        name: name,
         role: document.getElementById('editRole').value.trim(),
         program: document.getElementById('editProgram').value,
         classroom: document.getElementById('editClassroom').value.trim(),
         fte: document.getElementById('editFTE').value.trim(),
         education: document.getElementById('editEducation').value,
-        ece: document.getElementById('editECE').value.trim(),
+        eceCredentials: document.getElementById('editECE').value.trim(),
         gateways: document.getElementById('editGateways').value.trim(),
-        experience: document.getElementById('editExperience').value.trim(),
+        experienceYears: document.getElementById('editExperience').value.trim(),
+        registryId: document.getElementById('editRegistryId').value.trim(),
+        reviewedBy: reviewedBy,
+        // Stamp today automatically when a reviewer is named but no date given,
+        // so "reviewed" always carries a date with it.
+        reviewedDate: document.getElementById('editReviewedDate').value
+            || (reviewedBy ? new Date().toISOString().split('T')[0] : ''),
         notes: document.getElementById('editNotes').value.trim()
     };
 
-    if (editingIndex >= 0 && editingIndex < staffList.length) {
-        staffList[editingIndex] = s;
-    } else {
-        staffList.push(s);
+    const btn = document.querySelector('#editModal .btn-save');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+        const res = editingId
+            ? await apiFetch('/api/staff/' + encodeURIComponent(editingId), { method: 'PUT', body: JSON.stringify(body) })
+            : await apiFetch('/api/staff', { method: 'POST', body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Save failed');
+        await loadStaff();
+        renderCards();
+        closeModal();
+    } catch (e) {
+        alert('Save failed: ' + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
     }
-
-    saveAllStaff();
-    renderCards();
-    closeModal();
 }
 
 function addNewStaff() {
-    staffList.push({ name: '', role: '', program: 'n/a', classroom: '', fte: '1.0', education: '', ece: '', gateways: '', experience: '', notes: '' });
-    openEdit(staffList.length - 1);
+    openEdit(null);
 }
 
-function deleteStaff(index) {
-    const name = staffList[index].name || 'this staff member';
-    if (!confirm(`Remove "${name}" from staff cards?`)) return;
-    staffList.splice(index, 1);
-    saveAllStaff();
-    renderCards();
+async function deleteStaff(id) {
+    const s = staffList.find(x => String(x.Id) === String(id));
+    const name = (s && s.Name) || 'this staff member';
+    // Soft delete on the server: the record is retained as qualification history
+    // and only removed from the active list.
+    if (!confirm('Remove "' + name + '" from the active staff list?\n\nThe record is kept for qualification history and can be restored.')) return;
+    try {
+        const res = await apiFetch('/api/staff/' + encodeURIComponent(id), { method: 'DELETE' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Remove failed');
+        await loadStaff();
+        renderCards();
+    } catch (e) {
+        alert('Remove failed: ' + e.message);
+    }
 }
 
 // Close modal on backdrop click
@@ -421,9 +477,11 @@ document.getElementById('editModal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
 });
 
-// Init
-loadStaff();
-renderCards();
+// Init — loadStaff is async now, so render only once the data has arrived.
+(async function () {
+    await loadStaff();
+    renderCards();
+})();
 </script>
 <!-- Deploy / Restart controls while this area is under active development. -->
 <script src="deploy-widget.js"></script>

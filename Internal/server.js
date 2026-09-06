@@ -404,6 +404,81 @@ function parentInterviewEnsureSQL() {
 // rebuilding that constraint; item keys are validated against 50 instead.
 const COMPLIANCE_FIELD_NAME_MAX = 50;
 
+// ── Staff schema ──
+// Staff records were previously held in browser localStorage on staff-cards.html,
+// which meant credential data existed only in one browser and a version bump in
+// that page silently reset it to hardcoded defaults. They live here now because
+// four other things depend on them: the PAS qualification worksheets, PICC CB6
+// (classroom staff qualifications) and PI9 (professional development plans), the
+// ExceleRate training thresholds, and CB4 staff-to-classroom ratios.
+//
+// ReviewedBy/ReviewedDate exist because the seed data was machine-extracted from
+// Gateways PDFs and needs a human to confirm it before it backs a compliance
+// claim. Unreviewed is the honest default.
+function staffEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='Staff')
+    CREATE TABLE Staff (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        Name NVARCHAR(200) NOT NULL,
+        Role NVARCHAR(200),
+        Program NVARCHAR(40),
+        Classroom NVARCHAR(100),
+        Fte NVARCHAR(10),
+        Education NVARCHAR(100),
+        EceCredentials NVARCHAR(300),
+        Gateways NVARCHAR(200),
+        ExperienceYears NVARCHAR(20),
+        RegistryId NVARCHAR(40),
+        Notes NVARCHAR(MAX),
+        Active BIT DEFAULT 1,
+        ReviewedBy NVARCHAR(200),
+        ReviewedDate NVARCHAR(20),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+}
+
+// Columns the staff endpoints read and write, in one place so the SELECT, the
+// INSERT and the UPDATE cannot drift apart.
+const STAFF_COLUMNS = [
+    ['Name', 'name'], ['Role', 'role'], ['Program', 'program'], ['Classroom', 'classroom'],
+    ['Fte', 'fte'], ['Education', 'education'], ['EceCredentials', 'eceCredentials'],
+    ['Gateways', 'gateways'], ['ExperienceYears', 'experienceYears'], ['RegistryId', 'registryId'],
+    ['Notes', 'notes'], ['ReviewedBy', 'reviewedBy'], ['ReviewedDate', 'reviewedDate']
+];
+
+/* One-time migration payload: the staff list that used to be hardcoded in
+   staff-cards.html as DEFAULT_STAFF. Inserted only when the table is empty, so
+   it runs once and never overwrites the director's later edits. Registry IDs
+   have been lifted out of the free-text notes into their own column; the notes
+   are kept verbatim because they carry the verification trail.
+
+   Safe to delete this constant once the table is populated in production. */
+const STAFF_SEED = [
+    { name: 'Keyona Hentz', role: 'Lead Teacher / PFA Director', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: "Bachelor's", eceCredentials: 'ECE Level 5, IT Level 4, Director Level I', gateways: 'ECE Credential - Level 5', experienceYears: '9.5', registryId: 'N285894', notes: "Bachelor's ECE (Univ of Arizona Global, 2020). Associate's ECE (SWIC, 2016). Prior: Toddle Town Inc IT (5/2015-5/2018, 6,240 hrs) + Preschool (3/2020-5/2022, 4,160 hrs), Belleville PS Dist 118 IT (08/22-08/24, 2,340 hrs). Current: CofP since 2/2024 - PFA Teacher + Director (teaching 520 hrs + admin 2,050 hrs thru 03/2025, continuing). Total ~9.5 yrs as of 08/2026." },
+    { name: 'Madeline Muir', role: 'Paraprofessional', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '3.5', registryId: 'N559187', notes: 'HS Diploma (Waterloo HS, 2012). ECE Level 1 (2/20/2025). Prior: Together We Grow - Asst Teacher Infant room (01/2023-05/2023, 4,160 hrs). Current: CofP since 01/2024.' },
+    { name: 'Lindsey Runyon', role: 'Lead Teacher', program: 'INCCRA', classroom: 'Pre-School 2', fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '14', registryId: 'N171961', notes: "Associate's ECC (SWIC, 2011). At CofP since 4/2/2012. Current position: Pre-School Teacher since 11/2024. 40hrs/wk. Pending: ECE & IT (Missing Documents)." },
+    { name: 'Tara Goldsmith', role: 'Infant Room Teacher / Floater', program: 'PI', classroom: 'Infant', fte: '1.0', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '14', registryId: 'N230823', notes: 'HS Diploma (Belleville West, 2004). At CofP since 10/15/2012. 40hrs/wk x 12+ yrs = 24,900+ hrs. Responsible for care of children all ages, cleaning, covering areas. Pending: Director, ECE, IT.' },
+    { name: 'Paige Turner', role: 'Infant/Toddler Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: 'High School/GED', eceCredentials: '', gateways: '', experienceYears: '10', registryId: 'N452129', notes: 'HS Diploma (Litchfield Senior HS, 2013). At CofP since 1/2016 as Infant/Toddler Teacher. 32hrs/wk x 8+ yrs = 13,312+ hrs. Verified by Megan Nooney 12/16/2024. No Gateways credential yet.' },
+    { name: 'Janell Poenitske', role: 'Teacher / Director', program: 'PI', classroom: 'Twos', fte: '1.0', education: 'Some College', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '12', registryId: 'N147146', notes: "HS Diploma (Providence HS, 1994). Coursework: Bachelor's Music (SIUE). Prior: Together We Grow (9/2023, 1,040 hrs), Magic Building Blocks (9/09-12/2010, 4,640 hrs), First Baptist/Early Years (10/2015-2/2023, 15,184 hrs). Current: CofP since 6/3/2024. Pending: Director, IT, ECE." },
+    { name: 'Sue Engel', role: 'Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '37', registryId: 'N278509', notes: 'HS Diploma (Belleville West, 1982). At CofP since 5/1988. 30hrs/wk x 36+ yrs = 56,160+ total hrs. Preschool/Toddler - care, feed, daily activities. Pending: ECE & IT.' },
+    { name: 'Renee Nier', role: 'Assistant Teacher', program: 'PI', classroom: 'Twos', fte: '1.0', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Not in Gateways report as of 2/24/2025.' },
+    { name: 'Megan Nooney', role: 'Teacher / Director', program: 'PI', classroom: 'Toddlers', fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1, Gold IT2, Autism 101', gateways: 'ECE Credential - Level 1', experienceYears: '17.5', registryId: 'N179660', notes: "Associate's ECE (SWIC, 2012). At CofP since 01/2009. Teaching: 40hrs/wk x 15+ yrs = 31,200+ hrs - lead teacher preschool, curriculum, schedules. Admin: Director since 01/2009 - staff, files, admin, filling classrooms. Pending: IT, ECE, Director (Awaiting Work Exp). Gold IT2 (1/2024)." },
+    { name: 'New Teacher', role: 'TBD', program: 'n/a', classroom: 'TBD', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Placeholder for new hire' }
+];
+
+function staffSeedSQL() {
+    const cols = STAFF_COLUMNS.map(([c]) => c).join(',');
+    const rows = STAFF_SEED.map(s =>
+        '(' + STAFF_COLUMNS.map(([, key]) => esc(s[key])).join(',') + ')').join(',\n        ');
+    // Guarded on the table being empty, so this is a migration and not a reset.
+    return `IF NOT EXISTS (SELECT 1 FROM Staff)
+    INSERT INTO Staff (${cols}) VALUES
+        ${rows};
+`;
+}
+
 // ── SiteSettings schema ──
 // Key/value store for facts that are true of the site regardless of school year:
 // the DCFS license, ExceleRate level, and similar. Deliberately has no
@@ -1562,6 +1637,83 @@ ELSE
                 if (name) data[name] = raw === '1' ? true : raw === '0' ? false : raw;
             });
         return sendJSON(res, 200, data);
+    }
+
+    // GET staff (internal - protected)
+    // Ensure, seed-if-empty and select are separated by GO because the seed and
+    // the select reference a table the first batch may have only just created;
+    // SQL Server compiles a whole batch up front, so they cannot share one.
+    if (req.method === 'GET' && url === '/api/staff') {
+        if (!checkAuth(req, res)) return;
+        const select = ['Id'].concat(STAFF_COLUMNS.map(([c]) => c));
+        const projection = select.map(c =>
+            (c === 'Id' ? 'Id' : txCol(c))).join(',');
+        const sql = staffEnsureSQL() + 'GO\n' + staffSeedSQL() + 'GO\n'
+            + `SELECT ${projection},ISNULL(CAST(Active AS INT),1) AS Active FROM Staff WHERE ISNULL(Active,1)=1 ORDER BY Name`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const keys = select.concat(['Active']);
+        const rows = r.data.trim().split('\n')
+            .filter(l => /^\s*\d+\s*\|/.test(l))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                const o = {};
+                keys.forEach((k, i) => { o[k] = k === 'Id' || k === 'Active' ? v[i] : txDecode(v[i]); });
+                return o;
+            });
+        return sendJSON(res, 200, rows);
+    }
+
+    // POST new staff member (internal - protected)
+    if (req.method === 'POST' && url === '/api/staff') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            if (!String(d.name || '').trim()) return sendJSON(res, 400, { error: 'Name is required' });
+            const cols = STAFF_COLUMNS.map(([c]) => c).join(',');
+            const vals = STAFF_COLUMNS.map(([, key]) => esc(d[key])).join(',');
+            const sql = staffEnsureSQL() + 'GO\n'
+                + `INSERT INTO Staff (${cols}) VALUES (${vals});SELECT SCOPE_IDENTITY() AS Id`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
+    // PUT update staff member (internal - protected)
+    if (req.method === 'PUT' && url.startsWith('/api/staff/')) {
+        if (!checkAuth(req, res)) return;
+        const id = parseInt(url.split('/')[3]);
+        if (!id) return sendJSON(res, 400, { error: 'Staff id required' });
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            // Only update the fields actually supplied, so a partial save (for
+            // example marking a record reviewed) cannot blank the rest.
+            const sets = STAFF_COLUMNS
+                .filter(([, key]) => d[key] !== undefined)
+                .map(([c, key]) => `${c}=${esc(d[key])}`);
+            if (!sets.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+            const sql = staffEnsureSQL() + 'GO\n'
+                + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
+    // DELETE staff member (internal - protected)
+    // Soft delete: qualification history is compliance evidence, so the row stays
+    // and is simply excluded from the active list.
+    if (req.method === 'DELETE' && url.startsWith('/api/staff/')) {
+        if (!checkAuth(req, res)) return;
+        const id = parseInt(url.split('/')[3]);
+        if (!id) return sendJSON(res, 400, { error: 'Staff id required' });
+        const sql = staffEnsureSQL() + 'GO\n' + `UPDATE Staff SET Active=0,UpdatedAt=GETDATE() WHERE Id=${id}`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        return sendJSON(res, 200, { success: true });
     }
 
     // GET site-level settings (internal - protected)
