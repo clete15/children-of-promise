@@ -590,12 +590,38 @@ function staffDevPlanEnsureSQL() {
         PlanDate NVARCHAR(20),
         ReviewDate NVARCHAR(20),
         PlanType NVARCHAR(30),
+        SchoolYear NVARCHAR(20),
+        Location NVARCHAR(120),
+        SupervisorName NVARCHAR(200),
+        /* Self-assessment, in the four parts the centre's own goal plan uses.
+           Written by the employee, so these are never auto-filled. */
+        Strengths NVARCHAR(MAX),
+        GrowthAreas NVARCHAR(MAX),
+        FavoriteAspect NVARCHAR(MAX),
+        Frustrations NVARCHAR(MAX),
+        /* One SMART goal per plan, matching the existing form rather than a
+           in StaffDevelopmentGoal, each with its own mid-year review. */
+        /* Three sign-off points, as the 2024-25 form has them: the plan is agreed
+           at the start of the year, reviewed mid-year, and evaluated at year end.
+           Each carries its own notes and two signature dates, so one sheet
+           evidences the whole year rather than three separate documents. */
+        InitialDate NVARCHAR(20),
+        InitialNotes NVARCHAR(MAX),
+        InitialStaffSigned NVARCHAR(20),
+        InitialSupervisorSigned NVARCHAR(20),
+        MidYearDate NVARCHAR(20),
+        MidYearNotes NVARCHAR(MAX),
+        MidYearStaffSigned NVARCHAR(20),
+        MidYearSupervisorSigned NVARCHAR(20),
+        YearEndDate NVARCHAR(20),
+        YearEndNotes NVARCHAR(MAX),
+        YearEndStaffSigned NVARCHAR(20),
+        YearEndSupervisorSigned NVARCHAR(20),
         NeedsAssessment NVARCHAR(MAX),
         ProgramWillProvide NVARCHAR(MAX),
         LongTermGoals NVARCHAR(MAX),
         StaffSignedDate NVARCHAR(20),
         SupervisorSignedDate NVARCHAR(20),
-        SupervisorName NVARCHAR(200),
         Status NVARCHAR(20) DEFAULT 'Active',
         CreatedAt DATETIME DEFAULT GETDATE(),
         UpdatedAt DATETIME DEFAULT GETDATE()
@@ -605,7 +631,17 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StaffDe
     CREATE TABLE StaffDevelopmentGoal (
         Id INT IDENTITY(1,1) PRIMARY KEY,
         PlanId INT NOT NULL,
-        Goal NVARCHAR(500),
+        Goal NVARCHAR(MAX),
+        /* Named as the form names them: the professional development that will
+           support the goal, and the measurement that will evidence completion. */
+        PdSupport NVARCHAR(MAX),
+        Measurement NVARCHAR(MAX),
+        /* Per-goal review, which is the part that makes progression visible. The
+           2024-25 form carried a review date and mid-year comment against each
+           goal individually, not one comment for the whole plan. */
+        MidYearReviewDate NVARCHAR(20),
+        MidYearComments NVARCHAR(MAX),
+        YearEndComments NVARCHAR(MAX),
         ActionSteps NVARCHAR(MAX),
         Timeline NVARCHAR(200),
         Resources NVARCHAR(500),
@@ -621,13 +657,27 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StaffDe
 
 const DEVPLAN_COLUMNS = [
     ['StaffId', 'staffId'], ['PlanDate', 'planDate'], ['ReviewDate', 'reviewDate'],
-    ['PlanType', 'planType'], ['NeedsAssessment', 'needsAssessment'],
+    ['PlanType', 'planType'], ['SchoolYear', 'schoolYear'],
+    ['Location', 'location'], ['SupervisorName', 'supervisorName'],
+    ['Strengths', 'strengths'], ['GrowthAreas', 'growthAreas'],
+    ['FavoriteAspect', 'favoriteAspect'], ['Frustrations', 'frustrations'],
+    ['InitialDate', 'initialDate'], ['InitialNotes', 'initialNotes'],
+    ['InitialStaffSigned', 'initialStaffSigned'], ['InitialSupervisorSigned', 'initialSupervisorSigned'],
+    ['MidYearDate', 'midYearDate'], ['MidYearNotes', 'midYearNotes'],
+    ['MidYearStaffSigned', 'midYearStaffSigned'], ['MidYearSupervisorSigned', 'midYearSupervisorSigned'],
+    ['YearEndDate', 'yearEndDate'], ['YearEndNotes', 'yearEndNotes'],
+    ['YearEndStaffSigned', 'yearEndStaffSigned'], ['YearEndSupervisorSigned', 'yearEndSupervisorSigned'],
+    ['NeedsAssessment', 'needsAssessment'],
     ['ProgramWillProvide', 'programWillProvide'], ['LongTermGoals', 'longTermGoals'],
     ['StaffSignedDate', 'staffSignedDate'], ['SupervisorSignedDate', 'supervisorSignedDate'],
-    ['SupervisorName', 'supervisorName'], ['Status', 'status']
+    ['Status', 'status']
 ];
 const DEVGOAL_COLUMNS = [
-    ['PlanId', 'planId'], ['Goal', 'goal'], ['ActionSteps', 'actionSteps'],
+    ['PlanId', 'planId'], ['Goal', 'goal'],
+    ['PdSupport', 'pdSupport'], ['Measurement', 'measurement'],
+    ['MidYearReviewDate', 'midYearReviewDate'], ['MidYearComments', 'midYearComments'],
+    ['YearEndComments', 'yearEndComments'],
+    ['ActionSteps', 'actionSteps'],
     ['Timeline', 'timeline'], ['Resources', 'resources'], ['Evidence', 'evidence'],
     ['Status', 'status'], ['CompletedDate', 'completedDate'], ['SortOrder', 'sortOrder']
 ];
@@ -1959,8 +2009,14 @@ ELSE
                 c === 'StaffId' ? staffId
                 : c === 'Status' ? esc(d.status || 'Active')
                 : esc(d[key])).join(',');
+            /* One plan per person per program year. The mid-year and year-end
+               reviews are sections ON that plan, not separate records, so
+               superseding is scoped to the year alone. Re-issuing a plan for the
+               same year replaces it and keeps the old copy as history. */
+            const sameCycle = `StaffId=${staffId} AND ISNULL(Status,'Active')='Active'`
+                + ` AND ISNULL(SchoolYear,'')=${esc(d.schoolYear || '')}`;
             const sql = staffDevPlanEnsureSQL() + 'GO\n'
-                + `UPDATE StaffDevelopmentPlan SET Status='Superseded',UpdatedAt=GETDATE() WHERE StaffId=${staffId} AND ISNULL(Status,'Active')='Active';\n`
+                + `UPDATE StaffDevelopmentPlan SET Status='Superseded',UpdatedAt=GETDATE() WHERE ${sameCycle};\n`
                 + `INSERT INTO StaffDevelopmentPlan (${cols}) VALUES (${vals});SELECT SCOPE_IDENTITY() AS Id`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
