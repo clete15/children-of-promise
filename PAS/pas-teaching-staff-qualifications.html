@@ -189,6 +189,52 @@
             .classroom-selector { background: transparent; border: none; padding: 0; }
             .classroom-selector select { border: none; -webkit-appearance: none; appearance: none; }
             .saved-overview { display: none; }
+            .prefill-report { display: none !important; }
+        }
+
+        /* Fill-from-staff-records button and its result panel */
+        #prefillBtn {
+            margin-left: auto;
+            padding: 6px 14px;
+            background: #2c5282;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 9pt;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #prefillBtn:hover { background: #1f3f66; }
+        #prefillBtn:disabled { background: #94a3b8; cursor: default; }
+
+        .prefill-report {
+            margin: 0 0 14px;
+            padding: 12px 16px;
+            border: 1px solid #c7d7ea;
+            border-left: 4px solid #2c5282;
+            border-radius: 6px;
+            background: #f4f8fc;
+            font-size: 9pt;
+            line-height: 1.5;
+        }
+        .prefill-report h4 {
+            margin: 0 0 8px;
+            font-size: 9.5pt;
+            color: #1f3f66;
+        }
+        .prefill-report ul { margin: 4px 0 10px 18px; padding: 0; }
+        .prefill-report li { margin-bottom: 3px; }
+        .prefill-report .pr-need { color: #92400e; }
+        .prefill-report .pr-warn { color: #991b1b; }
+        .prefill-report .pr-done { color: #166534; }
+        .prefill-report .pr-close {
+            float: right;
+            border: none;
+            background: transparent;
+            font-size: 13pt;
+            line-height: 1;
+            cursor: pointer;
+            color: #64748b;
         }
     </style>
 </head>
@@ -215,7 +261,14 @@
         <option value="">Loading classrooms...</option>
     </select>
     <span class="status-text empty" id="classroomStatus">Not yet saved</span>
+    <button type="button" id="prefillBtn" onclick="prefillFromStaff()"
+            title="Fill this worksheet from the staff records, so you confirm instead of retyping">
+        ⤓ Fill from staff records
+    </button>
 </div>
+
+<!-- What the prefill filled, and what still needs a human. -->
+<div class="prefill-report no-print" id="prefillReport" style="display:none;"></div>
 
 <!-- Saved classrooms overview -->
 <div class="saved-overview no-print" id="savedOverview" style="display:none;">
@@ -555,6 +608,286 @@ function migrateOldData() {
             PasStore.storage.removeItem(oldStorageKey);
         }
     });
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Fill from staff records
+
+   The staff table already holds education, credentials and experience, gathered
+   from the Gateways reports. Retyping it here invites transcription errors and
+   lets the two copies drift apart. So this pulls the record and lets the
+   director confirm it instead.
+
+   Two things it deliberately does NOT do: it never overwrites entered work
+   without asking, and it never invents a value. Semester hours and credentials
+   are not tracked on the staff record, so they are reported as needing a human
+   rather than left to look complete.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Classroom names are free text on the staff record ("Twos", "Infant/Toddler")
+   but the worksheet is keyed to dimClassrooms ("2 Year Olds", "Infants /
+   Toddlers"). Reduce both sides to comparable tokens: split on anything that is
+   not a letter or digit, drop plurals, rejoin. That alone makes
+   "Infant/Toddler" meet "Infants / Toddlers". */
+function roomToken(name) {
+    if (!name) return '';
+    return String(name).toLowerCase()
+        .split(/[^a-z0-9]+/).filter(Boolean)
+        .map(w => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
+        .join('/');
+}
+
+/* Where tokenising is not enough because the words differ outright. Keyed and
+   valued in token form. Add to this if the director types a new variant. */
+const ROOM_SYNONYMS = {
+    'two': '2/year/old',
+    'twos': '2/year/old',
+    '2': '2/year/old',
+    'preschool': 'pre/school',
+    'prek': 'pre/school',
+    'pre/k': 'pre/school',
+    'baby': 'infant',
+    'babie': 'infant',
+    'it': 'infant/toddler',
+    'schoolage': 'before/and/afterschool',
+    'school/age': 'before/and/afterschool',
+    'afterschool': 'before/and/afterschool',
+    'before/after/school': 'before/and/afterschool'
+};
+
+function canonicalRoom(name) {
+    const t = roomToken(name);
+    return ROOM_SYNONYMS[t] || t;
+}
+
+/* PAS wants one of three teaching roles. Job titles here are compound
+   ("Lead Teacher / PFA Director", "Teacher / Director"), so order matters:
+   check lead first, then assistant, then plain teacher. Assistants and
+   paraprofessionals count as AT because they count toward ratio. */
+function pasRole(role) {
+    const r = (role || '').toLowerCase();
+    if (!r || r === 'tbd') return '';
+    if (/\blead\b/.test(r)) return 'LT';
+    // Explicit assistant titles first, because "Assistant Teacher" contains
+    // both words and is an AT.
+    if (/assistant|\bpara|aide/.test(r)) return 'AT';
+    // Then teacher. A secondary duty must not demote someone titled teacher:
+    // "Infant Room Teacher / Floater" is a teacher who also covers elsewhere,
+    // and scoring her AT would leave her room with no teacher of record.
+    if (/teacher|instructor/.test(r)) return 'T';
+    // Support-only titles, with no teacher in them at all.
+    if (/floater|support|helper/.test(r)) return 'AT';
+    return '';
+}
+
+/* Highest education LEVEL, which is not the same as coursework attempted.
+   "Some College" means no degree completed, so the highest completed level is
+   still high school — recorded that way and flagged, because it is a judgement
+   call the director should see rather than a silent decision. */
+function eduField(education) {
+    const e = (education || '').toLowerCase();
+    if (/doctor|phd|ed\.?d/.test(e)) return { field: 'edu_doctorate' };
+    if (/master|m\.?ed|m\.?a\b|m\.?s\b/.test(e)) return { field: 'edu_master' };
+    if (/bachelor|b\.?a\b|b\.?s\b/.test(e)) return { field: 'edu_bachelor' };
+    if (/associate|a\.?a\b|a\.?s\b/.test(e)) return { field: 'edu_associate' };
+    if (/some college|coursework/.test(e)) {
+        return { field: 'edu_hs', note: 'recorded High School/GED as the highest *completed* level ("Some College" means no degree finished) — confirm' };
+    }
+    if (/high school|hs|ged|diploma/.test(e)) return { field: 'edu_hs' };
+    return { field: null };
+}
+
+/* ExperienceYears is a decimal ("9.5"), the worksheet wants years + months. */
+function splitExperience(years) {
+    const n = parseFloat(years);
+    if (!isFinite(n) || n <= 0) return null;
+    const y = Math.floor(n);
+    const m = Math.round((n - y) * 12);
+    // 11.99 -> 12 months, which reads better rolled into the year.
+    if (m === 12) return { years: String(y + 1), months: '0' };
+    return { years: String(y), months: String(m) };
+}
+
+function initialsFrom(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    return parts.map(p => p[0].toUpperCase()).join('').slice(0, 5);
+}
+
+function setField(name, value) {
+    const el = document.querySelector(`[data-field="${name}"]`);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = !!value;
+    else el.value = value;
+}
+
+// True when any staff block already holds something worth protecting.
+function worksheetHasEntries() {
+    for (let i = 0; i < STAFF_COUNT; i++) {
+        const initials = document.querySelector(`[data-field="initials_${i}"]`);
+        const role = document.querySelector(`[data-field="role_${i}"]`);
+        if ((initials && initials.value.trim()) || (role && role.value)) return true;
+    }
+    return false;
+}
+
+function showPrefillReport(html) {
+    const el = document.getElementById('prefillReport');
+    el.innerHTML = '<button class="pr-close" onclick="document.getElementById(\'prefillReport\').style.display=\'none\'" title="Dismiss">&times;</button>' + html;
+    el.style.display = 'block';
+}
+
+async function prefillFromStaff() {
+    const btn = document.getElementById('prefillBtn');
+    const key = getCurrentClassroom();
+    const info = getClassroomInfo(key);
+    if (!info) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+    try {
+        let staff;
+        try {
+            const res = await fetch('/api/staff', { headers: { 'Authorization': AUTH } });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            staff = await res.json();
+        } catch (e) {
+            showPrefillReport('<h4>Could not reach the staff records</h4><p class="pr-warn">'
+                + 'The server did not answer, so nothing was changed. '
+                + 'If the site was just deployed it may still be restarting — wait a moment and try again.</p>'
+                + '<p style="color:#64748b">Details: ' + String(e.message || e) + '</p>');
+            return;
+        }
+
+        const active = (staff || []).filter(s => s.Active === undefined || s.Active === true || s.Active === 1);
+        const target = canonicalRoom(info.name);
+        const matched = active.filter(s => canonicalRoom(s.Classroom) === target);
+
+        if (!matched.length) {
+            // Say WHY nothing matched and what to do, rather than just "no results".
+            const unplaced = active
+                .filter(s => !CLASSROOMS.some(c => canonicalRoom(c.name) === canonicalRoom(s.Classroom)))
+                .map(s => `<li>${s.Name} — classroom recorded as “<strong>${s.Classroom || '(blank)'}</strong>”</li>`)
+                .join('');
+            showPrefillReport(
+                `<h4>No staff are assigned to ${info.name}</h4>`
+                + '<p>Nothing was changed. Assign staff to this room on the Staff Cards page, then try again.</p>'
+                + (unplaced ? '<p class="pr-need">These staff have a classroom that does not match any room, so they '
+                    + 'cannot be placed on any worksheet:</p><ul class="pr-need">' + unplaced + '</ul>' : ''));
+            return;
+        }
+
+        if (worksheetHasEntries() &&
+            !confirm(`This worksheet already has entries for ${info.name}.\n\n`
+                + `Replace them with the ${matched.length} staff record(s) on file?\n\n`
+                + 'Anything you typed in the staff blocks will be overwritten.')) {
+            return;
+        }
+
+        // Lead teacher first, then teachers, then assistants — how the form reads.
+        const order = { LT: 0, T: 1, AT: 2, '': 3 };
+        matched.sort((a, b) => order[pasRole(a.Role)] - order[pasRole(b.Role)]);
+
+        const overflow = matched.slice(STAFF_COUNT);
+        const fits = matched.slice(0, STAFF_COUNT);
+
+        // Clear only the staff blocks; leave program/classroom alone.
+        for (let i = 0; i < STAFF_COUNT; i++) {
+            ['initials', 'role', 'gen_sh', 'ece_sh', 'exp_years', 'exp_months'].forEach(f => setField(`${f}_${i}`, ''));
+            ['edu_hs', 'edu_associate', 'edu_bachelor', 'edu_master', 'edu_doctorate',
+             'enrolled_ba', 'enrolled_ece', 'cred_teacher_cert', 'cred_cda'].forEach(f => setField(`${f}_${i}`, false));
+        }
+
+        const filled = [];
+        const needs = [];
+
+        fits.forEach((s, i) => {
+            const got = [];
+            const miss = [];
+
+            setField(`initials_${i}`, initialsFrom(s.Name));
+            got.push('initials');
+
+            const role = pasRole(s.Role);
+            if (role) { setField(`role_${i}`, role); got.push('role ' + role); }
+            else miss.push(`teaching role (title on file is “${s.Role || 'blank'}”)`);
+
+            const edu = eduField(s.Education);
+            if (edu.field) {
+                setField(`${edu.field}_${i}`, true);
+                got.push('highest education');
+                if (edu.note) miss.push(edu.note);
+            } else {
+                miss.push('highest education level (nothing on file)');
+            }
+
+            const exp = splitExperience(s.ExperienceYears);
+            if (exp) {
+                setField(`exp_years_${i}`, exp.years);
+                setField(`exp_months_${i}`, exp.months);
+                got.push(`experience ${exp.years}y ${exp.months}m`);
+            } else {
+                miss.push('teaching experience (nothing on file)');
+            }
+
+            /* Only tick a credential the record says was actually earned.
+               Read the structured credential fields, not the free-text notes,
+               and drop anything listed as pending or missing — the notes use
+               "Pending: ECE, IT" phrasing, and a credential still in progress
+               must not be ticked as held. */
+            const credSource = [s.EceCredentials, s.Gateways].filter(Boolean).join('; ');
+            const earned = credSource.replace(/\b(pending|awaiting|in ?progress|missing|expired|not )\b[^;]*/gi, '');
+            if (/\bcda\b/i.test(earned)) { setField(`cred_cda_${i}`, true); got.push('CDA'); }
+            if (/professional educator license|\bpel\b|teacher certification|type 04/i.test(earned)) {
+                setField(`cred_teacher_cert_${i}`, true); got.push('teacher certification');
+            }
+            // A pending credential is worth surfacing, just not as a tick.
+            if (/\b(pending|awaiting|missing)\b/i.test(credSource + ' ' + (s.Notes || ''))) {
+                const p = (credSource + ' ' + (s.Notes || '')).match(/\b(?:pending|awaiting|missing)\b[^.;]*/i);
+                if (p) miss.push('credentials on file are marked incomplete — “' + p[0].trim() + '” — left unticked');
+            }
+
+            // Never tracked on the staff record, so always a manual step.
+            miss.push('semester hours (general and ECE/CD) — not tracked in staff records');
+
+            filled.push(`<li><strong>${s.Name}</strong> (${initialsFrom(s.Name)}) — ${got.join(', ')}</li>`);
+            if (miss.length) {
+                needs.push(`<li><strong>${s.Name}</strong><ul>` + miss.map(m => `<li>${m}</li>`).join('') + '</ul></li>');
+            }
+        });
+
+        // Persist and refresh the saved indicators.
+        saveData();
+
+        let html = `<h4>Filled ${fits.length} staff member(s) for ${info.name}</h4>`
+            + '<ul class="pr-done">' + filled.join('') + '</ul>';
+        if (overflow.length) {
+            html += `<p class="pr-warn">This worksheet holds ${STAFF_COUNT} staff, but ${matched.length} are `
+                + `assigned to ${info.name}. Not entered: `
+                + overflow.map(s => `<strong>${s.Name}</strong>`).join(', ')
+                + '. Print this worksheet, then add the rest on a second copy.</p>';
+        }
+        // PAS designates one Lead Teacher per group. Nobody scoring LT usually
+        // means a job title that does not say "lead", not a room without one.
+        const leads = fits.filter(s => pasRole(s.Role) === 'LT');
+        if (leads.length === 0) {
+            html += '<p class="pr-need">No one here scored Lead Teacher, because no job title on file '
+                + 'contains “lead”. PAS expects one Lead Teacher per classroom — the person responsible '
+                + 'for lesson planning, parent conferences and assessment. Set whoever that is to LT above.</p>';
+        } else if (leads.length > 1) {
+            html += '<p class="pr-need">' + leads.length + ' people scored Lead Teacher ('
+                + leads.map(s => s.Name).join(', ') + '). PAS expects one per classroom — '
+                + 'change the others to T.</p>';
+        }
+        html += '<h4 class="pr-need">Still needs you</h4><ul class="pr-need">' + needs.join('') + '</ul>'
+            + '<p style="color:#475569;margin:0">Everything above came from the staff records. '
+            + 'Check it against each person\u2019s Gateways report before you submit \u2014 this is a starting point, not a signed-off answer.</p>';
+        showPrefillReport(html);
+
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '⤓ Fill from staff records';
+    }
 }
 
 // Initialize — fetch classrooms then set up
