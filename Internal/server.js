@@ -479,6 +479,29 @@ function staffSeedSQL() {
 `;
 }
 
+// ── StaffTraining schema ──
+// One row per staff member per training. Backs two different requirements from
+// the same data: the ExceleRate Silver thresholds (How ERS Works needs the
+// director plus 50% of teaching staff, ideally one per classroom) and PICC PI9,
+// which wants a professional development record for every staff member.
+//
+// Keyed on (StaffId, TrainingKey). A completion is cleared by deleting the row
+// rather than blanking the date, so "no row" unambiguously means not done.
+function staffTrainingEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StaffTraining')
+    CREATE TABLE StaffTraining (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StaffId INT NOT NULL,
+        TrainingKey NVARCHAR(60) NOT NULL,
+        CompletedDate NVARCHAR(20),
+        EvidenceLink NVARCHAR(500),
+        Notes NVARCHAR(MAX),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+}
+
 // ── SiteSettings schema ──
 // Key/value store for facts that are true of the site regardless of school year:
 // the DCFS license, ExceleRate level, and similar. Deliberately has no
@@ -1714,6 +1737,55 @@ ELSE
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         return sendJSON(res, 200, { success: true });
+    }
+
+    // GET all staff training records (internal - protected)
+    if (req.method === 'GET' && url === '/api/staff-training') {
+        if (!checkAuth(req, res)) return;
+        const sql = staffTrainingEnsureSQL() + 'GO\n'
+            + `SELECT Id,StaffId,${txCol('TrainingKey')},${txCol('CompletedDate')},${txCol('EvidenceLink')},${txCol('Notes')} FROM StaffTraining`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => /^\s*\d+\s*\|/.test(l))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                return {
+                    Id: v[0], StaffId: v[1], TrainingKey: txDecode(v[2]),
+                    CompletedDate: txDecode(v[3]), EvidenceLink: txDecode(v[4]), Notes: txDecode(v[5])
+                };
+            });
+        return sendJSON(res, 200, rows);
+    }
+
+    // POST record or clear a staff training (internal - protected)
+    // Upserts on (StaffId, TrainingKey). Sending an empty completion with no
+    // evidence or notes removes the row, which is how a checkbox un-tick arrives.
+    if (req.method === 'POST' && url === '/api/staff-training') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const staffId = parseInt(d.staffId);
+            const key = String(d.trainingKey || '').trim();
+            if (!staffId || !key) return sendJSON(res, 400, { error: 'staffId and trainingKey are required' });
+
+            const date = String(d.completedDate || '').trim();
+            const link = String(d.evidenceLink || '').trim();
+            const notes = String(d.notes || '').trim();
+            const isEmpty = !date && !link && !notes;
+
+            const where = `StaffId=${staffId} AND TrainingKey=${esc(key)}`;
+            const sql = staffTrainingEnsureSQL() + 'GO\n' + (isEmpty
+                ? `DELETE FROM StaffTraining WHERE ${where}`
+                : `IF EXISTS (SELECT 1 FROM StaffTraining WHERE ${where})
+    UPDATE StaffTraining SET CompletedDate=${esc(date)},EvidenceLink=${esc(link)},Notes=${esc(notes)},UpdatedAt=GETDATE() WHERE ${where}
+ELSE
+    INSERT INTO StaffTraining (StaffId,TrainingKey,CompletedDate,EvidenceLink,Notes) VALUES (${staffId},${esc(key)},${esc(date)},${esc(link)},${esc(notes)})`);
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true, cleared: isEmpty });
+        });
+        return;
     }
 
     // GET site-level settings (internal - protected)

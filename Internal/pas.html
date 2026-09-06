@@ -150,6 +150,12 @@
                     </a>
                 </div>
 
+                <!-- Staff training matrix. Drives the ExceleRate Silver thresholds
+                     from the same records PICC PI9 needs, rather than a spreadsheet. -->
+                <div class="section-title">Staff Training — ExceleRate Silver Requirements</div>
+                <div id="trainingReqs"></div>
+                <div id="trainingMatrix"></div>
+
                 <div class="section-title">Upload Forms — Fill, Save &amp; Print for Padlet</div>
                 <div class="doc-grid">
                     <a class="doc-card" href="/pas/pas-item-summary-profile.html" target="_blank">
@@ -319,6 +325,8 @@
 
 </div><!-- end pasMainContent -->
 
+<!-- Shared auth + apiFetch, for the staff training records below. -->
+<script src="app.js"></script>
 <script>
 const PAS_PASSWORD = 'pasadmin';
 
@@ -382,6 +390,213 @@ function addMeetingRow() {
         row.innerHTML = '<td style="padding:8px 12px;font-weight:600;">' + m.date + '</td><td style="padding:8px 12px;">' + (m.time||'—') + '</td><td style="padding:8px 12px;">' + (m.attendees||'—') + '</td><td style="padding:8px 12px;">' + m.topic + '</td><td style="padding:8px 12px;">' + (m.notes||'') + '</td>';
         tbody.insertBefore(row, tbody.firstChild);
     });
+})();
+
+/* ── Staff training ──────────────────────────────────────────────────────
+   ExceleRate Silver sets thresholds against roles rather than headcount, so
+   the requirement has to be evaluated, not just counted. Per the Standard 1A
+   guidance on Padlet, "How ERS Works" is required for the Director or
+   Administrator plus 50% of teaching staff, where teachers and assistants both
+   count toward ratio, and at least one teacher per classroom is strongly
+   encouraged.
+
+   The same completion records satisfy PICC PI9, which wants a professional
+   development record for every staff member.                                */
+
+const TRAINING_CATALOG = [
+    {
+        key: 'howERSWorks',
+        name: 'How ERS Works',
+        via: 'iLearning',
+        // Required, not merely encouraged.
+        rule: 'directorPlusHalfTeaching',
+        note: 'Director/Administrator plus 50% of teaching staff. At least one teacher per classroom is strongly encouraged.'
+    },
+    {
+        key: 'ecers3',
+        name: 'ECERS-3 Classroom',
+        via: 'iLearning',
+        rule: 'none',
+        note: 'Preschool classroom observation tool.'
+    },
+    {
+        key: 'iters3',
+        name: 'ITERS-3 Classroom',
+        via: 'iLearning',
+        rule: 'none',
+        note: 'Infant/toddler classroom observation tool. Relevant to the PI rooms and to PICC monitoring.'
+    }
+];
+
+let staffRecords = [];
+let trainingRecords = [];
+
+// Role-based classification. The email is explicit that assistants count toward
+// ratio, so paraprofessionals and assistants are teaching staff here.
+function isDirector(s) {
+    return /director|administrator/i.test(s.Role || '');
+}
+function isTeachingStaff(s) {
+    return /teacher|assistant|paraprofessional|para\b/i.test(s.Role || '');
+}
+
+function trainingDone(staffId, key) {
+    return trainingRecords.some(t =>
+        String(t.StaffId) === String(staffId) && t.TrainingKey === key && (t.CompletedDate || '').trim());
+}
+
+function trainingRecord(staffId, key) {
+    return trainingRecords.find(t =>
+        String(t.StaffId) === String(staffId) && t.TrainingKey === key) || null;
+}
+
+// Evaluates the How ERS Works requirement and reports each part separately, so a
+// partial pass is visible rather than collapsed into one red or green light.
+function evaluateHowErsWorks() {
+    const directors = staffRecords.filter(isDirector);
+    const teaching = staffRecords.filter(isTeachingStaff);
+
+    const directorsDone = directors.filter(s => trainingDone(s.Id, 'howERSWorks'));
+    const teachingDone = teaching.filter(s => trainingDone(s.Id, 'howERSWorks'));
+    const needed = Math.ceil(teaching.length / 2);
+
+    // Per-classroom coverage, using the classroom recorded on the staff card.
+    const rooms = {};
+    teaching.forEach(s => {
+        const room = (s.Classroom || '').trim();
+        if (!room || /^tbd$/i.test(room)) return;
+        if (!rooms[room]) rooms[room] = { total: 0, done: 0 };
+        rooms[room].total++;
+        if (trainingDone(s.Id, 'howERSWorks')) rooms[room].done++;
+    });
+    const roomsWithout = Object.keys(rooms).filter(r => !rooms[r].done).sort();
+
+    return {
+        directorMet: directors.length > 0 && directorsDone.length > 0,
+        directors: directors, directorsDone: directorsDone,
+        teachingTotal: teaching.length, teachingDone: teachingDone.length, teachingNeeded: needed,
+        halfMet: teaching.length > 0 && teachingDone.length >= needed,
+        roomsWithout: roomsWithout, roomCount: Object.keys(rooms).length
+    };
+}
+
+function reqPill(met, text) {
+    const bg = met ? '#f0fdf4' : '#fffbeb';
+    const fg = met ? '#166534' : '#92400e';
+    return '<span style="font-size:0.7rem;font-weight:700;padding:3px 9px;border-radius:11px;background:' + bg + ';color:' + fg + ';white-space:nowrap;">'
+        + (met ? '\u2713 ' : '') + text + '</span>';
+}
+
+function renderTrainingReqs() {
+    const host = document.getElementById('trainingReqs');
+    if (!host) return;
+    if (!staffRecords.length) {
+        host.innerHTML = '<div style="padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.8rem;color:#64748b;">No staff records loaded.</div>';
+        return;
+    }
+    const e = evaluateHowErsWorks();
+    const allMet = e.directorMet && e.halfMet;
+
+    host.innerHTML =
+        '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px;">'
+        + '<div style="font-size:0.85rem;font-weight:800;color:#1e293b;margin-bottom:4px;">How ERS Works '
+        + reqPill(allMet, allMet ? 'requirement met' : 'not yet met') + '</div>'
+        + '<div style="font-size:0.74rem;color:#64748b;line-height:1.6;margin-bottom:10px;">'
+        + 'Required for the Director/Administrator and 50% of teaching staff. Assistants count toward ratio.</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+        + reqPill(e.directorMet, 'Director: ' + e.directorsDone.length + ' of ' + e.directors.length + ' trained')
+        + reqPill(e.halfMet, 'Teaching staff: ' + e.teachingDone + ' of ' + e.teachingTotal
+            + ' (need ' + e.teachingNeeded + ')')
+        + reqPill(e.roomsWithout.length === 0,
+            e.roomsWithout.length === 0
+                ? 'Every classroom covered'
+                : 'No one trained in: ' + e.roomsWithout.join(', '))
+        + '</div>'
+        + (e.roomsWithout.length
+            ? '<div style="font-size:0.72rem;color:#92400e;margin-top:9px;">One trained teacher per classroom is strongly encouraged rather than required, so this does not block the standard.</div>'
+            : '')
+        + '</div>';
+}
+
+function renderTrainingMatrix() {
+    const host = document.getElementById('trainingMatrix');
+    if (!host) return;
+    if (!staffRecords.length) { host.innerHTML = ''; return; }
+
+    // Director first, then teaching staff, then everyone else.
+    const ordered = staffRecords.slice().sort((a, b) => {
+        const rank = s => isDirector(s) ? 0 : isTeachingStaff(s) ? 1 : 2;
+        const d = rank(a) - rank(b);
+        return d !== 0 ? d : (a.Name || '').localeCompare(b.Name || '');
+    });
+
+    const head = TRAINING_CATALOG.map(t =>
+        '<th style="padding:8px 10px;text-align:center;font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#64748b;" title="'
+        + t.note.replace(/"/g, '&quot;') + '">' + t.name + '</th>').join('');
+
+    const rows = ordered.map(s => {
+        const tags = (isDirector(s) ? '<span style="font-size:0.62rem;font-weight:700;color:#1d4ed8;background:#eff6ff;padding:1px 6px;border-radius:8px;margin-left:6px;">Director</span>' : '')
+            + (isTeachingStaff(s) ? '<span style="font-size:0.62rem;font-weight:700;color:#166534;background:#f0fdf4;padding:1px 6px;border-radius:8px;margin-left:6px;">Teaching</span>' : '');
+        const cells = TRAINING_CATALOG.map(t => {
+            const rec = trainingRecord(s.Id, t.key);
+            const date = rec ? (rec.CompletedDate || '') : '';
+            return '<td style="padding:6px 10px;text-align:center;">'
+                + '<input type="date" value="' + date + '" onchange="saveTraining(' + s.Id + ',\'' + t.key + '\',this.value)" '
+                + 'title="Date completed. Clear the date to mark it not done." '
+                + 'style="padding:3px 6px;border:1px solid ' + (date ? '#bbf7d0' : '#d1d5db') + ';border-radius:5px;font-size:0.7rem;font-family:inherit;background:' + (date ? '#f0fdf4' : 'white') + ';">'
+                + '</td>';
+        }).join('');
+        return '<tr style="border-bottom:1px solid #f1f5f9;">'
+            + '<td style="padding:6px 10px;font-size:0.78rem;font-weight:600;color:#1e293b;white-space:nowrap;">' + (s.Name || '') + tags + '</td>'
+            + '<td style="padding:6px 10px;font-size:0.72rem;color:#64748b;white-space:nowrap;">' + (s.Classroom || '—') + '</td>'
+            + cells + '</tr>';
+    }).join('');
+
+    host.innerHTML =
+        '<div style="background:white;border:1.5px solid #e2e8f0;border-radius:10px;overflow-x:auto;margin-bottom:14px;">'
+        + '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
+        + '<th style="padding:8px 10px;text-align:left;font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#64748b;">Staff</th>'
+        + '<th style="padding:8px 10px;text-align:left;font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#64748b;">Classroom</th>'
+        + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + '<div style="font-size:0.72rem;color:#64748b;margin-bottom:6px;">Enter the completion date. Clearing a date marks the training as not done.</div>';
+}
+
+async function saveTraining(staffId, trainingKey, completedDate) {
+    try {
+        const res = await apiFetch('/api/staff-training', {
+            method: 'POST',
+            body: JSON.stringify({ staffId: staffId, trainingKey: trainingKey, completedDate: completedDate })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Save failed');
+        await loadTrainingData();
+        renderTrainingReqs();
+        renderTrainingMatrix();
+    } catch (e) {
+        alert('Could not save that training: ' + e.message);
+    }
+}
+
+async function loadTrainingData() {
+    try {
+        const [sRes, tRes] = await Promise.all([
+            apiFetch('/api/staff'),
+            apiFetch('/api/staff-training')
+        ]);
+        staffRecords = await sRes.json();
+        trainingRecords = await tRes.json();
+        if (!Array.isArray(staffRecords)) staffRecords = [];
+        if (!Array.isArray(trainingRecords)) trainingRecords = [];
+    } catch (e) {
+        console.error('Failed to load training data', e);
+    }
+}
+
+(async function () {
+    await loadTrainingData();
+    renderTrainingReqs();
+    renderTrainingMatrix();
 })();
 </script>
 <!-- Deploy / Restart controls while this area is under active development. -->
