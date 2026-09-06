@@ -670,6 +670,7 @@ function reqPill(met, text) {
 
 const IT_ROOMS = ['Infant', 'Infants / Toddlers', '2 Year Olds / Toddlers'];
 const PD_HOURS_REQUIRED = 20;
+const PD_YEAR = String(new Date().getFullYear());
 
 function roomKey(v) {
     return String(v || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
@@ -725,12 +726,26 @@ function evaluate4B() {
     };
 }
 
+/* 4C runs on the CALENDAR year, not the school year: the centre is open year
+   round and PAS applies centre-wide, to children who are PI, PFA or neither.
+   Hours recorded against an earlier year do not count, and are reported as
+   unknown rather than as a shortfall — the figure is stale, not proven low. */
+function pdHoursCurrent(s) {
+    const v = String(s.PdHoursYtd || '').trim();
+    if (v === '') return null;
+    const yr = String(s.PdHoursYear || '').trim();
+    // A total with no year recorded is treated as unknown rather than assumed current.
+    if (yr !== String(new Date().getFullYear())) return null;
+    const n = parseFloat(v);
+    return isFinite(n) ? n : null;
+}
+
 function evaluate4C() {
     const staff = countedStaff();
-    const withHours = staff.filter(s => String(s.PdHoursYtd || '').trim() !== '');
-    const met = withHours.filter(s => (parseFloat(s.PdHoursYtd) || 0) >= PD_HOURS_REQUIRED);
-    const short = withHours.filter(s => (parseFloat(s.PdHoursYtd) || 0) < PD_HOURS_REQUIRED);
-    const unknown = staff.filter(s => String(s.PdHoursYtd || '').trim() === '');
+    const withHours = staff.filter(s => pdHoursCurrent(s) !== null);
+    const met = withHours.filter(s => pdHoursCurrent(s) >= PD_HOURS_REQUIRED);
+    const short = withHours.filter(s => pdHoursCurrent(s) < PD_HOURS_REQUIRED);
+    const unknown = staff.filter(s => pdHoursCurrent(s) === null);
     // Unknown is not the same as failing, and must not be reported as either.
     return { staff, withHours, met, short, unknown, allMet: staff.length > 0 && met.length === staff.length };
 }
@@ -794,15 +809,18 @@ function renderExcelerate4() {
 
     const cardC = stdCard('4C', 'Professional development', c.allMet,
         stdRow('Teaching staff', c.staff.length, 'good')
-        + stdRow('At ' + PD_HOURS_REQUIRED + '+ hours', c.met.length + ' of ' + c.staff.length, c.allMet ? 'good' : 'bad')
+        + stdRow('At ' + PD_HOURS_REQUIRED + '+ hours in ' + PD_YEAR, c.met.length + ' of ' + c.staff.length, c.allMet ? 'good' : 'bad')
         + (c.short.length ? stdRow('Below ' + PD_HOURS_REQUIRED + ' hours',
-            c.short.map(s => (s.Name || '').split(' ')[0] + ' (' + (s.PdHoursYtd || 0) + ')').join(', '), 'bad') : '')
-        + (c.unknown.length ? stdRow('No hours recorded', nameList(c.unknown), 'warn') : ''),
+            c.short.map(s => (s.Name || '').split(' ')[0] + ' (' + pdHoursCurrent(s) + ')').join(', '), 'bad') : '')
+        + (c.unknown.length ? stdRow('No hours for ' + PD_YEAR, nameList(c.unknown), 'warn') : ''),
         (c.unknown.length
-            ? '<strong>' + c.unknown.length + ' staff have no PD hours recorded</strong>, which is not the same as '
-              + 'being short — it is unknown. Enter hours on the staff cards to make this a real answer.'
+            ? '<strong>' + c.unknown.length + ' staff have no PD hours recorded for ' + PD_YEAR + '</strong>, which is not '
+              + 'the same as being short — it is unknown. Enter hours on the staff cards to make this a real answer.'
             : '')
-        + ' ' + PD_HOURS_REQUIRED + ' clock hours a year per classroom teaching staff member. '
+        + ' ' + PD_HOURS_REQUIRED + ' clock hours per classroom teaching staff member, per calendar year. '
+        + 'This runs on the actual year, not the school year: the centre is open year round and PAS applies '
+        + 'centre-wide, to children who are PI, PFA or neither. Hours logged against an earlier year stop '
+        + 'counting on 1 January, so the count resets rather than carrying a stale total forward. '
         + 'Kept as a running total on each staff card, because PD comes from Gateways, in-house sessions '
         + 'and conferences that are not all itemised here.');
 

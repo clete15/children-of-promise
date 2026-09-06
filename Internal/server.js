@@ -487,6 +487,19 @@ GO
    (Gateways, in-house, conferences) that will never all be itemised here. */
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PdHoursYtd')
     ALTER TABLE Staff ADD PdHoursYtd NVARCHAR(20);
+GO
+/* Which CALENDAR year the PD hours above belong to.
+
+   The 20-hour expectation runs on the actual year, not the school year — the
+   centre is open year round and serves children who are PI, PFA or neither, so
+   PAS and ExceleRate are centre-wide and calendar-based while the PI and PFA
+   school-year clocks are a separate thing entirely.
+
+   Without this column a stored total has no year attached, so on 1 January last
+   year's hours would keep reading as though they were current. Hours only count
+   toward the requirement when this matches the present calendar year. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PdHoursYear')
+    ALTER TABLE Staff ADD PdHoursYear NVARCHAR(10);
 `;
 }
 
@@ -499,7 +512,8 @@ const STAFF_COLUMNS = [
     ['Notes', 'notes'], ['ReviewedBy', 'reviewedBy'], ['ReviewedDate', 'reviewedDate'],
     ['StaffGroup', 'staffGroup'], ['SecondaryClassroom', 'secondaryClassroom'],
     ['SemesterHoursTotal', 'semesterHoursTotal'], ['SemesterHoursEce', 'semesterHoursEce'],
-    ['TranscriptOnFile', 'transcriptOnFile'], ['PdHoursYtd', 'pdHoursYtd']
+    ['TranscriptOnFile', 'transcriptOnFile'], ['PdHoursYtd', 'pdHoursYtd'],
+    ['PdHoursYear', 'pdHoursYear']
 ];
 
 /* One-time migration payload: the staff list that used to be hardcoded in

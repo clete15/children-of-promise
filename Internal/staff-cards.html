@@ -614,7 +614,9 @@ function cardHtml(s) {
             ${row('Transcript w/ Gateways', sel('transcriptOnFile', s.TranscriptOnFile,
                 [['', '— unknown —'], ['On file', 'On file'], ['Submitted', 'Submitted, pending'],
                  ['Not submitted', 'NOT submitted'], ['N/A', 'N/A']]))}
-            ${row('PD hours this year', txt('pdHoursYtd', s.PdHoursYtd, 'e.g. 20', ' style="max-width:80px;" title="ExceleRate asks for 20 hours a year per classroom teaching staff member"'))}
+            ${row('PD hours', txt('pdHoursYtd', s.PdHoursYtd, 'e.g. 20', ' style="max-width:70px;" title="ExceleRate asks for 20 hours per classroom teaching staff member, per calendar year"')
+                + ' <span style="color:#6b7280;">in year</span> '
+                + txt('pdHoursYear', s.PdHoursYear, String(new Date().getFullYear()), ' style="max-width:70px;" title="The calendar year these hours were earned. The 20-hour expectation runs on the actual year, not the school year, so hours recorded against an earlier year no longer count."'))}
             ${row('Experience (yrs)', txt('experienceYears', s.ExperienceYears, 'e.g. 8', ' style="max-width:80px;"'))}
             ${row('Registry ID', txt('registryId', s.RegistryId, 'e.g. N285894', ' style="max-width:110px;"'))}
             ${row('Reviewed by', txt('reviewedBy', s.ReviewedBy, 'Director confirming'))}
@@ -699,7 +701,8 @@ async function saveCard(id) {
         registryId: 'RegistryId', notes: 'Notes', reviewedBy: 'ReviewedBy',
         reviewedDate: 'ReviewedDate', staffGroup: 'StaffGroup',
         semesterHoursTotal: 'SemesterHoursTotal', semesterHoursEce: 'SemesterHoursEce',
-        transcriptOnFile: 'TranscriptOnFile', pdHoursYtd: 'PdHoursYtd'
+        transcriptOnFile: 'TranscriptOnFile', pdHoursYtd: 'PdHoursYtd',
+        pdHoursYear: 'PdHoursYear'
     };
     const changed = {};
     Object.keys(body).forEach(k => {
