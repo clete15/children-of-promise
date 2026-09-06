@@ -210,7 +210,15 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Role / Title</label>
-                    <input type="text" id="editRole" placeholder="e.g. Lead Teacher">
+                    <!-- Staff are Teacher, Assistant Teacher or Director. A title
+                         already on file that is not one of these is added as an
+                         option on open, so opening a card never silently changes it. -->
+                    <select id="editRole">
+                        <option value="">—</option>
+                        <option value="Teacher">Teacher</option>
+                        <option value="Assistant Teacher">Assistant Teacher</option>
+                        <option value="Director">Director</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Program</label>
@@ -225,7 +233,12 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Classroom</label>
-                    <input type="text" id="editClassroom" placeholder="e.g. Pre-School">
+                    <!-- Filled from the classroom table on load. Exact room names
+                         matter: the PAS worksheets match staff to a room by name,
+                         so free text like "Twos" would leave someone off a form. -->
+                    <select id="editClassroom">
+                        <option value="">— none (no assigned room) —</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>FTE</label>
@@ -246,18 +259,63 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>ECE Credits (SH)</label>
-                    <input type="text" id="editECE" placeholder="e.g. 30">
+                    <label>Years Experience</label>
+                    <input type="text" id="editExperience" placeholder="e.g. 8">
+                </div>
+            </div>
+            <!-- Gateways credentials, broken into levels rather than one free-text
+                 box. ExceleRate 4B counts staff at ECE Level 3+ and infant/toddler
+                 staff at ITC Level 2, which cannot be counted reliably from prose.
+                 These recombine into the same stored field on save. -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Gateways ECE Level</label>
+                    <select id="editEceLevel">
+                        <option value="">— none —</option>
+                        <option value="1">ECE Level 1</option>
+                        <option value="2">ECE Level 2</option>
+                        <option value="3">ECE Level 3</option>
+                        <option value="4">ECE Level 4</option>
+                        <option value="5">ECE Level 5</option>
+                        <option value="6">ECE Level 6</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Gateways Infant/Toddler Level</label>
+                    <select id="editItLevel">
+                        <option value="">— none —</option>
+                        <option value="1">IT Level 1</option>
+                        <option value="2">IT Level 2</option>
+                        <option value="3">IT Level 3</option>
+                        <option value="4">IT Level 4</option>
+                        <option value="5">IT Level 5</option>
+                    </select>
                 </div>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label>Gateways Credential</label>
-                    <input type="text" id="editGateways" placeholder="e.g. ECE Level 5">
+                    <label>Gateways Director Level</label>
+                    <select id="editDirLevel">
+                        <option value="">— none —</option>
+                        <option value="I">Director Level I</option>
+                        <option value="II">Director Level II</option>
+                        <option value="III">Director Level III</option>
+                    </select>
                 </div>
                 <div class="form-group">
-                    <label>Years Experience</label>
-                    <input type="text" id="editExperience" placeholder="e.g. 8">
+                    <label>CDA</label>
+                    <label style="font-weight:normal;display:flex;align-items:center;gap:8px;margin-top:6px;">
+                        <input type="checkbox" id="editCda"> Holds a CDA
+                    </label>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex:1 1 100%;">
+                    <label>Other credentials</label>
+                    <!-- Anything not covered by the levels above (Gold IT2,
+                         Autism 101, and so on) is kept here verbatim so nothing
+                         is lost when the record round-trips. -->
+                    <input type="text" id="editOtherCreds" placeholder="e.g. Gold IT2, Autism 101">
                 </div>
             </div>
             <div class="form-row">
@@ -389,19 +447,106 @@ function openEdit(id) {
     const s = (id === null ? null : staffList.find(x => String(x.Id) === String(id))) || {};
     document.getElementById('modalTitle').textContent = id === null ? 'Add Staff' : 'Edit \u2013 ' + (s.Name || '');
     document.getElementById('editName').value = s.Name || '';
-    document.getElementById('editRole').value = s.Role || '';
     document.getElementById('editProgram').value = s.Program || 'n/a';
-    document.getElementById('editClassroom').value = s.Classroom || '';
     document.getElementById('editFTE').value = s.Fte || '';
     document.getElementById('editEducation').value = s.Education || '';
-    document.getElementById('editECE').value = s.EceCredentials || '';
-    document.getElementById('editGateways').value = s.Gateways || '';
     document.getElementById('editExperience').value = s.ExperienceYears || '';
+
+    // Role and classroom are dropdowns now. Keep a value already on file that is
+    // not in the list, rather than snapping it to the first option and losing it.
+    setSelectPreserving('editRole', s.Role || '');
+    populateClassroomOptions();
+    setSelectPreserving('editClassroom', s.Classroom || '', true);
+
+    // Split the stored credential text into the level dropdowns.
+    const creds = parseCredentials(s.EceCredentials || s.Gateways || '');
+    document.getElementById('editEceLevel').value = creds.ece;
+    document.getElementById('editItLevel').value = creds.it;
+    document.getElementById('editDirLevel').value = creds.dir;
+    document.getElementById('editCda').checked = creds.cda;
+    document.getElementById('editOtherCreds').value = creds.other.join(', ');
     document.getElementById('editRegistryId').value = s.RegistryId || '';
     document.getElementById('editReviewedBy').value = s.ReviewedBy || '';
     document.getElementById('editReviewedDate').value = s.ReviewedDate || '';
     document.getElementById('editNotes').value = s.Notes || '';
     document.getElementById('editModal').classList.add('active');
+}
+
+/* ── Dropdown helpers ──────────────────────────────────────────────────────
+   The point of these dropdowns is that role and classroom feed the PAS
+   worksheets, which match staff to a room by exact name. Free text like "Twos"
+   silently leaves someone off a form. But a value already on file must never be
+   destroyed just because it is not in the list, so anything unrecognised is
+   added as an option and marked. */
+
+function setSelectPreserving(selectId, value, flagUnknown) {
+    const sel = document.getElementById(selectId);
+    // Drop any option added by a previous open.
+    [...sel.querySelectorAll('option[data-adhoc]')].forEach(o => o.remove());
+    if (value && ![...sel.options].some(o => o.value === value)) {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = value + (flagUnknown ? '  (not a known room — please reselect)' : '  (not a standard title)');
+        opt.setAttribute('data-adhoc', '1');
+        sel.insertBefore(opt, sel.firstChild);
+    }
+    sel.value = value;
+}
+
+// Room list comes from the classroom table, so it stays right when rooms change.
+function populateClassroomOptions() {
+    const sel = document.getElementById('editClassroom');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— none (no assigned room) —</option>'
+        + (window.CLASSROOM_LIST || []).map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.value = current;
+}
+
+async function loadClassroomList() {
+    try {
+        const res = await apiFetch('/api/classrooms');
+        const rooms = await res.json();
+        window.CLASSROOM_LIST = rooms.map(r => r.Room).filter(Boolean);
+    } catch (e) {
+        console.warn('Could not load classrooms; the room dropdown will be empty.', e);
+        window.CLASSROOM_LIST = [];
+    }
+}
+
+/* Pull levels out of the stored credential text. Handles both the "ECE Level 5"
+   and "ECE Credential - Level 5" spellings. Whatever is not recognised is passed
+   through untouched so credentials like "Gold IT2" survive a round trip. */
+function parseCredentials(text) {
+    const res = { ece: '', it: '', dir: '', cda: false, other: [] };
+    String(text || '').split(',').map(t => t.trim()).filter(Boolean).forEach(tok => {
+        let m;
+        if ((m = tok.match(/^ECE\b(?:\s*Credential)?\s*-?\s*Level\s*(\d)$/i))) { res.ece = m[1]; return; }
+        if ((m = tok.match(/^(?:IT|ITC|Infant\s*\/?\s*Toddler)\b(?:\s*Credential)?\s*-?\s*Level\s*(\d)$/i))) { res.it = m[1]; return; }
+        if ((m = tok.match(/^Director\b(?:\s*Credential)?\s*-?\s*Level\s*(III|II|I|\d)$/i))) {
+            const v = m[1];
+            res.dir = /^\d$/.test(v) ? ['', 'I', 'II', 'III'][+v] || '' : v.toUpperCase();
+            return;
+        }
+        if (/^CDA$/i.test(tok)) { res.cda = true; return; }
+        res.other.push(tok);
+    });
+    return res;
+}
+
+// Rebuild the stored string: levels first, then CDA, then anything else.
+function composeCredentials() {
+    const ece = document.getElementById('editEceLevel').value;
+    const it = document.getElementById('editItLevel').value;
+    const dir = document.getElementById('editDirLevel').value;
+    const cda = document.getElementById('editCda').checked;
+    const other = document.getElementById('editOtherCreds').value
+        .split(',').map(t => t.trim()).filter(Boolean);
+    const parts = [];
+    if (ece) parts.push('ECE Level ' + ece);
+    if (it) parts.push('IT Level ' + it);
+    if (dir) parts.push('Director Level ' + dir);
+    if (cda) parts.push('CDA');
+    return parts.concat(other).join(', ');
 }
 
 function closeModal() {
@@ -421,8 +566,11 @@ async function saveStaff() {
         classroom: document.getElementById('editClassroom').value.trim(),
         fte: document.getElementById('editFTE').value.trim(),
         education: document.getElementById('editEducation').value,
-        eceCredentials: document.getElementById('editECE').value.trim(),
-        gateways: document.getElementById('editGateways').value.trim(),
+        eceCredentials: composeCredentials(),
+        // Kept in step with the ECE level so anything still reading this column
+        // does not go stale.
+        gateways: document.getElementById('editEceLevel').value
+            ? 'ECE Credential - Level ' + document.getElementById('editEceLevel').value : '',
         experienceYears: document.getElementById('editExperience').value.trim(),
         registryId: document.getElementById('editRegistryId').value.trim(),
         reviewedBy: reviewedBy,
@@ -478,8 +626,10 @@ document.getElementById('editModal').addEventListener('click', function(e) {
 });
 
 // Init — loadStaff is async now, so render only once the data has arrived.
+// The room list is fetched alongside it so the classroom dropdown is ready
+// before anyone opens a card.
 (async function () {
-    await loadStaff();
+    await Promise.all([loadStaff(), loadClassroomList()]);
     renderCards();
 })();
 </script>
