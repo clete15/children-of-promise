@@ -540,6 +540,13 @@ function setProgram(prog) {
 
 const FIELDS = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS','GrantPerfReport'];
 
+// Collapses the mixed truthy representations in the DB to a clean Yes/No for display.
+function yesNo(v) {
+    if (v === true || v === 1 || v === '1') return 'Yes';
+    if (typeof v === 'string' && v.trim().toLowerCase() === 'yes') return 'Yes';
+    return 'No';
+}
+
 function sortByName(a, b) {
     const cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
     return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
@@ -708,9 +715,11 @@ async function openInterview(studentId) {
     document.getElementById('piHHSize').textContent = student.HouseholdSize || '—';
     document.getElementById('piBenefits').textContent = student.PublicBenefits || 'None';
     document.getElementById('piFRP').textContent = student.F_R_P_Food || '—';
-    document.getElementById('piIEP').textContent = student.IEP || 'No';
+    // Normalize to Yes/No. These columns hold mixed values across legacy rows
+    // ('Yes'/'YES'/'no'/'false'/1/0), so print a clean answer instead of the raw value.
+    document.getElementById('piIEP').textContent = yesNo(student.IEP);
     document.getElementById('piFoster').textContent = student.Category === 'Foster' ? 'Yes' : 'No';
-    document.getElementById('piMilitary').textContent = (student.Military === 'Yes' || student.Military === 'YES') ? 'Yes' : 'No';
+    document.getElementById('piMilitary').textContent = yesNo(student.Military);
     document.getElementById('piCategory').textContent = student.Category || '—';
 
     // Clear manual fields
