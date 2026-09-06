@@ -682,6 +682,136 @@ const DEVGOAL_COLUMNS = [
     ['Status', 'status'], ['CompletedDate', 'completedDate'], ['SortOrder', 'sortOrder']
 ];
 
+/* ── Document library ───────────────────────────────────────────────────────────
+   The monitoring evidence already lives in a OneDrive-synced folder on this
+   machine. It is INDEXED here, not copied: two years of files stay exactly where
+   they are, so nothing can diverge between a store and the folder Megan and Clete
+   already use. What this adds is a way to reach it without a Microsoft login, and
+   a record of what is checked out.
+
+   Folder names are deliberately NOT trusted. Across 2025 and 2026 the same item
+   appears as "CB2" and "CB2.D - DCFS License and Evidence of Excelrate", and one
+   folder is misspelled "afer" in SharePoint. Matching on the item number parsed
+   out of the name makes every one of those equivalent, and keeps working when
+   somebody renames a folder next year.
+
+   The trailing "- M" / "- C" is the owner: Megan or Clete.                     */
+
+// Where the evidence lives. Overridable so a different machine can point elsewhere.
+const DOC_ROOT = process.env.COFP_DOC_ROOT
+    || 'C:\\Users\\child\\Children Of Promise\\Children Of Promise - Documents\\Operations';
+
+/* Pulls the PICC/PIQUET item number out of a folder name.
+     "CB2.D - DCFS License and Evidence of Excelrate"  -> CB2.D
+     "PI5.A-G Weighted Eligiblity Screen Form"         -> PI5.A-G
+     "PI8.B Written CQIP - Completed afer Monitoring"  -> PI8.B
+     "Child or Family Files - M"                       -> null (not an item) */
+function docItemNumber(folderName) {
+    /* The range part is tight on purpose: "A-B" and "A-G" never carry spaces.
+       Allowing them made "CB2.D - DCFS License..." parse as CB2.D-D, swallowing
+       the D of DCFS as a range end. A following letter must also not be part of a
+       word, so "PI8.A written" stops at .A rather than reading into the text. */
+    const m = String(folderName || '').match(/^\s*(CB|PI)\s*(\d+)(\.[A-Z](?:-[A-Z])?(?![A-Za-z]))?/);
+    if (!m) return null;
+    return m[1].toUpperCase() + m[2] + (m[3] || '').toUpperCase();
+}
+
+// Owner from the trailing marker. Absent on folders added since the convention.
+function docOwner(folderName) {
+    const m = String(folderName || '').match(/-\s*([MC])\s*$/);
+    return m ? (m[1].toUpperCase() === 'M' ? 'Megan' : 'Clete') : '';
+}
+
+// Child and family files are per-child rather than per-item.
+function isChildFileFolder(name) {
+    return /child\s*or\s*family|family\s*files/i.test(String(name || ''));
+}
+
+/* Checked-out state, and any note attached to a file. Only rows that need one
+   exist: an unremarkable file has no row, so "no row" means available. Keyed on
+   the path relative to DOC_ROOT so a file keeps its history if the tree moves. */
+function docMetaEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='DocumentMeta')
+    CREATE TABLE DocumentMeta (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        RelPath NVARCHAR(500) NOT NULL,
+        ItemNumber NVARCHAR(40),
+        SchoolYear NVARCHAR(20),
+        Owner NVARCHAR(60),
+        CheckedOutBy NVARCHAR(120),
+        CheckedOutDate NVARCHAR(20),
+        DueBackDate NVARCHAR(20),
+        Notes NVARCHAR(MAX),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+}
+
+/* Resolves a caller-supplied relative path inside DOC_ROOT.
+
+   This is the security boundary for the whole feature. A request controls the
+   path, so it is resolved and then checked to be genuinely inside the root —
+   without that, "..\..\..\Windows\System32" would be served. Returns null on
+   anything that escapes, which callers treat as 404 rather than explaining why. */
+function resolveDocPath(rel) {
+    if (!rel) return null;
+    const decoded = String(rel).replace(/\\/g, '/');
+    if (decoded.includes('\0')) return null;
+    const root = path.resolve(DOC_ROOT);
+    const full = path.resolve(root, decoded);
+    const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep;
+    if (full !== root && !full.startsWith(rootWithSep)) return null;
+    return full;
+}
+
+// Walks a year's evidence folder and groups the files by item number.
+function indexYearFolder(programFolder, yearFolder) {
+    const base = path.join(DOC_ROOT, programFolder, yearFolder);
+    const out = { items: {}, childFiles: [], missing: !fs.existsSync(base) };
+    if (out.missing) return out;
+    // PICC and PIQUET sit under the visit folder; tolerate either being absent.
+    ['PICC', 'PIQUET', ''].forEach(section => {
+        const dir = section ? path.join(base, section) : base;
+        if (!fs.existsSync(dir)) return;
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+        entries.filter(e => e.isDirectory()).forEach(d => {
+            const files = [];
+            const walk = p => {
+                let kids = [];
+                try { kids = fs.readdirSync(p, { withFileTypes: true }); } catch (e) { return; }
+                kids.forEach(k => {
+                    const full = path.join(p, k.name);
+                    if (k.isDirectory()) return walk(full);
+                    files.push({
+                        name: k.name,
+                        rel: path.relative(DOC_ROOT, full).replace(/\\/g, '/'),
+                        // Filenames that still name an earlier year are the usual
+                        // symptom of a folder copied forward and not refreshed.
+                        stale: /20\d\d/.test(k.name)
+                            ? !new RegExp(yearFolder.match(/(20\d\d)/)?.[1] || '').test(k.name)
+                            : false
+                    });
+                });
+            };
+            walk(path.join(dir, d.name));
+            if (isChildFileFolder(d.name)) {
+                out.childFiles = files;
+                out.childFolder = { name: d.name, owner: docOwner(d.name), count: files.length };
+                return;
+            }
+            const num = docItemNumber(d.name);
+            const key = num || d.name;
+            if (!out.items[key]) out.items[key] = { item: num, folders: [], files: [], owner: '' };
+            out.items[key].folders.push(d.name);
+            out.items[key].owner = out.items[key].owner || docOwner(d.name);
+            out.items[key].files = out.items[key].files.concat(files);
+        });
+    });
+    return out;
+}
+
 // ── SilverSelfAssessments schema ──
 // ExceleRate Silver wants one environment-rating self-assessment per classroom,
 // with the instrument set by the ages served: ITERS-3 for infants, toddlers and
@@ -1966,6 +2096,86 @@ ELSE
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         return sendJSON(res, 200, { success: true });
+    }
+
+    /* ── Document library ──
+       Indexes the monitoring evidence folder for a program and year, grouped by
+       item number so folder renames do not matter. Nothing is copied or moved. */
+    if (req.method === 'GET' && url.startsWith('/api/doc-index')) {
+        if (!checkAuth(req, res)) return;
+        const qs = new URLSearchParams(req.url.split('?')[1] || '');
+        const program = qs.get('program') === 'PFA' ? 'Preschool for All' : 'Birth to Three';
+        const year = (qs.get('year') || '').replace(/[^0-9]/g, '') || '2026';
+        const folder = qs.get('folder') || (program === 'Birth to Three'
+            ? year + ' PI Monitoring Visit' : 'PFA Monitoring Visit ' + year);
+        const idx = indexYearFolder(program, folder);
+
+        // Checked-out state, so the list can show what has left the cabinet.
+        const meta = {};
+        const m = runSQL(docMetaEnsureSQL() + 'GO\n'
+            + `SELECT ${txCol('RelPath')},${txCol('CheckedOutBy')},${txCol('CheckedOutDate')},${txCol('DueBackDate')},${txCol('Notes')} FROM DocumentMeta WHERE ISNULL(CheckedOutBy,'') <> '' OR ISNULL(Notes,'') <> ''`);
+        if (m.ok) {
+            m.data.trim().split('\n').filter(l => l.includes('|')).forEach(l => {
+                const v = l.split('|').map(x => txDecode(x.trim()));
+                if (v[0]) meta[v[0]] = { checkedOutBy: v[1], checkedOutDate: v[2], dueBack: v[3], notes: v[4] };
+            });
+        }
+        return sendJSON(res, 200, {
+            root: DOC_ROOT, program, year, folder,
+            missing: idx.missing, items: idx.items,
+            childFolder: idx.childFolder || null,
+            childFileCount: (idx.childFiles || []).length,
+            staleCount: Object.values(idx.items).reduce((n, i) =>
+                n + i.files.filter(f => f.stale).length, 0)
+                + (idx.childFiles || []).filter(f => f.stale).length,
+            meta
+        });
+    }
+
+    /* Serves one indexed file. The path is caller-supplied, so resolveDocPath
+       confines it to DOC_ROOT; anything escaping is a flat 404 rather than an
+       explanation. Requires the same login as the rest of the site — these are
+       children's records and must never be reachable by URL alone. */
+    if (req.method === 'GET' && url.startsWith('/api/doc-file')) {
+        if (!checkAuth(req, res)) return;
+        const rel = new URLSearchParams(req.url.split('?')[1] || '').get('path');
+        const full = resolveDocPath(rel);
+        if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+            res.writeHead(404); return res.end('Not found');
+        }
+        const ext = path.extname(full).toLowerCase();
+        const mime = MIME_TYPES[ext] || 'application/octet-stream';
+        // Attachment for anything not safely previewable, so nothing renders inline
+        // that could carry script.
+        const inline = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'].includes(ext);
+        res.writeHead(200, {
+            'Content-Type': mime,
+            'Content-Disposition': (inline ? 'inline' : 'attachment')
+                + '; filename="' + path.basename(full).replace(/"/g, '') + '"',
+            'X-Content-Type-Options': 'nosniff'
+        });
+        return fs.createReadStream(full).pipe(res);
+    }
+
+    // Check a file out or back in. Sending a blank name checks it back in.
+    if (req.method === 'POST' && url === '/api/doc-checkout') {
+        if (!checkAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const rel = String(d.relPath || '').trim();
+            if (!rel) return sendJSON(res, 400, { error: 'relPath required' });
+            if (!resolveDocPath(rel)) return sendJSON(res, 400, { error: 'Path outside the library' });
+            const by = String(d.checkedOutBy || '').trim();
+            const sql = docMetaEnsureSQL() + 'GO\n'
+                + `IF EXISTS (SELECT 1 FROM DocumentMeta WHERE RelPath=${esc(rel)})
+    UPDATE DocumentMeta SET CheckedOutBy=${esc(by)},CheckedOutDate=${esc(d.checkedOutDate)},DueBackDate=${esc(d.dueBackDate)},Notes=${esc(d.notes)},UpdatedAt=GETDATE() WHERE RelPath=${esc(rel)}
+ELSE
+    INSERT INTO DocumentMeta (RelPath,ItemNumber,SchoolYear,Owner,CheckedOutBy,CheckedOutDate,DueBackDate,Notes)
+    VALUES (${esc(rel)},${esc(d.itemNumber)},${esc(d.schoolYear)},${esc(d.owner)},${esc(by)},${esc(d.checkedOutDate)},${esc(d.dueBackDate)},${esc(d.notes)})`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            return sendJSON(res, 200, { success: true, checkedOut: !!by });
+        });
     }
 
     /* ── Staff development plans (PICC PI9) ──

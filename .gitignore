@@ -9,6 +9,18 @@ graph-config.json
 .env
 .env.*
 
+# ── Uploaded and scanned records ──
+# Children's and staff records: proof of income, scanned monitoring evidence,
+# anything ingested through the site. These are served only through auth-gated
+# endpoints and must never reach the remote, so the whole store is ignored
+# rather than relying on anyone remembering which paths are sensitive.
+#
+# Do NOT put scanned records in Internal/documents — that folder is tracked and
+# already holds committed reference PDFs, so files dropped there get published.
+uploads/
+filestore/
+Internal/documents/private/
+
 # ── Scratch files ──
 # Temporary output used when reading command results, and PDF text extraction.
 _*.txt
