@@ -156,6 +156,11 @@
                 <div id="trainingReqs"></div>
                 <div id="trainingMatrix"></div>
 
+                <!-- One environment-rating self-assessment per classroom, with the
+                     instrument chosen by the ages served. -->
+                <div class="section-title">Silver Self-Assessments — One Per Classroom</div>
+                <div id="silverAssessments"></div>
+
                 <div class="section-title">Upload Forms — Fill, Save &amp; Print for Padlet</div>
                 <div class="doc-grid">
                     <a class="doc-card" href="/pas/pas-item-summary-profile.html" target="_blank">
@@ -414,19 +419,173 @@ const TRAINING_CATALOG = [
     },
     {
         key: 'ecers3',
-        name: 'ECERS-3 Classroom',
+        name: 'Making ECERS-3 Work For You',
         via: 'iLearning',
         rule: 'none',
-        note: 'Preschool classroom observation tool.'
+        note: 'Per IDHS, preschool classrooms using ECERS-3 need some knowledge of the tool before receiving classroom support from the CCR&R. Full title: Making ECERS-3 Work For You: Supporting Children\u2019s Engagement in Learning.'
     },
     {
         key: 'iters3',
-        name: 'ITERS-3 Classroom',
+        name: 'ITERS-3 classroom training',
         via: 'iLearning',
         rule: 'none',
-        note: 'Infant/toddler classroom observation tool. Relevant to the PI rooms and to PICC monitoring.'
+        note: 'The ITERS-3 equivalent, for classrooms assessed with ITERS-3. Same IDHS expectation of tool knowledge before classroom support.'
     }
 ];
+
+/* ── Silver self-assessments, one per classroom ──────────────────────────
+   The instrument is set by the ages served, per the Standard 1A guidance:
+     ITERS-3   infants, toddlers, twos
+     ECERS-3   3-5 year olds
+     SACERS-U  school age
+   A 2-3 year old room uses ECERS-3 when 75% or more of the children are 3,
+   which is computed below from actual enrolled birth dates rather than left
+   to a judgement call.                                                    */
+
+const SILVER_INSTRUMENTS = {
+    iters3: { name: 'ITERS-3', scoresheet: 'One per classroom (Infants, Toddlers, Twos). Rate all indicators and make detailed notes.' },
+    ecers3: { name: 'ECERS-3', scoresheet: 'One per classroom (3-5 year olds). The profile sheet at the end is what gets submitted with the application.' },
+    sacersU: { name: 'SACERS-U', scoresheet: 'School-age classrooms.' }
+};
+
+const THREE_YEAR_MAJORITY = 0.75;
+
+function ageInYears(birthDate, asOf) {
+    const b = new Date(birthDate);
+    if (isNaN(b)) return null;
+    return (asOf - b) / (365.25 * 24 * 3600 * 1000);
+}
+
+// Share of a room's active children who are 3 or older. Returns null when we
+// cannot tell, so the caller can say so rather than guess.
+function shareAgedThreePlus(roomNumber) {
+    const today = new Date();
+    // `students` is a top-level `let` in app.js, so it lives in the global lexical
+    // scope and is NOT a property of window. Reference it by bare name.
+    const kids = (typeof students === 'undefined' ? [] : students).filter(s =>
+        String(s.RoomNumber) === String(roomNumber)
+        && (s.Active === 'Yes' || s.Active === 'YES')
+        && s.Birth_date);
+    if (!kids.length) return null;
+    const threes = kids.filter(s => {
+        const y = ageInYears(s.Birth_date, today);
+        return y !== null && y >= 3;
+    });
+    return { share: threes.length / kids.length, threes: threes.length, total: kids.length };
+}
+
+// Decides the instrument for a room from its age range, applying the 75% rule to
+// two-to-three rooms. Returns the instrument key plus the reasoning to display.
+function instrumentForRoom(room) {
+    const label = ((room.AgeRange || '') + ' ' + (room.Room || '')).toLowerCase();
+
+    if (/school\s*age|before|after|b\/a|\bba\b/.test(label)) {
+        return { key: 'sacersU', why: 'School-age room.' };
+    }
+    // A room spanning 2-3 is the ambiguous case the guidance calls out.
+    const isTwoToThree = /2\s*-\s*3|two.*three|\b2-3\b/.test(label);
+    if (isTwoToThree) {
+        const m = shareAgedThreePlus(room.RoomNumber);
+        if (!m) {
+            return { key: 'iters3', why: 'Two-to-three room with no birth dates on file, so the 75% rule cannot be applied. Defaulting to ITERS-3.', unsure: true };
+        }
+        const pct = Math.round(m.share * 100);
+        return m.share >= THREE_YEAR_MAJORITY
+            ? { key: 'ecers3', why: pct + '% of enrolled children are 3 or older (' + m.threes + ' of ' + m.total + '), so the 75% rule puts this room on ECERS-3.' }
+            : { key: 'iters3', why: 'Only ' + pct + '% of enrolled children are 3 or older (' + m.threes + ' of ' + m.total + '), below the 75% threshold, so ITERS-3 applies.' };
+    }
+    if (/infant|toddler|two|\b2\b|0-2|birth/.test(label)) {
+        return { key: 'iters3', why: 'Infant, toddler or twos room.' };
+    }
+    if (/pre-?school|preschool|3-5|3\s*-\s*5|pre-?k/.test(label)) {
+        return { key: 'ecers3', why: 'Preschool room serving 3-5 year olds.' };
+    }
+    return { key: 'ecers3', why: 'Age range not recognised from "' + (room.AgeRange || room.Room || '') + '". Defaulting to ECERS-3 \u2014 confirm this is right.', unsure: true };
+}
+
+let silverAssessments = [];
+
+function assessmentRecord(roomNumber, instrumentKey) {
+    const name = SILVER_INSTRUMENTS[instrumentKey].name;
+    return silverAssessments.find(a =>
+        String(a.RoomNumber) === String(roomNumber) && a.Instrument === name) || null;
+}
+
+function renderSilverAssessments() {
+    const host = document.getElementById('silverAssessments');
+    if (!host) return;
+    // Same as students: a top-level `let` in app.js, not on window.
+    const rooms = (typeof classrooms === 'undefined' ? [] : classrooms).filter(c => c.Room);
+    if (!rooms.length) {
+        host.innerHTML = '<div style="padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.8rem;color:#64748b;">No classrooms loaded.</div>';
+        return;
+    }
+
+    let done = 0, uploaded = 0;
+    const rows = rooms.map(room => {
+        const inst = instrumentForRoom(room);
+        const meta = SILVER_INSTRUMENTS[inst.key];
+        const rec = assessmentRecord(room.RoomNumber, inst.key);
+        const cDate = rec ? (rec.CompletedDate || '') : '';
+        const uDate = rec ? (rec.UploadedDate || '') : '';
+        if (cDate) done++;
+        if (uDate) uploaded++;
+
+        return '<tr style="border-bottom:1px solid #f1f5f9;">'
+            + '<td style="padding:7px 10px;font-size:0.78rem;font-weight:600;color:#1e293b;white-space:nowrap;">' + room.Room + '</td>'
+            + '<td style="padding:7px 10px;"><span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:10px;background:#eff6ff;color:#1d4ed8;">' + meta.name + '</span>'
+            + (inst.unsure ? ' <span title="' + inst.why.replace(/"/g, '&quot;') + '" style="font-size:0.66rem;font-weight:700;color:#92400e;">check</span>' : '')
+            + '<div style="font-size:0.68rem;color:#94a3b8;margin-top:2px;max-width:320px;line-height:1.45;">' + inst.why + '</div></td>'
+            + '<td style="padding:7px 10px;text-align:center;"><input type="date" value="' + cDate + '" onchange="saveAssessment(\'' + room.RoomNumber + '\',\'' + inst.key + '\',\'completedDate\',this.value)" title="Date the scoresheet was completed" style="padding:3px 6px;border:1px solid ' + (cDate ? '#bbf7d0' : '#d1d5db') + ';border-radius:5px;font-size:0.7rem;font-family:inherit;background:' + (cDate ? '#f0fdf4' : 'white') + ';"></td>'
+            + '<td style="padding:7px 10px;text-align:center;"><input type="date" value="' + uDate + '" onchange="saveAssessment(\'' + room.RoomNumber + '\',\'' + inst.key + '\',\'uploadedDate\',this.value)" title="Date it was uploaded to the Padlet Self Assessment Documents column" style="padding:3px 6px;border:1px solid ' + (uDate ? '#bbf7d0' : '#d1d5db') + ';border-radius:5px;font-size:0.7rem;font-family:inherit;background:' + (uDate ? '#f0fdf4' : 'white') + ';"></td>'
+            + '</tr>';
+    }).join('');
+
+    const pill = (met, text) => {
+        const bg = met ? '#f0fdf4' : '#fffbeb', fg = met ? '#166534' : '#92400e';
+        return '<span style="font-size:0.7rem;font-weight:700;padding:3px 9px;border-radius:11px;background:' + bg + ';color:' + fg + ';">' + (met ? '\u2713 ' : '') + text + '</span>';
+    };
+
+    host.innerHTML =
+        '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px;">'
+        + '<div style="font-size:0.85rem;font-weight:800;color:#1e293b;margin-bottom:6px;">Classroom self-assessments</div>'
+        + '<div style="font-size:0.74rem;color:#64748b;line-height:1.6;margin-bottom:10px;">'
+        + 'One scoresheet per classroom, then upload it to the Padlet <em>Self Assessment Documents</em> column.</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:8px;">'
+        + pill(done === rooms.length, 'Completed: ' + done + ' of ' + rooms.length)
+        + pill(uploaded === rooms.length, 'Uploaded to Padlet: ' + uploaded + ' of ' + rooms.length)
+        + '</div></div>'
+        + '<div style="background:white;border:1.5px solid #e2e8f0;border-radius:10px;overflow-x:auto;margin-bottom:14px;">'
+        + '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
+        + ['Classroom', 'Instrument', 'Scoresheet done', 'Uploaded'].map(h =>
+            '<th style="padding:8px 10px;text-align:' + (h === 'Classroom' || h === 'Instrument' ? 'left' : 'center') + ';font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#64748b;">' + h + '</th>').join('')
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+
+async function saveAssessment(roomNumber, instrumentKey, field, value) {
+    const name = SILVER_INSTRUMENTS[instrumentKey].name;
+    const existing = assessmentRecord(roomNumber, instrumentKey) || {};
+    const body = {
+        roomNumber: roomNumber,
+        instrument: name,
+        completedDate: existing.CompletedDate || '',
+        uploadedDate: existing.UploadedDate || '',
+        evidenceLink: existing.EvidenceLink || '',
+        notes: existing.Notes || ''
+    };
+    body[field] = value;
+    try {
+        const res = await apiFetch('/api/silver-assessments', { method: 'POST', body: JSON.stringify(body) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Save failed');
+        const aRes = await apiFetch('/api/silver-assessments');
+        silverAssessments = await aRes.json();
+        renderSilverAssessments();
+    } catch (e) {
+        alert('Could not save that assessment: ' + e.message);
+    }
+}
 
 let staffRecords = [];
 let trainingRecords = [];
@@ -580,14 +739,20 @@ async function saveTraining(staffId, trainingKey, completedDate) {
 
 async function loadTrainingData() {
     try {
-        const [sRes, tRes] = await Promise.all([
+        // Classrooms and students come from app.js's shared loaders; the 75% rule
+        // for two-to-three rooms needs the enrolled birth dates.
+        const [sRes, tRes, aRes] = await Promise.all([
             apiFetch('/api/staff'),
-            apiFetch('/api/staff-training')
+            apiFetch('/api/staff-training'),
+            apiFetch('/api/silver-assessments')
         ]);
         staffRecords = await sRes.json();
         trainingRecords = await tRes.json();
+        silverAssessments = await aRes.json();
         if (!Array.isArray(staffRecords)) staffRecords = [];
         if (!Array.isArray(trainingRecords)) trainingRecords = [];
+        if (!Array.isArray(silverAssessments)) silverAssessments = [];
+        await Promise.all([loadClassrooms(), loadStudents()]);
     } catch (e) {
         console.error('Failed to load training data', e);
     }
@@ -597,6 +762,7 @@ async function loadTrainingData() {
     await loadTrainingData();
     renderTrainingReqs();
     renderTrainingMatrix();
+    renderSilverAssessments();
 })();
 </script>
 <!-- Deploy / Restart controls while this area is under active development. -->

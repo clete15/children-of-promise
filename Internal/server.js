@@ -502,6 +502,30 @@ function staffTrainingEnsureSQL() {
 `;
 }
 
+// ── SilverSelfAssessments schema ──
+// ExceleRate Silver wants one environment-rating self-assessment per classroom,
+// with the instrument set by the ages served: ITERS-3 for infants, toddlers and
+// twos, ECERS-3 for 3-5s, SACERS-U for school age. Tracked per room rather than
+// per program because that is how the scoresheets are completed and submitted.
+//
+// Keyed on (RoomNumber, Instrument) so a 2-3 room that switches from ITERS-3 to
+// ECERS-3 under the 75% rule keeps both records rather than overwriting one.
+function silverAssessmentEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='SilverSelfAssessments')
+    CREATE TABLE SilverSelfAssessments (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        RoomNumber NVARCHAR(20) NOT NULL,
+        Instrument NVARCHAR(40) NOT NULL,
+        CompletedDate NVARCHAR(20),
+        UploadedDate NVARCHAR(20),
+        EvidenceLink NVARCHAR(500),
+        Notes NVARCHAR(MAX),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+}
+
 // ── SiteSettings schema ──
 // Key/value store for facts that are true of the site regardless of school year:
 // the DCFS license, ExceleRate level, and similar. Deliberately has no
@@ -1781,6 +1805,55 @@ ELSE
     UPDATE StaffTraining SET CompletedDate=${esc(date)},EvidenceLink=${esc(link)},Notes=${esc(notes)},UpdatedAt=GETDATE() WHERE ${where}
 ELSE
     INSERT INTO StaffTraining (StaffId,TrainingKey,CompletedDate,EvidenceLink,Notes) VALUES (${staffId},${esc(key)},${esc(date)},${esc(link)},${esc(notes)})`);
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true, cleared: isEmpty });
+        });
+        return;
+    }
+
+    // GET Silver self-assessment records (internal - protected)
+    if (req.method === 'GET' && url === '/api/silver-assessments') {
+        if (!checkAuth(req, res)) return;
+        const sql = silverAssessmentEnsureSQL() + 'GO\n'
+            + `SELECT Id,${txCol('RoomNumber')},${txCol('Instrument')},${txCol('CompletedDate')},${txCol('UploadedDate')},${txCol('EvidenceLink')},${txCol('Notes')} FROM SilverSelfAssessments`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => /^\s*\d+\s*\|/.test(l))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                return {
+                    Id: v[0], RoomNumber: txDecode(v[1]), Instrument: txDecode(v[2]),
+                    CompletedDate: txDecode(v[3]), UploadedDate: txDecode(v[4]),
+                    EvidenceLink: txDecode(v[5]), Notes: txDecode(v[6])
+                };
+            });
+        return sendJSON(res, 200, rows);
+    }
+
+    // POST record or clear a Silver self-assessment (internal - protected)
+    if (req.method === 'POST' && url === '/api/silver-assessments') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const room = String(d.roomNumber || '').trim();
+            const instrument = String(d.instrument || '').trim();
+            if (!room || !instrument) return sendJSON(res, 400, { error: 'roomNumber and instrument are required' });
+
+            const completed = String(d.completedDate || '').trim();
+            const uploaded = String(d.uploadedDate || '').trim();
+            const link = String(d.evidenceLink || '').trim();
+            const notes = String(d.notes || '').trim();
+            const isEmpty = !completed && !uploaded && !link && !notes;
+
+            const where = `RoomNumber=${esc(room)} AND Instrument=${esc(instrument)}`;
+            const sql = silverAssessmentEnsureSQL() + 'GO\n' + (isEmpty
+                ? `DELETE FROM SilverSelfAssessments WHERE ${where}`
+                : `IF EXISTS (SELECT 1 FROM SilverSelfAssessments WHERE ${where})
+    UPDATE SilverSelfAssessments SET CompletedDate=${esc(completed)},UploadedDate=${esc(uploaded)},EvidenceLink=${esc(link)},Notes=${esc(notes)},UpdatedAt=GETDATE() WHERE ${where}
+ELSE
+    INSERT INTO SilverSelfAssessments (RoomNumber,Instrument,CompletedDate,UploadedDate,EvidenceLink,Notes) VALUES (${esc(room)},${esc(instrument)},${esc(completed)},${esc(uploaded)},${esc(link)},${esc(notes)})`);
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true, cleared: isEmpty });
