@@ -1,0 +1,22 @@
+# ── Secrets ──
+# Microsoft Graph credentials for the SharePoint integration. This file holds a
+# client secret and must never be committed. It lives outside the repo in
+# production (C:\app\graph-config.json); this rule covers the case where someone
+# drops a copy in the working tree while testing.
+graph-config.json
+*.secret
+*.pfx
+.env
+.env.*
+
+# ── Scratch files ──
+# Temporary output used when reading command results, and PDF text extraction.
+_*.txt
+_*.js
+_*.sql
+_q.sql
+
+# ── OS / editor noise ──
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -106,6 +106,46 @@ function txDecode(v) {
     return String(v == null ? '' : v).split(TX_NL).join('\n').split(TX_PIPE).join('|');
 }
 
+// ── School year ──
+// Every per-child record is scoped to a school year. Without this, a returning
+// child carried last year's ticked checkboxes into the new year and saving a new
+// permission slip or screening overwrote the previous year's record, which the
+// PICC needs kept (permission is valid July 1 to June 30, and the Individual
+// Family Goal Plan must show annual updates).
+//
+// The year rolls over on July 1, matching getSchoolYear() in the browser and the
+// USDA threshold boundary already used for F/R/P.
+function currentSchoolYear() {
+    const now = new Date();
+    const start = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return start + '-' + (start + 1);
+}
+
+// Rows created before the SchoolYear columns existed are stamped with this on
+// migration. All of that data was entered during the 2025-2026 year.
+const LEGACY_SCHOOL_YEAR = '2025-2026';
+
+// Accepts a year from the client but never trusts it into SQL unescaped, and
+// falls back to the current year so an older client that omits it still works.
+function resolveSchoolYear(v) {
+    const s = String(v || '').trim();
+    return /^\d{4}-\d{4}$/.test(s) ? s : currentSchoolYear();
+}
+
+// Adds SchoolYear to a table that predates it, backfills existing rows, and
+// returns the DDL. Safe to re-run.
+function schoolYearColumnSQL(table) {
+    // Guarded on the table existing as well as the column, because callers run
+    // this before a SELECT that may be the first thing to touch the table.
+    return `IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='${table}')
+   AND NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='${table}' AND COLUMN_NAME='SchoolYear')
+BEGIN
+    EXEC('ALTER TABLE ${table} ADD SchoolYear NVARCHAR(20)');
+    EXEC('UPDATE ${table} SET SchoolYear=''${LEGACY_SCHOOL_YEAR}'' WHERE SchoolYear IS NULL');
+END;
+`;
+}
+
 // ── ISBETracking schema ──
 // Single source of truth for the checklist columns. Every read and write runs the
 // ensure block first, so a fresh database (or one predating a column we added
@@ -125,13 +165,26 @@ function isbeTrackingEnsureSQL() {
     let sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ISBETracking')
     CREATE TABLE ISBETracking (
         Id INT IDENTITY(1,1) PRIMARY KEY,
-        StudentId INT NOT NULL
+        StudentId INT NOT NULL,
+        SchoolYear NVARCHAR(20)
     );
 `;
     for (const c of ISBE_TRACKING_COLUMNS) {
         sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ISBETracking' AND COLUMN_NAME='${c}') ALTER TABLE ISBETracking ADD ${c} BIT DEFAULT 0;\n`;
     }
+    sql += schoolYearColumnSQL('ISBETracking');
     return sql;
+}
+
+// Ticks one checklist column for a student in a given year. Used by every form
+// save so the roster reflects a completed form immediately. Kept in one place
+// because there are six form handlers that all need identical upsert semantics.
+function trackingTickSQL(studentId, year, field) {
+    return `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId} AND SchoolYear=${esc(year)})
+    UPDATE ISBETracking SET ${field}=1 WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}
+ELSE
+    INSERT INTO ISBETracking (StudentId,SchoolYear,${field}) VALUES (${studentId},${esc(year)},1);
+`;
 }
 
 // ── PICC per-child document forms ──
@@ -339,6 +392,7 @@ function parentInterviewEnsureSQL() {
     for (const [name, type] of PARENT_INTERVIEW_ADDED_COLUMNS) {
         sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='${name}') ALTER TABLE ParentInterviews ADD ${name} ${type};\n`;
     }
+    sql += schoolYearColumnSQL('ParentInterviews');
     return sql;
 }
 
@@ -380,6 +434,7 @@ ${cols},
     for (const [name, type] of cfg.columns) {
         sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='${cfg.table}' AND COLUMN_NAME='${name}') ALTER TABLE ${cfg.table} ADD ${name} ${type};\n`;
     }
+    sql += schoolYearColumnSQL(cfg.table);
     return sql;
 }
 
@@ -615,10 +670,12 @@ function handleRequest(req, res) {
     // referral status without a request per child.
     if (req.method === 'GET' && url === '/api/screening-summary') {
         if (!checkAuth(req, res)) return;
+        const summaryYear = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
+        const summaryEnsure = schoolYearColumnSQL('ScreeningScores');
         // Concern logic differs by instrument:
         //  ASQ-3      higher score is better, so 'Below' cutoff is the concern.
         //  ASQ:SE-2   higher score means more concern, so 'Above' cutoff is the concern.
-        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ScreeningScores') SELECT 0 AS StudentId WHERE 1=0
+        const sql = summaryEnsure + `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ScreeningScores') SELECT 0 AS StudentId WHERE 1=0
             ELSE
             SELECT StudentId,
                 ISNULL(ScreeningType,'') AS ScreeningType,
@@ -630,7 +687,7 @@ function handleRequest(req, res) {
                      WHEN ScreeningType<>'ASQ-3' AND SEResult='Above' THEN 'concern'
                      WHEN ScreeningType<>'ASQ-3' AND SEResult='Monitor' THEN 'monitor'
                      ELSE 'ok' END AS Flag
-            FROM ScreeningScores`;
+            FROM ScreeningScores WHERE SchoolYear=${esc(summaryYear)}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
@@ -908,7 +965,9 @@ function handleRequest(req, res) {
         // Column list comes from ISBE_TRACKING_COLUMNS so the SELECT can never drift
         // out of step with the schema the way EnterSIS/RemoveFromSIS previously did.
         const select = ISBE_TRACKING_COLUMNS.map(c => `ISNULL(${c},0) AS ${c}`).join(',');
-        const sql = isbeTrackingEnsureSQL() + `SELECT StudentId,${select} FROM ISBETracking`;
+        const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
+        const sql = isbeTrackingEnsureSQL()
+            + `SELECT StudentId,${select} FROM ISBETracking WHERE SchoolYear=${esc(year)}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
@@ -926,8 +985,9 @@ function handleRequest(req, res) {
     if (req.method === 'GET' && url.startsWith('/api/parent-interview/')) {
         if (!checkAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
+        const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
         const sql = parentInterviewEnsureSQL()
-            + `SELECT Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')} FROM ParentInterviews WHERE StudentId=${studentId}`;
+            + `SELECT Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')} FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
@@ -945,16 +1005,15 @@ function handleRequest(req, res) {
         const studentId = parseInt(url.split('/')[3]);
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const year = resolveSchoolYear(d.year);
             const sql = parentInterviewEnsureSQL()
                 + isbeTrackingEnsureSQL()
-                + `IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId})
-                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},PreferredLanguage=${esc(d.preferredLanguage)},TranslatorNeeded=${esc(d.translatorNeeded)},TranslatorArrangements=${esc(d.translatorArrangements)},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                + `IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(year)})
+                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},PreferredLanguage=${esc(d.preferredLanguage)},TranslatorNeeded=${esc(d.translatorNeeded)},TranslatorArrangements=${esc(d.translatorArrangements)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}
                 ELSE
-                    INSERT INTO ParentInterviews (StudentId,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,StaffSignature,Notes,PreferredLanguage,TranslatorNeeded,TranslatorArrangements) VALUES (${studentId},${esc(d.interviewDate)},${esc(d.parentGoals)},${esc(d.parentConcerns)},${esc(d.childStrengths)},${esc(d.parentSignature)},${esc(d.staffSignature)},${esc(d.notes)},${esc(d.preferredLanguage)},${esc(d.translatorNeeded)},${esc(d.translatorArrangements)});
-                IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
-                    UPDATE ISBETracking SET ParentInterview=1 WHERE StudentId=${studentId}
-                ELSE
-                    INSERT INTO ISBETracking (StudentId,ParentInterview) VALUES (${studentId},1)`;
+                    INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,StaffSignature,Notes,PreferredLanguage,TranslatorNeeded,TranslatorArrangements) VALUES (${studentId},${esc(year)},${esc(d.interviewDate)},${esc(d.parentGoals)},${esc(d.parentConcerns)},${esc(d.childStrengths)},${esc(d.parentSignature)},${esc(d.staffSignature)},${esc(d.notes)},${esc(d.preferredLanguage)},${esc(d.translatorNeeded)},${esc(d.translatorArrangements)});
+`
+                + trackingTickSQL(studentId, year, 'ParentInterview');
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
@@ -981,7 +1040,8 @@ function handleRequest(req, res) {
                 CreatedAt DATETIME DEFAULT GETDATE(),
                 UpdatedAt DATETIME DEFAULT GETDATE()
             );
-            SELECT Id,StudentId,ISNULL(ParentName,'') AS ParentName,ISNULL(SchoolYear,'') AS SchoolYear,ISNULL(SignedDate,'') AS SignedDate,ISNULL(Teacher,'') AS Teacher,ISNULL(ParentSignature,'') AS ParentSignature,ISNULL(ParentSigDate,'') AS ParentSigDate,ISNULL(TeacherSignature,'') AS TeacherSignature,ISNULL(TeacherSigDate,'') AS TeacherSigDate,CreatedAt,UpdatedAt FROM PermissionSlips WHERE StudentId=${studentId}`;
+            ${schoolYearColumnSQL('PermissionSlips')}
+            SELECT Id,StudentId,ISNULL(ParentName,'') AS ParentName,ISNULL(SchoolYear,'') AS SchoolYear,ISNULL(SignedDate,'') AS SignedDate,ISNULL(Teacher,'') AS Teacher,ISNULL(ParentSignature,'') AS ParentSignature,ISNULL(ParentSigDate,'') AS ParentSigDate,ISNULL(TeacherSignature,'') AS TeacherSignature,ISNULL(TeacherSigDate,'') AS TeacherSigDate,CreatedAt,UpdatedAt FROM PermissionSlips WHERE StudentId=${studentId} AND SchoolYear=${esc(resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year')))}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
@@ -999,6 +1059,9 @@ function handleRequest(req, res) {
         const studentId = parseInt(url.split('/')[3]);
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            // The slip form already carries the school year it was filled in for;
+            // that is the year the record belongs to.
+            const slipYear = resolveSchoolYear(d.schoolYear || d.year);
             const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='PermissionSlips')
                 CREATE TABLE PermissionSlips (
                     Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -1014,14 +1077,13 @@ function handleRequest(req, res) {
                     CreatedAt DATETIME DEFAULT GETDATE(),
                     UpdatedAt DATETIME DEFAULT GETDATE()
                 );
-                IF EXISTS (SELECT 1 FROM PermissionSlips WHERE StudentId=${studentId})
-                    UPDATE PermissionSlips SET ParentName=${esc(d.parentName)},SchoolYear=${esc(d.schoolYear)},SignedDate=${esc(d.signedDate)},Teacher=${esc(d.teacher)},ParentSignature=${esc(d.parentSignature)},ParentSigDate=${esc(d.parentSigDate)},TeacherSignature=${esc(d.teacherSignature)},TeacherSigDate=${esc(d.teacherSigDate)},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                ${schoolYearColumnSQL('PermissionSlips')}
+                IF EXISTS (SELECT 1 FROM PermissionSlips WHERE StudentId=${studentId} AND SchoolYear=${esc(slipYear)})
+                    UPDATE PermissionSlips SET ParentName=${esc(d.parentName)},SignedDate=${esc(d.signedDate)},Teacher=${esc(d.teacher)},ParentSignature=${esc(d.parentSignature)},ParentSigDate=${esc(d.parentSigDate)},TeacherSignature=${esc(d.teacherSignature)},TeacherSigDate=${esc(d.teacherSigDate)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(slipYear)}
                 ELSE
-                    INSERT INTO PermissionSlips (StudentId,ParentName,SchoolYear,SignedDate,Teacher,ParentSignature,ParentSigDate,TeacherSignature,TeacherSigDate) VALUES (${studentId},${esc(d.parentName)},${esc(d.schoolYear)},${esc(d.signedDate)},${esc(d.teacher)},${esc(d.parentSignature)},${esc(d.parentSigDate)},${esc(d.teacherSignature)},${esc(d.teacherSigDate)});
-                IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
-                    UPDATE ISBETracking SET PermissionSlip=1 WHERE StudentId=${studentId}
-                ELSE
-                    INSERT INTO ISBETracking (StudentId,PermissionSlip) VALUES (${studentId},1)`;
+                    INSERT INTO PermissionSlips (StudentId,SchoolYear,ParentName,SignedDate,Teacher,ParentSignature,ParentSigDate,TeacherSignature,TeacherSigDate) VALUES (${studentId},${esc(slipYear)},${esc(d.parentName)},${esc(d.signedDate)},${esc(d.teacher)},${esc(d.parentSignature)},${esc(d.parentSigDate)},${esc(d.teacherSignature)},${esc(d.teacherSigDate)});
+`
+                + trackingTickSQL(studentId, slipYear, 'PermissionSlip');
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
@@ -1039,9 +1101,11 @@ function handleRequest(req, res) {
         const studentId = parseInt(parts[4]);
         if (!studentId) return sendJSON(res, 400, { error: 'Invalid student id' });
 
+        // `url` has the query string stripped, so read params off req.url.
+        const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
         const select = cfg.columns.map(([name]) => txCol(name)).join(',');
         const sql = docFormEnsureSQL(cfg)
-            + `SELECT Id,StudentId,${select} FROM ${cfg.table} WHERE StudentId=${studentId}`;
+            + `SELECT Id,StudentId,${select} FROM ${cfg.table} WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
@@ -1065,19 +1129,18 @@ function handleRequest(req, res) {
 
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const year = resolveSchoolYear(d.year);
             const names = cfg.columns.map(([name]) => name).join(',');
             const vals = cfg.columns.map(([, , key]) => esc(d[key])).join(',');
             const sets = cfg.columns.map(([name, , key]) => `${name}=${esc(d[key])}`).join(',');
             const sql = docFormEnsureSQL(cfg)
                 + isbeTrackingEnsureSQL()
-                + `IF EXISTS (SELECT 1 FROM ${cfg.table} WHERE StudentId=${studentId})
-    UPDATE ${cfg.table} SET ${sets},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                + `IF EXISTS (SELECT 1 FROM ${cfg.table} WHERE StudentId=${studentId} AND SchoolYear=${esc(year)})
+    UPDATE ${cfg.table} SET ${sets},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}
 ELSE
-    INSERT INTO ${cfg.table} (StudentId,${names}) VALUES (${studentId},${vals});
-IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
-    UPDATE ISBETracking SET ${cfg.trackingColumn}=1 WHERE StudentId=${studentId}
-ELSE
-    INSERT INTO ISBETracking (StudentId,${cfg.trackingColumn}) VALUES (${studentId},1);`;
+    INSERT INTO ${cfg.table} (StudentId,SchoolYear,${names}) VALUES (${studentId},${esc(year)},${vals});
+`
+                + trackingTickSQL(studentId, year, cfg.trackingColumn);
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
@@ -1093,6 +1156,7 @@ ELSE
         const params = new URLSearchParams(query);
         const type = params.get('type') || '';
         const period = params.get('period') || '';
+        const scrYear = resolveSchoolYear(params.get('year'));
         const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ScreeningScores')
             CREATE TABLE ScreeningScores (
                 Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -1113,7 +1177,8 @@ ELSE
                 CreatedAt DATETIME DEFAULT GETDATE(),
                 UpdatedAt DATETIME DEFAULT GETDATE()
             );
-            SELECT Id,StudentId,ScreeningType,Period,ISNULL(ScreeningDate,'') AS ScreeningDate,ISNULL(CompletedBy,'') AS CompletedBy,ISNULL([Interval],'') AS [Interval],ISNULL(ReferralMade,'') AS ReferralMade,ISNULL(CommScore,'') AS CommScore,ISNULL(CommStatus,'') AS CommStatus,ISNULL(GrossScore,'') AS GrossScore,ISNULL(GrossStatus,'') AS GrossStatus,ISNULL(FineScore,'') AS FineScore,ISNULL(FineStatus,'') AS FineStatus,ISNULL(ProblemScore,'') AS ProblemScore,ISNULL(ProblemStatus,'') AS ProblemStatus,ISNULL(PersonalScore,'') AS PersonalScore,ISNULL(PersonalStatus,'') AS PersonalStatus,ISNULL(SETotal,'') AS SETotal,ISNULL(SECutoff,'') AS SECutoff,ISNULL(SEResult,'') AS SEResult,ISNULL(Notes,'') AS Notes FROM ScreeningScores WHERE StudentId=${studentId} AND ScreeningType=${esc(type)} AND Period=${esc(period)}`;
+            ${schoolYearColumnSQL('ScreeningScores')}
+            SELECT Id,StudentId,ScreeningType,Period,ISNULL(ScreeningDate,'') AS ScreeningDate,ISNULL(CompletedBy,'') AS CompletedBy,ISNULL([Interval],'') AS [Interval],ISNULL(ReferralMade,'') AS ReferralMade,ISNULL(CommScore,'') AS CommScore,ISNULL(CommStatus,'') AS CommStatus,ISNULL(GrossScore,'') AS GrossScore,ISNULL(GrossStatus,'') AS GrossStatus,ISNULL(FineScore,'') AS FineScore,ISNULL(FineStatus,'') AS FineStatus,ISNULL(ProblemScore,'') AS ProblemScore,ISNULL(ProblemStatus,'') AS ProblemStatus,ISNULL(PersonalScore,'') AS PersonalScore,ISNULL(PersonalStatus,'') AS PersonalStatus,ISNULL(SETotal,'') AS SETotal,ISNULL(SECutoff,'') AS SECutoff,ISNULL(SEResult,'') AS SEResult,ISNULL(Notes,'') AS Notes FROM ScreeningScores WHERE StudentId=${studentId} AND ScreeningType=${esc(type)} AND Period=${esc(period)} AND SchoolYear=${esc(scrYear)}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
@@ -1137,6 +1202,7 @@ ELSE
             else if (d.type === 'ASQ-3' && d.period === 'End') isbeField = 'EndASQ';
             else if (d.type === 'ASQ:SE-2' && d.period === 'Beginning') isbeField = 'BegASE';
             else if (d.type === 'ASQ:SE-2' && d.period === 'End') isbeField = 'EndASE';
+            const scrYear = resolveSchoolYear(d.year);
 
             const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ScreeningScores')
                 CREATE TABLE ScreeningScores (
@@ -1158,14 +1224,13 @@ ELSE
                     CreatedAt DATETIME DEFAULT GETDATE(),
                     UpdatedAt DATETIME DEFAULT GETDATE()
                 );
-                IF EXISTS (SELECT 1 FROM ScreeningScores WHERE StudentId=${studentId} AND ScreeningType=${esc(d.type)} AND Period=${esc(d.period)})
-                    UPDATE ScreeningScores SET ScreeningDate=${esc(d.screeningDate)},CompletedBy=${esc(d.completedBy)},[Interval]=${esc(d.interval)},ReferralMade=${esc(d.referralMade)},CommScore=${esc(d.commScore||'')},CommStatus=${esc(d.commStatus||'')},GrossScore=${esc(d.grossScore||'')},GrossStatus=${esc(d.grossStatus||'')},FineScore=${esc(d.fineScore||'')},FineStatus=${esc(d.fineStatus||'')},ProblemScore=${esc(d.problemScore||'')},ProblemStatus=${esc(d.problemStatus||'')},PersonalScore=${esc(d.personalScore||'')},PersonalStatus=${esc(d.personalStatus||'')},SETotal=${esc(d.seTotal||'')},SECutoff=${esc(d.seCutoff||'')},SEResult=${esc(d.seResult||'')},Notes=${esc(d.notes)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND ScreeningType=${esc(d.type)} AND Period=${esc(d.period)}
+                ${schoolYearColumnSQL('ScreeningScores')}
+                IF EXISTS (SELECT 1 FROM ScreeningScores WHERE StudentId=${studentId} AND ScreeningType=${esc(d.type)} AND Period=${esc(d.period)} AND SchoolYear=${esc(scrYear)})
+                    UPDATE ScreeningScores SET ScreeningDate=${esc(d.screeningDate)},CompletedBy=${esc(d.completedBy)},[Interval]=${esc(d.interval)},ReferralMade=${esc(d.referralMade)},CommScore=${esc(d.commScore||'')},CommStatus=${esc(d.commStatus||'')},GrossScore=${esc(d.grossScore||'')},GrossStatus=${esc(d.grossStatus||'')},FineScore=${esc(d.fineScore||'')},FineStatus=${esc(d.fineStatus||'')},ProblemScore=${esc(d.problemScore||'')},ProblemStatus=${esc(d.problemStatus||'')},PersonalScore=${esc(d.personalScore||'')},PersonalStatus=${esc(d.personalStatus||'')},SETotal=${esc(d.seTotal||'')},SECutoff=${esc(d.seCutoff||'')},SEResult=${esc(d.seResult||'')},Notes=${esc(d.notes)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND ScreeningType=${esc(d.type)} AND Period=${esc(d.period)} AND SchoolYear=${esc(scrYear)}
                 ELSE
-                    INSERT INTO ScreeningScores (StudentId,ScreeningType,Period,ScreeningDate,CompletedBy,[Interval],ReferralMade,CommScore,CommStatus,GrossScore,GrossStatus,FineScore,FineStatus,ProblemScore,ProblemStatus,PersonalScore,PersonalStatus,SETotal,SECutoff,SEResult,Notes) VALUES (${studentId},${esc(d.type)},${esc(d.period)},${esc(d.screeningDate)},${esc(d.completedBy)},${esc(d.interval)},${esc(d.referralMade)},${esc(d.commScore||'')},${esc(d.commStatus||'')},${esc(d.grossScore||'')},${esc(d.grossStatus||'')},${esc(d.fineScore||'')},${esc(d.fineStatus||'')},${esc(d.problemScore||'')},${esc(d.problemStatus||'')},${esc(d.personalScore||'')},${esc(d.personalStatus||'')},${esc(d.seTotal||'')},${esc(d.seCutoff||'')},${esc(d.seResult||'')},${esc(d.notes)});
-                ${isbeField ? `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
-                    UPDATE ISBETracking SET ${isbeField}=1 WHERE StudentId=${studentId}
-                ELSE
-                    INSERT INTO ISBETracking (StudentId,${isbeField}) VALUES (${studentId},1)` : ''}`;
+                    INSERT INTO ScreeningScores (StudentId,SchoolYear,ScreeningType,Period,ScreeningDate,CompletedBy,[Interval],ReferralMade,CommScore,CommStatus,GrossScore,GrossStatus,FineScore,FineStatus,ProblemScore,ProblemStatus,PersonalScore,PersonalStatus,SETotal,SECutoff,SEResult,Notes) VALUES (${studentId},${esc(scrYear)},${esc(d.type)},${esc(d.period)},${esc(d.screeningDate)},${esc(d.completedBy)},${esc(d.interval)},${esc(d.referralMade)},${esc(d.commScore||'')},${esc(d.commStatus||'')},${esc(d.grossScore||'')},${esc(d.grossStatus||'')},${esc(d.fineScore||'')},${esc(d.fineStatus||'')},${esc(d.problemScore||'')},${esc(d.problemStatus||'')},${esc(d.personalScore||'')},${esc(d.personalStatus||'')},${esc(d.seTotal||'')},${esc(d.seCutoff||'')},${esc(d.seResult||'')},${esc(d.notes)});
+`
+                + (isbeField ? trackingTickSQL(studentId, scrYear, isbeField) : '');
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
@@ -1208,8 +1273,11 @@ ELSE
             const v = lines[0].split('|').map(x => x.trim());
             const student = { Id:v[0], First_Name:v[1], Last_Name:v[2], Birth_date:v[3], RoomNumber:v[4], Room:v[5], TeacherDescription:v[6], HouseholdIncome:v[7], HouseholdSize:v[8], PublicBenefits:v[9], IEP:v[10], Military:v[11], Category:v[12], City_Town:v[13], PFA_PI_na:v[14] };
 
-            // Get tracking status
-            const tSql = `SELECT PermissionSlip,ParentInterview FROM ISBETracking WHERE StudentId=${parseInt(student.Id)}`;
+            // Get tracking status for the year in progress. A parent following a
+            // code should see whether THIS year's slip and interview are done, not
+            // whether last year's were.
+            const tSql = isbeTrackingEnsureSQL()
+                + `SELECT PermissionSlip,ParentInterview FROM ISBETracking WHERE StudentId=${parseInt(student.Id)} AND SchoolYear=${esc(currentSchoolYear())}`;
             const tRes = runSQL(tSql);
             let tracking = {};
             if (tRes.ok) {
@@ -1254,6 +1322,9 @@ ELSE
             const code = (d.code || '').trim().toUpperCase();
             const formType = d.formType;
             const data = d.data || {};
+            // A parent signing today is signing for the year in progress. The
+            // form may also carry the year it was rendered with.
+            const formYear = resolveSchoolYear(data.schoolYear || d.year);
 
             // Verify code and get student ID
             const lookupSql = `SELECT StudentId FROM ParentCodes WHERE Code=${esc(code)}`;
@@ -1273,22 +1344,23 @@ ELSE
                         TeacherSignature NVARCHAR(200),TeacherSigDate NVARCHAR(20),
                         CreatedAt DATETIME DEFAULT GETDATE(),UpdatedAt DATETIME DEFAULT GETDATE()
                     );
-                    IF EXISTS (SELECT 1 FROM PermissionSlips WHERE StudentId=${studentId})
-                        UPDATE PermissionSlips SET ParentName=${esc(data.parentName)},SchoolYear=${esc(data.schoolYear)},SignedDate=${esc(data.signedDate)},Teacher=${esc(data.teacher)},ParentSignature=${esc(data.parentSignature)},ParentSigDate=${esc(data.parentSigDate)},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                    ${schoolYearColumnSQL('PermissionSlips')}
+                    IF EXISTS (SELECT 1 FROM PermissionSlips WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)})
+                        UPDATE PermissionSlips SET ParentName=${esc(data.parentName)},SignedDate=${esc(data.signedDate)},Teacher=${esc(data.teacher)},ParentSignature=${esc(data.parentSignature)},ParentSigDate=${esc(data.parentSigDate)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)}
                     ELSE
-                        INSERT INTO PermissionSlips (StudentId,ParentName,SchoolYear,SignedDate,Teacher,ParentSignature,ParentSigDate) VALUES (${studentId},${esc(data.parentName)},${esc(data.schoolYear)},${esc(data.signedDate)},${esc(data.teacher)},${esc(data.parentSignature)},${esc(data.parentSigDate)});
-                    IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
-                        UPDATE ISBETracking SET PermissionSlip=1 WHERE StudentId=${studentId}
-                    ELSE
-                        INSERT INTO ISBETracking (StudentId,PermissionSlip) VALUES (${studentId},1)`;
+                        INSERT INTO PermissionSlips (StudentId,SchoolYear,ParentName,SignedDate,Teacher,ParentSignature,ParentSigDate) VALUES (${studentId},${esc(formYear)},${esc(data.parentName)},${esc(data.signedDate)},${esc(data.teacher)},${esc(data.parentSignature)},${esc(data.parentSigDate)});
+`
+                    + trackingTickSQL(studentId, formYear, 'PermissionSlip');
                 const r = runSQL(sql);
                 if (!r.ok) return sendJSON(res, 500, { error: r.error });
                 return sendJSON(res, 200, { success: true });
             }
 
             if (formType === 'ParentInterview') {
-                // Store full interview as JSON in Notes field (comprehensive PI form)
-                const jsonData = JSON.stringify(data).replace(/'/g, "''");
+                // Full interview payload kept as JSON alongside the mapped columns.
+                // esc() handles the quote escaping, so this must stay raw or the
+                // stored JSON ends up double-escaped and unparseable.
+                const jsonData = JSON.stringify(data);
                 const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
                     CREATE TABLE ParentInterviews (
                         Id INT IDENTITY(1,1) PRIMARY KEY,StudentId INT NOT NULL,
@@ -1297,14 +1369,13 @@ ELSE
                         Notes NVARCHAR(MAX),CreatedAt DATETIME DEFAULT GETDATE(),UpdatedAt DATETIME DEFAULT GETDATE()
                     );
                     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='FormData') ALTER TABLE ParentInterviews ADD FormData NVARCHAR(MAX);
-                    IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId})
-                        UPDATE ParentInterviews SET InterviewDate=${esc(data.signDate||'')},ParentGoals=${esc(data.goals||'')},ParentConcerns=${esc(data.behaviors||'')},ChildStrengths=${esc(data.describeChild||'')},ParentSignature=${esc(data.parentSignature||'')},FormData='${jsonData}',UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+                    ${schoolYearColumnSQL('ParentInterviews')}
+                    IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)})
+                        UPDATE ParentInterviews SET InterviewDate=${esc(data.signDate||'')},ParentGoals=${esc(data.goals||'')},ParentConcerns=${esc(data.behaviors||'')},ChildStrengths=${esc(data.describeChild||'')},ParentSignature=${esc(data.parentSignature||'')},FormData=${esc(jsonData)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)}
                     ELSE
-                        INSERT INTO ParentInterviews (StudentId,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,FormData) VALUES (${studentId},${esc(data.signDate||'')},${esc(data.goals||'')},${esc(data.behaviors||'')},${esc(data.describeChild||'')},${esc(data.parentSignature||'')},'${jsonData}');
-                    IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
-                        UPDATE ISBETracking SET ParentInterview=1 WHERE StudentId=${studentId}
-                    ELSE
-                        INSERT INTO ISBETracking (StudentId,ParentInterview) VALUES (${studentId},1)`;
+                        INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,FormData) VALUES (${studentId},${esc(formYear)},${esc(data.signDate||'')},${esc(data.goals||'')},${esc(data.behaviors||'')},${esc(data.describeChild||'')},${esc(data.parentSignature||'')},${esc(jsonData)});
+`
+                    + trackingTickSQL(studentId, formYear, 'ParentInterview');
                 const r = runSQL(sql);
                 if (!r.ok) return sendJSON(res, 500, { error: r.error });
                 return sendJSON(res, 200, { success: true });
@@ -1413,8 +1484,9 @@ ELSE
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const week = d.week || '';
-            const pfaJson = JSON.stringify(d.pfa || {}).replace(/'/g, "''");
-            const otherJson = JSON.stringify(d.other || {}).replace(/'/g, "''");
+            // Raw JSON; esc() does the quoting and escaping at the point of use.
+            const pfaJson = JSON.stringify(d.pfa || {});
+            const otherJson = JSON.stringify(d.other || {});
             const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='WeeklyMenus')
                 CREATE TABLE WeeklyMenus (
                     Id INT IDENTITY(1,1) PRIMARY KEY,
@@ -1424,9 +1496,9 @@ ELSE
                     UpdatedAt DATETIME DEFAULT GETDATE()
                 );
                 IF EXISTS (SELECT 1 FROM WeeklyMenus WHERE WeekKey=${esc(week)})
-                    UPDATE WeeklyMenus SET PfaData='${pfaJson}',OtherData='${otherJson}',UpdatedAt=GETDATE() WHERE WeekKey=${esc(week)}
+                    UPDATE WeeklyMenus SET PfaData=${esc(pfaJson)},OtherData=${esc(otherJson)},UpdatedAt=GETDATE() WHERE WeekKey=${esc(week)}
                 ELSE
-                    INSERT INTO WeeklyMenus (WeekKey,PfaData,OtherData) VALUES (${esc(week)},'${pfaJson}','${otherJson}')`;
+                    INSERT INTO WeeklyMenus (WeekKey,PfaData,OtherData) VALUES (${esc(week)},${esc(pfaJson)},${esc(otherJson)})`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
@@ -1510,10 +1582,12 @@ ELSE
             // Whitelist is the schema list itself, so a new checklist column is
             // writable as soon as it is declared (and never writable if it isn't).
             if (!ISBE_TRACKING_COLUMNS.includes(field)) return sendJSON(res, 400, { error: 'Invalid field' });
-            const sql = isbeTrackingEnsureSQL() + `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${parseInt(studentId)})
-                UPDATE ISBETracking SET ${field}=${value?1:0} WHERE StudentId=${parseInt(studentId)}
+            const year = resolveSchoolYear(d.year);
+            const sql = isbeTrackingEnsureSQL()
+                + `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${parseInt(studentId)} AND SchoolYear=${esc(year)})
+                UPDATE ISBETracking SET ${field}=${value?1:0} WHERE StudentId=${parseInt(studentId)} AND SchoolYear=${esc(year)}
             ELSE
-                INSERT INTO ISBETracking (StudentId,${field}) VALUES (${parseInt(studentId)},${value?1:0})`;
+                INSERT INTO ISBETracking (StudentId,SchoolYear,${field}) VALUES (${parseInt(studentId)},${esc(year)},${value?1:0})`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });

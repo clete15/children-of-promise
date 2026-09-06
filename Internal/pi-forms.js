@@ -786,6 +786,8 @@
         // which is why this stays inline rather than filling in afterwards.
         if (spec.needsIntake) {
             try {
+                // Intake is the original pre-enrollment submission, not a per-year
+                // record, so this one is deliberately not year-scoped.
                 const ir = await apiFetch('/api/student-intake/' + studentId);
                 currentIntake = await ir.json();
             } catch (e) {
@@ -822,7 +824,10 @@
         });
 
         try {
-            const res = await apiFetch('/api/pi-doc/' + spec.api + '/' + studentId);
+            // activeSchoolYear is owned by isbe.html; these records are per year so
+            // a returning child starts fresh rather than showing last year's form.
+            const res = await apiFetch('/api/pi-doc/' + spec.api + '/' + studentId
+                + '?year=' + encodeURIComponent(activeSchoolYear));
             const d = await res.json();
             if (d && d.found) {
                 fields.forEach(f => {
@@ -869,7 +874,7 @@
         btn.disabled = true;
         btn.textContent = 'Saving...';
 
-        const body = {};
+        const body = { year: activeSchoolYear };
         allFields(spec).forEach(f => {
             if (f.type === 'checkgroup') {
                 body[f.key] = f.options.filter((o, i) => {

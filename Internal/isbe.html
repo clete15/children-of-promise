@@ -145,6 +145,13 @@
         /* Flash a roster column when jumping to it from a checklist item */
         .col-flash { background:#fef9c3 !important;transition:background 0.3s; }
 
+        /* School year picker in the roster header */
+        .year-picker { margin-left:auto;display:flex;align-items:center;gap:7px;flex-shrink:0; }
+        .year-picker label { font-size:0.7rem;font-weight:600;color:#6b7280;white-space:nowrap; }
+        .year-picker select { padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.76rem;font-family:inherit;background:white; }
+        .year-picker select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .year-prior { font-size:0.64rem;font-weight:700;color:#92400e;background:#fffbeb;padding:3px 8px;border-radius:10px;white-space:nowrap; }
+
         /* Print All container is hidden on screen; only used to build the print job */
         #printAllContainer { display:none; }
         .print-value { display:inline-block;min-height:1em; }
@@ -227,6 +234,14 @@
             <div class="isbe-header">
                 <h2 id="isbeTitle">PFA Roster</h2>
                 <span id="isbeCount"></span>
+                <!-- Everything per-child is stored against a school year. Checklist
+                     items reset each year because permission, screenings and the
+                     goal plan are annual, so the year in view matters. -->
+                <div class="year-picker">
+                    <label for="rosterYear">School year</label>
+                    <select id="rosterYear" onchange="setSchoolYear(this.value)"></select>
+                    <span id="yearBadge"></span>
+                </div>
             </div>
             <!-- Student roster grid -->
             <div class="isbe-grid" id="isbeRosterGrid">
@@ -257,7 +272,7 @@
                     <div id="complianceList" style="display:flex;flex-direction:column;gap:12px;"></div>
                     <div style="margin-top:20px;display:flex;gap:10px;align-items:center;">
                         <label style="font-size:0.75rem;font-weight:600;color:#6b7280;">School Year:</label>
-                        <select id="complianceYear" onchange="loadCompliance()" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;"></select>
+                        <select id="complianceYear" onchange="setComplianceYear(this.value)" style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.82rem;"></select>
                     </div>
                 </div>
             </div>
@@ -622,15 +637,79 @@ let screeningData = {};
 // ISBE/IDEC expects developmental screening within 45 days of enrollment.
 const SCREENING_DEADLINE_DAYS = 45;
 let activeProgram = 'PFA';
+
+/* Active school year for every per-child record on this page.
+   The checklist, the forms and the screening scores are all stored per year, so
+   a returning child starts the new year with an empty row rather than inheriting
+   last year's ticks. Changing this reloads the tracking and screening data.
+   Read by pi-forms.js when it fetches and saves the document forms. */
+let activeSchoolYear = getSchoolYear();
+
+// Appends the year to a GET url, respecting an existing query string.
+function yearQS(url) {
+    return url + (url.indexOf('?') === -1 ? '?' : '&') + 'year=' + encodeURIComponent(activeSchoolYear);
+}
+
+// Offers the current year plus the two before it, matching the compliance picker.
+function schoolYearOptions() {
+    const now = new Date();
+    const start = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const out = [];
+    for (let y = start; y >= start - 2; y--) out.push(y + '-' + (y + 1));
+    return out;
+}
+
+function renderYearPicker() {
+    const sel = document.getElementById('rosterYear');
+    if (!sel) return;
+    if (!sel.options.length) {
+        sel.innerHTML = schoolYearOptions()
+            .map(y => '<option value="' + y + '">' + y + '</option>').join('');
+    }
+    sel.value = activeSchoolYear;
+    // Viewing a closed year is read-only in spirit; flag it so nobody thinks
+    // they are filling in the current year's paperwork.
+    const badge = document.getElementById('yearBadge');
+    if (badge) {
+        const isCurrent = activeSchoolYear === getSchoolYear();
+        badge.textContent = isCurrent ? '' : 'prior year';
+        badge.className = isCurrent ? '' : 'year-prior';
+    }
+}
+
+async function setSchoolYear(year) {
+    activeSchoolYear = year;
+    renderYearPicker();
+    try {
+        const [tRes, scrRes] = await Promise.all([
+            apiFetch(yearQS('/api/isbe-tracking')),
+            apiFetch(yearQS('/api/screening-summary'))
+        ]);
+        const tRows = await tRes.json();
+        trackingData = {};
+        (Array.isArray(tRows) ? tRows : []).forEach(r => { trackingData[r.StudentId] = r; });
+        const scrRows = await scrRes.json();
+        screeningData = {};
+        (Array.isArray(scrRows) ? scrRows : []).forEach(r => {
+            if (!screeningData[r.StudentId]) screeningData[r.StudentId] = {};
+            screeningData[r.StudentId][r.ScreeningType + '|' + r.Period] = r;
+        });
+    } catch (e) {
+        console.error('Failed to load data for ' + year, e);
+    }
+    if (activeProgram === 'PFA' || activeProgram === 'PI') renderRoster();
+    else if (activeProgram === 'followUp') renderFollowUp();
+}
 let currentInterviewStudentId = null;
 
 async function init() {
     try {
+        renderYearPicker();
         const [sRes, cRes, tRes, scrRes] = await Promise.all([
             apiFetch('/api/students'),
             apiFetch('/api/classrooms'),
-            apiFetch('/api/isbe-tracking'),
-            apiFetch('/api/screening-summary')
+            apiFetch(yearQS('/api/isbe-tracking')),
+            apiFetch(yearQS('/api/screening-summary'))
         ]);
         students = await sRes.json();
         classrooms = await cRes.json();
@@ -1119,7 +1198,7 @@ async function saveField(studentId, field, value) {
     try {
         const res = await apiFetch('/api/isbe-tracking', {
             method: 'PUT',
-            body: JSON.stringify({ studentId, field, value: value ? 1 : 0 })
+            body: JSON.stringify({ studentId, field, value: value ? 1 : 0, year: activeSchoolYear })
         });
         const data = await res.json();
         if (data.success) {
@@ -1169,7 +1248,7 @@ async function openInterview(studentId) {
 
     // Load existing interview data if available
     try {
-        const res = await apiFetch(`/api/parent-interview/${studentId}`);
+        const res = await apiFetch(yearQS(`/api/parent-interview/${studentId}`));
         const data = await res.json();
         if (data && data.Id) {
             document.getElementById('piDate').value = data.InterviewDate || '';
@@ -1288,6 +1367,7 @@ async function saveInterview() {
         parentConcerns: document.getElementById('piConcerns').value,
         childStrengths: document.getElementById('piStrengths').value,
         notes: document.getElementById('piNotes').value,
+        year: activeSchoolYear,
         parentSignature: document.getElementById('piParentSig').value,
         staffSignature: document.getElementById('piStaffSig').value,
         preferredLanguage: document.getElementById('piPreferredLanguage').value,
@@ -1359,7 +1439,8 @@ async function openPermissionSlip(studentId) {
     if (!student) return;
 
     const teacher = getTeacher(student.RoomNumber);
-    const schoolYear = getSchoolYear();
+    // The slip belongs to the year being viewed, not necessarily today's year.
+    const schoolYear = activeSchoolYear;
 
     document.getElementById('psModalTitle').textContent = 'Permission Slip \u2013 ' + student.First_Name + ' ' + student.Last_Name;
     document.getElementById('psParentNameDisplay').innerHTML = '&nbsp;';
@@ -1379,7 +1460,7 @@ async function openPermissionSlip(studentId) {
 
     // Load existing data if saved
     try {
-        const res = await apiFetch('/api/permission-slip/' + studentId);
+        const res = await apiFetch(yearQS('/api/permission-slip/' + studentId));
         const data = await res.json();
         if (data && data.Id) {
             document.getElementById('psParentName').value = data.ParentName || '';
@@ -1504,7 +1585,7 @@ async function openScreening(studentId, type, period) {
 
     // Load existing data
     try {
-        var res = await apiFetch('/api/screening/' + studentId + '?type=' + encodeURIComponent(type) + '&period=' + encodeURIComponent(period));
+        var res = await apiFetch(yearQS('/api/screening/' + studentId + '?type=' + encodeURIComponent(type) + '&period=' + encodeURIComponent(period)));
         var data = await res.json();
         if (data && data.Id) {
             if (type === 'ASQ-3') {
@@ -1548,6 +1629,7 @@ async function saveScreening() {
     var body = {
         type: currentScrType,
         period: currentScrPeriod,
+        year: activeSchoolYear,
         screeningDate: document.getElementById('scrDate').value,
         completedBy: document.getElementById('scrCompletedBy').value,
         interval: document.getElementById('scrInterval').value,
@@ -1927,14 +2009,11 @@ async function loadCompliance(prog) {
 
     var sel = document.getElementById('complianceYear');
     if (!sel.options.length) {
-        var now = new Date();
-        var startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-        for (var y = startYear; y >= startYear - 2; y--) {
-            var opt = document.createElement('option');
-            opt.value = y + '-' + (y + 1);
-            opt.textContent = y + '-' + (y + 1);
-            sel.appendChild(opt);
-        }
+        // Same option list as the roster picker, and it opens on the year the
+        // roster is showing so the two panels agree.
+        sel.innerHTML = schoolYearOptions()
+            .map(function (y) { return '<option value="' + y + '">' + y + '</option>'; }).join('');
+        sel.value = activeSchoolYear;
     }
     var year = getComplianceYear();
     var data = {};
@@ -2142,6 +2221,17 @@ function jumpToRosterColumn(field) {
     setTimeout(function () {
         cells.forEach(function (el) { el.classList.remove('col-flash'); });
     }, 2600);
+}
+
+// Keeps the compliance year and the roster year as one setting. The PICC panel's
+// per-child roll-ups read the roster's tracking data, so if the two pickers
+// drifted apart the checklist would report one year's readiness against another
+// year's files.
+async function setComplianceYear(year) {
+    activeSchoolYear = year;
+    renderYearPicker();
+    await setSchoolYear(year);
+    loadCompliance();
 }
 
 async function saveCompliance(key, value) {
