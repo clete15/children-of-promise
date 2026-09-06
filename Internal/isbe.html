@@ -303,13 +303,15 @@
                 <div>✅ PFA<br>Compliance</div>
                 <span style="font-size:0.62rem;color:rgba(255,255,255,0.5);">Site-level</span>
             </button>
-            <button id="btnFollowUp" onclick="setProgram('followUp')">
-                <div>🔎 Screening<br>Follow-Up</div>
-                <span id="followUpCount"></span>
-            </button>
             <button id="btnPICompliance" onclick="setProgram('piCompliance')">
                 <div>✅ PI<br>Compliance</div>
                 <span style="font-size:0.62rem;color:rgba(255,255,255,0.5);">Site-level</span>
+            </button>
+            <!-- Last, so the two Compliance panels sit together. Follow-up is an
+                 exception report that is usually empty, not a place to start. -->
+            <button id="btnFollowUp" onclick="setProgram('followUp')">
+                <div>🔎 Screening<br>Follow-Up</div>
+                <span id="followUpCount"></span>
             </button>
         </div>
 
