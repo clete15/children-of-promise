@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document Library – Children Of Promise</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+    body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+    .dl-layout { display:flex;justify-content:center;padding:20px; }
+    .dl-wrap { width:100%;max-width:1100px; }
+    .dl-card { background:#fff;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);overflow:hidden; }
+    .dl-head { padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;flex-wrap:wrap;align-items:center;gap:12px; }
+    .dl-head h2 { font-size:1rem;font-weight:800;color:#1e3a8a;margin:0; }
+    .dl-head select { padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:0.82rem; }
+    .dl-body { padding:18px 22px;max-height:calc(100vh - 220px);overflow-y:auto; }
+    .dl-note { font-size:0.78rem;color:#64748b;line-height:1.6;margin-bottom:14px; }
+    .dl-summary { display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px; }
+    .dl-stat { background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 14px;font-size:0.78rem; }
+    .dl-stat strong { display:block;font-size:1.1rem;color:#1e293b; }
+    .dl-item { border:1px solid #e2e8f0;border-radius:8px;margin-bottom:10px;overflow:hidden; }
+    .dl-item > summary {
+        cursor:pointer;padding:10px 14px;background:#f8fafc;font-size:0.84rem;font-weight:700;color:#1e293b;
+        display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    }
+    .dl-item[open] > summary { border-bottom:1px solid #e2e8f0; }
+    .dl-num { background:#1e3a8a;color:#fff;border-radius:5px;padding:2px 8px;font-size:0.72rem;font-family:monospace; }
+    .dl-own { font-size:0.68rem;font-weight:700;padding:2px 8px;border-radius:9px;background:#eff6ff;color:#1d4ed8; }
+    .dl-own.none { background:#f1f5f9;color:#94a3b8; }
+    .dl-cnt { margin-left:auto;font-size:0.72rem;color:#64748b;font-weight:600; }
+    .dl-badge { font-size:0.66rem;font-weight:700;padding:2px 8px;border-radius:9px; }
+    .dl-badge.stale { background:#fffbeb;color:#92400e; }
+    .dl-badge.out { background:#fef2f2;color:#991b1b; }
+    .dl-files { padding:6px 14px 12px; }
+    .dl-file { display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid #f1f5f9;font-size:0.8rem; }
+    .dl-file:last-child { border-bottom:none; }
+    .dl-file a { color:#1d4ed8;text-decoration:none;font-weight:600;flex:1;word-break:break-word; }
+    .dl-file a:hover { text-decoration:underline; }
+    .dl-btn {
+        padding:4px 10px;border:1px solid #e2e8f0;border-radius:5px;background:#fff;
+        font-size:0.7rem;font-weight:700;cursor:pointer;color:#475569;white-space:nowrap;
+    }
+    .dl-btn:hover { border-color:#2563eb;color:#2563eb; }
+    .dl-folders { font-size:0.68rem;color:#94a3b8;padding:0 14px 8px;font-style:italic; }
+    .dl-empty { padding:22px;text-align:center;color:#64748b;font-size:0.85rem; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+    <a href="/staff/" class="brand">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Document Library &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+</header>
+
+<div class="dl-layout">
+  <div class="dl-wrap">
+    <div class="dl-card">
+        <div class="dl-head">
+            <h2>📁 Monitoring Evidence</h2>
+            <select id="progPick">
+                <option value="PI">Prevention Initiative</option>
+                <option value="PFA">Preschool for All</option>
+            </select>
+            <select id="yearPick"></select>
+            <span id="dlMsg" style="font-size:0.75rem;color:#64748b;"></span>
+        </div>
+        <div class="dl-body" id="dlBody">
+            <div class="dl-empty">Loading…</div>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+/* Reads the evidence folder through the API and lists it by PICC item.
+
+   Files are not stored here — they live in the OneDrive-synced folder the team
+   already uses, and open through an authenticated endpoint. That is the whole
+   point: no Microsoft sign-in, no second copy to drift, and the folder can be
+   renamed without breaking anything because items are matched on their number.
+
+   AUTH and apiFetch come from app.js. */
+
+let INDEX = null;
+
+function esc(v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+const msg = t => { document.getElementById('dlMsg').textContent = t || ''; };
+
+function fillYears() {
+    const now = new Date();
+    // Visit folders are named by calendar year; offer the current one and back.
+    const y = now.getFullYear();
+    document.getElementById('yearPick').innerHTML = [y, y - 1, y - 2]
+        .map(v => '<option value="' + v + '">' + v + '</option>').join('');
+}
+
+function fileRow(f, item) {
+    const out = (INDEX.meta || {})[f.rel];
+    const href = '/api/doc-file?path=' + encodeURIComponent(f.rel);
+    return '<div class="dl-file">'
+        + '<a href="' + href + '" target="_blank" rel="noopener">' + esc(f.name) + '</a>'
+        + (f.stale ? '<span class="dl-badge stale" title="The filename names a different year, so this may be carried over">older year</span>' : '')
+        + (out && out.checkedOutBy
+            ? '<span class="dl-badge out" title="Checked out ' + esc(out.checkedOutDate || '')
+              + (out.dueBack ? ', due back ' + esc(out.dueBack) : '') + '">out: ' + esc(out.checkedOutBy) + '</span>'
+            : '')
+        + '<button class="dl-btn" onclick="toggleOut(\'' + esc(f.rel).replace(/'/g, "\\'") + '\',\''
+        + esc(item || '') + '\')">' + (out && out.checkedOutBy ? 'Check in' : 'Check out') + '</button>'
+        + '</div>';
+}
+
+function render() {
+    const body = document.getElementById('dlBody');
+    if (!INDEX) { body.innerHTML = '<div class="dl-empty">Nothing loaded.</div>'; return; }
+    if (INDEX.missing) {
+        body.innerHTML = '<div class="dl-empty">No folder found at<br><code>' + esc(INDEX.folder)
+            + '</code><br>under <code>' + esc(INDEX.root) + '</code>.<br><br>'
+            + 'Either the year has not been set up yet, or the folder is named differently.</div>';
+        return;
+    }
+    const keys = Object.keys(INDEX.items).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const totalFiles = keys.reduce((n, k) => n + INDEX.items[k].files.length, 0);
+    const outCount = Object.values(INDEX.meta || {}).filter(m => m.checkedOutBy).length;
+
+    let html = '<div class="dl-note">Files stay in the shared folder the team already uses and open here '
+        + 'without a Microsoft sign-in. Items are matched on their PICC number, so a renamed folder '
+        + 'still lines up.</div>'
+        + '<div class="dl-summary">'
+        + '<div class="dl-stat"><strong>' + keys.length + '</strong>items with evidence</div>'
+        + '<div class="dl-stat"><strong>' + totalFiles + '</strong>files indexed</div>'
+        + (INDEX.childFileCount ? '<div class="dl-stat"><strong>' + INDEX.childFileCount + '</strong>child &amp; family files</div>' : '')
+        + '<div class="dl-stat"><strong>' + INDEX.staleCount + '</strong>naming an older year</div>'
+        + '<div class="dl-stat"><strong>' + outCount + '</strong>checked out</div>'
+        + '</div>';
+
+    keys.forEach(k => {
+        const it = INDEX.items[k];
+        const stale = it.files.filter(f => f.stale).length;
+        html += '<details class="dl-item">'
+            + '<summary>'
+            + '<span class="dl-num">' + esc(it.item || '—') + '</span>'
+            + '<span>' + esc(it.folders[0].replace(/\s*-\s*[MC]\s*$/, '')) + '</span>'
+            + '<span class="dl-own' + (it.owner ? '' : ' none') + '">'
+            + esc(it.owner || 'no owner') + '</span>'
+            + (stale ? '<span class="dl-badge stale">' + stale + ' older year</span>' : '')
+            + '<span class="dl-cnt">' + it.files.length + ' file(s)</span>'
+            + '</summary>'
+            // More than one folder means the same item was renamed across years.
+            + (it.folders.length > 1
+                ? '<div class="dl-folders">Folders: ' + it.folders.map(esc).join(' · ') + '</div>' : '')
+            + '<div class="dl-files">'
+            + (it.files.length ? it.files.map(f => fileRow(f, it.item)).join('')
+                : '<div style="font-size:0.78rem;color:#94a3b8;padding:6px 0;">No files yet.</div>')
+            + '</div></details>';
+    });
+
+    if (INDEX.childFolder) {
+        html += '<details class="dl-item"><summary>'
+            + '<span class="dl-num">files</span>'
+            + '<span>' + esc(INDEX.childFolder.name.replace(/\s*-\s*[MC]\s*$/, '')) + '</span>'
+            + '<span class="dl-own' + (INDEX.childFolder.owner ? '' : ' none') + '">'
+            + esc(INDEX.childFolder.owner || 'no owner') + '</span>'
+            + '<span class="dl-cnt">' + INDEX.childFolder.count + ' file(s)</span>'
+            + '</summary><div class="dl-files"><div style="font-size:0.78rem;color:#64748b;padding:6px 0;">'
+            + 'Per-child evidence. Open these from the child\u2019s row on the PFA or PI roster, '
+            + 'so a file is always viewed in the context of the child it belongs to.</div></div></details>';
+    }
+    body.innerHTML = html;
+}
+
+async function toggleOut(rel, item) {
+    const cur = (INDEX.meta || {})[rel];
+    let by = '';
+    if (!cur || !cur.checkedOutBy) {
+        by = prompt('Who is taking this file?');
+        if (by === null) return;
+        by = by.trim();
+        if (!by) return;
+    }
+    try {
+        const res = await apiFetch('/api/doc-checkout', { method: 'POST', body: JSON.stringify({
+            relPath: rel, itemNumber: item || '',
+            schoolYear: document.getElementById('yearPick').value,
+            checkedOutBy: by,
+            checkedOutDate: by ? new Date().toISOString().split('T')[0] : ''
+        }) });
+        const d = await res.json();
+        if (!d.success) throw new Error(d.error || 'Failed');
+        await load();
+    } catch (e) { msg('Could not update: ' + e.message); }
+}
+
+async function load() {
+    msg('Loading…');
+    try {
+        const p = document.getElementById('progPick').value;
+        const y = document.getElementById('yearPick').value;
+        const res = await apiFetch('/api/doc-index?program=' + p + '&year=' + y);
+        INDEX = await res.json();
+        render();
+        msg(INDEX.missing ? '' : INDEX.folder);
+    } catch (e) {
+        document.getElementById('dlBody').innerHTML =
+            '<div class="dl-empty">Could not read the library: ' + esc(e.message) + '</div>';
+        msg('');
+    }
+}
+
+fillYears();
+document.getElementById('progPick').addEventListener('change', load);
+document.getElementById('yearPick').addEventListener('change', load);
+load();
+</script>
+</body>
+</html>
