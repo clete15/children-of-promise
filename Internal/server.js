@@ -568,6 +568,70 @@ function staffTrainingEnsureSQL() {
 `;
 }
 
+/* ── StaffDevelopmentPlan / StaffDevelopmentGoal schemas ──
+   PICC PI9 requires a written, dated Professional Development Plan for every PI
+   staff member, carrying the person's name, the plan date and timelines, an
+   assessment of their needs, and a description of the learning the program will
+   provide. Those four things are the columns below.
+
+   Superseded plans are kept rather than overwritten. PI9 asks for timelines, and
+   a single mutable row cannot evidence progression or show a monitor that the
+   mid-year review happened. The current plan is the newest row for that person
+   with Status='Active'; issuing a new one marks the previous 'Superseded'.
+
+   Note the frequency: PI9 itself states no review cadence. The annual and
+   mid-year rhythm comes from the employee handbook 10.3 and the staff timeline,
+   which are the centre's own policy and stricter than the regulation. */
+function staffDevPlanEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StaffDevelopmentPlan')
+    CREATE TABLE StaffDevelopmentPlan (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StaffId INT NOT NULL,
+        PlanDate NVARCHAR(20),
+        ReviewDate NVARCHAR(20),
+        PlanType NVARCHAR(30),
+        NeedsAssessment NVARCHAR(MAX),
+        ProgramWillProvide NVARCHAR(MAX),
+        LongTermGoals NVARCHAR(MAX),
+        StaffSignedDate NVARCHAR(20),
+        SupervisorSignedDate NVARCHAR(20),
+        SupervisorName NVARCHAR(200),
+        Status NVARCHAR(20) DEFAULT 'Active',
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StaffDevelopmentGoal')
+    CREATE TABLE StaffDevelopmentGoal (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        PlanId INT NOT NULL,
+        Goal NVARCHAR(500),
+        ActionSteps NVARCHAR(MAX),
+        Timeline NVARCHAR(200),
+        Resources NVARCHAR(500),
+        Evidence NVARCHAR(500),
+        Status NVARCHAR(30),
+        CompletedDate NVARCHAR(20),
+        SortOrder INT DEFAULT 0,
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+}
+
+const DEVPLAN_COLUMNS = [
+    ['StaffId', 'staffId'], ['PlanDate', 'planDate'], ['ReviewDate', 'reviewDate'],
+    ['PlanType', 'planType'], ['NeedsAssessment', 'needsAssessment'],
+    ['ProgramWillProvide', 'programWillProvide'], ['LongTermGoals', 'longTermGoals'],
+    ['StaffSignedDate', 'staffSignedDate'], ['SupervisorSignedDate', 'supervisorSignedDate'],
+    ['SupervisorName', 'supervisorName'], ['Status', 'status']
+];
+const DEVGOAL_COLUMNS = [
+    ['PlanId', 'planId'], ['Goal', 'goal'], ['ActionSteps', 'actionSteps'],
+    ['Timeline', 'timeline'], ['Resources', 'resources'], ['Evidence', 'evidence'],
+    ['Status', 'status'], ['CompletedDate', 'completedDate'], ['SortOrder', 'sortOrder']
+];
+
 // ── SilverSelfAssessments schema ──
 // ExceleRate Silver wants one environment-rating self-assessment per classroom,
 // with the instrument set by the ages served: ITERS-3 for infants, toddlers and
@@ -1850,6 +1914,115 @@ ELSE
         if (!id) return sendJSON(res, 400, { error: 'Staff id required' });
         const sql = staffEnsureSQL() + 'GO\n' + `UPDATE Staff SET Active=0,UpdatedAt=GETDATE() WHERE Id=${id}`;
         const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        return sendJSON(res, 200, { success: true });
+    }
+
+    /* ── Staff development plans (PICC PI9) ──
+       Returns every plan and goal, current and superseded, so the page can show
+       history. The caller picks the current one; the server does not hide the
+       older versions, because they are the evidence of timelines PI9 asks for. */
+    if (req.method === 'GET' && url === '/api/dev-plans') {
+        if (!checkAuth(req, res)) return;
+        const pCols = ['Id'].concat(DEVPLAN_COLUMNS.map(([c]) => c));
+        const gCols = ['Id'].concat(DEVGOAL_COLUMNS.map(([c]) => c));
+        const r = runSQL(staffDevPlanEnsureSQL() + 'GO\n'
+            + `SELECT ${pCols.map(c => /^(Id|StaffId)$/.test(c) ? c : txCol(c)).join(',')} FROM StaffDevelopmentPlan ORDER BY StaffId, PlanDate DESC, Id DESC`);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const plans = r.data.trim().split('\n').filter(l => /^\s*\d+\s*\|/.test(l)).map(l => {
+            const v = l.split('|').map(x => x.trim());
+            const o = {};
+            pCols.forEach((c, i) => { o[c] = /^(Id|StaffId)$/.test(c) ? v[i] : txDecode(v[i]); });
+            return o;
+        });
+        const g = runSQL(staffDevPlanEnsureSQL() + 'GO\n'
+            + `SELECT ${gCols.map(c => /^(Id|PlanId|SortOrder)$/.test(c) ? c : txCol(c)).join(',')} FROM StaffDevelopmentGoal ORDER BY PlanId, SortOrder, Id`);
+        const goals = (!g.ok ? [] : g.data.trim().split('\n').filter(l => /^\s*\d+\s*\|/.test(l)).map(l => {
+            const v = l.split('|').map(x => x.trim());
+            const o = {};
+            gCols.forEach((c, i) => { o[c] = /^(Id|PlanId|SortOrder)$/.test(c) ? v[i] : txDecode(v[i]); });
+            return o;
+        }));
+        return sendJSON(res, 200, { plans, goals });
+    }
+
+    // POST a new plan. Any existing active plan for that person is superseded
+    // rather than deleted, so the dated history survives.
+    if (req.method === 'POST' && url === '/api/dev-plans') {
+        if (!checkAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const staffId = parseInt(d.staffId);
+            if (!staffId) return sendJSON(res, 400, { error: 'staffId required' });
+            const cols = DEVPLAN_COLUMNS.map(([c]) => c).join(',');
+            const vals = DEVPLAN_COLUMNS.map(([c, key]) =>
+                c === 'StaffId' ? staffId
+                : c === 'Status' ? esc(d.status || 'Active')
+                : esc(d[key])).join(',');
+            const sql = staffDevPlanEnsureSQL() + 'GO\n'
+                + `UPDATE StaffDevelopmentPlan SET Status='Superseded',UpdatedAt=GETDATE() WHERE StaffId=${staffId} AND ISNULL(Status,'Active')='Active';\n`
+                + `INSERT INTO StaffDevelopmentPlan (${cols}) VALUES (${vals});SELECT SCOPE_IDENTITY() AS Id`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            const m = (r.data || '').match(/(\d+)/);
+            return sendJSON(res, 200, { success: true, id: m ? m[1] : null });
+        });
+    }
+
+    // PUT edits a plan in place, for correcting the current one without
+    // generating a spurious new version.
+    if (req.method === 'PUT' && url.startsWith('/api/dev-plans/')) {
+        if (!checkAuth(req, res)) return;
+        const id = parseInt(url.split('/')[3]);
+        if (!id) return sendJSON(res, 400, { error: 'Plan id required' });
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const sets = DEVPLAN_COLUMNS.filter(([, key]) => d[key] !== undefined)
+                .map(([c, key]) => `${c}=${esc(d[key])}`);
+            if (!sets.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+            const r = runSQL(staffDevPlanEnsureSQL() + 'GO\n'
+                + `UPDATE StaffDevelopmentPlan SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            return sendJSON(res, 200, { success: true });
+        });
+    }
+
+    // Goals: upsert by id, or insert when no id is supplied.
+    if (req.method === 'POST' && url === '/api/dev-goals') {
+        if (!checkAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const id = parseInt(d.id);
+            let sql;
+            if (id) {
+                const sets = DEVGOAL_COLUMNS.filter(([, key]) => d[key] !== undefined)
+                    .map(([c, key]) => c === 'SortOrder' || c === 'PlanId'
+                        ? `${c}=${parseInt(d[key]) || 0}` : `${c}=${esc(d[key])}`);
+                if (!sets.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+                sql = `UPDATE StaffDevelopmentGoal SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
+            } else {
+                const planId = parseInt(d.planId);
+                if (!planId) return sendJSON(res, 400, { error: 'planId required' });
+                const cols = DEVGOAL_COLUMNS.map(([c]) => c).join(',');
+                const vals = DEVGOAL_COLUMNS.map(([c, key]) =>
+                    c === 'PlanId' ? planId
+                    : c === 'SortOrder' ? (parseInt(d.sortOrder) || 0)
+                    : esc(d[key])).join(',');
+                sql = `INSERT INTO StaffDevelopmentGoal (${cols}) VALUES (${vals});SELECT SCOPE_IDENTITY() AS Id`;
+            }
+            const r = runSQL(staffDevPlanEnsureSQL() + 'GO\n' + sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            const m = (r.data || '').match(/(\d+)/);
+            return sendJSON(res, 200, { success: true, id: id || (m ? m[1] : null) });
+        });
+    }
+
+    if (req.method === 'DELETE' && url.startsWith('/api/dev-goals/')) {
+        if (!checkAuth(req, res)) return;
+        const id = parseInt(url.split('/')[3]);
+        if (!id) return sendJSON(res, 400, { error: 'Goal id required' });
+        const r = runSQL(staffDevPlanEnsureSQL() + 'GO\n'
+            + `DELETE FROM StaffDevelopmentGoal WHERE Id=${id}`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         return sendJSON(res, 200, { success: true });
     }

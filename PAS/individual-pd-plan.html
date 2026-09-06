@@ -69,7 +69,25 @@
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
+
+<!-- Picker. Hidden when printed, so the sheet itself stays a clean form.
+     Open with ?staffId=N to go straight to one person's plan. -->
+<div class="no-print" id="picker" style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:10px 14px;margin:-0.5in -0.75in 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:10pt;">
+    <strong style="color:#1f3f66;">Staff member:</strong>
+    <select id="staffPick" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;min-width:220px;">
+        <option value="">Loading…</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:5px;">Plan date
+        <input type="date" id="planDate" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;">
+    </label>
+    <label style="display:flex;align-items:center;gap:5px;">Review by
+        <input type="date" id="reviewDate" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;">
+    </label>
+    <button id="btnSave" style="padding:7px 14px;background:#16a34a;color:#fff;border:none;border-radius:5px;font-size:9.5pt;font-weight:700;cursor:pointer;">Save plan</button>
+    <button onclick="window.print()" style="padding:7px 14px;background:#2c5282;color:#fff;border:none;border-radius:5px;font-size:9.5pt;font-weight:700;cursor:pointer;">🖨️ Print</button>
+    <span id="pickMsg" style="color:#64748b;font-size:9pt;"></span>
+</div>
+
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -78,29 +96,40 @@
 
     <div class="info-grid">
         <div class="info-field">
-            <label>Employee Name:</label><div class="line"></div>
+            <label>Employee Name:</label><div class="line" id="fName"></div>
         </div>
         <div class="info-field">
-            <label>Position:</label><div class="line"></div>
+            <label>Position:</label><div class="line" id="fPosition"></div>
         </div>
         <div class="info-field">
-            <label>Date Created:</label><div class="line"></div>
+            <label>Date Created:</label><div class="line" id="fPlanDate"></div>
         </div>
         <div class="info-field">
-            <label>Review Date:</label><div class="line"></div>
+            <label>Review Date:</label><div class="line" id="fReviewDate"></div>
         </div>
     </div>
 
     <div class="section-title">Current Credentials &amp; Education</div>
     <div class="info-field" style="margin-bottom:8px;">
-        <label>Highest Education Level:</label><div class="line"></div>
+        <label>Highest Education Level:</label><div class="line" id="fEducation"></div>
     </div>
     <div class="info-field" style="margin-bottom:8px;">
-        <label>Current Credentials/Certifications:</label><div class="line"></div>
+        <label>Current Credentials/Certifications:</label><div class="line" id="fCreds"></div>
+    </div>
+    <div class="info-field" style="margin-bottom:8px;">
+        <label>Gateways Credential Level:</label><div class="line" id="fGateways"></div>
     </div>
     <div class="info-field" style="margin-bottom:16px;">
-        <label>Gateways Credential Level:</label><div class="line"></div>
+        <label>College credit / PD hours:</label><div class="line" id="fHours"></div>
     </div>
+
+    <!-- PI9 requires an assessment of the individual's needs and a description of
+         the learning the program will provide. Both are filled from the records. -->
+    <div class="section-title">Assessment of Needs</div>
+    <div id="fNeeds" style="font-size:10pt;line-height:1.55;margin-bottom:14px;"></div>
+
+    <div class="section-title">Professional Learning the Program Will Provide</div>
+    <div id="fProvide" style="font-size:10pt;line-height:1.55;margin-bottom:14px;"></div>
 
     <div class="section-title">Professional Development Goals</div>
     <table class="pd-table">
@@ -113,7 +142,7 @@
                 <th style="width:21%">Evidence of Completion</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="fGoals">
             <tr><td></td><td></td><td></td><td></td><td></td></tr>
             <tr><td></td><td></td><td></td><td></td><td></td></tr>
             <tr><td></td><td></td><td></td><td></td><td></td></tr>
@@ -122,7 +151,7 @@
     </table>
 
     <div class="section-title">Long-Term Career Goals</div>
-    <div class="write-lines"></div><div class="write-lines"></div>
+    <div id="fLongTerm" style="font-size:10pt;line-height:1.6;min-height:0.7in;"></div>
     <div class="write-lines"></div><div class="write-lines"></div>
 
     <div class="signature-section">
@@ -136,7 +165,143 @@
 
     <div class="footer">
         <span>PAS Documentation — Confidential</span>
-        <span>Children of Promise LLC — Individual PD Plan</span>
+        <span id="fFooter">Children of Promise LLC — Individual PD Plan</span>
     </div>
+
+<script src="pd-suggestions.js"></script>
+<script>
+/* Fills this form from the staff record, and saves a dated plan so PICC PI9 has
+   a written plan on file per staff member. Superseded plans are kept server side,
+   so issuing a new one preserves the previous version and its date. */
+const AUTH = 'Basic ' + btoa(':cofpadmin');
+const api = (p, o) => fetch(p, Object.assign({ headers: {
+    'Authorization': AUTH, 'Content-Type': 'application/json' } }, o || {}));
+
+let STAFF = [], PLANS = [], GOALS = [], current = null;
+const esc = v => String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const msg = t => { document.getElementById('pickMsg').textContent = t || ''; };
+
+function activePlan(staffId) {
+    return PLANS.filter(p => String(p.StaffId) === String(staffId))
+        .sort((a, b) => (b.PlanDate || '').localeCompare(a.PlanDate || '') || (+b.Id) - (+a.Id))[0] || null;
+}
+
+function render() {
+    const s = current;
+    if (!s) return;
+    const sug = PDSuggest.suggest(s);
+    const plan = activePlan(s.Id);
+    const saved = plan ? GOALS.filter(g => String(g.PlanId) === String(plan.Id)) : [];
+
+    document.getElementById('fName').textContent = s.Name || '';
+    document.getElementById('fPosition').textContent = (s.Role || '')
+        + (s.Classroom ? ' — ' + s.Classroom : '')
+        + (s.SecondaryClassroom ? ' / ' + s.SecondaryClassroom + ' (part time)' : '');
+    document.getElementById('fEducation').textContent = s.Education || '—';
+    document.getElementById('fCreds').textContent = s.EceCredentials || '—';
+    const ece = PDSuggest.credLevel(s, 'ece'), it = PDSuggest.credLevel(s, 'it'), dir = PDSuggest.credLevel(s, 'dir');
+    document.getElementById('fGateways').textContent =
+        [ece ? 'ECE Level ' + ece : null, it ? 'Infant/Toddler Level ' + it : null,
+         dir ? 'Director Level ' + ['', 'I', 'II', 'III'][dir] : null].filter(Boolean).join(', ') || 'None on record';
+    const hrs = [];
+    if (s.SemesterHoursTotal) hrs.push(s.SemesterHoursTotal + ' credit hours total');
+    if (s.SemesterHoursEce) hrs.push(s.SemesterHoursEce + ' early childhood');
+    if (s.TranscriptOnFile) hrs.push('transcript ' + s.TranscriptOnFile.toLowerCase());
+    hrs.push((s.PdHoursYtd || 0) + ' of ' + PDSuggest.PD_HOURS_REQUIRED + ' PD hours this year');
+    document.getElementById('fHours').textContent = hrs.join(' · ');
+
+    const list = arr => '<ul style="margin:0 0 0 18px;">'
+        + arr.map(t => '<li style="margin-bottom:5px;">' + esc(t) + '</li>').join('') + '</ul>';
+    document.getElementById('fNeeds').innerHTML =
+        (plan && plan.NeedsAssessment ? '<div>' + esc(plan.NeedsAssessment) + '</div>' : '') + list(sug.needs);
+    document.getElementById('fProvide').innerHTML =
+        (plan && plan.ProgramWillProvide ? '<div>' + esc(plan.ProgramWillProvide) + '</div>' : '') + list(sug.provide);
+    document.getElementById('fLongTerm').textContent = plan ? (plan.LongTermGoals || '') : '';
+
+    // Saved goals take precedence; suggestions fill the remaining rows.
+    const rows = saved.map(g => ({ goal: g.Goal, actionSteps: g.ActionSteps, timeline: g.Timeline,
+        resources: g.Resources, evidence: g.Evidence }));
+    sug.goals.forEach(g => { if (!rows.some(r => r.goal === g.goal)) rows.push(g); });
+    while (rows.length < 4) rows.push({ goal: '', actionSteps: '', timeline: '', resources: '', evidence: '' });
+    document.getElementById('fGoals').innerHTML = rows.map(r =>
+        '<tr><td>' + esc(r.goal) + '</td><td>' + esc(r.actionSteps) + '</td><td>' + esc(r.timeline)
+        + '</td><td>' + esc(r.resources) + '</td><td>' + esc(r.evidence) + '</td></tr>').join('');
+
+    const pd = document.getElementById('planDate'), rd = document.getElementById('reviewDate');
+    if (plan) { pd.value = plan.PlanDate || ''; rd.value = plan.ReviewDate || ''; }
+    else if (!pd.value) {
+        pd.value = new Date().toISOString().split('T')[0];
+        // Annual review is the centre's own policy; PI9 sets no cadence.
+        const y = new Date(); y.setFullYear(y.getFullYear() + 1);
+        rd.value = y.toISOString().split('T')[0];
+    }
+    document.getElementById('fPlanDate').textContent = pd.value || '';
+    document.getElementById('fReviewDate').textContent = rd.value || '';
+    document.getElementById('fFooter').textContent = 'Children of Promise LLC — Individual PD Plan'
+        + (plan ? ' — plan dated ' + (plan.PlanDate || '') : ' — not yet saved');
+    msg(plan ? 'Plan on file, dated ' + (plan.PlanDate || 'undated')
+        + (plan.Status === 'Superseded' ? ' (superseded)' : '') : 'No saved plan yet for this person.');
+}
+
+async function save() {
+    if (!current) return;
+    const btn = document.getElementById('btnSave');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+        const sug = PDSuggest.suggest(current);
+        const r = await api('/api/dev-plans', { method: 'POST', body: JSON.stringify({
+            staffId: current.Id,
+            planDate: document.getElementById('planDate').value,
+            reviewDate: document.getElementById('reviewDate').value,
+            planType: 'Annual',
+            needsAssessment: sug.needs.join(' '),
+            programWillProvide: sug.provide.join(' '),
+            longTermGoals: document.getElementById('fLongTerm').textContent || '',
+            supervisorName: 'Megan Nooney'
+        }) });
+        const d = await r.json();
+        if (!d.success) throw new Error(d.error || 'Save failed');
+        // Persist the suggested goals so the plan is a record, not a re-render.
+        for (let i = 0; i < sug.goals.length; i++) {
+            const g = sug.goals[i];
+            await api('/api/dev-goals', { method: 'POST', body: JSON.stringify({
+                planId: d.id, goal: g.goal, actionSteps: g.actionSteps, timeline: g.timeline,
+                resources: g.resources, evidence: g.evidence, status: 'Open', sortOrder: i
+            }) });
+        }
+        await load(current.Id);
+        msg('Saved.');
+    } catch (e) {
+        msg('Save failed: ' + e.message);
+    } finally {
+        btn.disabled = false; btn.textContent = 'Save plan';
+    }
+}
+
+async function load(selectId) {
+    const [sRes, pRes] = await Promise.all([api('/api/staff'), api('/api/dev-plans').catch(() => null)]);
+    STAFF = await sRes.json();
+    if (pRes) { const d = await pRes.json(); PLANS = d.plans || []; GOALS = d.goals || []; }
+    const sel = document.getElementById('staffPick');
+    const want = selectId || new URLSearchParams(location.search).get('staffId') || (STAFF[0] || {}).Id;
+    sel.innerHTML = STAFF.map(s => '<option value="' + s.Id + '">' + esc(s.Name)
+        + (activePlan(s.Id) ? ' \u2713' : ' — no plan') + '</option>').join('');
+    sel.value = want;
+    current = STAFF.find(s => String(s.Id) === String(sel.value)) || STAFF[0];
+    render();
+}
+
+document.getElementById('staffPick').addEventListener('change', e => {
+    current = STAFF.find(s => String(s.Id) === String(e.target.value));
+    document.getElementById('planDate').value = '';
+    render();
+});
+['planDate', 'reviewDate'].forEach(id =>
+    document.getElementById(id).addEventListener('change', render));
+document.getElementById('btnSave').addEventListener('click', save);
+document.getElementById('fLongTerm').setAttribute('contenteditable', 'true');
+load().catch(e => msg('Could not load: ' + e.message));
+</script>
 </body>
 </html>
