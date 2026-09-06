@@ -792,9 +792,13 @@ async function prefillFromStaff() {
 
         if (!matched.length) {
             // Say WHY nothing matched and what to do, rather than just "no results".
+            /* Only flag a room that was filled in but matches nothing — that is a
+               typo or a room name this page does not know. A blank classroom is
+               deliberate (the Director has no room), so it is not a problem. */
             const unplaced = active
+                .filter(s => (s.Classroom || '').trim())
                 .filter(s => !CLASSROOMS.some(c => canonicalRoom(c.name) === canonicalRoom(s.Classroom)))
-                .map(s => `<li>${s.Name} — classroom recorded as “<strong>${s.Classroom || '(blank)'}</strong>”</li>`)
+                .map(s => `<li>${s.Name} — classroom recorded as “<strong>${s.Classroom}</strong>”</li>`)
                 .join('');
             showPrefillReport(
                 `<h4>No staff are assigned to ${info.name}</h4>`
