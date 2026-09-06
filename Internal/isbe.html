@@ -145,6 +145,28 @@
         /* Flash a roster column when jumping to it from a checklist item */
         .col-flash { background:#fef9c3 !important;transition:background 0.3s; }
 
+        /* "What Needs Doing" panel */
+        .sy-header { padding:14px 18px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px; }
+        .sy-year { font-size:1rem;font-weight:800;color:#1e293b; }
+        .sy-year-sub { font-size:0.74rem;color:#64748b;margin-top:3px;line-height:1.5; }
+        .sy-block { margin-bottom:18px;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden; }
+        .sy-block-head { padding:11px 15px;background:#f8fafc;border-bottom:1px solid #e5e7eb; }
+        .sy-block-title { font-size:0.84rem;font-weight:800;color:#1e293b; }
+        .sy-block-sub { font-size:0.72rem;color:#64748b;margin-top:2px;line-height:1.5; }
+        .sy-table { width:100%;border-collapse:collapse;font-size:0.76rem; }
+        .sy-table th { text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#94a3b8;padding:7px 15px;border-bottom:1px solid #f1f5f9; }
+        .sy-table td { padding:8px 15px;border-bottom:1px solid #f8fafc;vertical-align:middle;color:#334155; }
+        .sy-table tbody tr:last-child td { border-bottom:none; }
+        .sy-table tbody tr:hover { background:#f8fafc; }
+        .sy-table a { color:#2563eb;text-decoration:none;font-weight:700;font-size:0.72rem;white-space:nowrap; }
+        .sy-table a:hover { text-decoration:underline; }
+        .sy-count { font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap; }
+        .sy-names { color:#64748b;font-size:0.72rem;line-height:1.5; }
+        .sy-pill { font-size:0.66rem;font-weight:700;padding:3px 9px;border-radius:11px;white-space:nowrap; }
+        .sy-overdue { background:#fef2f2;color:#b91c1c; }
+        .sy-due { background:#fffbeb;color:#92400e; }
+        .sy-done { padding:14px 15px;font-size:0.76rem;color:#166534;background:#f0fdf4; }
+
         /* School year picker in the roster header */
         .year-picker { margin-left:auto;display:flex;align-items:center;gap:7px;flex-shrink:0; }
         .year-picker label { font-size:0.7rem;font-weight:600;color:#6b7280;white-space:nowrap; }
@@ -207,6 +229,12 @@
 
         <!-- LEFT SIDEBAR -->
         <div class="isbe-sidebar">
+            <!-- Opens on the work outstanding for the year in view, so the first
+                 thing the director sees is what to do rather than a grid to audit. -->
+            <button id="btnStartYear" onclick="setProgram('startYear')">
+                <div>🚦 What Needs<br>Doing</div>
+                <span id="startYearCount"></span>
+            </button>
             <button class="active" id="btnPFA" onclick="setProgram('PFA')">
                 <div>📋 PFA Roster</div>
                 <span id="pfaCount"></span>
@@ -254,6 +282,10 @@
                         <tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
                     </tbody>
                 </table>
+            </div>
+            <!-- Start of year / outstanding work -->
+            <div id="startYearPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
+                <div id="startYearBody"></div>
             </div>
             <!-- Screening Follow-Up: children whose screening flagged a concern -->
             <div id="followUpPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
@@ -697,8 +729,11 @@ async function setSchoolYear(year) {
     } catch (e) {
         console.error('Failed to load data for ' + year, e);
     }
+    updateFollowUpCount();
+    updateStartYearCount();
     if (activeProgram === 'PFA' || activeProgram === 'PI') renderRoster();
     else if (activeProgram === 'followUp') renderFollowUp();
+    else if (activeProgram === 'startYear') renderStartYear();
 }
 let currentInterviewStudentId = null;
 
@@ -732,6 +767,7 @@ async function init() {
         document.getElementById('pfaCount').textContent = pfaCount + ' students';
         document.getElementById('piCount').textContent = piCount + ' students';
         updateFollowUpCount();
+        updateStartYearCount();
         renderRoster();
     } catch(e) {
         console.error('[INIT ERROR]', e);
@@ -751,30 +787,32 @@ function setProgram(prog) {
     document.getElementById('btnPFACompliance').classList.toggle('active', prog === 'pfaCompliance');
     document.getElementById('btnPICompliance').classList.toggle('active', prog === 'piCompliance');
     document.getElementById('btnFollowUp').classList.toggle('active', prog === 'followUp');
+    document.getElementById('btnStartYear').classList.toggle('active', prog === 'startYear');
 
     const grid = document.getElementById('isbeRosterGrid');
     const compliance = document.getElementById('compliancePanel');
     const followUp = document.getElementById('followUpPanel');
+    const startYear = document.getElementById('startYearPanel');
+    [grid, compliance, followUp, startYear].forEach(el => { el.style.display = 'none'; });
 
     if (prog === 'pfaCompliance' || prog === 'piCompliance') {
         document.getElementById('isbeTitle').textContent = prog === 'pfaCompliance' ? 'PFA Compliance' : 'PI Compliance';
         document.getElementById('isbeCount').textContent = '';
-        grid.style.display = 'none';
-        followUp.style.display = 'none';
         compliance.style.display = 'block';
         loadCompliance(prog);
     } else if (prog === 'followUp') {
         document.getElementById('isbeTitle').textContent = 'Screening Follow-Up';
         document.getElementById('isbeCount').textContent = '';
-        grid.style.display = 'none';
-        compliance.style.display = 'none';
         followUp.style.display = 'block';
         renderFollowUp();
+    } else if (prog === 'startYear') {
+        document.getElementById('isbeTitle').textContent = 'What Needs Doing';
+        document.getElementById('isbeCount').textContent = '';
+        startYear.style.display = 'block';
+        renderStartYear();
     } else {
         document.getElementById('isbeTitle').textContent = prog + ' Roster';
         grid.style.display = 'block';
-        compliance.style.display = 'none';
-        followUp.style.display = 'none';
         renderRoster();
     }
 }
@@ -2035,6 +2073,238 @@ async function loadCompliance(prog) {
     }
     html += renderInstrumentSection(items, prefix, data);
     list.innerHTML = html;
+}
+
+/* ── What Needs Doing ──
+   Answers "what is outstanding right now" for the year in view.
+
+   Grouped by task rather than by child on purpose: the work is done in batches
+   ("print all the permission slips"), not child by child. Anything with a
+   regulatory clock is pulled to the top and sorted by how late it is, because a
+   count of outstanding items does not tell you which ones put you out of
+   compliance. */
+
+// Children in a program who are active, for the year in view.
+function activeRoster(program) {
+    return students.filter(s => s.PFA_PI_na === program && (s.Active === 'Yes' || s.Active === 'YES'));
+}
+
+// Per-task outstanding counts for one program.
+function outstandingByTask(program) {
+    const roster = activeRoster(program);
+    return visibleColumnsFor(program)
+        .map(col => {
+            const missing = roster.filter(s => !(trackingData[s.Id] || {})[col.field]);
+            return { col: col, missing: missing, total: roster.length };
+        })
+        .filter(t => t.missing.length);
+}
+
+// visibleColumns() reads activeProgram; this view needs both programs at once.
+function visibleColumnsFor(program) {
+    return COLUMNS.filter(c => !c.programs || c.programs.indexOf(program) !== -1);
+}
+
+// Beginning-of-year screening must land within 45 days of enrollment. Returns the
+// children who are past it or close to it, worst first.
+function screeningDeadlineWatch(program) {
+    const out = [];
+    activeRoster(program).forEach(s => {
+        ['BegASQ', 'BegASE'].forEach(field => {
+            if ((trackingData[s.Id] || {})[field]) return;
+            const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
+            const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
+            const dl = screeningDeadline(s, rec && rec.ScreeningDate);
+            if (!dl) return;   // no enrollment date, surfaced separately
+            if (dl.state === 'overdue' || dl.state === 'due') {
+                const elapsed = daysBetween(s.Start_Date, new Date().toISOString().split('T')[0]);
+                out.push({ student: s, field: field, type: type, state: dl.state, text: dl.text, elapsed: elapsed });
+            }
+        });
+    });
+    // Most overdue first.
+    return out.sort((a, b) => (b.elapsed || 0) - (a.elapsed || 0));
+}
+
+// PI6 documents are due within 6 months of enrollment.
+function sixMonthWatch() {
+    const WINDOW = 182;
+    const today = new Date().toISOString().split('T')[0];
+    const items = [
+        { field: 'FamilyCenteredAssessment', label: 'Family Centered Assessment', form: 'familyAssessment' },
+        { field: 'FamilyGoalPlan', label: 'Individual Family Goal Plan', form: 'familyGoalPlan' }
+    ];
+    const out = [];
+    activeRoster('PI').forEach(s => {
+        if (!s.Start_Date) return;
+        const elapsed = daysBetween(s.Start_Date, today);
+        if (elapsed === null) return;
+        items.forEach(it => {
+            if ((trackingData[s.Id] || {})[it.field]) return;
+            const left = WINDOW - elapsed;
+            if (left > 45) return;   // not yet worth chasing
+            out.push({
+                student: s, label: it.label, form: it.form,
+                state: left < 0 ? 'overdue' : 'due',
+                text: left < 0 ? Math.abs(left) + ' days overdue' : left + ' days left'
+            });
+        });
+    });
+    return out.sort((a, b) => (a.state === 'overdue' ? -1 : 1) - (b.state === 'overdue' ? -1 : 1));
+}
+
+// Records that break the deadline maths or the roll-ups, so they are worth
+// fixing before relying on either.
+function dataGaps() {
+    const gaps = [];
+    ['PFA', 'PI'].forEach(p => {
+        activeRoster(p).forEach(s => {
+            if (!s.Start_Date) gaps.push({ student: s, program: p, issue: 'No enrollment date, so the 45-day and 6-month clocks cannot be checked' });
+            else if (!s.RoomNumber) gaps.push({ student: s, program: p, issue: 'No classroom assigned' });
+        });
+    });
+    return gaps;
+}
+
+function syBlock(title, sub, body) {
+    return '<div class="sy-block"><div class="sy-block-head"><div class="sy-block-title">' + title + '</div>'
+        + (sub ? '<div class="sy-block-sub">' + sub + '</div>' : '') + '</div>' + body + '</div>';
+}
+
+function nameOf(s) { return s.Last_Name + ', ' + s.First_Name; }
+
+function renderStartYear() {
+    const isCurrent = activeSchoolYear === getSchoolYear();
+    const pfa = activeRoster('PFA').length;
+    const pi = activeRoster('PI').length;
+    let html = '';
+
+    html += '<div class="sy-header">'
+        + '<div><div class="sy-year">' + activeSchoolYear + (isCurrent ? '' : ' (prior year)') + '</div>'
+        + '<div class="sy-year-sub">' + pfa + ' active PFA &middot; ' + pi + ' active PI. '
+        + 'Everything below is for this school year only.</div></div></div>';
+
+    // 1. Regulatory clocks.
+    const scrWatch = screeningDeadlineWatch('PFA').concat(screeningDeadlineWatch('PI'));
+    const sixMonth = sixMonthWatch();
+
+    if (scrWatch.length) {
+        const rows = scrWatch.map(w =>
+            '<tr><td>' + nameOf(w.student) + '</td><td>' + getRoom(w.student.RoomNumber) + '</td>'
+            + '<td>' + w.type + '</td>'
+            + '<td><span class="sy-pill sy-' + w.state + '">' + w.text + '</span></td>'
+            + '<td><a href="#" onclick="event.preventDefault();openScreening(' + w.student.Id
+            + ',\'' + w.type + '\',\'Beginning\')">enter scores</a></td></tr>').join('');
+        html += syBlock('Screening window closing',
+            'The beginning-of-year screening must be completed within 45 days of enrollment.',
+            '<table class="sy-table"><thead><tr><th>Child</th><th>Room</th><th>Screening</th><th>Status</th><th></th></tr></thead><tbody>'
+            + rows + '</tbody></table>');
+    }
+
+    if (sixMonth.length) {
+        const rows = sixMonth.map(w =>
+            '<tr><td>' + nameOf(w.student) + '</td><td>' + getRoom(w.student.RoomNumber) + '</td>'
+            + '<td>' + w.label + '</td>'
+            + '<td><span class="sy-pill sy-' + w.state + '">' + w.text + '</span></td>'
+            + '<td><a href="#" onclick="event.preventDefault();openDocForm(\'' + w.form + '\',' + w.student.Id + ')">open form</a></td></tr>').join('');
+        html += syBlock('Six-month PI documents due',
+            'PICC PI6 requires the Family Centered Assessment and Individual Family Goal Plan within 6 months of enrollment.',
+            '<table class="sy-table"><thead><tr><th>Child</th><th>Room</th><th>Document</th><th>Status</th><th></th></tr></thead><tbody>'
+            + rows + '</tbody></table>');
+    }
+
+    // 2. Outstanding paperwork, grouped by task.
+    ['PFA', 'PI'].forEach(program => {
+        const tasks = outstandingByTask(program);
+        if (!activeRoster(program).length) return;
+        if (!tasks.length) {
+            html += syBlock(program + ' paperwork', null,
+                '<div class="sy-done">Every checklist item is complete for all ' + activeRoster(program).length
+                + ' active ' + program + ' children.</div>');
+            return;
+        }
+        const rows = tasks.map(t => {
+            const label = t.col.label.replace(/<br>/g, ' ');
+            const names = t.missing.slice(0, 4).map(nameOf).join(' &middot; ')
+                + (t.missing.length > 4 ? ' &middot; +' + (t.missing.length - 4) + ' more' : '');
+            const printAll = columnHasForm(t.col)
+                ? '<a href="#" onclick="event.preventDefault();printAllForColumn(\'' + t.col.field + '\')">print all</a>'
+                : '';
+            return '<tr><td><strong>' + label + '</strong></td>'
+                + '<td class="sy-count">' + t.missing.length + ' of ' + t.total + '</td>'
+                + '<td class="sy-names">' + names + '</td>'
+                + '<td>' + printAll + '</td></tr>';
+        }).join('');
+        html += syBlock(program + ' paperwork outstanding',
+            'Grouped by task, since these are done in batches. Counts are for active children only.',
+            '<table class="sy-table"><thead><tr><th>Task</th><th>Outstanding</th><th>Children</th><th></th></tr></thead><tbody>'
+            + rows + '</tbody></table>');
+    });
+
+    // 3. Program-level PICC items with nothing recorded.
+    html += '<div id="syPiccBlock"></div>';
+
+    // 4. Data problems that make the above unreliable.
+    const gaps = dataGaps();
+    if (gaps.length) {
+        const rows = gaps.map(g => '<tr><td>' + nameOf(g.student) + '</td><td>' + g.program + '</td><td>' + g.issue + '</td></tr>').join('');
+        html += syBlock('Records needing attention',
+            'These gaps stop the deadline checks above from being trustworthy for those children.',
+            '<table class="sy-table"><thead><tr><th>Child</th><th>Program</th><th>Issue</th></tr></thead><tbody>'
+            + rows + '</tbody></table>');
+    }
+
+    document.getElementById('startYearBody').innerHTML = html;
+    renderStartYearPicc();
+    updateStartYearCount();
+}
+
+// PICC readiness needs the compliance record, which is a separate fetch.
+async function renderStartYearPicc() {
+    const host = document.getElementById('syPiccBlock');
+    if (!host) return;
+    let data = {};
+    try {
+        const res = await apiFetch('/api/compliance?year=' + encodeURIComponent(activeSchoolYear));
+        data = await res.json();
+    } catch (e) { host.innerHTML = ''; return; }
+
+    const open = PICC_ITEMS.filter(item => {
+        const st = piccChildStats(item);
+        if (st) return !(st.total && st.complete === st.total);
+        return !data['PI_' + item.num];
+    });
+
+    if (!open.length) {
+        host.innerHTML = syBlock('PICC checklist', null,
+            '<div class="sy-done">All ' + PICC_ITEMS.length + ' checklist items have evidence recorded.</div>');
+        return;
+    }
+
+    const rows = open.map(item => {
+        const st = piccChildStats(item);
+        const status = st
+            ? (st.total ? st.complete + ' of ' + st.total + ' files complete' : 'no active PI children')
+            : 'no evidence recorded';
+        return '<tr><td><span class="picc-num">' + item.num + '</span></td>'
+            + '<td><strong>' + item.title + '</strong></td>'
+            + '<td class="sy-names">' + status + '</td></tr>';
+    }).join('');
+
+    host.innerHTML = syBlock('PICC items still open',
+        open.length + ' of ' + PICC_ITEMS.length + ' items need evidence. Open PI Compliance to record it.',
+        '<table class="sy-table"><thead><tr><th></th><th>Item</th><th>Status</th></tr></thead><tbody>'
+        + rows + '</tbody></table>');
+}
+
+// Sidebar badge: total outstanding tasks across both programs, so the count
+// reflects work items rather than children.
+function updateStartYearCount() {
+    const el = document.getElementById('startYearCount');
+    if (!el) return;
+    const n = outstandingByTask('PFA').reduce((a, t) => a + t.missing.length, 0)
+        + outstandingByTask('PI').reduce((a, t) => a + t.missing.length, 0);
+    el.textContent = n ? n + ' outstanding' : 'all clear';
 }
 
 // ── PICC checklist ──
