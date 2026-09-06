@@ -129,6 +129,8 @@
             transition: background 0.15s;
         }
         .btn-save-notes:hover { background: var(--primary-dark); }
+        /* Highlight rows whose program was never set, so they stand out as needing triage */
+        .program-unassigned { border-color: #f59e0b !important; background: #fffbeb !important; }
 
         /* ── BADGES ── */
         .score-badge {
@@ -254,6 +256,7 @@
                     <th>Contact</th>
                     <th>City</th>
                     <th>Children</th>
+                    <th>Program</th>
                     <th>Score</th>
                     <th>Risk Factors</th>
                     <th style="background:#fffbeb;color:#92400e;">Income</th>
@@ -263,7 +266,7 @@
                 </tr>
             </thead>
             <tbody id="wlBody">
-                <tr><td colspan="11" class="wl-empty">Loading…</td></tr>
+                <tr><td colspan="12" class="wl-empty">Loading…</td></tr>
             </tbody>
         </table>
     </div>
@@ -296,7 +299,7 @@ async function load() {
         updateTabCounts();
         renderTable();
     } catch (e) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">Failed to load waiting list.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="12" class="wl-empty">Failed to load waiting list.</td></tr>`;
     }
 }
 
@@ -319,8 +322,54 @@ function getChildAgeMonths(r) {
     return (now.getFullYear() - born.getFullYear()) * 12 + (now.getMonth() - born.getMonth());
 }
 
-// Program values the public pre-enrollment form can submit.
-const KNOWN_AGE_GROUPS = ['0-2', '2-3', '3-5', 'ba'];
+// Program values the public pre-enrollment form can submit, with staff-facing labels.
+const PROGRAM_OPTIONS = [
+    { value: '0-2', label: 'Infant & Toddler' },
+    { value: '2-3', label: '2-Year Olds' },
+    { value: '3-5', label: 'Pre-School' },
+    { value: 'ba',  label: 'Before & After' },
+];
+const KNOWN_AGE_GROUPS = PROGRAM_OPTIONS.map(o => o.value);
+
+// Editable program picker. Records with a missing/unknown program get an
+// "unassigned" placeholder so staff can file them into the right tab.
+function programSelect(r) {
+    const current = r.AgeGroup || '';
+    const known = KNOWN_AGE_GROUPS.includes(current);
+    const opts = PROGRAM_OPTIONS.map(o =>
+        `<option value="${o.value}" ${current === o.value ? 'selected' : ''}>${o.label}</option>`
+    ).join('');
+    const placeholder = known ? '' : `<option value="" selected>— unassigned —</option>`;
+    return `<select class="status-select${known ? '' : ' program-unassigned'}" id="prog-${r.Id}"
+        onchange="handleProgramChange(${parseInt(r.Id)}, this)"
+        title="Program the family applied for. Changing this moves the record to that tab.">
+        ${placeholder}${opts}
+    </select>`;
+}
+
+async function handleProgramChange(id, selectEl) {
+    const newGroup = selectEl.value;
+    if (!newGroup) return; // placeholder chosen, nothing to save
+    selectEl.disabled = true;
+    try {
+        const res = await fetch(`/api/waitinglist/${id}`, {
+            method: 'PUT',
+            headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ageGroup: newGroup })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'save failed');
+        // Update local state, then re-render so the row lands on the right tab
+        // and every tab count stays accurate.
+        const row = allRows.find(r => String(r.Id) === String(id));
+        if (row) row.AgeGroup = newGroup;
+        updateTabCounts();
+        renderTable();
+    } catch (e) {
+        alert('Failed to update program: ' + e.message);
+        selectEl.disabled = false;
+    }
+}
 
 function getFilteredRows(tab) {
     return allRows.filter(r => {
@@ -359,7 +408,7 @@ function renderTable() {
     document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
 
     if (!rows.length) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">No records found.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="12" class="wl-empty">No records found.</td></tr>`;
         syncScrollbar();
         return;
     }
@@ -390,6 +439,7 @@ function renderTable() {
             </td>
             <td style="font-size:0.72rem;white-space:nowrap;">${r.City || '—'}</td>
             <td style="font-size:0.72rem;max-width:120px;">${r.ChildrenInfo || '—'}</td>
+            <td>${programSelect(r)}</td>
             <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
             <td><div class="flag-list">${flags}</div></td>
             <td style="background:#fffbeb;font-weight:600;font-size:0.74rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
