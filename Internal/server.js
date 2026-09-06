@@ -469,6 +469,15 @@ const STAFF_SEED = [
        her qualifications belong on the Administrator Qualifications worksheet. */
     { name: 'Megan Nooney', role: 'Director', program: 'PI', classroom: '', fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1, Gold IT2, Autism 101', gateways: 'ECE Credential - Level 1', experienceYears: '17.5', registryId: 'N179660', notes: "Director only as of 2026-2027, no assigned classroom. Associate's ECE (SWIC, 2012). At CofP since 01/2009. Prior teaching: 40hrs/wk x 15+ yrs = 31,200+ hrs - lead teacher preschool, curriculum, schedules. Admin: Director since 01/2009 - staff, files, admin, filling classrooms. Pending: IT, ECE, Director (Awaiting Work Exp). Gold IT2 (1/2024)." },
     { name: 'Molly Ellis', role: 'Teacher', program: 'PI', classroom: '2 Year Olds', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'New teacher for 2026-2027, took over the 2 Year Olds room from Janell Poenitske. Qualifications not yet gathered — needs education, Gateways ECE level, credentials and prior experience before the PAS worksheets can be completed.' },
+    /* Before and Afterschool staff. These three were on the room chart but had
+       no staff record, which left room 8 invisible to the PAS worksheets and
+       excluded them from the ExceleRate credential counts. Role is left blank
+       rather than guessed at: the worksheet flags a blank role so the director
+       fills in teacher or assistant, instead of the form looking complete with
+       an invented answer. Last names and qualifications still to gather. */
+    { name: 'Pam', role: '', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Before/Afterschool staff. Needs last name, teacher-or-assistant role, education, Gateways ECE level, credentials and prior experience.' },
+    { name: 'Jeremy', role: '', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Before/Afterschool staff. Needs last name, teacher-or-assistant role, education, Gateways ECE level, credentials and prior experience.' },
+    { name: 'Sara', role: '', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Before/Afterschool staff. Needs last name, teacher-or-assistant role, education, Gateways ECE level, credentials and prior experience.' },
     { name: 'New Teacher', role: 'TBD', program: 'n/a', classroom: 'TBD', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Placeholder for new hire' }
 ];
 
