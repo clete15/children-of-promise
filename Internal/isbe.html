@@ -103,6 +103,48 @@
         .doc-criteria tfoot td { border-top:2px solid #2563eb;border-bottom:none;font-weight:700;font-size:0.8rem;color:#1d4ed8;padding-top:8px; }
         .doc-criteria th:nth-child(4), .doc-criteria td:nth-child(4) { width:90px; }
 
+        /* PICC compliance panel */
+        .picc-head { display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:14px; }
+        .picc-head-title { font-size:0.92rem;font-weight:800;color:#1e293b; }
+        .picc-head-sub { font-size:0.73rem;color:#64748b;margin-top:3px;line-height:1.5;max-width:620px; }
+        .picc-readiness { margin-left:auto;text-align:right;flex-shrink:0; }
+        .picc-readiness-num { font-size:1.35rem;font-weight:800;color:#1d4ed8;font-variant-numeric:tabular-nums;line-height:1.1; }
+        .picc-readiness-lbl { font-size:0.68rem;color:#64748b;font-weight:600; }
+        .picc-list { display:flex;flex-direction:column;gap:10px; }
+        .picc-item { border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;background:white; }
+        .picc-item-top { display:flex;align-items:flex-start;gap:12px; }
+        .picc-num { flex-shrink:0;font-size:0.7rem;font-weight:800;color:white;background:#2563eb;border-radius:5px;padding:4px 8px;min-width:42px;text-align:center;font-variant-numeric:tabular-nums; }
+        .picc-item-main { flex:1;min-width:0; }
+        .picc-item-title { font-size:0.86rem;font-weight:700;color:#1e293b;line-height:1.35; }
+        .picc-item-req { font-size:0.75rem;color:#475569;margin-top:4px;line-height:1.55; }
+        .picc-item-status { flex-shrink:0;display:flex;flex-direction:column;gap:4px;align-items:flex-end; }
+        .picc-pill { font-size:0.66rem;font-weight:700;padding:3px 9px;border-radius:11px;white-space:nowrap; }
+        .picc-ok { background:#f0fdf4;color:#166534; }
+        .picc-open { background:#fffbeb;color:#92400e; }
+        .picc-none { background:#f1f5f9;color:#64748b; }
+        .picc-info { background:#eff6ff;color:#1d4ed8; }
+        .picc-missing { font-size:0.72rem;color:#b91c1c;background:#fef2f2;border-radius:6px;padding:7px 10px;margin-top:9px;line-height:1.5; }
+        .picc-details { margin-top:9px; }
+        .picc-details summary { font-size:0.72rem;font-weight:700;color:#1d4ed8;cursor:pointer; }
+        .picc-details ul { margin:7px 0 0 18px;padding:0;font-size:0.73rem;color:#475569;line-height:1.6; }
+        .picc-guidance { font-size:0.72rem;color:#475569;background:#f8fafc;border-left:3px solid #cbd5e1;padding:8px 11px;border-radius:0 6px 6px 0;margin-top:9px;line-height:1.55; }
+        .picc-evidence-hint, .picc-na { font-size:0.71rem;color:#64748b;margin-top:8px;line-height:1.55; }
+        .picc-na { color:#92400e; }
+        .picc-actions { display:flex;flex-wrap:wrap;gap:6px;margin-top:11px; }
+        .picc-btn { display:inline-block;padding:5px 11px;border-radius:6px;font-size:0.69rem;font-weight:700;text-decoration:none;background:white;color:#1d4ed8;border:1px solid #bfdbfe;white-space:nowrap;cursor:pointer; }
+        .picc-btn:hover { background:#eff6ff; }
+        .picc-btn-primary { background:#2563eb;color:white;border-color:#2563eb;margin-left:auto;flex-shrink:0; }
+        .picc-btn-primary:hover { background:#1d4ed8; }
+        .picc-btn-jump { color:#475569;border-color:#e2e8f0;border-style:dashed; }
+        .picc-controls { display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:11px;padding-top:11px;border-top:1px solid #f3f4f6; }
+        .picc-controls input[type=date] { padding:5px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.73rem;font-family:inherit; }
+        .picc-check { display:flex;align-items:center;gap:6px;font-size:0.73rem;font-weight:600;color:#374151;cursor:pointer;white-space:nowrap; }
+        .picc-link-input { flex:1;min-width:200px;padding:5px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:0.72rem;font-family:inherit; }
+        .picc-notes { width:100%;margin-top:8px;min-height:38px;padding:7px 9px;border:1px solid #d1d5db;border-radius:6px;font-size:0.73rem;font-family:inherit;resize:vertical; }
+        .picc-link-input:focus, .picc-notes:focus, .picc-controls input[type=date]:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        /* Flash a roster column when jumping to it from a checklist item */
+        .col-flash { background:#fef9c3 !important;transition:background 0.3s; }
+
         /* Print All container is hidden on screen; only used to build the print job */
         #printAllContainer { display:none; }
         .print-value { display:inline-block;min-height:1em; }
@@ -776,10 +818,50 @@ function formLink(call, tip) {
         + '" title="' + tip + '">[form]</a>';
 }
 
+/* ── SharePoint document locations ──
+   SharePoint is the document of record. This app tracks state and links out to
+   it, so every location the page needs lives here rather than as a URL pasted
+   into the markup. Two reasons: the monitoring-visit folders carry a year in
+   their name, so the annual rollover is one edit here instead of a hunt through
+   the file; and a folder rename stops being a code change in several places.
+
+   spUrl() builds a document-library browse URL from a path relative to the
+   library root. encodeURIComponent produces exactly the %2F and %20 escaping
+   SharePoint expects. It leaves '-' and '.' unescaped where the older pasted
+   URLs used %2D and %2E; those are equivalent under RFC 3986 and SharePoint
+   accepts both, but it is the first thing to check if a built link misbehaves.
+
+   VERIFIED_LINKS holds deep links that were confirmed working and use URL forms
+   spUrl does not reproduce (Doc.aspx for Office documents, FolderCTID). They
+   stay literal on purpose; they are centralised here, not rebuilt. */
+const SP_SITE = 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise';
+const SP_LIBRARY = '/sites/ChildrenOfPromise/Shared Documents';
+const SP_PI_VISIT = 'Operations/Birth to Three/2026 PI Monitoring Visit';
+const SP_PFA_VISIT = 'Operations/Preschool for All/PFA Monitoring Visit 2026';
+const SP_PICC_FOLDER = SP_PI_VISIT + '/PICC';
+
+function spUrl(relPath) {
+    const full = SP_LIBRARY + '/' + relPath;
+    const parent = full.slice(0, full.lastIndexOf('/'));
+    return SP_SITE + '/Shared%20Documents/Forms/AllItems.aspx?id=' + encodeURIComponent(full)
+        + '&parent=' + encodeURIComponent(parent);
+}
+
+const VERIFIED_LINKS = {
+    grantReportPFA: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026',
+    grantReportPI: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit',
+    // Office document, opens in Word online rather than the library browser.
+    pfaComplianceCqip: 'https://childrenofpromisemillstadt.sharepoint.com/:w:/r/sites/ChildrenOfPromise/_layouts/15/Doc.aspx?sourcedoc=%7BF067D357-E395-433C-8179-387558881AFC%7D&file=PFA%20Compliance%20CQIP.docx&action=default&mobileredirect=true&DefaultItemOpen=1',
+    pfaEcers3Cqip: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026%2F2025%2D26%20Ecers%203%20CQIP%20PFA%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026',
+    piSelfAssessment: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?FolderCTID=0x01200055A06E3FB2FE0E4BB767F725C99B70FF&id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EA%20written%20Annual%20Self%2DAssessment%20%2D%20Completed%20after%20Monitoring%20Visit',
+    // Folder name is misspelled "afer" in SharePoint; the URL must match it.
+    piCqip: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EB%20Written%20CQIP%20%2D%20Completed%20afer%20Monitoring%20Visit%2F2025%2D26%20CQIP%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EB%20Written%20CQIP%20%2D%20Completed%20afer%20Monitoring%20Visit'
+};
+
 // Grant Periodic Performance Report lives in SharePoint, one per program.
 const GRANT_REPORT_LINKS = {
-    PFA: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026',
-    PI: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit'
+    PFA: VERIFIED_LINKS.grantReportPFA,
+    PI: VERIFIED_LINKS.grantReportPI
 };
 
 function renderRosterHead() {
@@ -1111,6 +1193,11 @@ async function openInterview(studentId) {
 // Risk factors captured at pre-enrollment. These feed ISBE eligibility/priority
 // determinations, so they belong in front of staff during the parent interview.
 const INTAKE_RISK_FACTORS = [
+    // PICC PI5.C / PI5.G / PI5.F priority populations first, since those are the
+    // ones a file review looks for.
+    ['ScreeningDelayNoEi', 'Screening-indicated delay, no EI referral'],
+    ['ParentEll', 'Parent is an English language learner'],
+    ['IncomeBelow50Fpl', 'Income at or below 50% FPL'],
     ['Homeless', 'Homeless / unstable housing'],
     ['FosterAdopted', 'Foster or adopted'],
     ['IEP', 'IEP'],
@@ -1537,8 +1624,8 @@ function printScreening() {
 // ── Program Compliance Checklist ──
 const PFA_COMPLIANCE_ITEMS = [
     { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file' },
-    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', link: 'https://childrenofpromisemillstadt.sharepoint.com/:w:/r/sites/ChildrenOfPromise/_layouts/15/Doc.aspx?sourcedoc=%7BF067D357-E395-433C-8179-387558881AFC%7D&file=PFA%20Compliance%20CQIP.docx&action=default&mobileredirect=true&DefaultItemOpen=1' },
-    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 classroom assessment and quality improvement plan', link: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026%2F2025%2D26%20Ecers%203%20CQIP%20PFA%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026' },
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', link: VERIFIED_LINKS.pfaComplianceCqip },
+    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 classroom assessment and quality improvement plan', link: VERIFIED_LINKS.pfaEcers3Cqip },
     { key: 'PEL_ECE5', label: 'PEL / ECE Level 5', description: 'Lead teacher holds Professional Educator License with ECE endorsement or Gateways ECE Credential Level 5' },
     { key: 'Paraprofessional', label: 'Paraprofessional Credentials', description: 'Paraprofessional holds ELS-Para license (60 credit hours, associate degree, or passing ACT WorkKeys exam)' },
     { key: 'PFACalendar', label: 'PFA Calendar', description: 'PFA program calendar submitted and approved for the school year' },
@@ -1572,15 +1659,215 @@ const PI_FY27_MONITORING = {
     ],
 };
 
+// Instruments and program-wide documents the monitor will ask for. These are not
+// PICC line items; the PICC itself is modelled separately in PICC_ITEMS below.
+// The old standalone 'PICC' entry was removed once that list existed.
 const PI_COMPLIANCE_ITEMS = [
-    { key: 'PICC', label: 'PI Compliance Checklist (PICC)', description: 'Full PICC reviewed and supporting evidence assembled for the FY27 monitoring visit' },
-    { key: 'ITERS3Observation', label: 'ITERS-3 Classroom Observation', description: 'ITERS-3 observation completed for each infant/toddler classroom' },
+    { key: 'ITERS3Observation', label: 'ITERS-3 Classroom Observation', description: 'ITERS-3 observation completed for each infant/toddler classroom. Unannounced, up to 3 hours, at least one PI classroom. Personal Care Routines is not scored.' },
     { key: 'PIQET3', label: 'PIQET-3 Quality Evaluation', description: 'Prevention Initiative Quality Evaluation Tool-3 completed' },
-    { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', link: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?FolderCTID=0x01200055A06E3FB2FE0E4BB767F725C99B70FF&id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EA%20written%20Annual%20Self%2DAssessment%20%2D%20Completed%20after%20Monitoring%20Visit' },
-    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', link: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EB%20Written%20CQIP%20%2D%20Completed%20afer%20Monitoring%20Visit%2F2025%2D26%20CQIP%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2FPICC%2FPI8%2EB%20Written%20CQIP%20%2D%20Completed%20afer%20Monitoring%20Visit' },
+    { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', link: VERIFIED_LINKS.piSelfAssessment },
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', link: VERIFIED_LINKS.piCqip },
     { key: 'ITERS3CQIP', label: 'ITERS-3 CQIP', description: 'ITERS-3 infant/toddler environment assessment and quality improvement plan' },
     { key: 'PICalendar', label: 'PI Calendar', description: 'PI program calendar submitted and approved for the school year' },
 ];
+
+/* ── FY27 Prevention Initiative Compliance Checklist ──
+   The real checklist, as it applies to a DCFS-licensed center-based program.
+
+   The PICC is one document where every item is tagged with the program types it
+   covers (HV, CB, FCCH, FCCGH). We are CB, which means PI1-PI10 (all program
+   types) plus CB1-CB8 apply, and HV1-HV5 do not. That is 18 items.
+
+   Source: Internal/documents/DEC PI - FY27 PICC Checklist.pdf
+   Extracted text: Internal/documents/FY27-PI-PICC-Checklist-EXTRACTED-TEXT.txt
+
+   num          checklist number as printed
+   title        item heading
+   requires     what a file or program review is looking for
+   subs         lettered sub-items, so the director can see the parts
+   childFields  roster columns that hold this item's per-child evidence; drives a
+                live "x of y children" roll-up rather than a checkbox someone has
+                to keep in their head
+   docs         known SharePoint locations
+   guidance     anything that changes how the item is judged
+   na           sub-parts that do not apply to a center, recorded so the
+                exclusion reads as a decision rather than an oversight
+   scored       false only for PI1, which the CQIP marks "Not Scored for IDEC
+                Monitoring"                                                     */
+const PICC_ITEMS = [
+    {
+        num: 'PI1', title: 'Identification of the Prevention Initiative program',
+        scored: false,
+        requires: 'Program type is identified as DCFS Licensed Center-Based, and the program operates 165 or more working days of service to children.',
+        subs: ['A. PI program type', 'B. Program services for children and families, 165+ working days'],
+        guidance: 'Informational only. The FY27 CQIP marks PI1 "Not Scored for IDEC Monitoring".',
+        evidence: 'Program calendar, schedule in the program or staff handbook, or program brochures.'
+    },
+    {
+        num: 'PI2', title: 'Mission statement developed cooperatively',
+        requires: 'A mission statement built with parents, families, staff and community representatives, and made publicly available.',
+        subs: ['A. Mission statement has been developed', 'B. Mission statement is publicly available'],
+        evidence: 'Copy of the mission statement. A district statement is acceptable, as is one printed in a brochure or on paperwork. Posting it in the vestibule, main office or classrooms satisfies part B.'
+    },
+    {
+        num: 'PI3', title: 'No fees collected from enrolled families',
+        requires: 'The program collects no fees from parents or guardians of enrolled PI children.',
+        evidence: 'Fee policy, parent handbook, and billing records showing PI children are not charged.'
+    },
+    {
+        num: 'PI4', title: 'Policies and procedures developed',
+        requires: 'Written program policies and procedures are in place.',
+        evidence: 'Policies and procedures manual.'
+    },
+    {
+        num: 'PI5', title: 'Eligibility screening documentation in every child file',
+        requires: 'Every enrolled child has a completed weighted eligibility form with income verification and a Parent Interview Form, all dated on or before the enrollment date.',
+        subs: [
+            'A. Weighted eligibility form on file for every child',
+            'B-G. Priority populations on the form: developmental delay, screening-indicated delay with no EI referral, homelessness, Youth in Care, income at or below 50% FPL, parent is an English language learner',
+            'H. Eligibility screening result recorded in the file',
+            'I. Highest-scoring families prioritised on the enrollment or waiting list',
+            'J. Proof of income verification in each file',
+            'K. Completed Parent Interview Form in each file',
+            'L. Preferred language identified on the Parent Interview Form',
+            'M. Translator arrangements recorded on the Parent Interview Form'
+        ],
+        childFields: ['WeightedEligibility', 'ProofOfIncome', 'ParentInterview'],
+        na: 'N. Families living outside Chicago/CPS applies to home visiting programs only.',
+        guidance: 'Eligibility documents must be completed and dated on or prior to the enrollment date. Income verification is required each time a weighted eligibility form is completed. Sections L and M may not be left blank.',
+        waitlistLink: true
+    },
+    {
+        num: 'PI6', title: 'Family Centered Assessment and Individual Family Goal Plan',
+        requires: 'Both documents completed within 6 months of enrollment, with the goal plan updated annually thereafter.',
+        subs: [
+            'A. Published, research-based Family Centered Assessment within 6 months of enrollment',
+            'B. Individual Family Goal Plan within 6 months of enrollment, updated annually'
+        ],
+        childFields: ['FamilyCenteredAssessment', 'FamilyGoalPlan'],
+        guidance: 'Acceptable assessments include the Life Skills Progression, Baby TALK Family Centered Assessment and FROG. The LSP child portion may be replaced by the ASQ or another child developmental tool.'
+    },
+    {
+        num: 'PI7', title: 'Referral system and written transition plans',
+        requires: 'Individualised written transition plans, and evidence the referral system is used when a family needs it.',
+        subs: [
+            'A. Written individualised Transition Plans in each child/family file, as applicable',
+            'B. Evidence the referral system is utilised when necessary'
+        ],
+        childFields: ['TransitionPlan', 'Referral'],
+        guidance: 'Not applicable for families that did not require a referral, but the file should show that determination was made. For a family that exited suddenly, case notes with documented contact attempts substitute for the transition plan.'
+    },
+    {
+        num: 'PI8', title: 'Annual Self-Assessment and written CQIP',
+        requires: 'Both documents on file and valid for the current program year.',
+        subs: [
+            'A. Written Annual Self-Assessment/Evaluation with measurable outcomes for children and families',
+            'B. Written Continuous Quality Improvement Plan, updated annually'
+        ],
+        guidance: 'Both documents are required to be in compliance, and both must be valid for the current program year. The Compliance Checklist CQIP is due 30 days from receipt of the monitoring results and must address all non-compliance items by the following fiscal year. CQIP questions go to dec.picqip@illinois.gov.',
+        docs: [
+            { label: 'PI8.A Self-Assessment', url: VERIFIED_LINKS.piSelfAssessment },
+            { label: 'PI8.B CQIP', url: VERIFIED_LINKS.piCqip },
+            { label: 'FY27 CQIP form (blank)', url: 'documents/DEC PI - FY27 CQIP.pdf' }
+        ],
+        // Evidence already lives in these named folders rather than PICC/PI8.
+        folderUrl: VERIFIED_LINKS.piSelfAssessment
+    },
+    {
+        num: 'PI9', title: 'Staff development and professional development plans',
+        requires: 'A written Professional Development Plan for every PI staff member.',
+        subs: ['A. Professional Development Plan written for all staff members'],
+        guidance: 'Each plan needs the staff name, plan date and timelines, an assessment of that staff member\u2019s needs, and a description of the in-service or other professional learning the program will provide.'
+    },
+    {
+        num: 'PI10', title: 'Developmental screening and monitoring documentation',
+        requires: 'Comprehensive research-based screening for any family enrolled 6 months or longer whose child is 3 months or older, with written parent permission and evidence the results were shared.',
+        subs: [
+            'A. Completed comprehensive research-based screening on file',
+            'B-F. Screening covers cognitive, social-emotional, fine and gross motor, visual motor integration, and language and speech',
+            'G. Written parent/guardian permission for developmental screening, valid for the fiscal year',
+            'H. Evidence the screening results were shared with the parent/guardian',
+            'I. Children identified with concerns referred for further evaluation'
+        ],
+        childFields: ['PermissionSlip', 'BegASQ', 'BegASE', 'ScreeningResultsShared'],
+        guidance: 'More than one tool may be needed for a comprehensive screening; ASQ-3 plus ASQ:SE-2 together satisfy it. Permission forms are valid July 1 to June 30 and must exist for every child screened. The results-shared documentation needs seven components: child name, tool used, evidence shared, shared with whom, date screened, date shared, and screener name.',
+        followUpLink: true
+    },
+    {
+        num: 'CB1', title: 'Hours of PI center-based services',
+        requires: 'PI children are enrolled in a program providing a minimum of 2 hours 30 minutes, with set program hours and a PI-funded teacher present throughout.',
+        subs: [
+            'A. Minimum of 2 hours 30 minutes of service',
+            'B. Number of hours and minutes',
+            'C. Program has set PI program hours',
+            'D. Start and end time',
+            'E. A PI-funded teacher is in the classroom throughout PI operating hours'
+        ],
+        na: 'F. Second caregiver requirement applies to DCFS Family Child Care Homes only.',
+        guidance: 'Some children attend PI hours only while others receive extended hours through CCAP or Early Head Start. Maintain sign-in sheets, classroom schedules and attendance records for the PI program, and lesson plans specific to the PI period.',
+        evidence: 'Class schedules, policies and procedures manual, sign-in sheets, attendance records, PI-specific lesson plans.'
+    },
+    {
+        num: 'CB2', title: 'DCFS licensure, ExceleRate and Early Head Start',
+        requires: 'Current DCFS license, and evidence of work toward the next ExceleRate Circle of Quality.',
+        subs: [
+            'A. Current DCFS licensure, with license number and expiration date',
+            'B. Alignment with Early Head Start / Head Start, if applicable',
+            'C. Working toward the next advanced ExceleRate level',
+            'D. Description of the evidence of that work'
+        ],
+        evidence: 'DCFS license, ExceleRate award letter and report dates, Early Head Start federal monitoring report if applicable.'
+    },
+    {
+        num: 'CB3', title: 'Research-based curriculum aligned to the IELG',
+        requires: 'A research-based child-centered curriculum and assessment, with Illinois Early Learning Guidelines references visible in classroom lesson plans.',
+        subs: [
+            'A. Identification of the research-based, IELG-aligned curriculum',
+            'B. References to the IELG are evident in classroom lesson plans'
+        ],
+        guidance: 'To be in compliance the child activities in the lesson plans must carry IELG references.',
+        evidence: 'Classroom lesson plans, curriculum documentation.'
+    },
+    {
+        num: 'CB4', title: 'Staff to classroom ratios',
+        requires: 'Ratios meet the standard for DCFS Licensed Child Care Centers in every PI classroom.',
+        evidence: 'Classroom rosters, staffing schedules, DCFS ratio documentation.'
+    },
+    {
+        num: 'CB5', title: 'Classroom food service',
+        requires: 'The program provides food service meeting the applicable standards.',
+        evidence: 'Menus, meal counts, CACFP records.'
+    },
+    {
+        num: 'CB6', title: 'Classroom staff qualifications',
+        requires: 'Center-based staff meet the qualification requirements.',
+        subs: ['A. Staff qualifications for center-based classrooms'],
+        guidance: 'Judged against TITLE 89: Social Services, and Gateways credential levels.',
+        evidence: 'Transcripts, Gateways training certificates, credential letters.'
+    },
+    {
+        num: 'CB7', title: 'Center-based parent and family education services',
+        requires: 'Parent and family education services are identified and delivered.',
+        evidence: 'Parent education calendars, sign-in sheets, newsletters, family engagement plans.'
+    },
+    {
+        num: 'CB8', title: 'Center-based policies and procedures',
+        requires: 'Written policies and procedures covering the center-based program, including preventing suspensions and expulsions.',
+        subs: ['A. Evidence the program has developed the required policies and procedures'],
+        evidence: 'Policies and procedures manual, suspension and expulsion policy.'
+    }
+];
+
+// Root of the PICC evidence folder. Individual items resolve their own link in
+// this order: a URL pasted for that item and school year, then a folder named
+// after the item number under PICC/, then this root.
+const PICC_SHAREPOINT_FOLDER = spUrl(SP_PICC_FOLDER);
+
+// Convention: PICC/<item number>, e.g. PICC/PI5. Items whose evidence already
+// lives in a differently named folder carry an explicit link instead.
+function piccItemFolderUrl(num) {
+    return spUrl(SP_PICC_FOLDER + '/' + num);
+}
 
 let activeComplianceProgram = 'pfaCompliance';
 
@@ -1659,21 +1946,202 @@ async function loadCompliance(prog) {
     renderPIMonitoringBanner();
 
     var list = document.getElementById('complianceList');
-    list.innerHTML = items.map(function(item) {
+    var html = '';
+
+    // The PICC only describes the Prevention Initiative. PFA has its own
+    // requirements and no equivalent checklist document here, so inventing one
+    // would be worse than leaving it out.
+    if (activeComplianceProgram === 'piCompliance') {
+        html += renderPiccSection(data);
+    }
+    html += renderInstrumentSection(items, prefix, data);
+    list.innerHTML = html;
+}
+
+// ── PICC checklist ──
+
+// Live per-child evidence roll-up for an item backed by roster columns. Counts a
+// child as complete only when every backing column is ticked, so the number
+// answers "how many files would pass" rather than "how many boxes are ticked".
+function piccChildStats(item) {
+    if (!item.childFields) return null;
+    var roster = students.filter(function (s) {
+        return s.PFA_PI_na === 'PI' && (s.Active === 'Yes' || s.Active === 'YES');
+    });
+    var missing = roster.filter(function (s) {
+        var t = trackingData[s.Id] || {};
+        return item.childFields.some(function (f) { return !t[f]; });
+    });
+    return { total: roster.length, complete: roster.length - missing.length, missing: missing };
+}
+
+function statusPill(state, text) {
+    return '<span class="picc-pill picc-' + state + '">' + text + '</span>';
+}
+
+function renderPiccSection(data) {
+    var rows = PICC_ITEMS.map(function (item) { return renderPiccItem(item, data); }).join('');
+
+    // Readiness counts what the director is actually asked at the visit: how many
+    // items have evidence recorded. Per-child items count as ready only when
+    // every child's file is complete.
+    var ready = 0, blocked = 0;
+    PICC_ITEMS.forEach(function (item) {
+        var st = piccChildStats(item);
+        if (st) { if (st.total && st.complete === st.total) ready++; else blocked++; return; }
+        if (data['PI_' + item.num]) ready++; else blocked++;
+    });
+
+    return '<div class="picc-head">'
+        + '<div>'
+        + '<div class="picc-head-title">FY27 Prevention Initiative Compliance Checklist</div>'
+        + '<div class="picc-head-sub">' + PICC_ITEMS.length + ' items apply to a DCFS-licensed center-based program '
+        + '(PI1&ndash;PI10 and CB1&ndash;CB8). HV1&ndash;HV5 are home-visiting only and are not shown.</div>'
+        + '</div>'
+        + '<div class="picc-readiness">'
+        + '<div class="picc-readiness-num">' + ready + ' / ' + PICC_ITEMS.length + '</div>'
+        + '<div class="picc-readiness-lbl">' + (blocked ? blocked + ' still open' : 'all evidence recorded') + '</div>'
+        + '</div>'
+        + '<a class="picc-btn picc-btn-primary" href="' + PICC_SHAREPOINT_FOLDER + '" target="_blank" rel="noopener">Open PICC folder</a>'
+        + '</div>'
+        + '<div class="picc-list">' + rows + '</div>';
+}
+
+function renderPiccItem(item, data) {
+    var key = 'PI_' + item.num;
+    var stats = piccChildStats(item);
+    var checked = data[key] ? 'checked' : '';
+    var dateVal = data[key + 'Date'] || '';
+    var notes = data[key + 'Notes'] || '';
+    var savedLink = data[key + 'Link'] || '';
+
+    // Status: derived for per-child items, manual for program-level ones.
+    var status;
+    if (stats) {
+        if (!stats.total) status = statusPill('none', 'no active PI children');
+        else if (stats.complete === stats.total) status = statusPill('ok', stats.total + ' of ' + stats.total + ' files complete');
+        else status = statusPill('open', stats.complete + ' of ' + stats.total + ' files complete');
+    } else {
+        status = data[key] ? statusPill('ok', 'evidence recorded') : statusPill('open', 'not recorded');
+    }
+    if (item.scored === false) status += statusPill('info', 'not scored');
+
+    // Evidence buttons: item-specific pasted link wins, then a known folder, then
+    // the convention folder.
+    var evidence = '';
+    (item.docs || []).forEach(function (d) {
+        evidence += '<a class="picc-btn" href="' + d.url + '" target="_blank" rel="noopener">' + d.label + '</a>';
+    });
+    var folder = savedLink || item.folderUrl || piccItemFolderUrl(item.num);
+    evidence += '<a class="picc-btn" href="' + folder + '" target="_blank" rel="noopener">'
+        + (savedLink ? 'Evidence link' : 'Folder') + '</a>';
+
+    // Per-child items jump straight to the roster column that holds the evidence.
+    var jumps = '';
+    if (item.childFields) {
+        item.childFields.forEach(function (f) {
+            var col = COLUMNS.find(function (c) { return c.field === f; });
+            if (!col) return;
+            jumps += '<a class="picc-btn picc-btn-jump" href="#" onclick="event.preventDefault();jumpToRosterColumn(\'' + f + '\')">'
+                + col.label.replace(/<br>/g, ' ') + '</a>';
+        });
+    }
+    if (item.waitlistLink) {
+        jumps += '<a class="picc-btn picc-btn-jump" href="waitinglist.html">Waiting list</a>';
+    }
+    if (item.followUpLink) {
+        jumps += '<a class="picc-btn picc-btn-jump" href="#" onclick="event.preventDefault();setProgram(\'followUp\')">Screening follow-up</a>';
+    }
+
+    var missingNote = '';
+    if (stats && stats.missing.length) {
+        var names = stats.missing.slice(0, 6).map(function (s) { return s.Last_Name + ', ' + s.First_Name; }).join(' &middot; ');
+        missingNote = '<div class="picc-missing"><strong>Missing:</strong> ' + names
+            + (stats.missing.length > 6 ? ' &middot; +' + (stats.missing.length - 6) + ' more' : '') + '</div>';
+    }
+
+    return '<div class="picc-item">'
+        + '<div class="picc-item-top">'
+        + '<span class="picc-num">' + item.num + '</span>'
+        + '<div class="picc-item-main">'
+        + '<div class="picc-item-title">' + item.title + '</div>'
+        + '<div class="picc-item-req">' + item.requires + '</div>'
+        + '</div>'
+        + '<div class="picc-item-status">' + status + '</div>'
+        + '</div>'
+        + missingNote
+        + (item.subs ? '<details class="picc-details"><summary>What the reviewer checks ('
+            + item.subs.length + ')</summary><ul>'
+            + item.subs.map(function (s) { return '<li>' + s + '</li>'; }).join('')
+            + '</ul></details>' : '')
+        + (item.guidance ? '<div class="picc-guidance">' + item.guidance + '</div>' : '')
+        + (item.evidence ? '<div class="picc-evidence-hint"><strong>Evidence:</strong> ' + item.evidence + '</div>' : '')
+        + (item.na ? '<div class="picc-na"><strong>Not applicable:</strong> ' + item.na + '</div>' : '')
+        + '<div class="picc-actions">' + evidence + jumps + '</div>'
+        + '<div class="picc-controls">'
+        + (stats ? '' : '<label class="picc-check"><input type="checkbox" ' + checked
+            + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>')
+        + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
+        + '<input type="url" class="picc-link-input" placeholder="Paste the SharePoint link for this item" value="'
+        + savedLink.replace(/"/g, '&quot;') + '" onchange="saveComplianceLink(\'' + key + '\',this.value)">'
+        + '</div>'
+        + '<textarea class="picc-notes" placeholder="Notes for the monitor, or what is still outstanding" '
+        + 'onchange="saveComplianceNotes(\'' + key + '\',this.value)">' + notes + '</textarea>'
+        + '</div>';
+}
+
+function renderInstrumentSection(items, prefix, data) {
+    var rows = items.map(function (item) {
         var fullKey = prefix + item.key;
         var checked = data[fullKey] ? 'checked' : '';
         var dateVal = data[fullKey + 'Date'] || '';
-        var linkBtn = item.link ? '<a href="' + item.link + '" target="_blank" style="padding:4px 10px;background:#2563eb;color:white;border-radius:5px;font-size:0.68rem;font-weight:600;text-decoration:none;white-space:nowrap;" title="Open document in SharePoint">📄 Open</a>' : '';
-        return '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e5e7eb;">' +
-            '<input type="checkbox" ' + checked + ' onchange="saveCompliance(\'' + fullKey + '\',this.checked)" style="width:18px;height:18px;accent-color:#2563eb;cursor:pointer;flex-shrink:0;">' +
-            '<div style="flex:1;">' +
-                '<div style="font-size:0.85rem;font-weight:700;color:#1e293b;">' + item.label + '</div>' +
-                '<div style="font-size:0.72rem;color:#6b7280;">' + item.description + '</div>' +
-            '</div>' +
-            linkBtn +
-            '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + fullKey + '\',this.value)" style="padding:4px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.75rem;width:130px;" title="Date completed">' +
-        '</div>';
+        var savedLink = data[fullKey + 'Link'] || '';
+        var href = savedLink || item.link;
+        var linkBtn = href
+            ? '<a class="picc-btn" href="' + href + '" target="_blank" rel="noopener">Open</a>'
+            : '';
+        return '<div class="picc-item">'
+            + '<div class="picc-item-top">'
+            + '<label class="picc-check" style="margin:0;"><input type="checkbox" ' + checked
+            + ' onchange="saveCompliance(\'' + fullKey + '\',this.checked)"></label>'
+            + '<div class="picc-item-main">'
+            + '<div class="picc-item-title">' + item.label + '</div>'
+            + '<div class="picc-item-req">' + item.description + '</div>'
+            + '</div>'
+            + '</div>'
+            + '<div class="picc-controls">'
+            + linkBtn
+            + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + fullKey + '\',this.value)" title="Date completed">'
+            + '<input type="url" class="picc-link-input" placeholder="Paste the SharePoint link" value="'
+            + savedLink.replace(/"/g, '&quot;') + '" onchange="saveComplianceLink(\'' + fullKey + '\',this.value)">'
+            + '</div>'
+            + '</div>';
     }).join('');
+
+    return '<div class="picc-head" style="margin-top:22px;">'
+        + '<div>'
+        + '<div class="picc-head-title">Monitoring instruments &amp; program documents</div>'
+        + '<div class="picc-head-sub">Observation tools and program-wide documents the monitor will ask for, '
+        + 'alongside the checklist itself.</div>'
+        + '</div></div>'
+        + '<div class="picc-list">' + rows + '</div>';
+}
+
+// Switches to the roster and flashes the column that holds an item's evidence,
+// so the director can go from a checklist row to the children still missing it.
+function jumpToRosterColumn(field) {
+    setProgram('PI');
+    var idx = visibleColumns().findIndex(function (c) { return c.field === field; });
+    if (idx === -1) return;
+    var nth = idx + 3;   // + Student, Room, and CSS is 1-based
+    var grid = document.getElementById('isbeRosterGrid');
+    var cells = grid.querySelectorAll('tr > *:nth-child(' + nth + ')');
+    cells.forEach(function (el) { el.classList.add('col-flash'); });
+    var head = grid.querySelector('thead tr > *:nth-child(' + nth + ')');
+    if (head && head.scrollIntoView) head.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    setTimeout(function () {
+        cells.forEach(function (el) { el.classList.remove('col-flash'); });
+    }, 2600);
 }
 
 async function saveCompliance(key, value) {
@@ -1696,6 +2164,34 @@ async function saveComplianceDate(key, dateValue) {
     } catch (e) { console.error('Save compliance date failed', e); }
 }
 
+// Per-item SharePoint link. Lets the director point an item at wherever its
+// evidence actually lives without a code change, and survives folder renames.
+async function saveComplianceLink(key, url) {
+    var year = getComplianceYear();
+    var clean = (url || '').trim();
+    if (clean && !/^https?:\/\//i.test(clean)) {
+        alert('That does not look like a link. Paste the full SharePoint URL, starting with https://');
+        return;
+    }
+    try {
+        await apiFetch('/api/compliance', {
+            method: 'POST',
+            body: JSON.stringify({ year: year, field: key + 'Link', value: clean })
+        });
+        loadCompliance();   // refresh so the Folder button becomes an Evidence link
+    } catch (e) { console.error('Save compliance link failed', e); }
+}
+
+async function saveComplianceNotes(key, text) {
+    var year = getComplianceYear();
+    try {
+        await apiFetch('/api/compliance', {
+            method: 'POST',
+            body: JSON.stringify({ year: year, field: key + 'Notes', value: text || '' })
+        });
+    } catch (e) { console.error('Save compliance notes failed', e); }
+}
+
 // Close modals on overlay click
 document.getElementById('piOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeInterview();
@@ -1706,11 +2202,15 @@ document.getElementById('psOverlay').addEventListener('click', function(e) {
 document.getElementById('scrOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeScreening();
 });
+document.getElementById('docOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeDocForm();
+});
 
 // Close modals on Escape key
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-        if (document.getElementById('scrOverlay').classList.contains('open')) closeScreening();
+        if (document.getElementById('docOverlay').classList.contains('open')) closeDocForm();
+        else if (document.getElementById('scrOverlay').classList.contains('open')) closeScreening();
         else if (document.getElementById('psOverlay').classList.contains('open')) closePermissionSlip();
         else if (document.getElementById('piOverlay').classList.contains('open')) closeInterview();
     }

@@ -421,6 +421,45 @@
             </select>
         </div>
     </div>
+
+    <!-- Priority populations the Prevention Initiative Compliance Checklist requires
+         on the weighted eligibility form (PICC PI5.C, PI5.F and PI5.G). Asking them
+         here means the waiting list order reflects them, not just the child's file. -->
+    <div class="form-row">
+        <div class="form-group">
+            <label>Has a developmental screening suggested a delay without a current Early Intervention referral?</label>
+            <select id="screeningDelayNoEi">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Is the parent or primary caregiver still learning English?</label>
+            <select id="parentEll">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Is your total household income less than half of the federal poverty level for your household size?</label>
+            <select id="incomeBelow50Fpl">
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+                <option value="Unsure">Not sure</option>
+            </select>
+            <div style="font-size:0.72rem;color:#6b7280;margin-top:4px;">
+                Roughly $10,400 for a household of two or $15,900 for a household of four.
+                Choose "Not sure" and we will work it out with you from your income verification.
+            </div>
+        </div>
+        <div class="form-group"></div>
+    </div>
     </div><!-- end scoredQuestionsSection -->
 
     <button type="submit" class="btn-submit" id="submitBtn">Submit Pre-Enrollment</button>
@@ -610,6 +649,9 @@ function collectHouseholdData() {
         substanceAbuse:     document.getElementById('substanceAbuse').value,
         caregiverOther:     document.getElementById('caregiverOther').value,
         familyDeath:        document.getElementById('familyDeath').value,
+        screeningDelayNoEi: document.getElementById('screeningDelayNoEi').value,
+        parentEll:          document.getElementById('parentEll').value,
+        incomeBelow50Fpl:   document.getElementById('incomeBelow50Fpl').value,
         lowBirthWeight:     document.getElementById('lowBirthWeight').value,
         parentIncarcerated: document.getElementById('parentIncarcerated').value,
     };
@@ -630,6 +672,12 @@ function calcScore(d) {
     if (yes(d.familyDeath))        score += 5;
     if (yes(d.lowBirthWeight))     score += 5;
     if (yes(d.parentIncarcerated)) score += 5;
+    // PICC PI5.C / PI5.G / PI5.F priority populations. "Not sure" on the income
+    // question scores nothing here; staff settle it from income verification and
+    // can correct the answer on the weighted eligibility form.
+    if (yes(d.screeningDelayNoEi)) score += 5;
+    if (yes(d.parentEll))          score += 5;
+    if (yes(d.incomeBelow50Fpl))   score += 5;
     if (yes(d.teenParent))         score += 5;
     if (yes(d.noHSDiploma))        score += 5;
     if (yes(d.bornOutsideUS))      score += 5;

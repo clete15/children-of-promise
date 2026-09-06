@@ -342,6 +342,29 @@ function parentInterviewEnsureSQL() {
     return sql;
 }
 
+// ── ProgramCompliance schema ──
+// Key/value store, one row per (school year, field). The PICC panel writes a
+// status, a date and a free-text note per checklist item, and a 200-char note
+// would truncate, so FieldValue widens to MAX. FieldName stays NVARCHAR(50)
+// because it sits inside UQ_Compliance and widening it would mean dropping and
+// rebuilding that constraint; item keys are validated against 50 instead.
+const COMPLIANCE_FIELD_NAME_MAX = 50;
+
+function complianceEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ProgramCompliance')
+    CREATE TABLE ProgramCompliance (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        SchoolYear NVARCHAR(20) NOT NULL,
+        FieldName NVARCHAR(${COMPLIANCE_FIELD_NAME_MAX}) NOT NULL,
+        FieldValue NVARCHAR(MAX),
+        UpdatedAt DATETIME DEFAULT GETDATE(),
+        CONSTRAINT UQ_Compliance UNIQUE(SchoolYear, FieldName)
+    );
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ProgramCompliance' AND COLUMN_NAME='FieldValue' AND CHARACTER_MAXIMUM_LENGTH <> -1)
+    ALTER TABLE ProgramCompliance ALTER COLUMN FieldValue NVARCHAR(MAX);
+`;
+}
+
 function docFormEnsureSQL(cfg) {
     const cols = cfg.columns.map(([name, type]) => `        ${name} ${type}`).join(',\n');
     let sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='${cfg.table}')
@@ -640,13 +663,17 @@ function handleRequest(req, res) {
             + `ISNULL(p.NoHSDiploma,'') AS NoHSDiploma,ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,`
             + `ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,ISNULL(p.PriorEarlyLearning,'') AS PriorEarlyLearning,ISNULL(p.BrightpointSubsidy,'') AS BrightpointSubsidy,`
             + `${flat('p.LivingSituation')} AS LivingSituation,ISNULL(p.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(p.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,`
-            + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,${flat('p.Notes')} AS Notes`;
+            + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,`
+            // PICC PI5.C / PI5.G / PI5.F priority populations. Added to the intake
+            // form later than the rest, so older records return blank here.
+            + `ISNULL(p.ScreeningDelayNoEi,'') AS ScreeningDelayNoEi,ISNULL(p.ParentEll,'') AS ParentEll,ISNULL(p.IncomeBelow50Fpl,'') AS IncomeBelow50Fpl,`
+            + `${flat('p.Notes')} AS Notes`;
         const sql = `SELECT TOP 1 ${cols},'linked' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${studentId}
             UNION ALL
             SELECT TOP 1 ${cols},'name+dob' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date) WHERE e.Id=${studentId} AND e.PreEnrollmentId IS NULL`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const keys = ['Id','SubmittedAt','ParentFirst','ParentLast','Phone','Email','Address','City','Zip','ChildName','ChildBirthDate','AgeGroup','DaysRequested','Score','WaitlistStatus','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','CaregiverOther','FamilyDeath','LowBirthWeight','ParentIncarcerated','TeenParent','NoHSDiploma','BornOutsideUS','NonEnglishHome','ActiveMilitary','PriorEarlyLearning','BrightpointSubsidy','LivingSituation','HouseholdIncome','HouseholdSize','PublicBenefits','Notes','MatchType'];
+        const keys = ['Id','SubmittedAt','ParentFirst','ParentLast','Phone','Email','Address','City','Zip','ChildName','ChildBirthDate','AgeGroup','DaysRequested','Score','WaitlistStatus','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','CaregiverOther','FamilyDeath','LowBirthWeight','ParentIncarcerated','TeenParent','NoHSDiploma','BornOutsideUS','NonEnglishHome','ActiveMilitary','PriorEarlyLearning','BrightpointSubsidy','LivingSituation','HouseholdIncome','HouseholdSize','PublicBenefits','ScreeningDelayNoEi','ParentEll','IncomeBelow50Fpl','Notes','MatchType'];
         const line = r.data.trim().split('\n').find(l => /^\s*\d+\s*\|/.test(l));
         if (!line) return sendJSON(res, 200, { found: false });
         const v = line.split('|').map(x => x.trim());
@@ -840,6 +867,9 @@ function handleRequest(req, res) {
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='WaitlistStatus') ALTER TABLE PreEnrollment ADD WaitlistStatus NVARCHAR(20) DEFAULT 'Pending';
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='AgeGroup') ALTER TABLE PreEnrollment ADD AgeGroup NVARCHAR(10);
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='DaysRequested') ALTER TABLE PreEnrollment ADD DaysRequested NVARCHAR(50);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ScreeningDelayNoEi') ALTER TABLE PreEnrollment ADD ScreeningDelayNoEi NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ParentEll') ALTER TABLE PreEnrollment ADD ParentEll NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='IncomeBelow50Fpl') ALTER TABLE PreEnrollment ADD IncomeBelow50Fpl NVARCHAR(10);
                 INSERT INTO PreEnrollment (
                     FirstName,LastName,Email,Address,City,Zip,Country,Phone,
                     ChildrenInfo,ChildName,ChildBirthDate,ChildStartDate,AgeGroup,DaysRequested,HouseholdIncome,HouseholdSize,PublicBenefits,Homeless,IEP,
@@ -847,7 +877,8 @@ function handleRequest(req, res) {
                     NonEnglishHome,ActiveMilitary,PriorEarlyLearning,
                     BrightpointSubsidy,LivingSituation,EarlyIntervention,
                     AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,
-                    CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,Score
+                    CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,
+                    ScreeningDelayNoEi,ParentEll,IncomeBelow50Fpl,Score
                 ) VALUES (
                     ${esc(d.firstName)},${esc(d.lastName)},${esc(d.email)},
                     ${esc(d.address)},${esc(d.city)},${esc(d.zip)},${esc(d.country)},
@@ -861,6 +892,7 @@ function handleRequest(req, res) {
                     ${esc(d.dcfsInvolvement)},${esc(d.substanceAbuse)},
                     ${esc(d.caregiverOther)},${esc(d.familyDeath)},
                     ${esc(d.lowBirthWeight)},${esc(d.parentIncarcerated)},
+                    ${esc(d.screeningDelayNoEi)},${esc(d.parentEll)},${esc(d.incomeBelow50Fpl)},
                     ${parseInt(d.score)||0}
                 );`;
             const r = runSQL(sql);
@@ -1426,24 +1458,21 @@ ELSE
         const query = req.url.split('?')[1] || '';
         const params = new URLSearchParams(query);
         const year = params.get('year') || '';
-        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ProgramCompliance')
-            CREATE TABLE ProgramCompliance (
-                Id INT IDENTITY(1,1) PRIMARY KEY,
-                SchoolYear NVARCHAR(20) NOT NULL,
-                FieldName NVARCHAR(50) NOT NULL,
-                FieldValue NVARCHAR(200),
-                UpdatedAt DATETIME DEFAULT GETDATE(),
-                CONSTRAINT UQ_Compliance UNIQUE(SchoolYear, FieldName)
-            );
-            SELECT FieldName,FieldValue FROM ProgramCompliance WHERE SchoolYear=${esc(year)}`;
+        const sql = complianceEnsureSQL()
+            + `SELECT FieldName,${txCol('FieldValue')} FROM ProgramCompliance WHERE SchoolYear=${esc(year)}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const data = {};
         r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .forEach(l => {
-                const v = l.split('|').map(x => x.trim());
-                if (v[0]) data[v[0]] = v[1] === '1' ? true : v[1] === '0' ? false : v[1];
+                // Only split off the first delimiter: the value is free text that may
+                // legitimately contain an encoded pipe.
+                const i = l.indexOf('|');
+                if (i === -1) return;
+                const name = l.slice(0, i).trim();
+                const raw = txDecode(l.slice(i + 1).trim());
+                if (name) data[name] = raw === '1' ? true : raw === '0' ? false : raw;
             });
         return sendJSON(res, 200, data);
     }
@@ -1455,16 +1484,13 @@ ELSE
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const { year, field, value } = d;
             if (!year || !field) return sendJSON(res, 400, { error: 'Year and field required' });
-            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ProgramCompliance')
-                CREATE TABLE ProgramCompliance (
-                    Id INT IDENTITY(1,1) PRIMARY KEY,
-                    SchoolYear NVARCHAR(20) NOT NULL,
-                    FieldName NVARCHAR(50) NOT NULL,
-                    FieldValue NVARCHAR(200),
-                    UpdatedAt DATETIME DEFAULT GETDATE(),
-                    CONSTRAINT UQ_Compliance UNIQUE(SchoolYear, FieldName)
-                );
-                IF EXISTS (SELECT 1 FROM ProgramCompliance WHERE SchoolYear=${esc(year)} AND FieldName=${esc(field)})
+            // A key longer than the column would be silently truncated and could then
+            // collide with another item's key under the unique constraint.
+            if (String(field).length > COMPLIANCE_FIELD_NAME_MAX) {
+                return sendJSON(res, 400, { error: 'Field name exceeds ' + COMPLIANCE_FIELD_NAME_MAX + ' characters' });
+            }
+            const sql = complianceEnsureSQL()
+                + `IF EXISTS (SELECT 1 FROM ProgramCompliance WHERE SchoolYear=${esc(year)} AND FieldName=${esc(field)})
                     UPDATE ProgramCompliance SET FieldValue=${esc(String(value))},UpdatedAt=GETDATE() WHERE SchoolYear=${esc(year)} AND FieldName=${esc(field)}
                 ELSE
                     INSERT INTO ProgramCompliance (SchoolYear,FieldName,FieldValue) VALUES (${esc(year)},${esc(field)},${esc(String(value))})`;

@@ -144,9 +144,17 @@
         { key: 'youthInCare', label: 'Youth in Care (foster) or adopted', points: 50, picc: 'PI5.E', intakeKey: 'FosterAdopted' },
         { key: 'earlyIntervention', label: 'Enrolled in Early Intervention with an identified delay', points: 5, picc: 'PI5.B', intakeKey: 'EarlyIntervention' },
         { key: 'hasIep', label: 'Has an IEP', points: 5, picc: 'PI5.B', intakeKey: 'IEP' },
-        { key: 'screeningDelayNoEi', label: 'Screening indicated a delay but no current Early Intervention referral', points: 5, picc: 'PI5.C' },
-        { key: 'incomeBelow50Fpl', label: 'Family income at or below 50% of the federal poverty level', points: 5, picc: 'PI5.F' },
-        { key: 'parentEll', label: 'Parent or caregiver is an English language learner', points: 5, picc: 'PI5.G' },
+        { key: 'screeningDelayNoEi', label: 'Screening indicated a delay but no current Early Intervention referral', points: 5, picc: 'PI5.C', intakeKey: 'ScreeningDelayNoEi' },
+        // The intake form offers "Not sure" on this one. Leave it unanswered rather
+        // than defaulting to No, so staff settle it from the income verification.
+        {
+            key: 'incomeBelow50Fpl', label: 'Family income at or below 50% of the federal poverty level', points: 5, picc: 'PI5.F',
+            derive: d => {
+                const v = String(d.IncomeBelow50Fpl || '').trim().toLowerCase();
+                return v === 'yes' ? 'Yes' : v === 'no' ? 'No' : '';
+            }
+        },
+        { key: 'parentEll', label: 'Parent or caregiver is an English language learner', points: 5, picc: 'PI5.G', intakeKey: 'ParentEll' },
         { key: 'nonEnglishHome', label: 'Primary language in the home is not English', points: 5, intakeKey: 'NonEnglishHome' },
         { key: 'publicBenefits', label: 'Receiving public benefits (WIC, Medicaid, SNAP, TANF)', points: 5, derive: d => (d.PublicBenefits ? 'Yes' : 'No') },
         { key: 'abuseHistory', label: 'Abuse or domestic violence history', points: 5, intakeKey: 'AbuseHistory' },
@@ -413,8 +421,9 @@
                 {
                     title: 'Weighted Criteria',
                     note: 'PICC PI5.B through PI5.G require the priority populations to appear on this form. '
-                        + 'Rows tagged PI5.C, PI5.F and PI5.G are not asked on the public pre-enrollment form yet, '
-                        + 'so they start blank and need answering here.',
+                        + 'Answers come from the pre-enrollment submission where one exists. Families who applied '
+                        + 'before those questions were added, and anyone who answered "Not sure" to the income '
+                        + 'question, will have blank rows that need answering here.',
                     fields: [
                         { key: 'criteriaTable', type: 'criteria', label: 'Weighted Eligibility Criteria', items: WEIGHTED_CRITERIA },
                         { key: 'totalPoints', label: 'Total Weighted Points', type: 'text' }
