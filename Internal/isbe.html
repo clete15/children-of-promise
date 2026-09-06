@@ -1113,15 +1113,19 @@ function shortDate(iso) {
 
 // Beginning-of-year screening must happen within 45 days of the enrollment date.
 // Returns null when we can't judge it (no start date, or not a beginning screening).
-// First day of a school year, as a date the 45-day clock can measure from.
-// The program year begins around August, well before the July 1 rollover the
-// F/R/P thresholds use, so Aug 1 of the start year is the anchor. A screening
-// due "within 45 days" is 45 days from when the child started THIS year's
-// program, which for a returning child is the start of school, not their
-// original enrollment years ago.
+// First day of the program year, as month-day. The beginning-screening batch
+// runs right after this, so it anchors the 45-day clock: a returning child's
+// screening is due 45 days from the first day of school, not from their original
+// enrollment years ago.
+//
+// This is the one value to change if the first day of school moves. It is a
+// fixed month/day applied to whichever year is in view, so it does not need
+// updating every year, only when the calendar actually shifts.
+const SCHOOL_YEAR_START_MONTH_DAY = '09-08';   // September 8
+
 function schoolYearStartDate(year) {
     const start = parseInt(String(year || activeSchoolYear).split('-')[0], 10);
-    return isNaN(start) ? null : start + '-08-01';
+    return isNaN(start) ? null : start + '-' + SCHOOL_YEAR_START_MONTH_DAY;
 }
 
 // The date the beginning-of-year screening clock runs from: the later of the
