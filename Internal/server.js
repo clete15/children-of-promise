@@ -2017,10 +2017,15 @@ ELSE
                 + ` AND ISNULL(SchoolYear,'')=${esc(d.schoolYear || '')}`;
             const sql = staffDevPlanEnsureSQL() + 'GO\n'
                 + `UPDATE StaffDevelopmentPlan SET Status='Superseded',UpdatedAt=GETDATE() WHERE ${sameCycle};\n`
-                + `INSERT INTO StaffDevelopmentPlan (${cols}) VALUES (${vals});SELECT SCOPE_IDENTITY() AS Id`;
+                /* Tag the identity so it can be found unambiguously. A bare
+                   SELECT SCOPE_IDENTITY() gets lost among sqlcmd's row-count
+                   messages, and matching the first number in the output returned
+                   0 — which silently detached every goal from its plan. */
+                + `INSERT INTO StaffDevelopmentPlan (${cols}) VALUES (${vals});`
+                + `SELECT 'NEWID=' + CAST(SCOPE_IDENTITY() AS VARCHAR(20))`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
-            const m = (r.data || '').match(/(\d+)/);
+            const m = (r.data || '').match(/NEWID=(\d+)/);
             return sendJSON(res, 200, { success: true, id: m ? m[1] : null });
         });
     }
@@ -2064,11 +2069,12 @@ ELSE
                     c === 'PlanId' ? planId
                     : c === 'SortOrder' ? (parseInt(d.sortOrder) || 0)
                     : esc(d[key])).join(',');
-                sql = `INSERT INTO StaffDevelopmentGoal (${cols}) VALUES (${vals});SELECT SCOPE_IDENTITY() AS Id`;
+                sql = `INSERT INTO StaffDevelopmentGoal (${cols}) VALUES (${vals});`
+                    + `SELECT 'NEWID=' + CAST(SCOPE_IDENTITY() AS VARCHAR(20))`;
             }
             const r = runSQL(staffDevPlanEnsureSQL() + 'GO\n' + sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
-            const m = (r.data || '').match(/(\d+)/);
+            const m = (r.data || '').match(/NEWID=(\d+)/);
             return sendJSON(res, 200, { success: true, id: id || (m ? m[1] : null) });
         });
     }

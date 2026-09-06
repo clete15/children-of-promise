@@ -244,12 +244,101 @@
         return { needs: needs, provide: provide, goals: goals };
     }
 
+    /* ── Review cycles ──
+       The centre reviews plans twice: mid-year and end-of-year. That cadence is
+       its own policy — PI9 requires a written dated plan but sets no frequency —
+       so it is defined here rather than presented as a regulation.
+
+       The school year starts 08 September, which is what decides which year a
+       plan belongs to. Both cycles are records for the same school year and
+       neither replaces the other. */
+    var SCHOOL_YEAR_START = { month: 9, day: 8 };
+    var CYCLES = [
+        { key: 'Mid-Year', label: 'Mid-Year Review', dueMonth: 1, dueDay: 15 },
+        { key: 'End-of-Year', label: 'End-of-Year Review', dueMonth: 6, dueDay: 30 }
+    ];
+
+    function pad(n) { return (n < 10 ? '0' : '') + n; }
+    function iso(y, m, d) { return y + '-' + pad(m) + '-' + pad(d); }
+
+    /* Reads a date as calendar year/month/day without a timezone shift.
+
+       "2026-09-08" passed to new Date() is parsed as UTC midnight, and reading it
+       back with getDate() in Central time returns the 7th. That would file a plan
+       created on the first day of the school year into the previous year, so
+       date-only strings are split by hand instead. */
+    function ymd(value) {
+        var s = String(value == null ? '' : value).trim();
+        var m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (m) return { y: +m[1], m: +m[2], d: +m[3] };
+        var dt = s ? new Date(s) : new Date();
+        if (isNaN(dt.getTime())) dt = new Date();
+        return { y: dt.getFullYear(), m: dt.getMonth() + 1, d: dt.getDate() };
+    }
+
+    // "2026-2027" for any date inside that school year.
+    function schoolYearOf(date) {
+        var p = ymd(date);
+        var afterStart = p.m > SCHOOL_YEAR_START.month
+            || (p.m === SCHOOL_YEAR_START.month && p.d >= SCHOOL_YEAR_START.day);
+        return afterStart ? p.y + '-' + (p.y + 1) : (p.y - 1) + '-' + p.y;
+    }
+
+    // Compares two date-only strings without constructing Date objects.
+    function onOrBefore(a, b) {
+        var x = ymd(a), y = ymd(b);
+        return (x.y * 10000 + x.m * 100 + x.d) <= (y.y * 10000 + y.m * 100 + y.d);
+    }
+
+    // Both cycles fall in the calendar year AFTER the school year begins.
+    function cycleDueDate(cycleKey, schoolYear) {
+        var startYear = parseInt(String(schoolYear || schoolYearOf()).split('-')[0], 10);
+        var c = CYCLES.filter(function (x) { return x.key === cycleKey; })[0];
+        if (!c || !startYear) return '';
+        return iso(startYear + 1, c.dueMonth, c.dueDay);
+    }
+
+    /* Which cycles exist for a person this school year, and what is outstanding.
+       A missing cycle whose due date has not arrived is "upcoming", not "overdue" —
+       reporting it as late would train the director to ignore the list. */
+    function cycleStatus(staffId, plans, schoolYear, today) {
+        var sy = schoolYear || schoolYearOf();
+        var mine = (plans || []).filter(function (p) {
+            return String(p.StaffId) === String(staffId)
+                && (p.SchoolYear || schoolYearOf(p.PlanDate)) === sy;
+        });
+        return CYCLES.map(function (c) {
+            var found = mine.filter(function (p) { return (p.PlanType || '') === c.key; })
+                .sort(function (a, b) { return (+b.Id) - (+a.Id); })[0] || null;
+            var due = cycleDueDate(c.key, sy);
+            // Overdue only once the due date has actually passed.
+            var overdue = !found && !!due && !onOrBefore(today || new Date(), due);
+            return {
+                key: c.key, label: c.label, due: due, plan: found,
+                state: found ? 'done' : (overdue ? 'overdue' : 'upcoming')
+            };
+        });
+    }
+
+    // The cycle a new plan should default to: the earliest one not yet on file.
+    function suggestedCycle(staffId, plans, schoolYear, today) {
+        var st = cycleStatus(staffId, plans, schoolYear, today);
+        var open = st.filter(function (c) { return c.state !== 'done'; });
+        return (open[0] || st[st.length - 1]).key;
+    }
+
     root.PDSuggest = {
         suggest: suggest,
         credLevel: credLevel,
         servesInfantToddler: servesInfantToddler,
         roomKey: roomKey,
         PD_HOURS_REQUIRED: PD_HOURS_REQUIRED,
-        IT_ROOMS: IT_ROOMS
+        IT_ROOMS: IT_ROOMS,
+        CYCLES: CYCLES,
+        SCHOOL_YEAR_START: SCHOOL_YEAR_START,
+        schoolYearOf: schoolYearOf,
+        cycleDueDate: cycleDueDate,
+        cycleStatus: cycleStatus,
+        suggestedCycle: suggestedCycle
     };
 })(typeof window !== 'undefined' ? window : globalThis);

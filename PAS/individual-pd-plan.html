@@ -77,6 +77,12 @@
     <select id="staffPick" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;min-width:220px;">
         <option value="">Loading…</option>
     </select>
+    <label style="display:flex;align-items:center;gap:5px;">Review
+        <select id="planType" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;">
+            <option value="Mid-Year">Mid-Year</option>
+            <option value="End-of-Year">End-of-Year</option>
+        </select>
+    </label>
     <label style="display:flex;align-items:center;gap:5px;">Plan date
         <input type="date" id="planDate" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;">
     </label>
@@ -86,6 +92,7 @@
     <button id="btnSave" style="padding:7px 14px;background:#16a34a;color:#fff;border:none;border-radius:5px;font-size:9.5pt;font-weight:700;cursor:pointer;">Save plan</button>
     <button onclick="window.print()" style="padding:7px 14px;background:#2c5282;color:#fff;border:none;border-radius:5px;font-size:9.5pt;font-weight:700;cursor:pointer;">🖨️ Print</button>
     <span id="pickMsg" style="color:#64748b;font-size:9pt;"></span>
+    <div id="cycleBar" style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px;font-size:9pt;"></div>
 </div>
 
     <div class="header">
@@ -102,10 +109,13 @@
             <label>Position:</label><div class="line" id="fPosition"></div>
         </div>
         <div class="info-field">
+            <label>Review / School Year:</label><div class="line" id="fCycle"></div>
+        </div>
+        <div class="info-field">
             <label>Date Created:</label><div class="line" id="fPlanDate"></div>
         </div>
         <div class="info-field">
-            <label>Review Date:</label><div class="line" id="fReviewDate"></div>
+            <label>Next Review Due:</label><div class="line" id="fReviewDate"></div>
         </div>
     </div>
 
@@ -182,17 +192,55 @@ const esc = v => String(v == null ? '' : v)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const msg = t => { document.getElementById('pickMsg').textContent = t || ''; };
 
-function activePlan(staffId) {
+// The plan for the cycle currently selected, not merely the newest one — the
+// mid-year and end-of-year reviews are separate records for the same year.
+function planFor(staffId, cycle, sy) {
+    return PLANS.filter(p => String(p.StaffId) === String(staffId)
+            && (p.PlanType || '') === cycle
+            && (p.SchoolYear || PDSuggest.schoolYearOf(p.PlanDate)) === sy)
+        .sort((a, b) => (+b.Id) - (+a.Id))[0] || null;
+}
+function anyPlan(staffId) {
     return PLANS.filter(p => String(p.StaffId) === String(staffId))
         .sort((a, b) => (b.PlanDate || '').localeCompare(a.PlanDate || '') || (+b.Id) - (+a.Id))[0] || null;
+}
+function currentSchoolYear() { return PDSuggest.schoolYearOf(); }
+
+// Both cycles for this school year, so it is obvious what is still outstanding.
+function renderCycleBar() {
+    const bar = document.getElementById('cycleBar');
+    if (!current) { bar.innerHTML = ''; return; }
+    const sy = currentSchoolYear();
+    const st = PDSuggest.cycleStatus(current.Id, PLANS, sy);
+    bar.innerHTML = '<span style="color:#64748b;">School year ' + sy + ':</span>' + st.map(c => {
+        const tone = c.state === 'done' ? ['#f0fdf4', '#166534', '✓ ']
+            : c.state === 'overdue' ? ['#fef2f2', '#991b1b', '! ']
+            : ['#fffbeb', '#92400e', ''];
+        const detail = c.state === 'done'
+            ? 'saved ' + (c.plan.PlanDate || 'undated')
+            : (c.state === 'overdue' ? 'overdue, was due ' : 'due ') + c.due;
+        return '<button data-cycle="' + c.key + '" style="background:' + tone[0] + ';color:' + tone[1]
+            + ';border:1px solid ' + tone[1] + '33;border-radius:11px;padding:3px 10px;font-size:9pt;'
+            + 'font-weight:700;cursor:pointer;">' + tone[2] + c.label + ' — ' + detail + '</button>';
+    }).join('');
+    bar.querySelectorAll('button[data-cycle]').forEach(btn =>
+        btn.addEventListener('click', () => {
+            document.getElementById('planType').value = btn.getAttribute('data-cycle');
+            document.getElementById('planDate').value = '';
+            render();
+        }));
 }
 
 function render() {
     const s = current;
     if (!s) return;
     const sug = PDSuggest.suggest(s);
-    const plan = activePlan(s.Id);
+    const sy = currentSchoolYear();
+    const cycle = document.getElementById('planType').value;
+    const plan = planFor(s.Id, cycle, sy);
     const saved = plan ? GOALS.filter(g => String(g.PlanId) === String(plan.Id)) : [];
+    renderCycleBar();
+    document.getElementById('fCycle').textContent = cycle.replace('-', ' ') + ' Review — ' + sy;
 
     document.getElementById('fName').textContent = s.Name || '';
     document.getElementById('fPosition').textContent = (s.Role || '')
@@ -232,16 +280,21 @@ function render() {
     if (plan) { pd.value = plan.PlanDate || ''; rd.value = plan.ReviewDate || ''; }
     else if (!pd.value) {
         pd.value = new Date().toISOString().split('T')[0];
-        // Annual review is the centre's own policy; PI9 sets no cadence.
-        const y = new Date(); y.setFullYear(y.getFullYear() + 1);
-        rd.value = y.toISOString().split('T')[0];
+        /* Next review is the other cycle's due date: a mid-year plan points at
+           end-of-year, and end-of-year points at next year's mid-year. Two
+           reviews a year is the centre's own policy — PI9 sets no cadence. */
+        const other = PDSuggest.CYCLES.find(c => c.key !== cycle);
+        const nextSy = cycle === 'End-of-Year'
+            ? (parseInt(sy.split('-')[0], 10) + 1) + '-' + (parseInt(sy.split('-')[1], 10) + 1)
+            : sy;
+        rd.value = PDSuggest.cycleDueDate(other.key, nextSy);
     }
     document.getElementById('fPlanDate').textContent = pd.value || '';
     document.getElementById('fReviewDate').textContent = rd.value || '';
-    document.getElementById('fFooter').textContent = 'Children of Promise LLC — Individual PD Plan'
-        + (plan ? ' — plan dated ' + (plan.PlanDate || '') : ' — not yet saved');
-    msg(plan ? 'Plan on file, dated ' + (plan.PlanDate || 'undated')
-        + (plan.Status === 'Superseded' ? ' (superseded)' : '') : 'No saved plan yet for this person.');
+    document.getElementById('fFooter').textContent = 'Children of Promise LLC — Individual PD Plan — '
+        + cycle + ' ' + sy + (plan ? ', dated ' + (plan.PlanDate || 'undated') : ', not yet saved');
+    msg(plan ? cycle + ' plan on file, dated ' + (plan.PlanDate || 'undated')
+        : 'No ' + cycle + ' plan yet for this school year.');
 }
 
 async function save() {
@@ -254,7 +307,8 @@ async function save() {
             staffId: current.Id,
             planDate: document.getElementById('planDate').value,
             reviewDate: document.getElementById('reviewDate').value,
-            planType: 'Annual',
+            planType: document.getElementById('planType').value,
+            schoolYear: currentSchoolYear(),
             needsAssessment: sug.needs.join(' '),
             programWillProvide: sug.provide.join(' '),
             longTermGoals: document.getElementById('fLongTerm').textContent || '',
@@ -285,10 +339,18 @@ async function load(selectId) {
     if (pRes) { const d = await pRes.json(); PLANS = d.plans || []; GOALS = d.goals || []; }
     const sel = document.getElementById('staffPick');
     const want = selectId || new URLSearchParams(location.search).get('staffId') || (STAFF[0] || {}).Id;
-    sel.innerHTML = STAFF.map(s => '<option value="' + s.Id + '">' + esc(s.Name)
-        + (activePlan(s.Id) ? ' \u2713' : ' — no plan') + '</option>').join('');
+    // Marks how many of the two cycles are on file, so the gap list is the dropdown.
+    const sy = currentSchoolYear();
+    sel.innerHTML = STAFF.map(s => {
+        const done = PDSuggest.cycleStatus(s.Id, PLANS, sy).filter(c => c.state === 'done').length;
+        return '<option value="' + s.Id + '">' + esc(s.Name)
+            + (done === 2 ? ' \u2713\u2713' : done === 1 ? ' \u2713 (1 of 2)' : ' \u2014 no plan')
+            + '</option>';
+    }).join('');
     sel.value = want;
     current = STAFF.find(s => String(s.Id) === String(sel.value)) || STAFF[0];
+    // Open on whichever cycle is outstanding, rather than always the first.
+    document.getElementById('planType').value = PDSuggest.suggestedCycle(current.Id, PLANS, sy);
     render();
 }
 
@@ -299,6 +361,10 @@ document.getElementById('staffPick').addEventListener('change', e => {
 });
 ['planDate', 'reviewDate'].forEach(id =>
     document.getElementById(id).addEventListener('change', render));
+document.getElementById('planType').addEventListener('change', () => {
+    document.getElementById('planDate').value = '';
+    render();
+});
 document.getElementById('btnSave').addEventListener('click', save);
 document.getElementById('fLongTerm').setAttribute('contenteditable', 'true');
 load().catch(e => msg('Could not load: ' + e.message));

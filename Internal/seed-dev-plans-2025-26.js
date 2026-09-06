@@ -180,20 +180,36 @@ const PLANS = [
                 + (p.departed ? ' (no longer employed — plan exists on paper only)' : ' — name may not match'));
             continue;
         }
-        const existing = (dev.plans || []).find(x => String(x.StaffId) === String(rec.Id)
+        const fresh = await getJSON('/api/dev-plans') || { plans: [], goals: [] };
+        const existing = (fresh.plans || []).find(x => String(x.StaffId) === String(rec.Id)
             && (x.SchoolYear || '') === SCHOOL_YEAR);
-        if (existing) { log.push(`SKIPPED ${p.staffName}: already has a ${SCHOOL_YEAR} plan`); continue; }
+        let planId = existing ? existing.Id : null;
 
-        const r = await call('POST', '/api/dev-plans', {
-            staffId: rec.Id, schoolYear: SCHOOL_YEAR, planDate: PLAN_DATE,
-            planType: 'Annual', location: p.location, supervisorName: p.supervisor,
-            strengths: p.strengths || '', growthAreas: p.growth || '',
-            favoriteAspect: p.favorite || '', frustrations: p.frustrations || '',
-            initialDate: PLAN_DATE, reviewDate: YEAR_END_DUE,
-            midYearDate: '', midYearNotes: '', yearEndDate: '', yearEndNotes: ''
-        });
-        if (r.status !== 200) { log.push(`FAILED ${p.staffName}: HTTP ${r.status} ${r.body.slice(0, 120)}`); continue; }
-        const planId = JSON.parse(r.body).id;
+        if (existing) {
+            // A plan already here with no goals means an earlier run created the
+            // plan but could not attach them. Backfill rather than skip.
+            const has = (fresh.goals || []).filter(g => String(g.PlanId) === String(existing.Id)).length;
+            if (has) { log.push(`SKIPPED ${p.staffName}: already has a ${SCHOOL_YEAR} plan with ${has} goal(s)`); continue; }
+            log.push(`BACKFILL ${p.staffName}: plan ${planId} exists with no goals`);
+        } else {
+            const r = await call('POST', '/api/dev-plans', {
+                staffId: rec.Id, schoolYear: SCHOOL_YEAR, planDate: PLAN_DATE,
+                planType: 'Annual', location: p.location, supervisorName: p.supervisor,
+                strengths: p.strengths || '', growthAreas: p.growth || '',
+                favoriteAspect: p.favorite || '', frustrations: p.frustrations || '',
+                initialDate: PLAN_DATE, reviewDate: YEAR_END_DUE,
+                midYearDate: '', midYearNotes: '', yearEndDate: '', yearEndNotes: ''
+            });
+            if (r.status !== 200) { log.push(`FAILED ${p.staffName}: HTTP ${r.status} ${r.body.slice(0, 120)}`); continue; }
+            /* Do not trust the id echoed back: an older server build returned 0.
+               Re-read and match on staff plus year, which is unique by design. */
+            const after = await getJSON('/api/dev-plans') || { plans: [] };
+            const mine = (after.plans || []).filter(x => String(x.StaffId) === String(rec.Id)
+                && (x.SchoolYear || '') === SCHOOL_YEAR)
+                .sort((a, b) => (+b.Id) - (+a.Id));
+            planId = mine.length ? mine[0].Id : null;
+            if (!planId) { log.push(`FAILED ${p.staffName}: plan created but its id could not be resolved`); continue; }
+        }
 
         let n = 0;
         for (let i = 0; i < p.goals.length; i++) {
@@ -205,7 +221,7 @@ const PLANS = [
             });
             if (gr.status === 200) n++;
         }
-        log.push(`CREATED ${p.staffName}: plan ${planId}, ${n} goal(s), supervisor ${p.supervisor}`);
+        log.push(`  -> ${p.staffName}: plan ${planId}, ${n} of ${p.goals.length} goal(s) attached, supervisor ${p.supervisor}`);
     }
 
     // What the document says versus who is actually on staff.
