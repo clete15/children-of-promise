@@ -708,6 +708,33 @@ function splitExperience(years) {
     return { years: String(y), months: String(m) };
 }
 
+/* PAS defines the Lead Teacher as "the individual with the highest professional
+   qualifications assigned to teach a group of children" who also handles lesson
+   planning, parent conferences and assessment. It is a per-classroom function,
+   not a job title — and no job title here says "lead", because staff are titled
+   Teacher, Assistant Teacher or Director. So rank the teachers in the room and
+   suggest the best-qualified one, for the director to confirm.
+
+   Ranked on completed education first, then Gateways ECE level, then years of
+   experience. Returned as a tuple so ties fall through in that order. */
+function qualificationScore(s) {
+    const eduRank = { edu_doctorate: 6, edu_master: 5, edu_bachelor: 4, edu_associate: 3, edu_hs: 1 };
+    const edu = eduRank[eduField(s.Education).field] || 0;
+    // "ECE Level 5" / "ECE Credential - Level 5" -> 5
+    const lv = [s.EceCredentials, s.Gateways].filter(Boolean).join(' ')
+        .match(/ece[^0-9]{0,20}?(\d)/i);
+    const ece = lv ? parseInt(lv[1], 10) : 0;
+    const exp = parseFloat(s.ExperienceYears) || 0;
+    return [edu, ece, exp];
+}
+
+function compareScore(a, b) {
+    for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return a[i] - b[i];
+    }
+    return 0;
+}
+
 function initialsFrom(name) {
     const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
     if (!parts.length) return '';
@@ -784,12 +811,28 @@ async function prefillFromStaff() {
             return;
         }
 
+        /* Pair each person with their PAS role up front, so the role survives
+           sorting and the Lead Teacher suggestion below. */
+        const rows = matched.map(s => ({ staff: s, role: pasRole(s.Role) }));
+
+        // Suggest a Lead Teacher when no job title supplies one.
+        let ltSuggested = null;
+        if (!rows.some(r => r.role === 'LT')) {
+            let best = null;
+            rows.forEach(r => {
+                if (r.role !== 'T') return;   // an assistant is never the lead
+                const sc = qualificationScore(r.staff);
+                if (!best || compareScore(sc, best.score) > 0) best = { row: r, score: sc };
+            });
+            if (best) { best.row.role = 'LT'; ltSuggested = best.row.staff; }
+        }
+
         // Lead teacher first, then teachers, then assistants — how the form reads.
         const order = { LT: 0, T: 1, AT: 2, '': 3 };
-        matched.sort((a, b) => order[pasRole(a.Role)] - order[pasRole(b.Role)]);
+        rows.sort((a, b) => order[a.role] - order[b.role]);
 
-        const overflow = matched.slice(STAFF_COUNT);
-        const fits = matched.slice(0, STAFF_COUNT);
+        const overflow = rows.slice(STAFF_COUNT).map(r => r.staff);
+        const fits = rows.slice(0, STAFF_COUNT);
 
         // Clear only the staff blocks; leave program/classroom alone.
         for (let i = 0; i < STAFF_COUNT; i++) {
@@ -801,16 +844,21 @@ async function prefillFromStaff() {
         const filled = [];
         const needs = [];
 
-        fits.forEach((s, i) => {
+        fits.forEach((row, i) => {
+            const s = row.staff;
             const got = [];
             const miss = [];
 
             setField(`initials_${i}`, initialsFrom(s.Name));
             got.push('initials');
 
-            const role = pasRole(s.Role);
-            if (role) { setField(`role_${i}`, role); got.push('role ' + role); }
-            else miss.push(`teaching role (title on file is “${s.Role || 'blank'}”)`);
+            const role = row.role;
+            if (role) {
+                setField(`role_${i}`, role);
+                got.push('role ' + role + (s === ltSuggested ? ' (suggested)' : ''));
+            } else {
+                miss.push(`teaching role (title on file is “${s.Role || 'blank'}”)`);
+            }
 
             const edu = eduField(s.Education);
             if (edu.field) {
@@ -867,16 +915,22 @@ async function prefillFromStaff() {
                 + overflow.map(s => `<strong>${s.Name}</strong>`).join(', ')
                 + '. Print this worksheet, then add the rest on a second copy.</p>';
         }
-        // PAS designates one Lead Teacher per group. Nobody scoring LT usually
-        // means a job title that does not say "lead", not a room without one.
-        const leads = fits.filter(s => pasRole(s.Role) === 'LT');
-        if (leads.length === 0) {
-            html += '<p class="pr-need">No one here scored Lead Teacher, because no job title on file '
-                + 'contains “lead”. PAS expects one Lead Teacher per classroom — the person responsible '
-                + 'for lesson planning, parent conferences and assessment. Set whoever that is to LT above.</p>';
+        // Be explicit that the Lead Teacher was inferred, not read off a record.
+        const leads = fits.filter(r => r.role === 'LT');
+        if (ltSuggested) {
+            const sc = qualificationScore(ltSuggested);
+            html += '<p class="pr-need"><strong>Lead Teacher suggested: ' + ltSuggested.Name + '.</strong> '
+                + 'No job title says “lead”, so this is the best-qualified teacher in the room '
+                + '(education, then Gateways ECE level, then experience — here: '
+                + ['no degree on file', 'high school', '', 'associate', 'bachelor', 'master', 'doctorate'][sc[0]]
+                + ', ECE level ' + (sc[1] || 'none') + ', ' + sc[2] + ' yrs). '
+                + 'Change it if someone else does the lesson planning, parent conferences and assessment.</p>';
+        } else if (leads.length === 0) {
+            html += '<p class="pr-need">No Lead Teacher could be suggested — nobody in this room is '
+                + 'recorded as a teacher. PAS expects one Lead Teacher per classroom.</p>';
         } else if (leads.length > 1) {
             html += '<p class="pr-need">' + leads.length + ' people scored Lead Teacher ('
-                + leads.map(s => s.Name).join(', ') + '). PAS expects one per classroom — '
+                + leads.map(r => r.staff.Name).join(', ') + '). PAS expects one per classroom — '
                 + 'change the others to T.</p>';
         }
         html += '<h4 class="pr-need">Still needs you</h4><ul class="pr-need">' + needs.join('') + '</ul>'
