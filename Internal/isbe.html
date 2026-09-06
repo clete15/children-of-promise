@@ -1113,17 +1113,59 @@ function shortDate(iso) {
 
 // Beginning-of-year screening must happen within 45 days of the enrollment date.
 // Returns null when we can't judge it (no start date, or not a beginning screening).
-function screeningDeadline(student, screeningDate) {
-    if (!student.Start_Date) return null;
+// First day of a school year, as a date the 45-day clock can measure from.
+// The program year begins around August, well before the July 1 rollover the
+// F/R/P thresholds use, so Aug 1 of the start year is the anchor. A screening
+// due "within 45 days" is 45 days from when the child started THIS year's
+// program, which for a returning child is the start of school, not their
+// original enrollment years ago.
+function schoolYearStartDate(year) {
+    const start = parseInt(String(year || activeSchoolYear).split('-')[0], 10);
+    return isNaN(start) ? null : start + '-08-01';
+}
+
+// The date the beginning-of-year screening clock runs from: the later of the
+// child's enrollment and the start of the year in view. Rosters are set before
+// the year starts, so returning and pre-enrolled children anchor to the year
+// start (the batch). A child brought in after the batch window anchors to their
+// own enrollment and gets an individual 45-day clock.
+function screeningAnchorDate(student, year) {
+    const yearStart = schoolYearStartDate(year);
+    const enrolled = student.Start_Date || null;
+    if (!enrolled) return yearStart;
+    if (!yearStart) return enrolled;
+    return enrolled > yearStart ? enrolled : yearStart;
+}
+
+// A child is a "late enrollee" for screening when they joined after the batch
+// window closed (year start + 45 days), so their beginning screening is an
+// individual task rather than part of the start-of-year batch. Children enrolled
+// before or during the window are batch children even if they enrolled a little
+// after Aug 1.
+function isLateEnrollee(student, year) {
+    const yearStart = schoolYearStartDate(year);
+    if (!yearStart || !student.Start_Date) return false;
+    const into = daysBetween(yearStart, student.Start_Date);
+    return into !== null && into > SCREENING_DEADLINE_DAYS;
+}
+
+function screeningDeadline(student, screeningDate, year) {
+    const anchor = screeningAnchorDate(student, year);
+    if (!anchor) return null;
     if (screeningDate) {
-        const used = daysBetween(student.Start_Date, screeningDate);
+        const used = daysBetween(anchor, screeningDate);
         if (used === null) return null;
+        // A screening dated before the anchor (e.g. carried over) is on time.
+        if (used < 0) return { state: 'ok', text: 'on file' };
         return used <= SCREENING_DEADLINE_DAYS
             ? { state: 'ok', text: 'day ' + used }
             : { state: 'late', text: used + 'd (late)' };
     }
-    // Not screened yet: count against today.
-    const elapsed = daysBetween(student.Start_Date, new Date().toISOString().split('T')[0]);
+    // Not screened yet: count against today, but never start the clock before the
+    // anchor — a screening due Aug 1 is not "overdue" when viewed in June.
+    const today = new Date().toISOString().split('T')[0];
+    if (today < anchor) return { state: 'ok', text: 'not started' };
+    const elapsed = daysBetween(anchor, today);
     if (elapsed === null) return null;
     const left = SCREENING_DEADLINE_DAYS - elapsed;
     if (left < 0) return { state: 'overdue', text: Math.abs(left) + 'd overdue' };
@@ -1149,8 +1191,8 @@ function screeningMeta(student, type, period, isBeginning) {
     }
     // 45-day clock only applies to the beginning-of-year screening.
     if (isBeginning) {
-        const dl = screeningDeadline(student, rec && rec.ScreeningDate);
-        if (dl) bits.push('<span class="scr-flag dl-' + dl.state + '" title="45-day screening window from enrollment">' + dl.text + '</span>');
+        const dl = screeningDeadline(student, rec && rec.ScreeningDate, activeSchoolYear);
+        if (dl) bits.push('<span class="scr-flag dl-' + dl.state + '" title="45 days from the start of the school year, or from enrollment if later">' + dl.text + '</span>');
     }
     return bits.length ? '<div class="scr-meta">' + bits.join(' ') + '</div>' : '';
 }
@@ -2208,9 +2250,11 @@ function childUrgency(s) {
     let worst = null;
     ['BegASQ', 'BegASE'].forEach(field => {
         if ((trackingData[s.Id] || {})[field]) return;
+        // Only late enrollees have an individual clock that should raise urgency.
+        if (!isLateEnrollee(s, activeSchoolYear)) return;
         const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
         const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
-        const dl = screeningDeadline(s, rec && rec.ScreeningDate);
+        const dl = screeningDeadline(s, rec && rec.ScreeningDate, activeSchoolYear);
         if (!dl) return;
         const rank = dl.state === 'overdue' ? 0 : dl.state === 'due' ? 1 : 2;
         if (worst === null || rank < worst) worst = rank;
@@ -2284,10 +2328,15 @@ function renderClassroom() {
                 const period = col.field.indexOf('Beg') === 0 ? 'Beginning' : 'End';
                 action = 'openScreening(' + s.Id + ',\'' + type + '\',\'' + period + '\')';
                 if (!done && period === 'Beginning') {
-                    const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
-                    const dl = screeningDeadline(s, rec && rec.ScreeningDate);
-                    if (dl && (dl.state === 'overdue' || dl.state === 'due')) {
-                        extra = '<span class="cls-dl cls-dl-' + dl.state + '">' + dl.text + '</span>';
+                    // Only late enrollees carry an individual clock. Batch children
+                    // are covered by the classroom's batch line, so their chip just
+                    // shows done/not-done without a misleading per-child countdown.
+                    if (isLateEnrollee(s, activeSchoolYear)) {
+                        const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
+                        const dl = screeningDeadline(s, rec && rec.ScreeningDate, activeSchoolYear);
+                        if (dl && (dl.state === 'overdue' || dl.state === 'due')) {
+                            extra = '<span class="cls-dl cls-dl-' + dl.state + '">' + dl.text + '</span>';
+                        }
                     }
                 }
             } else if (col.field === 'PermissionSlip') {
@@ -2349,25 +2398,58 @@ function visibleColumnsFor(program) {
     return COLUMNS.filter(c => !c.programs || c.programs.indexOf(program) !== -1);
 }
 
-// Beginning-of-year screening must land within 45 days of enrollment. Returns the
-// children who are past it or close to it, worst first.
-function screeningDeadlineWatch(program) {
-    const out = [];
-    activeRoster(program).forEach(s => {
+// Beginning ASQ / ASE for the whole program, split into the start-of-year batch
+// (children on the roster at year start, one shared deadline) and late enrollees
+// (each on their own 45-day clock). Returns per-program summaries plus the flat
+// list of late-enrollee items so the views can show the batch as one line.
+function beginningScreeningStatus(program) {
+    const roster = activeRoster(program);
+    const batchDue = schoolYearStartDate(activeSchoolYear);
+    const batchDeadline = batchDue ? addDays(batchDue, SCREENING_DEADLINE_DAYS) : null;
+    const today = new Date().toISOString().split('T')[0];
+
+    const batch = { total: 0, done: 0, deadline: batchDeadline };
+    const late = [];
+
+    roster.forEach(s => {
+        const lateOne = isLateEnrollee(s, activeSchoolYear);
         ['BegASQ', 'BegASE'].forEach(field => {
-            if ((trackingData[s.Id] || {})[field]) return;
             const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
-            const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
-            const dl = screeningDeadline(s, rec && rec.ScreeningDate);
-            if (!dl) return;   // no enrollment date, surfaced separately
-            if (dl.state === 'overdue' || dl.state === 'due') {
-                const elapsed = daysBetween(s.Start_Date, new Date().toISOString().split('T')[0]);
-                out.push({ student: s, field: field, type: type, state: dl.state, text: dl.text, elapsed: elapsed });
+            const done = !!(trackingData[s.Id] || {})[field];
+            if (lateOne) {
+                if (done) return;
+                const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
+                const dl = screeningDeadline(s, rec && rec.ScreeningDate, activeSchoolYear);
+                if (dl && (dl.state === 'overdue' || dl.state === 'due')) {
+                    late.push({ student: s, field: field, type: type, state: dl.state, text: dl.text });
+                }
+            } else {
+                batch.total++;
+                if (done) batch.done++;
             }
         });
     });
-    // Most overdue first.
-    return out.sort((a, b) => (b.elapsed || 0) - (a.elapsed || 0));
+
+    // Batch urgency measured against the shared deadline.
+    let batchState = 'ok';
+    if (batchDeadline && batch.done < batch.total) {
+        const left = daysBetween(today, batchDeadline);
+        if (left === null) batchState = 'ok';
+        else if (left < 0) batchState = 'overdue';
+        else if (left <= 14) batchState = 'due';
+    }
+    batch.state = batchState;
+    batch.left = batchDeadline ? daysBetween(today, batchDeadline) : null;
+
+    return { program: program, batch: batch, late: late };
+}
+
+// Small date helper: add days to a YYYY-MM-DD string, returning the same format.
+function addDays(iso, n) {
+    const d = new Date(iso);
+    if (isNaN(d)) return null;
+    d.setDate(d.getDate() + n);
+    return d.toISOString().split('T')[0];
 }
 
 // PI6 documents are due within 6 months of enrollment.
@@ -2429,21 +2511,43 @@ function renderStartYear() {
         + 'Everything below is for this school year only.</div></div></div>';
 
     // 1. Regulatory clocks.
-    const scrWatch = screeningDeadlineWatch('PFA').concat(screeningDeadlineWatch('PI'));
     const sixMonth = sixMonthWatch();
 
-    if (scrWatch.length) {
-        const rows = scrWatch.map(w =>
-            '<tr><td>' + nameOf(w.student) + '</td><td>' + getRoom(w.student.RoomNumber) + '</td>'
-            + '<td>' + w.type + '</td>'
-            + '<td><span class="sy-pill sy-' + w.state + '">' + w.text + '</span></td>'
-            + '<td><a href="#" onclick="event.preventDefault();openScreening(' + w.student.Id
-            + ',\'' + w.type + '\',\'Beginning\')">enter scores</a></td></tr>').join('');
-        html += syBlock('Screening window closing',
-            'The beginning-of-year screening must be completed within 45 days of enrollment.',
-            '<table class="sy-table"><thead><tr><th>Child</th><th>Room</th><th>Screening</th><th>Status</th><th></th></tr></thead><tbody>'
-            + rows + '</tbody></table>');
-    }
+    // Beginning-of-year screening batch, per program, plus any late enrollees.
+    ['PFA', 'PI'].forEach(program => {
+        if (!activeRoster(program).length) return;
+        const st = beginningScreeningStatus(program);
+        const b = st.batch;
+        let rows = '';
+
+        if (b.total) {
+            const left = b.left;
+            const when = b.deadline
+                ? (left === null ? '' : left < 0 ? Math.abs(left) + ' days past the batch date'
+                    : left + ' days until the batch date (' + shortDate(b.deadline) + ')')
+                : '';
+            const pill = b.done >= b.total
+                ? '<span class="sy-pill sy-ok">complete</span>'
+                : '<span class="sy-pill sy-' + b.state + '">' + b.done + ' of ' + b.total + ' done</span>';
+            rows += '<tr><td><strong>Start-of-year batch</strong><div class="sy-names">'
+                + 'All children on the roster at the start of the year, screened together.</div></td>'
+                + '<td>' + pill + '</td><td class="sy-names">' + when + '</td></tr>';
+        }
+
+        st.late.forEach(w => {
+            rows += '<tr><td>' + nameOf(w.student) + ' <span class="sy-names">(enrolled after the batch)</span></td>'
+                + '<td><span class="sy-pill sy-' + w.state + '">' + w.type + ' \u2014 ' + w.text + '</span></td>'
+                + '<td><a href="#" onclick="event.preventDefault();openScreening(' + w.student.Id
+                + ',\'' + w.type + '\',\'Beginning\')">enter scores</a></td></tr>';
+        });
+
+        if (rows && (b.done < b.total || st.late.length)) {
+            html += syBlock(program + ' beginning screenings (ASQ &amp; ASE)',
+                'Screened as one batch at the start of the year. Children enrolled after the window get an individual 45-day clock.',
+                '<table class="sy-table"><thead><tr><th>Who</th><th>Status</th><th></th></tr></thead><tbody>'
+                + rows + '</tbody></table>');
+        }
+    });
 
     if (sixMonth.length) {
         const rows = sixMonth.map(w =>
