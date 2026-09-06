@@ -115,7 +115,8 @@ function txDecode(v) {
 const ISBE_TRACKING_COLUMNS = [
     'PermissionSlip', 'ParentInterview', 'ProofOfIncome', 'EnterSIS',
     'BegASQ', 'BegASE', 'MidYearReport', 'EndASQ', 'EndASE', 'EndYearReport',
-    // PICC PI6/PI7 per-child document forms (Prevention Initiative only).
+    // PICC per-child document forms (Prevention Initiative only).
+    'WeightedEligibility', 'ScreeningResultsShared',
     'FamilyCenteredAssessment', 'FamilyGoalPlan', 'TransitionPlan', 'Referral',
     'RemoveFromSIS', 'GrantPerfReport'
 ];
@@ -216,6 +217,73 @@ const PI_DOC_FORMS = {
             ['SignedDate', 'NVARCHAR(20)', 'signedDate']
         ]
     },
+    // PI5.A weighted eligibility form, with PI5.B-G priority populations,
+    // PI5.H determination and PI5.J income verification on the same document.
+    // One column per criterion so eligibility can be reported on later.
+    'weighted-eligibility': {
+        table: 'PIWeightedEligibility',
+        trackingColumn: 'WeightedEligibility',
+        columns: [
+            ['CompletedDate', 'NVARCHAR(20)', 'completedDate'],
+            ['EnrollmentDate', 'NVARCHAR(20)', 'enrollmentDate'],
+            ['CompletedBy', 'NVARCHAR(200)', 'completedBy'],
+            ['Homeless', 'NVARCHAR(10)', 'homeless'],
+            ['YouthInCare', 'NVARCHAR(10)', 'youthInCare'],
+            ['EarlyIntervention', 'NVARCHAR(10)', 'earlyIntervention'],
+            ['HasIep', 'NVARCHAR(10)', 'hasIep'],
+            ['ScreeningDelayNoEi', 'NVARCHAR(10)', 'screeningDelayNoEi'],
+            ['IncomeBelow50Fpl', 'NVARCHAR(10)', 'incomeBelow50Fpl'],
+            ['ParentEll', 'NVARCHAR(10)', 'parentEll'],
+            ['NonEnglishHome', 'NVARCHAR(10)', 'nonEnglishHome'],
+            ['PublicBenefits', 'NVARCHAR(10)', 'publicBenefits'],
+            ['AbuseHistory', 'NVARCHAR(10)', 'abuseHistory'],
+            ['MentalIllness', 'NVARCHAR(10)', 'mentalIllness'],
+            ['DcfsInvolvement', 'NVARCHAR(10)', 'dcfsInvolvement'],
+            ['SubstanceAbuse', 'NVARCHAR(10)', 'substanceAbuse'],
+            ['CaregiverOther', 'NVARCHAR(10)', 'caregiverOther'],
+            ['FamilyDeath', 'NVARCHAR(10)', 'familyDeath'],
+            ['LowBirthWeight', 'NVARCHAR(10)', 'lowBirthWeight'],
+            ['ParentIncarcerated', 'NVARCHAR(10)', 'parentIncarcerated'],
+            ['TeenParent', 'NVARCHAR(10)', 'teenParent'],
+            ['NoHsDiploma', 'NVARCHAR(10)', 'noHsDiploma'],
+            ['BornOutsideUs', 'NVARCHAR(10)', 'bornOutsideUs'],
+            ['ActiveMilitary', 'NVARCHAR(10)', 'activeMilitary'],
+            ['SingleParent', 'NVARCHAR(10)', 'singleParent'],
+            ['TotalPoints', 'NVARCHAR(10)', 'totalPoints'],
+            ['HouseholdIncome', 'NVARCHAR(40)', 'householdIncome'],
+            ['HouseholdSize', 'NVARCHAR(10)', 'householdSize'],
+            ['IncomeVerificationType', 'NVARCHAR(120)', 'incomeVerificationType'],
+            ['IncomeVerificationDate', 'NVARCHAR(20)', 'incomeVerificationDate'],
+            ['BenefitCardInParentName', 'NVARCHAR(20)', 'benefitCardInParentName'],
+            ['EligibilityResult', 'NVARCHAR(120)', 'eligibilityResult'],
+            ['Notes', 'NVARCHAR(MAX)', 'notes'],
+            ['ParentSignature', 'NVARCHAR(200)', 'parentSignature'],
+            ['StaffSignature', 'NVARCHAR(200)', 'staffSignature'],
+            ['SignedDate', 'NVARCHAR(20)', 'signedDate']
+        ]
+    },
+    'screening-results-shared': {
+        table: 'PIScreeningResultsShared',
+        trackingColumn: 'ScreeningResultsShared',
+        columns: [
+            ['ToolUsed', 'NVARCHAR(120)', 'toolUsed'],
+            ['ToolOther', 'NVARCHAR(200)', 'toolOther'],
+            ['ScreeningDate', 'NVARCHAR(20)', 'screeningDate'],
+            ['ScreenerName', 'NVARCHAR(200)', 'screenerName'],
+            ['ResultsSummary', 'NVARCHAR(MAX)', 'resultsSummary'],
+            ['SharedDate', 'NVARCHAR(20)', 'sharedDate'],
+            ['SharedWith', 'NVARCHAR(200)', 'sharedWith'],
+            ['SharedMethod', 'NVARCHAR(120)', 'sharedMethod'],
+            ['EvidenceOfSharing', 'NVARCHAR(MAX)', 'evidenceOfSharing'],
+            ['ParentResponse', 'NVARCHAR(MAX)', 'parentResponse'],
+            ['ConcernIdentified', 'NVARCHAR(10)', 'concernIdentified'],
+            ['ReferralMade', 'NVARCHAR(20)', 'referralMade'],
+            ['FollowUpNotes', 'NVARCHAR(MAX)', 'followUpNotes'],
+            ['ParentSignature', 'NVARCHAR(200)', 'parentSignature'],
+            ['StaffSignature', 'NVARCHAR(200)', 'staffSignature'],
+            ['SignedDate', 'NVARCHAR(20)', 'signedDate']
+        ]
+    },
     'referral': {
         table: 'PIReferrals',
         trackingColumn: 'Referral',
@@ -240,6 +308,39 @@ const PI_DOC_FORMS = {
         ]
     }
 };
+
+// ── ParentInterviews schema ──
+// PICC PI5.L requires the preferred language to be identified on the Parent
+// Interview Form, and PI5.M requires a section recording translator
+// arrangements. The checklist states neither section may be left blank. The
+// table predates these columns in production, hence the migrations.
+const PARENT_INTERVIEW_ADDED_COLUMNS = [
+    ['PreferredLanguage', 'NVARCHAR(120)'],
+    ['TranslatorNeeded', 'NVARCHAR(20)'],
+    ['TranslatorArrangements', 'NVARCHAR(MAX)']
+];
+
+function parentInterviewEnsureSQL() {
+    let sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
+    CREATE TABLE ParentInterviews (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StudentId INT NOT NULL,
+        InterviewDate NVARCHAR(20),
+        ParentGoals NVARCHAR(MAX),
+        ParentConcerns NVARCHAR(MAX),
+        ChildStrengths NVARCHAR(MAX),
+        ParentSignature NVARCHAR(200),
+        StaffSignature NVARCHAR(200),
+        Notes NVARCHAR(MAX),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+    for (const [name, type] of PARENT_INTERVIEW_ADDED_COLUMNS) {
+        sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='${name}') ALTER TABLE ParentInterviews ADD ${name} ${type};\n`;
+    }
+    return sql;
+}
 
 function docFormEnsureSQL(cfg) {
     const cols = cfg.columns.map(([name, type]) => `        ${name} ${type}`).join(',\n');
@@ -793,28 +894,15 @@ function handleRequest(req, res) {
     if (req.method === 'GET' && url.startsWith('/api/parent-interview/')) {
         if (!checkAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
-        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
-            CREATE TABLE ParentInterviews (
-                Id INT IDENTITY(1,1) PRIMARY KEY,
-                StudentId INT NOT NULL,
-                InterviewDate NVARCHAR(20),
-                ParentGoals NVARCHAR(MAX),
-                ParentConcerns NVARCHAR(MAX),
-                ChildStrengths NVARCHAR(MAX),
-                ParentSignature NVARCHAR(200),
-                StaffSignature NVARCHAR(200),
-                Notes NVARCHAR(MAX),
-                CreatedAt DATETIME DEFAULT GETDATE(),
-                UpdatedAt DATETIME DEFAULT GETDATE()
-            );
-            SELECT Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},CreatedAt,UpdatedAt FROM ParentInterviews WHERE StudentId=${studentId}`;
+        const sql = parentInterviewEnsureSQL()
+            + `SELECT Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')} FROM ParentInterviews WHERE StudentId=${studentId}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
-                return { Id:v[0], StudentId:v[1], InterviewDate:v[2], ParentGoals:txDecode(v[3]), ParentConcerns:txDecode(v[4]), ChildStrengths:txDecode(v[5]), ParentSignature:txDecode(v[6]), StaffSignature:txDecode(v[7]), Notes:txDecode(v[8]), CreatedAt:v[9], UpdatedAt:v[10] };
+                return { Id:v[0], StudentId:v[1], InterviewDate:v[2], ParentGoals:txDecode(v[3]), ParentConcerns:txDecode(v[4]), ChildStrengths:txDecode(v[5]), ParentSignature:txDecode(v[6]), StaffSignature:txDecode(v[7]), Notes:txDecode(v[8]), PreferredLanguage:txDecode(v[9]), TranslatorNeeded:txDecode(v[10]), TranslatorArrangements:txDecode(v[11]) };
             });
         return sendJSON(res, 200, rows.length ? rows[0] : null);
     }
@@ -825,24 +913,12 @@ function handleRequest(req, res) {
         const studentId = parseInt(url.split('/')[3]);
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
-            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
-                CREATE TABLE ParentInterviews (
-                    Id INT IDENTITY(1,1) PRIMARY KEY,
-                    StudentId INT NOT NULL,
-                    InterviewDate NVARCHAR(20),
-                    ParentGoals NVARCHAR(MAX),
-                    ParentConcerns NVARCHAR(MAX),
-                    ChildStrengths NVARCHAR(MAX),
-                    ParentSignature NVARCHAR(200),
-                    StaffSignature NVARCHAR(200),
-                    Notes NVARCHAR(MAX),
-                    CreatedAt DATETIME DEFAULT GETDATE(),
-                    UpdatedAt DATETIME DEFAULT GETDATE()
-                );
-                IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId})
-                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+            const sql = parentInterviewEnsureSQL()
+                + isbeTrackingEnsureSQL()
+                + `IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId})
+                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},PreferredLanguage=${esc(d.preferredLanguage)},TranslatorNeeded=${esc(d.translatorNeeded)},TranslatorArrangements=${esc(d.translatorArrangements)},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
                 ELSE
-                    INSERT INTO ParentInterviews (StudentId,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,StaffSignature,Notes) VALUES (${studentId},${esc(d.interviewDate)},${esc(d.parentGoals)},${esc(d.parentConcerns)},${esc(d.childStrengths)},${esc(d.parentSignature)},${esc(d.staffSignature)},${esc(d.notes)});
+                    INSERT INTO ParentInterviews (StudentId,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,StaffSignature,Notes,PreferredLanguage,TranslatorNeeded,TranslatorArrangements) VALUES (${studentId},${esc(d.interviewDate)},${esc(d.parentGoals)},${esc(d.parentConcerns)},${esc(d.childStrengths)},${esc(d.parentSignature)},${esc(d.staffSignature)},${esc(d.notes)},${esc(d.preferredLanguage)},${esc(d.translatorNeeded)},${esc(d.translatorArrangements)});
                 IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
                     UPDATE ISBETracking SET ParentInterview=1 WHERE StudentId=${studentId}
                 ELSE

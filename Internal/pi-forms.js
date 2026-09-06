@@ -124,6 +124,82 @@
         'Closed'
     ];
 
+    /* ── Weighted eligibility criteria (PI5.A) ──
+       These mirror the scoring the public pre-enrollment form already applies to
+       rank the waiting list (External/preenrollment.html calcScore), so a child
+       who came through that form has this whole table filled in automatically.
+
+       points     must stay in step with calcScore or the printed form will
+                  disagree with the waiting-list order it claims to explain
+       picc       priority population the criterion satisfies, where PI5.B-G
+                  names one; the checklist requires those to appear on the form
+       intakeKey  Yes/No column on the pre-enrollment record
+       derive     for criteria the intake stores as something other than Yes/No
+
+       PI5.C, PI5.F and PI5.G are required priority populations that the
+       pre-enrollment form does not currently ask about, so they have no
+       intakeKey and start blank for staff to answer. */
+    const WEIGHTED_CRITERIA = [
+        { key: 'homeless', label: 'Experiencing homelessness', points: 50, picc: 'PI5.D', intakeKey: 'Homeless' },
+        { key: 'youthInCare', label: 'Youth in Care (foster) or adopted', points: 50, picc: 'PI5.E', intakeKey: 'FosterAdopted' },
+        { key: 'earlyIntervention', label: 'Enrolled in Early Intervention with an identified delay', points: 5, picc: 'PI5.B', intakeKey: 'EarlyIntervention' },
+        { key: 'hasIep', label: 'Has an IEP', points: 5, picc: 'PI5.B', intakeKey: 'IEP' },
+        { key: 'screeningDelayNoEi', label: 'Screening indicated a delay but no current Early Intervention referral', points: 5, picc: 'PI5.C' },
+        { key: 'incomeBelow50Fpl', label: 'Family income at or below 50% of the federal poverty level', points: 5, picc: 'PI5.F' },
+        { key: 'parentEll', label: 'Parent or caregiver is an English language learner', points: 5, picc: 'PI5.G' },
+        { key: 'nonEnglishHome', label: 'Primary language in the home is not English', points: 5, intakeKey: 'NonEnglishHome' },
+        { key: 'publicBenefits', label: 'Receiving public benefits (WIC, Medicaid, SNAP, TANF)', points: 5, derive: d => (d.PublicBenefits ? 'Yes' : 'No') },
+        { key: 'abuseHistory', label: 'Abuse or domestic violence history', points: 5, intakeKey: 'AbuseHistory' },
+        { key: 'mentalIllness', label: 'Mental illness in the home', points: 5, intakeKey: 'MentalIllness' },
+        { key: 'dcfsInvolvement', label: 'DCFS involvement', points: 5, intakeKey: 'DcfsInvolvement' },
+        { key: 'substanceAbuse', label: 'Substance abuse in the home', points: 5, intakeKey: 'SubstanceAbuse' },
+        { key: 'caregiverOther', label: 'Child cared for by someone other than a parent', points: 5, intakeKey: 'CaregiverOther' },
+        { key: 'familyDeath', label: 'Death in the immediate family', points: 5, intakeKey: 'FamilyDeath' },
+        { key: 'lowBirthWeight', label: 'Low birth weight or failure to thrive', points: 5, intakeKey: 'LowBirthWeight' },
+        { key: 'parentIncarcerated', label: 'Parent incarcerated', points: 5, intakeKey: 'ParentIncarcerated' },
+        { key: 'teenParent', label: 'Teen parent', points: 5, intakeKey: 'TeenParent' },
+        { key: 'noHsDiploma', label: 'Parent without a high school diploma', points: 5, intakeKey: 'NoHSDiploma' },
+        { key: 'bornOutsideUs', label: 'Child or parent born outside the United States', points: 5, intakeKey: 'BornOutsideUS' },
+        { key: 'activeMilitary', label: 'Active military family', points: 5, intakeKey: 'ActiveMilitary' },
+        { key: 'singleParent', label: 'Single-parent household', points: 3, derive: d => (d.LivingSituation === 'Single Parent' ? 'Yes' : 'No') }
+    ];
+
+    // PI5.H: the three determinations the checklist recognises.
+    const ELIGIBILITY_RESULTS = [
+        '',
+        'Family is enrolled in the PI program',
+        'Family did not qualify for the PI program',
+        'Family is on the PI waiting list'
+    ];
+
+    const INCOME_VERIFICATION_TYPES = [
+        '',
+        'Pay stubs',
+        'Prior year tax return',
+        'Benefit award letter',
+        'Employer statement',
+        'Self-declaration of income',
+        'Other (describe in notes)'
+    ];
+
+    const SCREENING_TOOLS = [
+        '',
+        'ASQ-3',
+        'ASQ:SE-2',
+        'ASQ-3 and ASQ:SE-2',
+        'Other (describe below)'
+    ];
+
+    const SHARING_METHODS = [
+        '',
+        'In person',
+        'Parent-teacher conference',
+        'Sent home in writing',
+        'Phone call',
+        'Email',
+        'Other (describe below)'
+    ];
+
     // The child header every one of these documents needs. PICC file reviews
     // check that each document identifies the child it belongs to.
     function childSection() {
@@ -305,6 +381,130 @@
             ]
         },
 
+        weightedEligibility: {
+            api: 'weighted-eligibility',
+            field: 'WeightedEligibility',
+            title: 'Weighted Eligibility Determination',
+            picc: 'PICC PI5.A / PI5.B-G / PI5.H / PI5.J',
+            piccNote: 'Every child enrolled in PI needs a completed weighted eligibility form on file, '
+                + 'with income verification, and it must be dated on or before the enrollment date. '
+                + 'Criteria are pre-filled from the family\u2019s pre-enrollment submission where one exists; '
+                + 'check them against the file and correct anything that has changed.',
+            saveLabel: 'Save Determination',
+            primaryDate: 'completedDate',
+            beforeEnrollment: true,
+            needsIntake: true,
+            sections: [
+                childSection(),
+                {
+                    title: 'Completion',
+                    fields: [
+                        { key: 'completedDate', label: 'Date Completed', type: 'date' },
+                        { key: 'enrollmentDate', label: 'Enrollment Date', type: 'date', default: s => s.Start_Date || '' },
+                        { key: 'completedBy', label: 'Completed By (staff)', type: 'text' },
+                        {
+                            label: 'Pre-Enrollment Record', type: 'static',
+                            value: (s, intake) => !intake ? 'None on file'
+                                : 'Submitted ' + (intake.SubmittedAt || '').split(' ')[0]
+                                + (intake.MatchType === 'name+dob' ? ' (matched by name + DOB)' : '')
+                        }
+                    ]
+                },
+                {
+                    title: 'Weighted Criteria',
+                    note: 'PICC PI5.B through PI5.G require the priority populations to appear on this form. '
+                        + 'Rows tagged PI5.C, PI5.F and PI5.G are not asked on the public pre-enrollment form yet, '
+                        + 'so they start blank and need answering here.',
+                    fields: [
+                        { key: 'criteriaTable', type: 'criteria', label: 'Weighted Eligibility Criteria', items: WEIGHTED_CRITERIA },
+                        { key: 'totalPoints', label: 'Total Weighted Points', type: 'text' }
+                    ]
+                },
+                {
+                    title: 'Income Verification',
+                    note: 'PI5.J requires proof of income in the file, re-verified each time this form is completed. '
+                        + 'If the family uses a benefit card as proof, the card must be in the parent\u2019s name, not the child\u2019s.',
+                    fields: [
+                        { key: 'householdIncome', label: 'Household Income', type: 'text', default: (s, intake) => (intake && intake.HouseholdIncome) || '' },
+                        { key: 'householdSize', label: 'Household Size', type: 'text', default: (s, intake) => (intake && intake.HouseholdSize) || '' },
+                        { key: 'incomeVerificationType', label: 'Proof of Income Provided', type: 'select', options: INCOME_VERIFICATION_TYPES },
+                        { key: 'incomeVerificationDate', label: 'Date Income Verified', type: 'date' },
+                        { key: 'benefitCardInParentName', label: 'If a Benefit Card Was Used, Is It in the Parent\u2019s Name?', type: 'select', options: YES_NO_NA, full: true }
+                    ]
+                },
+                {
+                    title: 'Determination',
+                    note: 'PI5.H records the outcome of the eligibility screening in the child/family file.',
+                    fields: [
+                        { key: 'eligibilityResult', label: 'Eligibility Screening Result', type: 'select', options: ELIGIBILITY_RESULTS, full: true },
+                        { key: 'notes', label: 'Notes', type: 'textarea', full: true }
+                    ]
+                },
+                {
+                    title: 'Signatures',
+                    fields: [
+                        { key: 'parentSignature', label: 'Parent/Guardian Signature', type: 'text', placeholder: 'Type full name as signature' },
+                        { key: 'staffSignature', label: 'Staff Signature', type: 'text', placeholder: 'Type full name as signature' },
+                        { key: 'signedDate', label: 'Date Signed', type: 'date' }
+                    ]
+                }
+            ]
+        },
+
+        screeningResultsShared: {
+            api: 'screening-results-shared',
+            field: 'ScreeningResultsShared',
+            title: 'Screening Results Shared with Parent',
+            picc: 'PICC PI10.H',
+            piccNote: 'Every child who was screened needs documentation that the results were shared with the '
+                + 'parent or guardian. The checklist names seven components: child name, the tool used, evidence '
+                + 'the results were shared, who they were shared with, the date screened, the date shared, and '
+                + 'the name of the screener.',
+            saveLabel: 'Save Record',
+            primaryDate: 'sharedDate',
+            sections: [
+                childSection(),
+                {
+                    title: 'Screening',
+                    fields: [
+                        { key: 'toolUsed', label: 'Research-Based Tool Used', type: 'select', options: SCREENING_TOOLS },
+                        { key: 'toolOther', label: 'If Other, name the tool', type: 'text' },
+                        { key: 'screeningDate', label: 'Date Child Was Screened', type: 'date' },
+                        { key: 'screenerName', label: 'Name of Screener (staff)', type: 'text' },
+                        { key: 'resultsSummary', label: 'Results Summary', type: 'textarea', full: true, placeholder: 'Domains screened and the outcome in each.' }
+                    ]
+                },
+                {
+                    title: 'Sharing with Parent',
+                    fields: [
+                        { key: 'sharedDate', label: 'Date Results Were Shared', type: 'date' },
+                        { key: 'sharedWith', label: 'Shared With (parent/guardian name)', type: 'text' },
+                        { key: 'sharedMethod', label: 'How Results Were Shared', type: 'select', options: SHARING_METHODS },
+                        { key: 'evidenceOfSharing', label: 'Evidence the Results Were Shared', type: 'textarea', full: true, placeholder: 'What was given to or discussed with the parent, and any copy retained in the file.' },
+                        { key: 'parentResponse', label: 'Parent Questions or Response', type: 'textarea', full: true }
+                    ]
+                },
+                {
+                    title: 'Follow-Up',
+                    note: 'PI10.I requires a referral for further evaluation when a screening identifies a concern. '
+                        + 'Record the referral itself on the Referral form.',
+                    fields: [
+                        { key: 'concernIdentified', label: 'Screening Identified a Concern', type: 'select', options: YES_NO },
+                        { key: 'referralMade', label: 'Referred for Further Evaluation', type: 'select', options: YES_NO_NA },
+                        { key: 'followUpNotes', label: 'Follow-Up Notes', type: 'textarea', full: true }
+                    ]
+                },
+                {
+                    title: 'Signatures',
+                    fields: [
+                        { key: 'parentSignature', label: 'Parent/Guardian Signature', type: 'text', placeholder: 'Type full name as signature' },
+                        { key: 'staffSignature', label: 'Staff Signature', type: 'text', placeholder: 'Type full name as signature' },
+                        { key: 'signedDate', label: 'Date Signed', type: 'date', default: todayISO }
+                    ]
+                }
+            ]
+        },
+
         referral: {
             api: 'referral',
             field: 'Referral',
@@ -368,17 +568,48 @@
 
     let currentKey = null;
     let currentStudentId = null;
+    let currentIntake = null;   // pre-enrollment record, when the spec asks for it
 
     // ── Rendering ──
+
+    // A criteria block is stored one column per criterion, so it expands into
+    // ordinary select fields for save/load and only differs in how it renders.
+    function criteriaFields(f) {
+        return f.items.map(it => ({ key: it.key, type: 'select', options: YES_NO, criterion: it }));
+    }
+
+    function criteriaHtml(f) {
+        const rows = f.items.map(it =>
+            '<tr>'
+            + '<td>' + escHtml(it.label) + '</td>'
+            + '<td class="doc-criteria-picc">' + (it.picc ? escHtml(it.picc) : '') + '</td>'
+            + '<td class="doc-criteria-pts">' + it.points + '</td>'
+            + '<td><select id="doc_' + it.key + '" onchange="recalcWeightedTotal()">'
+            + YES_NO.map(o => '<option value="' + escHtml(o) + '">'
+                + escHtml(o || '\u2014') + '</option>').join('')
+            + '</select></td>'
+            + '</tr>').join('');
+
+        return '<div class="pi-field pi-full"><label>' + escHtml(f.label) + '</label>'
+            + '<table class="doc-criteria">'
+            + '<thead><tr><th>Criterion</th><th>PICC</th><th>Pts</th><th>Applies</th></tr></thead>'
+            + '<tbody>' + rows + '</tbody>'
+            + '<tfoot><tr><td colspan="2">Total weighted points</td>'
+            + '<td class="doc-criteria-pts" id="docCriteriaTotal">0</td><td></td></tr></tfoot>'
+            + '</table>'
+            + '<div id="docScoreCompare" class="doc-note"></div></div>';
+    }
 
     function fieldHtml(f, student) {
         const id = 'doc_' + f.key;
         const cls = 'pi-field' + (f.full ? ' pi-full' : '');
         const ph = f.placeholder ? ' placeholder="' + escHtml(f.placeholder) + '"' : '';
 
+        if (f.type === 'criteria') return criteriaHtml(f);
+
         if (f.type === 'static') {
             let v = '';
-            try { v = f.value(student) || ''; } catch (e) { v = ''; }
+            try { v = f.value(student, currentIntake) || ''; } catch (e) { v = ''; }
             return '<div class="' + cls + '"><label>' + escHtml(f.label) + '</label>'
                 + '<div class="pi-value">' + escHtml(v || '\u2014') + '</div></div>';
         }
@@ -426,8 +657,50 @@
 
     function allFields(spec) {
         const out = [];
-        spec.sections.forEach(sec => sec.fields.forEach(f => { if (f.key) out.push(f); }));
+        spec.sections.forEach(sec => sec.fields.forEach(f => {
+            if (f.type === 'criteria') { criteriaFields(f).forEach(c => out.push(c)); return; }
+            if (f.key) out.push(f);
+        }));
         return out;
+    }
+
+    // Sums the points of every criterion answered Yes and, when the child came
+    // through the online pre-enrollment, notes where the live total diverges from
+    // the score the waiting list was ranked by.
+    function recalcWeightedTotal() {
+        const spec = DOC_FORM_SPECS[currentKey];
+        if (!spec) return;
+        let block = null;
+        spec.sections.forEach(sec => sec.fields.forEach(f => { if (f.type === 'criteria') block = f; }));
+        if (!block) return;
+
+        let total = 0;
+        block.items.forEach(it => {
+            const el = document.getElementById('doc_' + it.key);
+            if (el && el.value === 'Yes') total += it.points;
+        });
+
+        const totalEl = document.getElementById('docCriteriaTotal');
+        if (totalEl) totalEl.textContent = total;
+        const stored = document.getElementById('doc_totalPoints');
+        if (stored) stored.value = total;
+
+        const cmp = document.getElementById('docScoreCompare');
+        if (!cmp) return;
+        const intakeScore = currentIntake && currentIntake.found ? parseInt(currentIntake.Score, 10) : NaN;
+        if (isNaN(intakeScore)) {
+            cmp.textContent = 'No pre-enrollment score on file, so this total was entered by hand.';
+            return;
+        }
+        if (intakeScore === total) {
+            cmp.textContent = 'Matches the waiting-list score of ' + intakeScore + ' from the pre-enrollment record.';
+        } else {
+            // Expected whenever PI5.C/F/G are answered here, since the public form
+            // does not ask those three questions yet.
+            cmp.innerHTML = 'Waiting-list score at intake was <strong>' + intakeScore
+                + '</strong>; this form totals <strong>' + total + '</strong>. '
+                + 'A difference is expected when criteria the pre-enrollment form does not ask about are answered here.';
+        }
     }
 
     // ── Compliance window badge ──
@@ -437,10 +710,32 @@
         const host = document.getElementById('docWindowBadge');
         if (!host) return;
         host.innerHTML = '';
-        if (!spec.window || !student.Start_Date) return;
+        if (!student.Start_Date) return;
 
         const done = document.getElementById('doc_' + spec.primaryDate);
         const doneVal = done ? done.value : '';
+
+        // PI5 eligibility documents are the other way round from PI6: rather than a
+        // window that opens at enrollment, they must be dated on or before it.
+        if (spec.beforeEnrollment) {
+            if (!doneVal) {
+                host.innerHTML = '<div class="doc-window dl-due">Eligibility documents must be dated on or '
+                    + 'before the enrollment date <span class="doc-window-sub">(enrolled '
+                    + escHtml(student.Start_Date) + ')</span></div>';
+                return;
+            }
+            const diff = daysBetween(doneVal, student.Start_Date);
+            if (diff === null) return;
+            const okBefore = diff >= 0;
+            host.innerHTML = '<div class="doc-window dl-' + (okBefore ? 'ok' : 'late') + '">'
+                + (okBefore
+                    ? 'Dated on or before enrollment'
+                    : 'Dated ' + Math.abs(diff) + ' day(s) AFTER enrollment \u2014 the checklist requires on or before')
+                + ' <span class="doc-window-sub">(enrolled ' + escHtml(student.Start_Date) + ')</span></div>';
+            return;
+        }
+
+        if (!spec.window) return;
         const days = spec.window.days;
         let state, text;
 
@@ -475,6 +770,19 @@
 
         currentKey = key;
         currentStudentId = studentId;
+        currentIntake = null;
+
+        // Fetch the linked pre-enrollment record before rendering, so static fields
+        // and criteria defaults can read it. openDocForm is awaited by Print All,
+        // which is why this stays inline rather than filling in afterwards.
+        if (spec.needsIntake) {
+            try {
+                const ir = await apiFetch('/api/student-intake/' + studentId);
+                currentIntake = await ir.json();
+            } catch (e) {
+                console.error('Failed to load intake record', e);
+            }
+        }
 
         document.getElementById('docModalTitle').textContent =
             spec.title + ' \u2013 ' + fullName(student);
@@ -485,12 +793,20 @@
         const fields = allFields(spec);
 
         // Defaults first, then overwrite with anything already saved.
+        const intake = currentIntake && currentIntake.found ? currentIntake : null;
+        const isYes = v => String(v).trim().toLowerCase() === 'yes';
+
         fields.forEach(f => {
             const el = document.getElementById('doc_' + f.key);
             if (!el || f.type === 'checkgroup') return;
             let v = '';
-            if (f.default) {
-                try { v = (typeof f.default === 'function' ? f.default(student) : f.default) || ''; }
+            // A weighted criterion answers itself from the pre-enrollment record.
+            if (f.criterion && intake) {
+                const c = f.criterion;
+                if (c.derive) { try { v = c.derive(intake) || ''; } catch (e) { v = ''; } }
+                else if (c.intakeKey) v = isYes(intake[c.intakeKey]) ? 'Yes' : 'No';
+            } else if (f.default) {
+                try { v = (typeof f.default === 'function' ? f.default(student, intake) : f.default) || ''; }
                 catch (e) { v = ''; }
             }
             el.value = v;
@@ -523,6 +839,7 @@
         }
 
         renderWindowBadge(spec, student);
+        recalcWeightedTotal();
         const primary = document.getElementById('doc_' + spec.primaryDate);
         if (primary) primary.addEventListener('change', () => renderWindowBadge(spec, student));
 
@@ -533,6 +850,7 @@
         document.getElementById('docOverlay').classList.remove('open');
         currentKey = null;
         currentStudentId = null;
+        currentIntake = null;
     }
 
     async function saveDocForm() {
@@ -587,6 +905,7 @@
     }
 
     window.DOC_FORM_SPECS = DOC_FORM_SPECS;
+    window.recalcWeightedTotal = recalcWeightedTotal;   // referenced by inline onchange
     window.openDocForm = openDocForm;
     window.closeDocForm = closeDocForm;
     window.saveDocForm = saveDocForm;

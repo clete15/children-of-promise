@@ -92,6 +92,16 @@
         .doc-checkgroup { display:flex;flex-direction:column;gap:5px;padding:4px 0; }
         .doc-check { display:flex;align-items:center;gap:7px;font-size:0.78rem;font-weight:500;color:#111;cursor:pointer; }
         .doc-check input { margin:0; }
+        /* Weighted eligibility criteria table (PI5.A) */
+        .doc-criteria { width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px; }
+        .doc-criteria th { text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748b;padding:6px 8px;border-bottom:2px solid #e5e7eb;background:#f8fafc; }
+        .doc-criteria td { padding:5px 8px;border-bottom:1px solid #f3f4f6;vertical-align:middle; }
+        .doc-criteria tbody tr:hover { background:#f8fafc; }
+        .doc-criteria select { font-size:0.76rem;padding:4px 6px;border:1px solid #d1d5db;border-radius:5px;font-family:inherit;background:white;width:100%; }
+        .doc-criteria-picc { font-size:0.66rem;font-weight:700;color:#1d4ed8;white-space:nowrap; }
+        .doc-criteria-pts { text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap; }
+        .doc-criteria tfoot td { border-top:2px solid #2563eb;border-bottom:none;font-weight:700;font-size:0.8rem;color:#1d4ed8;padding-top:8px; }
+        .doc-criteria th:nth-child(4), .doc-criteria td:nth-child(4) { width:90px; }
 
         /* Print All container is hidden on screen; only used to build the print job */
         #printAllContainer { display:none; }
@@ -273,6 +283,36 @@
                     <div class="pi-field pi-full">
                         <label>Additional Notes</label>
                         <textarea id="piNotes" placeholder="Any additional notes from the interview..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <!-- PICC PI5.L and PI5.M. The checklist is explicit that neither of these
+                 sections may be left blank, and that the language must appear in the
+                 designated area of the form, so they live on the form itself rather
+                 than as separate roster columns. -->
+            <div class="pi-section">
+                <h4>Language &amp; Translation</h4>
+                <div class="doc-note">
+                    PICC PI5.L requires the preferred language to be identified here, and PI5.M
+                    requires the translator arrangements to be recorded. Neither may be left blank
+                    &mdash; if no translator was needed, say so.
+                </div>
+                <div class="pi-grid">
+                    <div class="pi-field">
+                        <label>Preferred Language</label>
+                        <input type="text" id="piPreferredLanguage" placeholder="e.g. English, Spanish">
+                    </div>
+                    <div class="pi-field">
+                        <label>Translator Needed for the Interview</label>
+                        <select id="piTranslatorNeeded">
+                            <option value="">&mdash; select &mdash;</option>
+                            <option value="No">No &ndash; interview conducted in the family's preferred language</option>
+                            <option value="Yes">Yes</option>
+                        </select>
+                    </div>
+                    <div class="pi-field pi-full">
+                        <label>Translator Arrangements / Accommodations Provided</label>
+                        <textarea id="piTranslatorArrangements" placeholder="Who translated and how it was arranged, or state that none was needed and why."></textarea>
                     </div>
                 </div>
             </div>
@@ -708,6 +748,8 @@ const COLUMNS = [
     { field: 'EndASQ', label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.' },
     { field: 'EndASE', label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.' },
     { field: 'EndYearReport', label: 'End Year<br>Report Card', title: 'Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.' },
+    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', programs: ['PI'], title: 'PICC PI5.A - weighted eligibility form with income verification, dated on or before enrollment. Pre-fills from the pre-enrollment record.' },
+    { field: 'ScreeningResultsShared', label: 'Results<br>Shared', docForm: 'screeningResultsShared', programs: ['PI'], title: 'PICC PI10.H - documentation that developmental screening results were shared with the parent or guardian.' },
     { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment', docForm: 'familyAssessment', programs: ['PI'], title: 'PICC PI6.A - published, research-based Family Centered Assessment conducted within 6 months of enrollment (LSP, Baby TALK, FROG).' },
     { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan', docForm: 'familyGoalPlan', programs: ['PI'], title: 'PICC PI6.B - Individual Family Goal Plan developed within 6 months of enrollment and updated annually thereafter.' },
     { field: 'TransitionPlan', label: 'Transition<br>Plan', docForm: 'transitionPlan', programs: ['PI'], title: 'PICC PI7.A - written individualized Transition Plan so children and families experience a seamless transition of services.' },
@@ -1036,6 +1078,11 @@ async function openInterview(studentId) {
     document.getElementById('piNotes').value = '';
     document.getElementById('piParentSig').value = '';
     document.getElementById('piStaffSig').value = '';
+    // Default the language from the intake record's non-English-home answer below;
+    // start blank so a saved value always wins.
+    document.getElementById('piPreferredLanguage').value = '';
+    document.getElementById('piTranslatorNeeded').value = '';
+    document.getElementById('piTranslatorArrangements').value = '';
     document.getElementById('piSavedBadge').style.display = 'none';
 
     // Load existing interview data if available
@@ -1050,6 +1097,9 @@ async function openInterview(studentId) {
             document.getElementById('piNotes').value = data.Notes || '';
             document.getElementById('piParentSig').value = data.ParentSignature || '';
             document.getElementById('piStaffSig').value = data.StaffSignature || '';
+            document.getElementById('piPreferredLanguage').value = data.PreferredLanguage || '';
+            document.getElementById('piTranslatorNeeded').value = data.TranslatorNeeded || '';
+            document.getElementById('piTranslatorArrangements').value = data.TranslatorArrangements || '';
         }
     } catch (e) { console.error('Failed to load interview', e); }
 
@@ -1144,8 +1194,6 @@ function closeInterview() {
 async function saveInterview() {
     if (!currentInterviewStudentId) return;
     const btn = document.getElementById('piSaveBtn');
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
 
     const body = {
         interviewDate: document.getElementById('piDate').value,
@@ -1154,8 +1202,25 @@ async function saveInterview() {
         childStrengths: document.getElementById('piStrengths').value,
         notes: document.getElementById('piNotes').value,
         parentSignature: document.getElementById('piParentSig').value,
-        staffSignature: document.getElementById('piStaffSig').value
+        staffSignature: document.getElementById('piStaffSig').value,
+        preferredLanguage: document.getElementById('piPreferredLanguage').value,
+        translatorNeeded: document.getElementById('piTranslatorNeeded').value,
+        translatorArrangements: document.getElementById('piTranslatorArrangements').value
     };
+
+    // PI5.L/PI5.M are scored on the section not being blank, so warn before saving
+    // a form that would fail the file review rather than silently accepting it.
+    const missing = [];
+    if (!body.preferredLanguage.trim()) missing.push('Preferred Language (PI5.L)');
+    if (!body.translatorNeeded) missing.push('Translator Needed (PI5.M)');
+    if (!body.translatorArrangements.trim()) missing.push('Translator Arrangements (PI5.M)');
+    if (missing.length && !confirm('The PICC requires these sections to be filled in:\n\n  \u2022 '
+        + missing.join('\n  \u2022 ') + '\n\nSave anyway?')) {
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
 
     try {
         const res = await apiFetch(`/api/parent-interview/${currentInterviewStudentId}`, {
