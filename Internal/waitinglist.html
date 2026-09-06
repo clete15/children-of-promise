@@ -233,6 +233,8 @@
         <button class="toggle-btn" id="tab-toddler" onclick="setTab('toddler')">👶 Toddler <span class="tab-count" id="count-toddler"></span><div class="tab-pending" id="pending-toddler"></div></button>
         <button class="toggle-btn" id="tab-2-3" onclick="setTab('2-3')">🧒 2-Year Olds <span class="tab-count" id="count-2-3"></span><div class="tab-pending" id="pending-2-3"></div></button>
         <button class="toggle-btn" id="tab-3-5" onclick="setTab('3-5')">🎨 Pre-School <span class="tab-count" id="count-3-5"></span><div class="tab-pending" id="pending-3-5"></div></button>
+        <button class="toggle-btn" id="tab-ba" onclick="setTab('ba')">🎒 Before &amp; After <span class="tab-count" id="count-ba"></span><div class="tab-pending" id="pending-ba"></div></button>
+        <button class="toggle-btn" id="tab-other" onclick="setTab('other')" title="Submissions with a missing or unrecognized program">❓ Unassigned <span class="tab-count" id="count-other"></span><div class="tab-pending" id="pending-other"></div></button>
     </div>
     <input class="wl-search" type="text" id="searchInput" placeholder="Search by name, phone, or email…" oninput="renderTable()">
     <span class="wl-count" id="wlCount"></span>
@@ -272,6 +274,9 @@ const AUTH = 'Basic ' + btoa(':cofpadmin');
 let allRows = [];
 let classrooms = [];
 let activeTab = 'infant';
+// Every tab shown in the toolbar. 'other' catches unrecognized/missing programs
+// so a real submission can never be invisible to staff.
+const WL_TABS = ['infant', 'toddler', '2-3', '3-5', 'ba', 'other'];
 
 // Sync top scrollbar width with table
 function syncScrollbar() {
@@ -296,7 +301,7 @@ async function load() {
 }
 
 function updateTabCounts() {
-    ['infant','toddler','2-3','3-5'].forEach(tab => {
+    WL_TABS.forEach(tab => {
         const count = getFilteredRows(tab).length;
         const el = document.getElementById(`count-${tab}`);
         if (el) el.textContent = count ? `(${count})` : '';
@@ -314,9 +319,13 @@ function getChildAgeMonths(r) {
     return (now.getFullYear() - born.getFullYear()) * 12 + (now.getMonth() - born.getMonth());
 }
 
+// Program values the public pre-enrollment form can submit.
+const KNOWN_AGE_GROUPS = ['0-2', '2-3', '3-5', 'ba'];
+
 function getFilteredRows(tab) {
     return allRows.filter(r => {
         if (r.WaitlistStatus === 'Declined' || r.WaitlistStatus === 'Enrolled') return false;
+        // Infant and Toddler both come from the 0-2 program, split at 12 months.
         if (tab === 'infant') {
             if (r.AgeGroup !== '0-2') return false;
             const months = getChildAgeMonths(r);
@@ -327,13 +336,15 @@ function getFilteredRows(tab) {
             const months = getChildAgeMonths(r);
             return months !== null && months >= 12;
         }
+        // Catch-all so a submission with a missing or unexpected program is still visible.
+        if (tab === 'other') return !KNOWN_AGE_GROUPS.includes(r.AgeGroup);
         return r.AgeGroup === tab;
     });
 }
 
 function setTab(tab) {
     activeTab = tab;
-    ['infant','toddler','2-3','3-5'].forEach(t => document.getElementById(`tab-${t}`).classList.toggle('active', t === tab));
+    WL_TABS.forEach(t => document.getElementById(`tab-${t}`).classList.toggle('active', t === tab));
     renderTable();
 }
 
