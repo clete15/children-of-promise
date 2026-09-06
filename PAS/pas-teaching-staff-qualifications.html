@@ -912,8 +912,25 @@ async function prefillFromStaff() {
                 if (p) miss.push('credentials on file are marked incomplete — “' + p[0].trim() + '” — left unticked');
             }
 
-            // Never tracked on the staff record, so always a manual step.
-            miss.push('semester hours (general and ECE/CD) — not tracked in staff records');
+            /* Semester hours come off the transcript. General hours are the total
+               minus the ECE ones, since the form asks for them separately. */
+            const shTotal = parseFloat(s.SemesterHoursTotal);
+            const shEce = parseFloat(s.SemesterHoursEce);
+            if (isFinite(shEce)) { setField(`ece_sh_${i}`, String(shEce)); got.push(`${shEce} ECE sem hrs`); }
+            else miss.push('ECE semester hours — add them to the staff card from the transcript');
+            if (isFinite(shTotal) && isFinite(shEce)) {
+                setField(`gen_sh_${i}`, String(Math.max(0, shTotal - shEce)));
+                got.push(`${Math.max(0, shTotal - shEce)} general sem hrs`);
+            } else if (isFinite(shTotal)) {
+                setField(`gen_sh_${i}`, String(shTotal));
+                miss.push('general semester hours shown as the full total, because ECE hours are not recorded');
+            } else {
+                miss.push('total semester hours — add them to the staff card from the transcript');
+            }
+            // Hours the Registry never received cannot raise a credential level.
+            if ((s.TranscriptOnFile || '') === 'Not submitted') {
+                miss.push('transcript is NOT with Gateways — these hours are not counting toward a credential');
+            }
 
             filled.push(`<li><strong>${s.Name}</strong> (${initialsFrom(s.Name)}) — ${got.join(', ')}</li>`);
             if (miss.length) {

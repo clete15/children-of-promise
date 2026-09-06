@@ -334,6 +334,33 @@
                     </select>
                 </div>
             </div>
+            <!-- Straight off the official transcript. The PAS worksheet asks for
+                 these per person, so recording them here stops that form printing
+                 blank. Whether Gateways HAS the transcript is tracked separately:
+                 hours the Registry never received cannot raise a credential. -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Total semester hours</label>
+                    <input type="text" id="editShTotal" placeholder="e.g. 53">
+                </div>
+                <div class="form-group">
+                    <label>ECE semester hours</label>
+                    <input type="text" id="editShEce" placeholder="e.g. 22">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Transcript with Gateways?</label>
+                    <select id="editTranscript">
+                        <option value="">— unknown —</option>
+                        <option value="On file">On file with the Registry</option>
+                        <option value="Not submitted">NOT submitted</option>
+                        <option value="Submitted">Submitted, awaiting processing</option>
+                        <option value="N/A">Not applicable</option>
+                    </select>
+                </div>
+                <div class="form-group"></div>
+            </div>
             <div class="form-row">
                 <div class="form-group" style="flex:1 1 100%;">
                     <label>Other credentials</label>
@@ -506,6 +533,9 @@ function openEdit(id) {
     populateClassroomOptions();
     setSelectPreserving('editClassroom', s.Classroom || '', true);
     setSelectPreserving('editSecondaryClassroom', s.SecondaryClassroom || '', true);
+    document.getElementById('editShTotal').value = s.SemesterHoursTotal || '';
+    document.getElementById('editShEce').value = s.SemesterHoursEce || '';
+    document.getElementById('editTranscript').value = s.TranscriptOnFile || '';
 
     // Split the stored credential text into the level dropdowns.
     const creds = parseCredentials(s.EceCredentials || s.Gateways || '');
@@ -617,6 +647,9 @@ async function saveStaff() {
         program: document.getElementById('editProgram').value,
         staffGroup: document.getElementById('editStaffGroup').value,
         secondaryClassroom: document.getElementById('editSecondaryClassroom').value,
+        semesterHoursTotal: document.getElementById('editShTotal').value.trim(),
+        semesterHoursEce: document.getElementById('editShEce').value.trim(),
+        transcriptOnFile: document.getElementById('editTranscript').value,
         classroom: document.getElementById('editClassroom').value.trim(),
         fte: document.getElementById('editFTE').value.trim(),
         education: document.getElementById('editEducation').value,

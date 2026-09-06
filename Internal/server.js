@@ -435,6 +435,9 @@ function staffEnsureSQL() {
         ReviewedDate NVARCHAR(20),
         StaffGroup NVARCHAR(40),
         SecondaryClassroom NVARCHAR(100),
+        SemesterHoursTotal NVARCHAR(20),
+        SemesterHoursEce NVARCHAR(20),
+        TranscriptOnFile NVARCHAR(20),
         CreatedAt DATETIME DEFAULT GETDATE(),
         UpdatedAt DATETIME DEFAULT GETDATE()
     );
@@ -455,6 +458,24 @@ GO
    Staff appear on the PAS teaching worksheet for both rooms. */
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='SecondaryClassroom')
     ALTER TABLE Staff ADD SecondaryClassroom NVARCHAR(100);
+GO
+/* Semester hours off the official transcript, and whether the Registry has it.
+
+   The PAS Teaching Staff Qualifications worksheet asks for general and ECE
+   semester hours per person, and until now nothing held them, so every worksheet
+   printed with those columns blank. They also explain a gap that cost real
+   credential levels here: Sue Engel has 53 earned hours including an infant and
+   toddler course, none of which reached Gateways, so her registry record shows a
+   high school diploma only. Tracking whether the transcript is on file makes that
+   kind of omission visible instead of invisible. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='SemesterHoursTotal')
+    ALTER TABLE Staff ADD SemesterHoursTotal NVARCHAR(20);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='SemesterHoursEce')
+    ALTER TABLE Staff ADD SemesterHoursEce NVARCHAR(20);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='TranscriptOnFile')
+    ALTER TABLE Staff ADD TranscriptOnFile NVARCHAR(20);
 `;
 }
 
@@ -465,7 +486,9 @@ const STAFF_COLUMNS = [
     ['Fte', 'fte'], ['Education', 'education'], ['EceCredentials', 'eceCredentials'],
     ['Gateways', 'gateways'], ['ExperienceYears', 'experienceYears'], ['RegistryId', 'registryId'],
     ['Notes', 'notes'], ['ReviewedBy', 'reviewedBy'], ['ReviewedDate', 'reviewedDate'],
-    ['StaffGroup', 'staffGroup'], ['SecondaryClassroom', 'secondaryClassroom']
+    ['StaffGroup', 'staffGroup'], ['SecondaryClassroom', 'secondaryClassroom'],
+    ['SemesterHoursTotal', 'semesterHoursTotal'], ['SemesterHoursEce', 'semesterHoursEce'],
+    ['TranscriptOnFile', 'transcriptOnFile']
 ];
 
 /* One-time migration payload: the staff list that used to be hardcoded in
