@@ -438,6 +438,7 @@ function staffEnsureSQL() {
         SemesterHoursTotal NVARCHAR(20),
         SemesterHoursEce NVARCHAR(20),
         TranscriptOnFile NVARCHAR(20),
+        PdHoursYtd NVARCHAR(20),
         CreatedAt DATETIME DEFAULT GETDATE(),
         UpdatedAt DATETIME DEFAULT GETDATE()
     );
@@ -476,6 +477,16 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff'
 GO
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='TranscriptOnFile')
     ALTER TABLE Staff ADD TranscriptOnFile NVARCHAR(20);
+GO
+/* Professional development clock hours in the current school year.
+
+   ExceleRate asks for 20 hours a year per classroom teaching staff member. The
+   StaffTraining table records WHICH trainings were completed but carries no hour
+   count, so the total cannot be derived from it. Held as a running total the
+   director maintains, rather than computed, because PD comes from many sources
+   (Gateways, in-house, conferences) that will never all be itemised here. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PdHoursYtd')
+    ALTER TABLE Staff ADD PdHoursYtd NVARCHAR(20);
 `;
 }
 
@@ -488,7 +499,7 @@ const STAFF_COLUMNS = [
     ['Notes', 'notes'], ['ReviewedBy', 'reviewedBy'], ['ReviewedDate', 'reviewedDate'],
     ['StaffGroup', 'staffGroup'], ['SecondaryClassroom', 'secondaryClassroom'],
     ['SemesterHoursTotal', 'semesterHoursTotal'], ['SemesterHoursEce', 'semesterHoursEce'],
-    ['TranscriptOnFile', 'transcriptOnFile']
+    ['TranscriptOnFile', 'transcriptOnFile'], ['PdHoursYtd', 'pdHoursYtd']
 ];
 
 /* One-time migration payload: the staff list that used to be hardcoded in

@@ -614,6 +614,7 @@ function cardHtml(s) {
             ${row('Transcript w/ Gateways', sel('transcriptOnFile', s.TranscriptOnFile,
                 [['', '— unknown —'], ['On file', 'On file'], ['Submitted', 'Submitted, pending'],
                  ['Not submitted', 'NOT submitted'], ['N/A', 'N/A']]))}
+            ${row('PD hours this year', txt('pdHoursYtd', s.PdHoursYtd, 'e.g. 20', ' style="max-width:80px;" title="ExceleRate asks for 20 hours a year per classroom teaching staff member"'))}
             ${row('Experience (yrs)', txt('experienceYears', s.ExperienceYears, 'e.g. 8', ' style="max-width:80px;"'))}
             ${row('Registry ID', txt('registryId', s.RegistryId, 'e.g. N285894', ' style="max-width:110px;"'))}
             ${row('Reviewed by', txt('reviewedBy', s.ReviewedBy, 'Director confirming'))}
@@ -698,7 +699,7 @@ async function saveCard(id) {
         registryId: 'RegistryId', notes: 'Notes', reviewedBy: 'ReviewedBy',
         reviewedDate: 'ReviewedDate', staffGroup: 'StaffGroup',
         semesterHoursTotal: 'SemesterHoursTotal', semesterHoursEce: 'SemesterHoursEce',
-        transcriptOnFile: 'TranscriptOnFile'
+        transcriptOnFile: 'TranscriptOnFile', pdHoursYtd: 'PdHoursYtd'
     };
     const changed = {};
     Object.keys(body).forEach(k => {

@@ -152,6 +152,11 @@
 
                 <!-- Staff training matrix. Drives the ExceleRate Silver thresholds
                      from the same records PICC PI9 needs, rather than a spreadsheet. -->
+                <!-- Standard 4 readiness, computed from the staff records so it
+                     cannot drift from what the qualification worksheets print. -->
+                <div class="section-title">ExceleRate Silver — Standard 4 Readiness</div>
+                <div id="excelerate4"></div>
+
                 <div class="section-title">Staff Training — ExceleRate Silver Requirements</div>
                 <div id="trainingReqs"></div>
                 <div id="trainingMatrix"></div>
@@ -646,6 +651,174 @@ function reqPill(met, text) {
         + (met ? '\u2713 ' : '') + text + '</span>';
 }
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Standard 4 readiness — 4A director credential, 4B staff credentials,
+   4C professional development.
+
+   Computed from the staff records rather than typed, so the panel and the printed
+   qualification worksheets can never disagree. Three rules shape the maths:
+
+     · The ownership group is excluded. Genni confirmed owners and administrators
+       are left out of the ExceleRate totals, and including them changes whether
+       4B passes.
+     · A person is counted once even when they teach in two rooms, but they count
+       toward both rooms' requirements. Double counting would inflate the
+       denominator and understate compliance.
+     · Percentages are reported against the number of PEOPLE needed, because 30%
+       of nine people is three people, not 2.7.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+const IT_ROOMS = ['Infant', 'Infants / Toddlers', '2 Year Olds / Toddlers'];
+const PD_HOURS_REQUIRED = 20;
+
+function roomKey(v) {
+    return String(v || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+        .map(w => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).join('/');
+}
+function servesRoom(s, room) {
+    return roomKey(s.Classroom) === roomKey(room) || roomKey(s.SecondaryClassroom) === roomKey(room);
+}
+function isPartTimeIn(s, room) {
+    return roomKey(s.SecondaryClassroom) === roomKey(room) && roomKey(s.Classroom) !== roomKey(room);
+}
+function credLevel(s, kind) {
+    const src = [s.EceCredentials, s.Gateways].filter(Boolean).join(', ');
+    const re = kind === 'ece' ? /ECE(?:\s*Credential)?\s*-?\s*Level\s*(\d)/i
+        : kind === 'it' ? /(?:IT|ITC|Infant\s*\/?\s*Toddler)(?:\s*Credential)?\s*-?\s*Level\s*(\d)/i
+        : /Director(?:\s*Credential)?\s*-?\s*Level\s*(III|II|I|\d)/i;
+    const m = src.match(re);
+    if (!m) return 0;
+    if (kind === 'dir') return /^\d$/.test(m[1]) ? +m[1] : { I: 1, II: 2, III: 3 }[m[1].toUpperCase()] || 0;
+    return +m[1];
+}
+// Everyone the ExceleRate percentages are calculated over.
+function countedStaff() {
+    return staffRecords
+        .filter(s => (s.StaffGroup || '') !== 'Ownership')
+        .filter(s => isTeachingStaff(s))
+        .filter(s => (s.Classroom || '').trim() || (s.SecondaryClassroom || '').trim());
+}
+const peopleNeeded = n => Math.ceil(n * 0.3);
+
+function evaluate4A() {
+    // The credential belongs to whoever administers the programme.
+    const directors = staffRecords.filter(isDirector);
+    const qualified = directors.filter(s => credLevel(s, 'dir') >= 1
+        || /principal endorsement/i.test([s.EceCredentials, s.Gateways, s.Notes].join(' ')));
+    return { met: qualified.length > 0, directors, qualified };
+}
+
+function evaluate4B() {
+    const staff = countedStaff();
+    const ece3 = staff.filter(s => credLevel(s, 'ece') >= 3);
+    const itStaff = staff.filter(s => IT_ROOMS.some(r => servesRoom(s, r)));
+    const itOk = itStaff.filter(s => credLevel(s, 'it') >= 2);
+    return {
+        staff, ece3, itStaff, itOk,
+        eceNeeded: peopleNeeded(staff.length), itNeeded: peopleNeeded(itStaff.length),
+        eceMet: staff.length > 0 && ece3.length >= peopleNeeded(staff.length),
+        itMet: itStaff.length > 0 && itOk.length >= peopleNeeded(itStaff.length),
+        // No spare capacity means one schedule change breaks compliance.
+        eceMargin: ece3.length - peopleNeeded(staff.length),
+        itMargin: itOk.length - peopleNeeded(itStaff.length),
+        itPartTimeReliant: itOk.filter(s => IT_ROOMS.some(r => isPartTimeIn(s, r))).length
+    };
+}
+
+function evaluate4C() {
+    const staff = countedStaff();
+    const withHours = staff.filter(s => String(s.PdHoursYtd || '').trim() !== '');
+    const met = withHours.filter(s => (parseFloat(s.PdHoursYtd) || 0) >= PD_HOURS_REQUIRED);
+    const short = withHours.filter(s => (parseFloat(s.PdHoursYtd) || 0) < PD_HOURS_REQUIRED);
+    const unknown = staff.filter(s => String(s.PdHoursYtd || '').trim() === '');
+    // Unknown is not the same as failing, and must not be reported as either.
+    return { staff, withHours, met, short, unknown, allMet: staff.length > 0 && met.length === staff.length };
+}
+
+function stdRow(label, value, tone) {
+    const c = tone === 'good' ? '#166534' : tone === 'bad' ? '#991b1b' : '#92400e';
+    return '<div style="display:flex;justify-content:space-between;gap:12px;padding:4px 0;font-size:0.75rem;">'
+        + '<span style="color:#64748b;">' + label + '</span>'
+        + '<span style="color:' + c + ';font-weight:700;text-align:right;">' + value + '</span></div>';
+}
+function stdCard(code, title, met, bodyHtml, footNote) {
+    const border = met ? '#86efac' : '#fcd34d';
+    const bg = met ? '#f0fdf4' : '#fffbeb';
+    return '<div style="flex:1 1 300px;min-width:280px;background:' + bg + ';border:1.5px solid ' + border
+        + ';border-radius:10px;padding:14px 16px;">'
+        + '<div style="font-size:0.8rem;font-weight:800;color:#1e293b;margin-bottom:6px;">' + code + ' ' + title
+        + ' ' + reqPill(met, met ? 'met' : 'not met') + '</div>'
+        + bodyHtml
+        + (footNote ? '<div style="margin-top:8px;font-size:0.7rem;color:#64748b;line-height:1.5;">' + footNote + '</div>' : '')
+        + '</div>';
+}
+const nameList = arr => arr.length ? arr.map(s => (s.Name || '').split(' ')[0]).join(', ') : 'none';
+
+function renderExcelerate4() {
+    const host = document.getElementById('excelerate4');
+    if (!host) return;
+    if (!staffRecords.length) {
+        host.innerHTML = '<div style="padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.8rem;color:#64748b;">No staff records loaded.</div>';
+        return;
+    }
+
+    const a = evaluate4A(), b = evaluate4B(), c = evaluate4C();
+
+    const cardA = stdCard('4A', 'Director credential', a.met,
+        stdRow('Directors on record', a.directors.length ? nameList(a.directors) : 'none', a.directors.length ? 'good' : 'bad')
+        + stdRow('Holding Director Level I+', a.qualified.length ? nameList(a.qualified) : 'none', a.met ? 'good' : 'bad')
+        + (a.qualified.length ? stdRow('Level', a.qualified.map(s => 'L' + credLevel(s, 'dir')).join(', '), 'good') : ''),
+        'Needs a Gateways Illinois Director Credential at Level I or above, or a Principal Endorsement.');
+
+    const cardB = stdCard('4B', 'Staff credentials', b.eceMet && b.itMet,
+        stdRow('Teaching staff counted', b.staff.length, 'good')
+        + stdRow('ECE Level 3+', b.ece3.length + ' of ' + b.staff.length + ' — need ' + b.eceNeeded
+            + ' (' + Math.round(b.ece3.length / (b.staff.length || 1) * 100) + '%)', b.eceMet ? 'good' : 'bad')
+        + stdRow('', nameList(b.ece3), b.eceMet ? 'good' : 'bad')
+        + '<div style="height:6px;"></div>'
+        + stdRow('Infant/toddler staff', b.itStaff.length, 'good')
+        + stdRow('Infant/Toddler Level 2+', b.itOk.length + ' of ' + b.itStaff.length + ' — need ' + b.itNeeded
+            + ' (' + Math.round(b.itOk.length / (b.itStaff.length || 1) * 100) + '%)', b.itMet ? 'good' : 'bad')
+        + stdRow('', nameList(b.itOk), b.itMet ? 'good' : 'bad'),
+        (b.eceMargin === 0 || b.itMargin === 0
+            ? '<strong style="color:#92400e;">Passing with no margin.</strong> '
+              + (b.eceMargin === 0 ? 'ECE has exactly the minimum. ' : '')
+              + (b.itMargin === 0 ? 'Infant/toddler has exactly the minimum. ' : '')
+              + 'One person changing rooms or leaving drops you below.'
+            : '')
+        + (b.itPartTimeReliant
+            ? ' <strong style="color:#92400e;">' + b.itPartTimeReliant + ' of the infant/toddler credential holders '
+              + 'are there on a part-time assignment</strong>, so the schedule is what supports this.'
+            : '')
+        + ' Ownership is excluded from both counts, per Genni. Staff teaching two rooms are counted once.');
+
+    const cardC = stdCard('4C', 'Professional development', c.allMet,
+        stdRow('Teaching staff', c.staff.length, 'good')
+        + stdRow('At ' + PD_HOURS_REQUIRED + '+ hours', c.met.length + ' of ' + c.staff.length, c.allMet ? 'good' : 'bad')
+        + (c.short.length ? stdRow('Below ' + PD_HOURS_REQUIRED + ' hours',
+            c.short.map(s => (s.Name || '').split(' ')[0] + ' (' + (s.PdHoursYtd || 0) + ')').join(', '), 'bad') : '')
+        + (c.unknown.length ? stdRow('No hours recorded', nameList(c.unknown), 'warn') : ''),
+        (c.unknown.length
+            ? '<strong>' + c.unknown.length + ' staff have no PD hours recorded</strong>, which is not the same as '
+              + 'being short — it is unknown. Enter hours on the staff cards to make this a real answer.'
+            : '')
+        + ' ' + PD_HOURS_REQUIRED + ' clock hours a year per classroom teaching staff member. '
+        + 'Kept as a running total on each staff card, because PD comes from Gateways, in-house sessions '
+        + 'and conferences that are not all itemised here.');
+
+    const allMet = a.met && b.eceMet && b.itMet && c.allMet;
+    host.innerHTML =
+        '<div style="background:' + (allMet ? '#f0fdf4' : '#f8fafc') + ';border:1.5px solid '
+        + (allMet ? '#86efac' : '#e2e8f0') + ';border-radius:10px;padding:14px 16px;margin-bottom:12px;">'
+        + '<div style="font-size:0.85rem;font-weight:800;color:#1e293b;">Standard 4 '
+        + reqPill(allMet, allMet ? 'all three met' : 'outstanding items') + '</div>'
+        + '<div style="font-size:0.74rem;color:#64748b;line-height:1.6;margin-top:4px;">'
+        + 'Calculated live from the staff records, so this matches what the Teaching Staff Qualifications '
+        + 'worksheets print. Fix a credential or a room assignment on the staff cards and this updates.</div>'
+        + '</div>'
+        + '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px;">' + cardA + cardB + cardC + '</div>';
+}
+
 function renderTrainingReqs() {
     const host = document.getElementById('trainingReqs');
     if (!host) return;
@@ -730,6 +903,7 @@ async function saveTraining(staffId, trainingKey, completedDate) {
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Save failed');
         await loadTrainingData();
+        renderExcelerate4();
         renderTrainingReqs();
         renderTrainingMatrix();
     } catch (e) {
@@ -760,6 +934,7 @@ async function loadTrainingData() {
 
 (async function () {
     await loadTrainingData();
+    renderExcelerate4();
     renderTrainingReqs();
     renderTrainingMatrix();
     renderSilverAssessments();
