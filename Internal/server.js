@@ -83,6 +83,182 @@ function bit(v) {
     return 'NULL';
 }
 
+// ── sqlcmd transport encoding ──
+// runSQL() shells out to sqlcmd with `-s "|" -W -h -1`, so results come back as
+// one line per row with columns separated by '|'. That means any stored value
+// containing a literal '|' shifts every later column, and any value containing a
+// line break splits one row into several unparseable lines.
+//
+// Free-text form fields (textareas) hit both cases routinely. Rather than
+// mangling what we store, we keep the real text in the database and encode only
+// the transport: wrap text columns in txCol() on the way out and run the value
+// through txDecode() after splitting. Sentinels are plain ASCII so they survive
+// whatever code page sqlcmd writes -- a non-ASCII sentinel such as CHAR(166)
+// would come back as a replacement char once execSync decoded the output utf8.
+const TX_PIPE = '{PIPE}';
+const TX_NL = '{NL}';
+
+function txCol(col, alias) {
+    return `REPLACE(REPLACE(REPLACE(ISNULL(${col},''),'|','${TX_PIPE}'),CHAR(13),''),CHAR(10),'${TX_NL}') AS ${alias || col}`;
+}
+
+function txDecode(v) {
+    return String(v == null ? '' : v).split(TX_NL).join('\n').split(TX_PIPE).join('|');
+}
+
+// ── ISBETracking schema ──
+// Single source of truth for the checklist columns. Every read and write runs the
+// ensure block first, so a fresh database (or one predating a column we added
+// later) heals itself instead of failing. EnterSIS and RemoveFromSIS were
+// accepted by the PUT whitelist but never existed as columns, so those two
+// checkboxes silently failed to save until this list took over.
+const ISBE_TRACKING_COLUMNS = [
+    'PermissionSlip', 'ParentInterview', 'ProofOfIncome', 'EnterSIS',
+    'BegASQ', 'BegASE', 'MidYearReport', 'EndASQ', 'EndASE', 'EndYearReport',
+    // PICC PI6/PI7 per-child document forms (Prevention Initiative only).
+    'FamilyCenteredAssessment', 'FamilyGoalPlan', 'TransitionPlan', 'Referral',
+    'RemoveFromSIS', 'GrantPerfReport'
+];
+
+function isbeTrackingEnsureSQL() {
+    let sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ISBETracking')
+    CREATE TABLE ISBETracking (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StudentId INT NOT NULL
+    );
+`;
+    for (const c of ISBE_TRACKING_COLUMNS) {
+        sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ISBETracking' AND COLUMN_NAME='${c}') ALTER TABLE ISBETracking ADD ${c} BIT DEFAULT 0;\n`;
+    }
+    return sql;
+}
+
+// ── PICC per-child document forms ──
+// PI6.A Family Centered Assessment, PI6.B Individual Family Goal Plan,
+// PI7.A Transition Plan and PI7.B Referral all need the same treatment: one row
+// per student, a printable form, and an auto-checked box on the roster. Rather
+// than four near-identical endpoint pairs, each form is declared here as
+// [columnName, sqlType, jsonKey] and served by one generic GET/POST.
+// Column order drives both the INSERT and the SELECT, so it must stay stable;
+// append new fields at the end and the migration below adds them in place.
+const PI_DOC_FORMS = {
+    'family-assessment': {
+        table: 'PIFamilyAssessments',
+        trackingColumn: 'FamilyCenteredAssessment',
+        columns: [
+            ['AssessmentDate', 'NVARCHAR(20)', 'assessmentDate'],
+            ['EnrollmentDate', 'NVARCHAR(20)', 'enrollmentDate'],
+            ['AssessmentTool', 'NVARCHAR(200)', 'assessmentTool'],
+            ['ToolOther', 'NVARCHAR(300)', 'toolOther'],
+            ['CompletedBy', 'NVARCHAR(200)', 'completedBy'],
+            ['FamilyStrengths', 'NVARCHAR(MAX)', 'familyStrengths'],
+            ['FamilyNeeds', 'NVARCHAR(MAX)', 'familyNeeds'],
+            ['AreasOfConcern', 'NVARCHAR(MAX)', 'areasOfConcern'],
+            ['NextSteps', 'NVARCHAR(MAX)', 'nextSteps'],
+            ['ParentSignature', 'NVARCHAR(200)', 'parentSignature'],
+            ['StaffSignature', 'NVARCHAR(200)', 'staffSignature'],
+            ['SignedDate', 'NVARCHAR(20)', 'signedDate']
+        ]
+    },
+    'family-goal-plan': {
+        table: 'PIFamilyGoalPlans',
+        trackingColumn: 'FamilyGoalPlan',
+        columns: [
+            ['PlanDate', 'NVARCHAR(20)', 'planDate'],
+            ['EnrollmentDate', 'NVARCHAR(20)', 'enrollmentDate'],
+            ['PlanType', 'NVARCHAR(60)', 'planType'],
+            ['FamilyStrengths', 'NVARCHAR(MAX)', 'familyStrengths'],
+            ['Goal1', 'NVARCHAR(MAX)', 'goal1'],
+            ['Goal1Steps', 'NVARCHAR(MAX)', 'goal1Steps'],
+            ['Goal1Resources', 'NVARCHAR(MAX)', 'goal1Resources'],
+            ['Goal1Responsible', 'NVARCHAR(200)', 'goal1Responsible'],
+            ['Goal1Target', 'NVARCHAR(20)', 'goal1Target'],
+            ['Goal1Status', 'NVARCHAR(40)', 'goal1Status'],
+            ['Goal2', 'NVARCHAR(MAX)', 'goal2'],
+            ['Goal2Steps', 'NVARCHAR(MAX)', 'goal2Steps'],
+            ['Goal2Resources', 'NVARCHAR(MAX)', 'goal2Resources'],
+            ['Goal2Responsible', 'NVARCHAR(200)', 'goal2Responsible'],
+            ['Goal2Target', 'NVARCHAR(20)', 'goal2Target'],
+            ['Goal2Status', 'NVARCHAR(40)', 'goal2Status'],
+            ['Goal3', 'NVARCHAR(MAX)', 'goal3'],
+            ['Goal3Steps', 'NVARCHAR(MAX)', 'goal3Steps'],
+            ['Goal3Resources', 'NVARCHAR(MAX)', 'goal3Resources'],
+            ['Goal3Responsible', 'NVARCHAR(200)', 'goal3Responsible'],
+            ['Goal3Target', 'NVARCHAR(20)', 'goal3Target'],
+            ['Goal3Status', 'NVARCHAR(40)', 'goal3Status'],
+            ['NextReviewDate', 'NVARCHAR(20)', 'nextReviewDate'],
+            ['ParentSignature', 'NVARCHAR(200)', 'parentSignature'],
+            ['StaffSignature', 'NVARCHAR(200)', 'staffSignature'],
+            ['SignedDate', 'NVARCHAR(20)', 'signedDate']
+        ]
+    },
+    'transition-plan': {
+        table: 'PITransitionPlans',
+        trackingColumn: 'TransitionPlan',
+        columns: [
+            ['PlanDate', 'NVARCHAR(20)', 'planDate'],
+            ['TransitionType', 'NVARCHAR(120)', 'transitionType'],
+            ['TransitionDate', 'NVARCHAR(20)', 'transitionDate'],
+            ['ReceivingProgram', 'NVARCHAR(300)', 'receivingProgram'],
+            ['ReceivingContact', 'NVARCHAR(200)', 'receivingContact'],
+            ['ReceivingPhone', 'NVARCHAR(60)', 'receivingPhone'],
+            ['CurrentServices', 'NVARCHAR(MAX)', 'currentServices'],
+            ['TransitionSteps', 'NVARCHAR(MAX)', 'transitionSteps'],
+            ['RecordsTransferred', 'NVARCHAR(MAX)', 'recordsTransferred'],
+            ['ParentNotifiedDate', 'NVARCHAR(20)', 'parentNotifiedDate'],
+            ['RecordsConsent', 'NVARCHAR(20)', 'recordsConsent'],
+            ['FamilyConcerns', 'NVARCHAR(MAX)', 'familyConcerns'],
+            ['StaffResponsible', 'NVARCHAR(200)', 'staffResponsible'],
+            ['SuddenExit', 'NVARCHAR(20)', 'suddenExit'],
+            ['ContactAttempts', 'NVARCHAR(MAX)', 'contactAttempts'],
+            ['ParentSignature', 'NVARCHAR(200)', 'parentSignature'],
+            ['StaffSignature', 'NVARCHAR(200)', 'staffSignature'],
+            ['SignedDate', 'NVARCHAR(20)', 'signedDate']
+        ]
+    },
+    'referral': {
+        table: 'PIReferrals',
+        trackingColumn: 'Referral',
+        columns: [
+            ['NotApplicable', 'NVARCHAR(20)', 'notApplicable'],
+            ['NotApplicableReason', 'NVARCHAR(MAX)', 'notApplicableReason'],
+            ['ReferralDate', 'NVARCHAR(20)', 'referralDate'],
+            ['ReferralReason', 'NVARCHAR(200)', 'referralReason'],
+            ['ConcernSource', 'NVARCHAR(200)', 'concernSource'],
+            ['ConcernDetail', 'NVARCHAR(MAX)', 'concernDetail'],
+            ['ReferredTo', 'NVARCHAR(300)', 'referredTo'],
+            ['AgencyContact', 'NVARCHAR(200)', 'agencyContact'],
+            ['AgencyPhone', 'NVARCHAR(60)', 'agencyPhone'],
+            ['ReferredBy', 'NVARCHAR(200)', 'referredBy'],
+            ['ParentNotifiedDate', 'NVARCHAR(20)', 'parentNotifiedDate'],
+            ['ParentConsent', 'NVARCHAR(20)', 'parentConsent'],
+            ['Outcome', 'NVARCHAR(120)', 'outcome'],
+            ['OutcomeDate', 'NVARCHAR(20)', 'outcomeDate'],
+            ['FollowUpNotes', 'NVARCHAR(MAX)', 'followUpNotes'],
+            ['StaffSignature', 'NVARCHAR(200)', 'staffSignature'],
+            ['SignedDate', 'NVARCHAR(20)', 'signedDate']
+        ]
+    }
+};
+
+function docFormEnsureSQL(cfg) {
+    const cols = cfg.columns.map(([name, type]) => `        ${name} ${type}`).join(',\n');
+    let sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='${cfg.table}')
+    CREATE TABLE ${cfg.table} (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StudentId INT NOT NULL,
+${cols},
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+    // Forward migration so fields added to the config later appear without manual DDL.
+    for (const [name, type] of cfg.columns) {
+        sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='${cfg.table}' AND COLUMN_NAME='${name}') ALTER TABLE ${cfg.table} ADD ${name} ${type};\n`;
+    }
+    return sql;
+}
+
 function runSQL(sql) {
     const tmp = path.join(__dirname, '_q.sql');
     fs.writeFileSync(tmp, sql, 'utf8');
@@ -596,30 +772,19 @@ function handleRequest(req, res) {
     // GET ISBE tracking data (internal - protected)
     if (req.method === 'GET' && url === '/api/isbe-tracking') {
         if (!checkAuth(req, res)) return;
-        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ISBETracking')
-            CREATE TABLE ISBETracking (
-                Id INT IDENTITY(1,1) PRIMARY KEY,
-                StudentId INT NOT NULL,
-                PermissionSlip BIT DEFAULT 0,
-                ParentInterview BIT DEFAULT 0,
-                ProofOfIncome BIT DEFAULT 0,
-                BegASQ BIT DEFAULT 0,
-                BegASE BIT DEFAULT 0,
-                MidYearReport BIT DEFAULT 0,
-                EndASQ BIT DEFAULT 0,
-                EndASE BIT DEFAULT 0,
-                EndYearReport BIT DEFAULT 0,
-                GrantPerfReport BIT DEFAULT 0
-            );
-            IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ISBETracking' AND COLUMN_NAME='GrantPerfReport') ALTER TABLE ISBETracking ADD GrantPerfReport BIT DEFAULT 0;
-            SELECT StudentId,PermissionSlip,ParentInterview,ProofOfIncome,BegASQ,BegASE,MidYearReport,EndASQ,EndASE,EndYearReport,ISNULL(GrantPerfReport,0) AS GrantPerfReport FROM ISBETracking`;
+        // Column list comes from ISBE_TRACKING_COLUMNS so the SELECT can never drift
+        // out of step with the schema the way EnterSIS/RemoveFromSIS previously did.
+        const select = ISBE_TRACKING_COLUMNS.map(c => `ISNULL(${c},0) AS ${c}`).join(',');
+        const sql = isbeTrackingEnsureSQL() + `SELECT StudentId,${select} FROM ISBETracking`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
-                return { StudentId: v[0], PermissionSlip: v[1]==='1', ParentInterview: v[2]==='1', ProofOfIncome: v[3]==='1', BegASQ: v[4]==='1', BegASE: v[5]==='1', MidYearReport: v[6]==='1', EndASQ: v[7]==='1', EndASE: v[8]==='1', EndYearReport: v[9]==='1', GrantPerfReport: v[10]==='1' };
+                const row = { StudentId: v[0] };
+                ISBE_TRACKING_COLUMNS.forEach((c, i) => { row[c] = v[i + 1] === '1'; });
+                return row;
             });
         return sendJSON(res, 200, rows);
     }
@@ -642,14 +807,14 @@ function handleRequest(req, res) {
                 CreatedAt DATETIME DEFAULT GETDATE(),
                 UpdatedAt DATETIME DEFAULT GETDATE()
             );
-            SELECT Id,StudentId,InterviewDate,ISNULL(ParentGoals,'') AS ParentGoals,ISNULL(ParentConcerns,'') AS ParentConcerns,ISNULL(ChildStrengths,'') AS ChildStrengths,ISNULL(ParentSignature,'') AS ParentSignature,ISNULL(StaffSignature,'') AS StaffSignature,ISNULL(Notes,'') AS Notes,CreatedAt,UpdatedAt FROM ParentInterviews WHERE StudentId=${studentId}`;
+            SELECT Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},CreatedAt,UpdatedAt FROM ParentInterviews WHERE StudentId=${studentId}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
-                return { Id:v[0], StudentId:v[1], InterviewDate:v[2], ParentGoals:v[3], ParentConcerns:v[4], ChildStrengths:v[5], ParentSignature:v[6], StaffSignature:v[7], Notes:v[8], CreatedAt:v[9], UpdatedAt:v[10] };
+                return { Id:v[0], StudentId:v[1], InterviewDate:v[2], ParentGoals:txDecode(v[3]), ParentConcerns:txDecode(v[4]), ChildStrengths:txDecode(v[5]), ParentSignature:txDecode(v[6]), StaffSignature:txDecode(v[7]), Notes:txDecode(v[8]), CreatedAt:v[9], UpdatedAt:v[10] };
             });
         return sendJSON(res, 200, rows.length ? rows[0] : null);
     }
@@ -749,6 +914,62 @@ function handleRequest(req, res) {
                     UPDATE ISBETracking SET PermissionSlip=1 WHERE StudentId=${studentId}
                 ELSE
                     INSERT INTO ISBETracking (StudentId,PermissionSlip) VALUES (${studentId},1)`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
+    // GET a PICC document form for a student (internal - protected)
+    // /api/pi-doc/<form-type>/<studentId>
+    if (req.method === 'GET' && url.startsWith('/api/pi-doc/')) {
+        if (!checkAuth(req, res)) return;
+        const parts = url.split('/');
+        const cfg = PI_DOC_FORMS[parts[3]];
+        if (!cfg) return sendJSON(res, 404, { error: 'Unknown form type' });
+        const studentId = parseInt(parts[4]);
+        if (!studentId) return sendJSON(res, 400, { error: 'Invalid student id' });
+
+        const select = cfg.columns.map(([name]) => txCol(name)).join(',');
+        const sql = docFormEnsureSQL(cfg)
+            + `SELECT Id,StudentId,${select} FROM ${cfg.table} WHERE StudentId=${studentId}`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+        if (!rows.length) return sendJSON(res, 200, { found: false });
+        const v = rows[0].split('|').map(x => x.trim());
+        const out = { found: true, Id: v[0], StudentId: v[1] };
+        cfg.columns.forEach(([name], i) => { out[name] = txDecode(v[i + 2]); });
+        return sendJSON(res, 200, out);
+    }
+
+    // POST save a PICC document form (internal - protected)
+    // Upserts the form row and auto-checks the matching roster column.
+    if (req.method === 'POST' && url.startsWith('/api/pi-doc/')) {
+        if (!checkAuth(req, res)) return;
+        const parts = url.split('/');
+        const cfg = PI_DOC_FORMS[parts[3]];
+        if (!cfg) return sendJSON(res, 404, { error: 'Unknown form type' });
+        const studentId = parseInt(parts[4]);
+        if (!studentId) return sendJSON(res, 400, { error: 'Invalid student id' });
+
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const names = cfg.columns.map(([name]) => name).join(',');
+            const vals = cfg.columns.map(([, , key]) => esc(d[key])).join(',');
+            const sets = cfg.columns.map(([name, , key]) => `${name}=${esc(d[key])}`).join(',');
+            const sql = docFormEnsureSQL(cfg)
+                + isbeTrackingEnsureSQL()
+                + `IF EXISTS (SELECT 1 FROM ${cfg.table} WHERE StudentId=${studentId})
+    UPDATE ${cfg.table} SET ${sets},UpdatedAt=GETDATE() WHERE StudentId=${studentId}
+ELSE
+    INSERT INTO ${cfg.table} (StudentId,${names}) VALUES (${studentId},${vals});
+IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${studentId})
+    UPDATE ISBETracking SET ${cfg.trackingColumn}=1 WHERE StudentId=${studentId}
+ELSE
+    INSERT INTO ISBETracking (StudentId,${cfg.trackingColumn}) VALUES (${studentId},1);`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
@@ -1184,9 +1405,10 @@ function handleRequest(req, res) {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const { studentId, field, value } = d;
-            const validFields = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS','GrantPerfReport'];
-            if (!validFields.includes(field)) return sendJSON(res, 400, { error: 'Invalid field' });
-            const sql = `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${parseInt(studentId)})
+            // Whitelist is the schema list itself, so a new checklist column is
+            // writable as soon as it is declared (and never writable if it isn't).
+            if (!ISBE_TRACKING_COLUMNS.includes(field)) return sendJSON(res, 400, { error: 'Invalid field' });
+            const sql = isbeTrackingEnsureSQL() + `IF EXISTS (SELECT 1 FROM ISBETracking WHERE StudentId=${parseInt(studentId)})
                 UPDATE ISBETracking SET ${field}=${value?1:0} WHERE StudentId=${parseInt(studentId)}
             ELSE
                 INSERT INTO ISBETracking (StudentId,${field}) VALUES (${parseInt(studentId)},${value?1:0})`;

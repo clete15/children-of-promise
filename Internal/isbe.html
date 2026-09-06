@@ -77,6 +77,22 @@
         .pi-flags { display:flex;flex-wrap:wrap;gap:6px;padding:4px 0; }
         .pi-flag { padding:3px 9px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:0.7rem;font-weight:700;white-space:nowrap; }
 
+        /* PICC document forms (rendered from pi-forms.js) */
+        .pi-field select { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:white; }
+        .pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        /* Which checklist item this form satisfies, so staff can trace it back to the PICC */
+        .doc-picc { font-size:0.74rem;color:#374151;background:#f8fafc;border-left:3px solid #2563eb;padding:10px 12px;border-radius:0 6px 6px 0;margin-bottom:16px;line-height:1.5; }
+        .doc-picc strong { color:#1d4ed8; }
+        .doc-note { font-size:0.72rem;color:#6b7280;margin:-4px 0 10px 0;line-height:1.5; }
+        .doc-window { font-size:0.74rem;padding:8px 12px;border-radius:6px;margin-bottom:16px;font-weight:600; }
+        .doc-window-sub { font-weight:400;opacity:0.75; }
+        .doc-window.dl-ok { background:#f0fdf4;color:#166534; }
+        .doc-window.dl-due { background:#fffbeb;color:#92400e; }
+        .doc-window.dl-late, .doc-window.dl-overdue { background:#fef2f2;color:#b91c1c; }
+        .doc-checkgroup { display:flex;flex-direction:column;gap:5px;padding:4px 0; }
+        .doc-check { display:flex;align-items:center;gap:7px;font-size:0.78rem;font-weight:500;color:#111;cursor:pointer; }
+        .doc-check input { margin:0; }
+
         /* Print All container is hidden on screen; only used to build the print job */
         #printAllContainer { display:none; }
         .print-value { display:inline-block;min-height:1em; }
@@ -163,26 +179,12 @@
             <!-- Student roster grid -->
             <div class="isbe-grid" id="isbeRosterGrid">
                 <table>
-                    <thead>
-                        <tr>
-                            <th class="left" style="min-width:120px;">Student</th>
-                            <th style="width:80px;">Room</th>
-                            <th title="Parent signs consent form allowing ASQ and ASE developmental screenings to be performed on their child for the school year.">Permission<br>Slip</th>
-                            <th title="Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Complete at enrollment or beginning of year.">Parent<br>Interview</th>
-                            <th title="Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.">Proof of<br>Income</th>
-                            <th title="Enter student into the ISBE Student Information System (SIS) before beginning screenings.">Enter<br>into SIS</th>
-                            <th title="Administer the ASQ-3 developmental screening at the beginning of the school year. Parent completes the questionnaire; teacher scores it.">Beg ASQ</th>
-                            <th title="Administer the ASQ:SE-2 social-emotional screening at the beginning of the school year. Parent completes; teacher scores and reviews results.">Beg ASE</th>
-                            <th title="Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.">Mid Year<br>Report Card</th>
-                            <th title="Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.">End ASQ</th>
-                            <th title="Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.">End ASE</th>
-                            <th title="Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.">End Year<br>Report Card</th>
-                            <th title="Remove student from ISBE Student Information System (SIS) after completing end-of-year reporting.">Remove<br>from SIS</th>
-                            <th title="Grant Periodic Performance Report – open and complete the report document for PFA/PI compliance.">Grant Perf<br>Report</th>
-                        </tr>
-                    </thead>
+                    <!-- Header cells are generated from the COLUMNS config so they can never
+                         drift out of step with the body cells, and so the PICC document
+                         columns can appear for Prevention Initiative only. -->
+                    <thead id="isbeHead"></thead>
                     <tbody id="isbeBody">
-                        <tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
+                        <tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -498,8 +500,30 @@
     </div>
 </div>
 
+<!-- PICC document forms (Family Centered Assessment, Individual Family Goal Plan,
+     Transition Plan, Referral). One shared shell; the body is rendered from the
+     spec in pi-forms.js so all four share this markup. -->
+<div class="pi-overlay" id="docOverlay">
+    <div class="pi-modal">
+        <div class="pi-modal-header">
+            <h3 id="docModalTitle">PICC Document</h3>
+            <button class="pi-close" onclick="closeDocForm()" aria-label="Close">&times;</button>
+        </div>
+        <div class="pi-modal-body" id="docModalBody"></div>
+        <div class="pi-modal-footer">
+            <span class="pi-saved-badge" id="docSavedBadge" style="display:none;">&#10003; Saved</span>
+            <button class="pi-btn pi-btn-secondary" onclick="printDocForm()">&#x1F5A8;&#xFE0F; Print</button>
+            <button class="pi-btn pi-btn-primary" id="docSaveBtn" onclick="saveDocForm()">Save</button>
+        </div>
+    </div>
+</div>
+
 <!-- Hidden container used to build a single multi-form print job (Print All) -->
 <div id="printAllContainer"></div>
+
+<!-- PICC document form specs + renderer. Loaded before the page script; it reads
+     shared state (students, trackingData) by name at call time. -->
+<script src="pi-forms.js"></script>
 
 <script>
 const AUTH = 'Basic ' + btoa(':cofpadmin');
@@ -550,7 +574,7 @@ async function init() {
         renderRoster();
     } catch(e) {
         console.error('[INIT ERROR]', e);
-        document.getElementById('isbeBody').innerHTML = '<tr><td colspan="13" style="color:red;padding:20px;">Error loading data: ' + e.message + '</td></tr>';
+        document.getElementById('isbeBody').innerHTML = '<tr><td colspan="' + (COLUMNS.length + 2) + '" style="color:red;padding:20px;">Error loading data: ' + e.message + '</td></tr>';
     }
 }
 
@@ -660,7 +684,71 @@ function renderFollowUp() {
     </table>`;
 }
 
-const FIELDS = ['PermissionSlip','ParentInterview','ProofOfIncome','EnterSIS','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','RemoveFromSIS','GrantPerfReport'];
+/* Roster checklist columns.
+   One entry drives the <th>, the body cell and the Print All footer cell, so the
+   header can't fall out of step with the data the way the old parallel
+   <th> block + FIELDS array could.
+
+   field    ISBETracking column
+   label    header text (may contain <br>)
+   title    hover explanation
+   docForm  key in DOC_FORM_SPECS (pi-forms.js) -- renders a [form] link
+   programs restrict the column to these programs; omitted means both
+
+   The four PICC document columns are Prevention Initiative only: PI6 and PI7 come
+   from the Prevention Initiative Compliance Checklist and have no PFA counterpart. */
+const COLUMNS = [
+    { field: 'PermissionSlip', label: 'Permission<br>Slip', title: 'Parent signs consent form allowing ASQ and ASE developmental screenings to be performed on their child for the school year.' },
+    { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Complete at enrollment or beginning of year.' },
+    { field: 'ProofOfIncome', label: 'Proof of<br>Income', title: 'Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.' },
+    { field: 'EnterSIS', label: 'Enter<br>into SIS', title: 'Enter student into the ISBE Student Information System (SIS) before beginning screenings.' },
+    { field: 'BegASQ', label: 'Beg ASQ', title: 'Administer the ASQ-3 developmental screening at the beginning of the school year. Parent completes the questionnaire; teacher scores it.' },
+    { field: 'BegASE', label: 'Beg ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the beginning of the school year. Parent completes; teacher scores and reviews results.' },
+    { field: 'MidYearReport', label: 'Mid Year<br>Report Card', title: 'Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.' },
+    { field: 'EndASQ', label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.' },
+    { field: 'EndASE', label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.' },
+    { field: 'EndYearReport', label: 'End Year<br>Report Card', title: 'Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.' },
+    { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment', docForm: 'familyAssessment', programs: ['PI'], title: 'PICC PI6.A - published, research-based Family Centered Assessment conducted within 6 months of enrollment (LSP, Baby TALK, FROG).' },
+    { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan', docForm: 'familyGoalPlan', programs: ['PI'], title: 'PICC PI6.B - Individual Family Goal Plan developed within 6 months of enrollment and updated annually thereafter.' },
+    { field: 'TransitionPlan', label: 'Transition<br>Plan', docForm: 'transitionPlan', programs: ['PI'], title: 'PICC PI7.A - written individualized Transition Plan so children and families experience a seamless transition of services.' },
+    { field: 'Referral', label: 'Referral', docForm: 'referral', programs: ['PI'], title: 'PICC PI7.B and PI10.I - referral to community resources when needed, and referral for further evaluation when a screening flags a concern.' },
+    { field: 'RemoveFromSIS', label: 'Remove<br>from SIS', title: 'Remove student from ISBE Student Information System (SIS) after completing end-of-year reporting.' },
+    { field: 'GrantPerfReport', label: 'Grant Perf<br>Report', title: 'Grant Periodic Performance Report \u2013 open and complete the report document for PFA/PI compliance.' }
+];
+
+// Columns visible for the program currently selected.
+function visibleColumns() {
+    return COLUMNS.filter(c => !c.programs || c.programs.indexOf(activeProgram) !== -1);
+}
+
+// Columns wired to a form, so Print All knows which cells to offer.
+const SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
+function columnHasForm(c) {
+    return !!c.docForm || c.field === 'PermissionSlip' || c.field === 'ParentInterview'
+        || SCREENING_FIELDS.indexOf(c.field) !== -1;
+}
+
+const LINK_STYLE = 'font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;';
+function formLink(call, tip) {
+    return ' <a href="#" style="' + LINK_STYLE + '" onclick="event.preventDefault();' + call
+        + '" title="' + tip + '">[form]</a>';
+}
+
+// Grant Periodic Performance Report lives in SharePoint, one per program.
+const GRANT_REPORT_LINKS = {
+    PFA: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026',
+    PI: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit'
+};
+
+function renderRosterHead() {
+    const head = document.getElementById('isbeHead');
+    if (!head) return;
+    head.innerHTML = '<tr><th class="left" style="min-width:120px;">Student</th>'
+        + '<th style="width:80px;">Room</th>'
+        + visibleColumns().map(c =>
+            '<th title="' + c.title.replace(/"/g, '&quot;') + '">' + c.label + '</th>').join('')
+        + '</tr>';
+}
 
 // Collapses the mixed truthy representations in the DB to a clean Yes/No for display.
 function yesNo(v) {
@@ -755,54 +843,66 @@ function screeningMeta(student, type, period, isBeginning) {
 }
 
 function renderRoster() {
+    renderRosterHead();
+    const cols = visibleColumns();
+    const span = cols.length + 2;  // + Student and Room
+
     const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByRoomThenName);
     document.getElementById('isbeCount').textContent = roster.length + ' students';
     const tbody = document.getElementById('isbeBody');
-    if (!roster.length) { tbody.innerHTML = '<tr><td colspan="14" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
+    if (!roster.length) { tbody.innerHTML = '<tr><td colspan="' + span + '" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
 
     tbody.innerHTML = roster.map(s => {
         const t = trackingData[s.Id] || {};
-        const cells = FIELDS.map(f => {
-            const checked = t[f] ? 'checked' : '';
+        const cells = cols.map(c => {
+            const f = c.field;
+            const box = '<input type="checkbox" ' + (t[f] ? 'checked' : '')
+                + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox">';
+
             if (f === 'ParentInterview') {
-                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openInterview(' + s.Id + ')" title="Open Parent Interview Form">[form]</a></td>';
+                return '<td>' + box + formLink('openInterview(' + s.Id + ')', 'Open Parent Interview Form') + '</td>';
             }
             if (f === 'PermissionSlip') {
-                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openPermissionSlip(' + s.Id + ')" title="Open Permission Slip Form">[form]</a></td>';
+                return '<td>' + box + formLink('openPermissionSlip(' + s.Id + ')', 'Open Permission Slip Form') + '</td>';
             }
             if (f === 'BegASQ' || f === 'EndASQ') {
-                var period = f === 'BegASQ' ? 'Beginning' : 'End';
-                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openScreening(' + s.Id + ',\'ASQ-3\',\'' + period + '\')" title="Open ASQ-3 Score Entry">[form]</a>'
+                const period = f === 'BegASQ' ? 'Beginning' : 'End';
+                return '<td>' + box
+                    + formLink('openScreening(' + s.Id + ',\'ASQ-3\',\'' + period + '\')', 'Open ASQ-3 Score Entry')
                     + screeningMeta(s, 'ASQ-3', period, f === 'BegASQ') + '</td>';
             }
             if (f === 'BegASE' || f === 'EndASE') {
-                var period2 = f === 'BegASE' ? 'Beginning' : 'End';
-                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="#" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openScreening(' + s.Id + ',\'ASQ:SE-2\',\'' + period2 + '\')" title="Open ASQ:SE-2 Score Entry">[form]</a>'
-                    + screeningMeta(s, 'ASQ:SE-2', period2, f === 'BegASE') + '</td>';
+                const period = f === 'BegASE' ? 'Beginning' : 'End';
+                return '<td>' + box
+                    + formLink('openScreening(' + s.Id + ',\'ASQ:SE-2\',\'' + period + '\')', 'Open ASQ:SE-2 Score Entry')
+                    + screeningMeta(s, 'ASQ:SE-2', period, f === 'BegASE') + '</td>';
             }
-            if (f === 'GrantPerfReport' && activeProgram === 'PFA') {
-                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026" target="_blank" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" title="Open Grant Performance Report in SharePoint">[doc]</a></td>';
+            // PICC document forms are all rendered by the same engine.
+            if (c.docForm) {
+                const spec = window.DOC_FORM_SPECS[c.docForm];
+                return '<td>' + box
+                    + formLink('openDocForm(\'' + c.docForm + '\',' + s.Id + ')',
+                        'Open ' + (spec ? spec.title : 'form')) + '</td>';
             }
-            if (f === 'GrantPerfReport' && activeProgram === 'PI') {
-                return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox"> <a href="https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit" target="_blank" style="font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;" title="Open PI Grant Performance Report in SharePoint">[doc]</a></td>';
+            if (f === 'GrantPerfReport') {
+                const href = GRANT_REPORT_LINKS[activeProgram];
+                if (!href) return '<td>' + box + '</td>';
+                return '<td>' + box + '<a href="' + href + '" target="_blank" style="' + LINK_STYLE
+                    + '" title="Open the Grant Periodic Performance Report in SharePoint">[doc]</a></td>';
             }
-            return '<td><input type="checkbox" ' + checked + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)"></td>';
+            return '<td>' + box + '</td>';
         }).join('');
         return '<tr><td class="left" style="font-weight:600;font-size:0.73rem;">' + s.Last_Name + ', ' + s.First_Name + '</td><td style="font-size:0.7rem;color:var(--text-muted);">' + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
     }).join('');
 
-    // Add "Print All" row at the bottom
-    const printAllCells = FIELDS.map(f => {
-        // Only show print all for columns that have forms
-        const hasForm = ['PermissionSlip','ParentInterview','BegASQ','BegASE','EndASQ','EndASE'].includes(f);
-        if (hasForm) {
-            const uncheckedCount = roster.filter(s => !(trackingData[s.Id] || {})[f]).length;
-            if (uncheckedCount > 0) {
-                return '<td><a href="#" onclick="event.preventDefault();printAllForColumn(\'' + f + '\')" style="font-size:0.6rem;color:#2563eb;text-decoration:none;font-weight:700;white-space:nowrap;" title="Print all unchecked forms for this column">🖨️ All (' + uncheckedCount + ')</a></td>';
-            }
-            return '<td style="font-size:0.58rem;color:#9ca3af;">✓ Done</td>';
+    // "Print All" footer row, one cell per column that can produce a form.
+    const printAllCells = cols.map(c => {
+        if (!columnHasForm(c)) return '<td></td>';
+        const uncheckedCount = roster.filter(s => !(trackingData[s.Id] || {})[c.field]).length;
+        if (uncheckedCount > 0) {
+            return '<td><a href="#" onclick="event.preventDefault();printAllForColumn(\'' + c.field + '\')" style="font-size:0.6rem;color:#2563eb;text-decoration:none;font-weight:700;white-space:nowrap;" title="Print all unchecked forms for this column">🖨️ All (' + uncheckedCount + ')</a></td>';
         }
-        return '<td></td>';
+        return '<td style="font-size:0.58rem;color:#9ca3af;">✓ Done</td>';
     }).join('');
     tbody.innerHTML += '<tr style="background:#f0f7ff;border-top:2px solid #2563eb;"><td class="left" style="font-weight:700;font-size:0.7rem;color:#2563eb;">Print All</td><td></td>' + printAllCells + '</tr>';
 }
@@ -823,6 +923,12 @@ function serializeModalForPrint(modalEl) {
         if (live) {
             if (live.tagName === 'SELECT') {
                 val = live.options[live.selectedIndex] ? live.options[live.selectedIndex].text : '';
+                // Placeholder option prints blank rather than the "select" prompt.
+                if (!live.value) val = '';
+            } else if (live.type === 'checkbox' || live.type === 'radio') {
+                // .value on a checkbox is its payload ("on"), not its state, so
+                // render the tick state instead or every box prints as "on".
+                val = live.checked ? '\u2611' : '\u2610';
             } else {
                 val = live.value || '';
             }
@@ -845,7 +951,11 @@ async function printAllForColumn(field) {
 
     // Map the column to the open function + overlay used to populate a form.
     let openFn, overlayId, closeFn;
-    if (field === 'PermissionSlip') {
+    const docCol = COLUMNS.find(c => c.field === field && c.docForm);
+    if (docCol) {
+        // All four PICC document forms share one overlay and one renderer.
+        openFn = id => openDocForm(docCol.docForm, id); overlayId = 'docOverlay'; closeFn = closeDocForm;
+    } else if (field === 'PermissionSlip') {
         openFn = id => openPermissionSlip(id); overlayId = 'psOverlay'; closeFn = closePermissionSlip;
     } else if (field === 'ParentInterview') {
         openFn = id => openInterview(id); overlayId = 'piOverlay'; closeFn = closeInterview;
@@ -1392,7 +1502,7 @@ const PI_FY27_MONITORING = {
     // Instruments named in the IDEC letter that do not apply to this site.
     // Recorded so the exclusion is a documented decision, not an oversight.
     notApplicable: [
-        { name: 'FCCERS-3', why: 'Family Child Care Environment Rating Scale — scores care delivered in a provider\'s home. ITERS-3 is the center-based equivalent.' },
+        { name: 'FCCERS-3', why: 'Family Child Care Environment Rating Scale. The FY27 PICC marks this instrument "FCCH ONLY" and marks ITERS-3 "center-based ONLY", so ITERS-3 is our equivalent.' },
         { name: 'HOVRS-3', why: 'Home Visit Rating Scale — scored on observed home visits. Listed under PI Home Visiting monitoring, not center-based.' },
     ],
 };
