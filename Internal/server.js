@@ -310,6 +310,38 @@ function handleRequest(req, res) {
         return;
     }
 
+    // GET screening summary for every student (internal - protected).
+    // One row per student/type/period so the roster can show dates, concerns and
+    // referral status without a request per child.
+    if (req.method === 'GET' && url === '/api/screening-summary') {
+        if (!checkAuth(req, res)) return;
+        // Concern logic differs by instrument:
+        //  ASQ-3      higher score is better, so 'Below' cutoff is the concern.
+        //  ASQ:SE-2   higher score means more concern, so 'Above' cutoff is the concern.
+        const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ScreeningScores') SELECT 0 AS StudentId WHERE 1=0
+            ELSE
+            SELECT StudentId,
+                ISNULL(ScreeningType,'') AS ScreeningType,
+                ISNULL(Period,'') AS Period,
+                ISNULL(ScreeningDate,'') AS ScreeningDate,
+                ISNULL(ReferralMade,'') AS ReferralMade,
+                CASE WHEN ScreeningType='ASQ-3' AND (CommStatus='Below' OR GrossStatus='Below' OR FineStatus='Below' OR ProblemStatus='Below' OR PersonalStatus='Below') THEN 'concern'
+                     WHEN ScreeningType='ASQ-3' AND (CommStatus='Monitor' OR GrossStatus='Monitor' OR FineStatus='Monitor' OR ProblemStatus='Monitor' OR PersonalStatus='Monitor') THEN 'monitor'
+                     WHEN ScreeningType<>'ASQ-3' AND SEResult='Above' THEN 'concern'
+                     WHEN ScreeningType<>'ASQ-3' AND SEResult='Monitor' THEN 'monitor'
+                     ELSE 'ok' END AS Flag
+            FROM ScreeningScores`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const rows = r.data.trim().split('\n')
+            .filter(l => /^\s*\d+\s*\|/.test(l))
+            .map(l => {
+                const v = l.split('|').map(x => x.trim());
+                return { StudentId: v[0], ScreeningType: v[1], Period: v[2], ScreeningDate: v[3], ReferralMade: v[4], Flag: v[5] };
+            });
+        return sendJSON(res, 200, rows);
+    }
+
     // GET the pre-enrollment intake record linked to a student (internal - protected).
     // Prefers the stored PreEnrollmentId; falls back to an exact child name + DOB match
     // for students enrolled before the link existed.
