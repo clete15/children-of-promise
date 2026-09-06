@@ -1,9 +1,8 @@
-<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Individual Professional Development Plan — Children of Promise LLC</title>
+    <title>Professional Development Plan — Children of Promise LLC</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -21,307 +20,467 @@
             display: grid; grid-template-columns: 1fr 1fr;
             gap: 10px; margin-bottom: 20px;
         }
-        .info-field {
-            display: flex; align-items: baseline; gap: 8px;
-        }
+        .info-field { display: flex; align-items: baseline; gap: 8px; }
         .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
         .info-field .line {
-            flex: 1; border-bottom: 1px solid #999; min-width: 80px; height: 1.2em;
+            flex: 1; border-bottom: 1px solid #999; min-width: 80px; min-height: 1.2em;
+            font-size: 10pt;
         }
         .section-title {
             font-size: 11pt; font-weight: 700; color: #2c5282;
             margin-top: 18px; margin-bottom: 10px;
             border-bottom: 1px solid #cbd5e0; padding-bottom: 4px;
         }
-        .write-lines {
-            border-bottom: 1px solid #999; height: 1.4em; margin-bottom: 6px;
-        }
-        .pd-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-        .pd-table th, .pd-table td {
-            border: 1px solid #cbd5e0; padding: 6px 8px;
-            text-align: left; font-size: 9.5pt; vertical-align: top;
-        }
-        .pd-table th {
-            background-color: #edf2f7; font-weight: 600;
-            color: #2c5282; font-size: 9pt;
-        }
-        .pd-table td { height: 3.5em; }
+        .write-lines { border-bottom: 1px solid #999; height: 1.4em; margin-bottom: 6px; }
         .narrative-section { margin-bottom: 14px; }
         .narrative-section p { font-weight: 600; margin-bottom: 6px; font-size: 10pt; }
-        .signature-section {
-            margin-top: 25px; display: grid;
-            grid-template-columns: 2fr 1fr; gap: 24px;
+
+        /* Self-assessment: the employee's own words, so it prints as prose on a
+           ruled line rather than in a box. */
+        .sa-q { margin-bottom: 12px; }
+        .sa-q > label { font-weight: 600; font-size: 10pt; display: block; margin-bottom: 3px; }
+        .sa-a {
+            border-bottom: 1px solid #999; min-height: 1.5em; font-size: 10pt;
+            padding: 2px 2px 1px; white-space: pre-wrap;
         }
-        .sig-field label {
-            font-weight: 600; font-size: 10pt; display: block; margin-bottom: 18px;
+        .sa-a:empty::after { content: ' '; }
+
+        /* One block per goal, carrying its own mid-year and year-end review. That
+           per-goal review is what makes progression visible on a single sheet. */
+        .goal-block {
+            border: 1px solid #cbd5e0; border-radius: 4px;
+            padding: 10px 12px; margin-bottom: 14px;
+            page-break-inside: avoid;
         }
-        .sig-field .sig-line { border-bottom: 1px solid #333; margin-top: 22px; }
+        .goal-block h4 {
+            font-size: 10.5pt; color: #2c5282; margin-bottom: 6px;
+            border-bottom: 1px solid #edf2f7; padding-bottom: 3px;
+        }
+        .goal-row { margin-bottom: 8px; }
+        .goal-row > label {
+            font-weight: 600; font-size: 9.5pt; display: block; color: #4a5568;
+        }
+        .goal-row .val {
+            font-size: 10pt; min-height: 1.4em; padding: 2px 0;
+            border-bottom: 1px dotted #cbd5e0; white-space: pre-wrap;
+        }
+        .review-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
+        .review-box { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 3px; padding: 7px 9px; }
+        .review-box .rb-title { font-weight: 700; font-size: 9pt; color: #2c5282; margin-bottom: 3px; }
+        .review-box .rb-date { font-size: 8.5pt; color: #718096; margin-bottom: 4px; }
+        .review-box .rb-text {
+            font-size: 9.5pt; min-height: 2.6em; border-bottom: 1px solid #cbd5e0;
+            white-space: pre-wrap;
+        }
+
+        /* Three sign-off blocks: agreed at the start, reviewed mid-year, evaluated
+           at year end. All on one sheet so the year is evidenced by one document. */
+        .signoff {
+            border: 1px solid #cbd5e0; border-left: 4px solid #2c5282;
+            border-radius: 4px; padding: 10px 14px; margin-bottom: 12px;
+            page-break-inside: avoid;
+        }
+        .signoff h4 { font-size: 10.5pt; color: #2c5282; margin-bottom: 3px; }
+        .signoff .statement { font-size: 9.5pt; color: #4a5568; margin-bottom: 7px; }
+        .signoff .notes {
+            font-size: 10pt; min-height: 2.2em; border-bottom: 1px solid #999;
+            margin-bottom: 12px; white-space: pre-wrap;
+        }
+        .sig-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .sig-cell { font-size: 9.5pt; }
+        .sig-cell .sig-line { border-bottom: 1px solid #333; height: 1.5em; margin-bottom: 2px; }
+        .sig-cell .sig-label { font-size: 8.5pt; color: #718096; }
+
         .footer {
             margin-top: 25px; padding-top: 10px;
             border-top: 1px solid #cbd5e0; display: flex;
             justify-content: space-between; font-size: 9pt; color: #666;
         }
+        /* Editable fields look flat on screen and leave no boxes on paper. */
+        [contenteditable="true"]:focus {
+            outline: none; background: #fffbeb; box-shadow: 0 0 0 2px rgba(245,158,11,0.25);
+        }
+        [contenteditable="true"]:hover { background: #fcfcfd; }
+        .toolbar {
+            position: sticky; top: 0; z-index: 50; background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0; padding: 10px 14px;
+            margin: -0.5in -0.75in 18px; display: flex; flex-wrap: wrap;
+            gap: 10px; align-items: center; font-size: 10pt;
+        }
+        .toolbar select, .toolbar input[type="date"] {
+            padding: 6px 9px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 10pt;
+        }
+        .toolbar button {
+            padding: 7px 14px; border: none; border-radius: 5px;
+            font-size: 9.5pt; font-weight: 700; cursor: pointer; color: #fff;
+        }
+        .btn-save { background: #16a34a; }
+        .btn-print { background: #2c5282; }
+        .btn-add { background: #7c3aed; }
+        .btn-sug { background: #0f766e; }
+        .toolbar button:disabled { background: #94a3b8; cursor: default; }
+        .hint { font-size: 8.5pt; color: #94a3b8; font-style: italic; }
         @media print {
             body { padding: 0; }
             @page { margin: 0.5in 0.6in; size: letter; }
-            .no-print { display: none; }
+            .no-print { display: none !important; }
+            .goal-block, .signoff { border-color: #999; }
+            .hint { display: none; }
         }
     </style>
 </head>
 <body>
 
-<!-- Picker. Hidden when printed, so the sheet itself stays a clean form.
-     Open with ?staffId=N to go straight to one person's plan. -->
-<div class="no-print" id="picker" style="position:sticky;top:0;background:#f8fafc;border-bottom:1px solid #e2e8f0;padding:10px 14px;margin:-0.5in -0.75in 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:10pt;">
-    <strong style="color:#1f3f66;">Staff member:</strong>
-    <select id="staffPick" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;min-width:220px;">
-        <option value="">Loading…</option>
-    </select>
-    <label style="display:flex;align-items:center;gap:5px;">Review
-        <select id="planType" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;">
-            <option value="Mid-Year">Mid-Year</option>
-            <option value="End-of-Year">End-of-Year</option>
-        </select>
+<!-- Controls, hidden when printed so the sheet stays a clean signable form. -->
+<div class="toolbar no-print" id="toolbar">
+    <strong style="color:#1f3f66;">Staff:</strong>
+    <select id="staffPick"><option value="">Loading…</option></select>
+    <label>Program year
+        <select id="yearPick"></select>
     </label>
-    <label style="display:flex;align-items:center;gap:5px;">Plan date
-        <input type="date" id="planDate" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;">
-    </label>
-    <label style="display:flex;align-items:center;gap:5px;">Review by
-        <input type="date" id="reviewDate" style="padding:5px 8px;border:1px solid #cbd5e1;border-radius:5px;font-size:10pt;">
-    </label>
-    <button id="btnSave" style="padding:7px 14px;background:#16a34a;color:#fff;border:none;border-radius:5px;font-size:9.5pt;font-weight:700;cursor:pointer;">Save plan</button>
-    <button onclick="window.print()" style="padding:7px 14px;background:#2c5282;color:#fff;border:none;border-radius:5px;font-size:9.5pt;font-weight:700;cursor:pointer;">🖨️ Print</button>
-    <span id="pickMsg" style="color:#64748b;font-size:9pt;"></span>
-    <div id="cycleBar" style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px;font-size:9pt;"></div>
+    <button class="btn-save" id="btnSave">Save plan</button>
+    <button class="btn-add" id="btnAddGoal">+ Goal</button>
+    <button class="btn-sug" id="btnSuggest">Suggest goals</button>
+    <button class="btn-print" onclick="window.print()">🖨️ Print</button>
+    <span id="msg" class="hint"></span>
+    <div style="flex:1 1 100%;font-size:8.5pt;color:#94a3b8;">
+        Click any underlined area to type. Everything saves together.
+    </div>
 </div>
 
-    <div class="header">
-        <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
-        <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
-        <h1>Individual Professional Development Plan</h1>
-    </div>
+<div class="header">
+    <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
+    <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
+    <h1>Professional Development Plan</h1>
+</div>
 
-    <div class="info-grid">
-        <div class="info-field">
-            <label>Employee Name:</label><div class="line" id="fName"></div>
-        </div>
-        <div class="info-field">
-            <label>Position:</label><div class="line" id="fPosition"></div>
-        </div>
-        <div class="info-field">
-            <label>Review / School Year:</label><div class="line" id="fCycle"></div>
-        </div>
-        <div class="info-field">
-            <label>Date Created:</label><div class="line" id="fPlanDate"></div>
-        </div>
-        <div class="info-field">
-            <label>Next Review Due:</label><div class="line" id="fReviewDate"></div>
-        </div>
-    </div>
+<div class="info-grid">
+    <div class="info-field"><label>Date:</label><div class="line" id="fPlanDate"></div></div>
+    <div class="info-field"><label>Program year:</label><div class="line" id="fYear"></div></div>
+    <div class="info-field"><label>Staff Name:</label><div class="line" id="fName"></div></div>
+    <div class="info-field"><label>Position:</label><div class="line" id="fPosition"></div></div>
+    <div class="info-field"><label>Work Location(s):</label><div class="line editable" id="fLocation" contenteditable="true"></div></div>
+    <div class="info-field"><label>Supervisor:</label><div class="line editable" id="fSupervisor" contenteditable="true"></div></div>
+</div>
 
-    <div class="section-title">Current Credentials &amp; Education</div>
-    <div class="info-field" style="margin-bottom:8px;">
-        <label>Highest Education Level:</label><div class="line" id="fEducation"></div>
-    </div>
-    <div class="info-field" style="margin-bottom:8px;">
-        <label>Current Credentials/Certifications:</label><div class="line" id="fCreds"></div>
-    </div>
-    <div class="info-field" style="margin-bottom:8px;">
-        <label>Gateways Credential Level:</label><div class="line" id="fGateways"></div>
-    </div>
-    <div class="info-field" style="margin-bottom:16px;">
-        <label>College credit / PD hours:</label><div class="line" id="fHours"></div>
-    </div>
+<!-- Read straight from the staff record, so the plan and the qualification
+     worksheets cannot disagree about someone's credentials. -->
+<div class="section-title">Current Credentials, Coursework &amp; Training Hours</div>
+<div class="info-grid" style="margin-bottom:6px;">
+    <div class="info-field"><label>Highest education:</label><div class="line" id="fEducation"></div></div>
+    <div class="info-field"><label>Gateways credentials:</label><div class="line" id="fGateways"></div></div>
+    <div class="info-field"><label>College credit hours:</label><div class="line" id="fHours"></div></div>
+    <div class="info-field"><label>PD hours this year:</label><div class="line" id="fPd"></div></div>
+</div>
 
-    <!-- PI9 requires an assessment of the individual's needs and a description of
-         the learning the program will provide. Both are filled from the records. -->
-    <div class="section-title">Assessment of Needs</div>
-    <div id="fNeeds" style="font-size:10pt;line-height:1.55;margin-bottom:14px;"></div>
+<div class="section-title">Self-Assessment</div>
+<div class="sa-q">
+    <label>Identify your current strengths:</label>
+    <div class="sa-a" id="fStrengths" contenteditable="true"></div>
+</div>
+<div class="sa-q">
+    <label>Identify areas of needed growth:</label>
+    <div class="sa-a" id="fGrowth" contenteditable="true"></div>
+</div>
+<div class="sa-q">
+    <label>Describe any areas of frustration in your work:</label>
+    <div class="sa-a" id="fFrustrations" contenteditable="true"></div>
+</div>
+<div class="sa-q">
+    <label>Describe your favorite aspects of your work:</label>
+    <div class="sa-a" id="fFavorite" contenteditable="true"></div>
+</div>
 
-    <div class="section-title">Professional Learning the Program Will Provide</div>
-    <div id="fProvide" style="font-size:10pt;line-height:1.55;margin-bottom:14px;"></div>
+<div class="section-title">Goals</div>
+<p style="font-size:9.5pt;color:#4a5568;margin-bottom:12px;">
+    The purpose of this area is to establish work goals for the program year. Goals are statements with
+    expected outcomes within a period of time. Each goal should fit into and support the overall mission,
+    values, and vision of Children of Promise. Include any professional development or other support
+    necessary to accomplish the goal.
+</p>
+<div id="goalList"></div>
 
-    <div class="section-title">Professional Development Goals</div>
-    <table class="pd-table">
-        <thead>
-            <tr>
-                <th style="width:20%">Goal</th>
-                <th style="width:25%">Action Steps</th>
-                <th style="width:14%">Timeline</th>
-                <th style="width:20%">Resources Needed</th>
-                <th style="width:21%">Evidence of Completion</th>
-            </tr>
-        </thead>
-        <tbody id="fGoals">
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-        </tbody>
-    </table>
+<div class="section-title">Reviews &amp; Signatures</div>
 
-    <div class="section-title">Long-Term Career Goals</div>
-    <div id="fLongTerm" style="font-size:10pt;line-height:1.6;min-height:0.7in;"></div>
-    <div class="write-lines"></div><div class="write-lines"></div>
-
-    <div class="signature-section">
-        <div class="sig-field"><label>Employee Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+<div class="signoff">
+    <h4>Initial Completion</h4>
+    <div class="statement">I have participated in the development of these goals.</div>
+    <label style="font-size:9pt;font-weight:600;color:#4a5568;">Notes:</label>
+    <div class="notes" id="fInitialNotes" contenteditable="true"></div>
+    <div class="sig-row">
+        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Employee Signature</div></div>
+        <div class="sig-cell"><div class="sig-line" id="fInitialStaffDate"></div><div class="sig-label">Date</div></div>
     </div>
-    <div class="signature-section">
-        <div class="sig-field"><label>Supervisor Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+    <div class="sig-row" style="margin-top:10px;">
+        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Director Signature</div></div>
+        <div class="sig-cell"><div class="sig-line" id="fInitialSupDate"></div><div class="sig-label">Date</div></div>
     </div>
+</div>
 
-    <div class="footer">
-        <span>PAS Documentation — Confidential</span>
-        <span id="fFooter">Children of Promise LLC — Individual PD Plan</span>
+<div class="signoff">
+    <h4>Mid-year Review</h4>
+    <div class="statement">Progress toward these goals has been discussed at the mid-year point.</div>
+    <label style="font-size:9pt;font-weight:600;color:#4a5568;">Notes:</label>
+    <div class="notes" id="fMidNotes" contenteditable="true"></div>
+    <div class="sig-row">
+        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Employee Signature</div></div>
+        <div class="sig-cell"><div class="sig-line" id="fMidStaffDate"></div><div class="sig-label">Date</div></div>
     </div>
+    <div class="sig-row" style="margin-top:10px;">
+        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Director Signature</div></div>
+        <div class="sig-cell"><div class="sig-line" id="fMidSupDate"></div><div class="sig-label">Date</div></div>
+    </div>
+</div>
+
+<div class="signoff">
+    <h4>Year-end Review</h4>
+    <div class="statement">
+        I have updated my progress toward the completion of these goals. I have discussed with my
+        supervisor and understand the progress and overall evaluation of my goal.
+    </div>
+    <label style="font-size:9pt;font-weight:600;color:#4a5568;">Notes:</label>
+    <div class="notes" id="fEndNotes" contenteditable="true"></div>
+    <div class="sig-row">
+        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Employee Signature</div></div>
+        <div class="sig-cell"><div class="sig-line" id="fEndStaffDate"></div><div class="sig-label">Date</div></div>
+    </div>
+    <div class="sig-row" style="margin-top:10px;">
+        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Director Signature</div></div>
+        <div class="sig-cell"><div class="sig-line" id="fEndSupDate"></div><div class="sig-label">Date</div></div>
+    </div>
+</div>
+
+<div class="footer">
+    <span>PAS Documentation — Confidential</span>
+    <span id="fFooter">Children of Promise LLC — Professional Development Plan</span>
+</div>
 
 <script src="pd-suggestions.js"></script>
 <script>
-/* Fills this form from the staff record, and saves a dated plan so PICC PI9 has
-   a written plan on file per staff member. Superseded plans are kept server side,
-   so issuing a new one preserves the previous version and its date. */
+/* One plan per staff member per program year, with both reviews on the sheet.
+
+   PICC PI9 requires a written dated plan per PI staff member carrying the name,
+   plan date, timelines, an assessment of needs, and the learning the program will
+   provide. This form holds all of that; the suggestion engine can pre-fill the
+   needs and goals from the credential records so the director confirms rather
+   than composes.
+
+   Previous plans are kept server side, so saving a year again supersedes rather
+   than erases. */
 const AUTH = 'Basic ' + btoa(':cofpadmin');
 const api = (p, o) => fetch(p, Object.assign({ headers: {
     'Authorization': AUTH, 'Content-Type': 'application/json' } }, o || {}));
 
-let STAFF = [], PLANS = [], GOALS = [], current = null;
+let STAFF = [], PLANS = [], GOALS = [], current = null, goalRows = [];
+const $ = id => document.getElementById(id);
+const msg = t => { $('msg').textContent = t || ''; };
 const esc = v => String(v == null ? '' : v)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-const msg = t => { document.getElementById('pickMsg').textContent = t || ''; };
 
-// The plan for the cycle currently selected, not merely the newest one — the
-// mid-year and end-of-year reviews are separate records for the same year.
-function planFor(staffId, cycle, sy) {
-    return PLANS.filter(p => String(p.StaffId) === String(staffId)
-            && (p.PlanType || '') === cycle
-            && (p.SchoolYear || PDSuggest.schoolYearOf(p.PlanDate)) === sy)
+function selectedYear() { return $('yearPick').value || PDSuggest.schoolYearOf(); }
+function planFor(staffId, sy) {
+    return PLANS.filter(p => String(p.StaffId) === String(staffId) && (p.SchoolYear || '') === sy)
         .sort((a, b) => (+b.Id) - (+a.Id))[0] || null;
 }
-function anyPlan(staffId) {
-    return PLANS.filter(p => String(p.StaffId) === String(staffId))
-        .sort((a, b) => (b.PlanDate || '').localeCompare(a.PlanDate || '') || (+b.Id) - (+a.Id))[0] || null;
-}
-function currentSchoolYear() { return PDSuggest.schoolYearOf(); }
 
-// Both cycles for this school year, so it is obvious what is still outstanding.
-function renderCycleBar() {
-    const bar = document.getElementById('cycleBar');
-    if (!current) { bar.innerHTML = ''; return; }
-    const sy = currentSchoolYear();
-    const st = PDSuggest.cycleStatus(current.Id, PLANS, sy);
-    bar.innerHTML = '<span style="color:#64748b;">School year ' + sy + ':</span>' + st.map(c => {
-        const tone = c.state === 'done' ? ['#f0fdf4', '#166534', '✓ ']
-            : c.state === 'overdue' ? ['#fef2f2', '#991b1b', '! ']
-            : ['#fffbeb', '#92400e', ''];
-        const detail = c.state === 'done'
-            ? 'saved ' + (c.plan.PlanDate || 'undated')
-            : (c.state === 'overdue' ? 'overdue, was due ' : 'due ') + c.due;
-        return '<button data-cycle="' + c.key + '" style="background:' + tone[0] + ';color:' + tone[1]
-            + ';border:1px solid ' + tone[1] + '33;border-radius:11px;padding:3px 10px;font-size:9pt;'
-            + 'font-weight:700;cursor:pointer;">' + tone[2] + c.label + ' — ' + detail + '</button>';
-    }).join('');
-    bar.querySelectorAll('button[data-cycle]').forEach(btn =>
+// Program years offered: the current one plus the two before it.
+function fillYearOptions() {
+    const now = PDSuggest.schoolYearOf();
+    const start = parseInt(now.split('-')[0], 10);
+    const years = [start, start - 1, start - 2].map(y => y + '-' + (y + 1));
+    $('yearPick').innerHTML = years.map(y =>
+        `<option value="${y}">${y}${y === now ? ' (current)' : ''}</option>`).join('');
+    $('yearPick').value = now;
+}
+
+/* Goals are held in memory while editing and written on save, so adding three
+   goals is one save rather than three round trips. */
+function goalHtml(g, i) {
+    return `<div class="goal-block" data-i="${i}">
+        <h4>Goal ${i + 1}
+            <button class="no-print" data-del="${i}" title="Remove this goal"
+                style="float:right;border:none;background:transparent;color:#dc2626;cursor:pointer;font-size:9pt;font-weight:700;">remove</button>
+        </h4>
+        <div class="goal-row">
+            <label>Goal:</label>
+            <div class="val" contenteditable="true" data-f="goal" data-i="${i}">${esc(g.goal)}</div>
+        </div>
+        <div class="goal-row">
+            <label>Professional development plan to support goal:</label>
+            <div class="val" contenteditable="true" data-f="pdSupport" data-i="${i}">${esc(g.pdSupport)}</div>
+        </div>
+        <div class="goal-row">
+            <label>Measurement / outcome that will provide evidence of goal completion
+                <span class="hint">(quantity, quality, time frame, percentages or other specific measures)</span>:</label>
+            <div class="val" contenteditable="true" data-f="measurement" data-i="${i}">${esc(g.measurement)}</div>
+        </div>
+        <div class="review-pair">
+            <div class="review-box">
+                <div class="rb-title">Mid-year Comments</div>
+                <div class="rb-date">Review date:
+                    <span contenteditable="true" data-f="midYearReviewDate" data-i="${i}">${esc(g.midYearReviewDate)}</span></div>
+                <div class="rb-text" contenteditable="true" data-f="midYearComments" data-i="${i}">${esc(g.midYearComments)}</div>
+            </div>
+            <div class="review-box">
+                <div class="rb-title">Year-end Comments</div>
+                <div class="rb-date">&nbsp;</div>
+                <div class="rb-text" contenteditable="true" data-f="yearEndComments" data-i="${i}">${esc(g.yearEndComments)}</div>
+            </div>
+        </div>
+    </div>`;
+}
+
+function renderGoals() {
+    $('goalList').innerHTML = goalRows.length
+        ? goalRows.map(goalHtml).join('')
+        : '<p class="hint" style="margin-bottom:12px;">No goals yet. Use “+ Goal” to add one, '
+          + 'or “Suggest goals” to draft them from this person\u2019s credential record.</p>';
+    // Typing writes straight back into the in-memory row.
+    $('goalList').querySelectorAll('[data-f]').forEach(el => {
+        el.addEventListener('input', () => {
+            const i = +el.getAttribute('data-i');
+            goalRows[i][el.getAttribute('data-f')] = el.textContent.trim();
+        });
+    });
+    $('goalList').querySelectorAll('[data-del]').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.getElementById('planType').value = btn.getAttribute('data-cycle');
-            document.getElementById('planDate').value = '';
-            render();
-        }));
+            goalRows.splice(+btn.getAttribute('data-del'), 1);
+            renderGoals();
+        });
+    });
 }
 
 function render() {
     const s = current;
     if (!s) return;
-    const sug = PDSuggest.suggest(s);
-    const sy = currentSchoolYear();
-    const cycle = document.getElementById('planType').value;
-    const plan = planFor(s.Id, cycle, sy);
-    const saved = plan ? GOALS.filter(g => String(g.PlanId) === String(plan.Id)) : [];
-    renderCycleBar();
-    document.getElementById('fCycle').textContent = cycle.replace('-', ' ') + ' Review — ' + sy;
+    const sy = selectedYear();
+    const plan = planFor(s.Id, sy);
 
-    document.getElementById('fName').textContent = s.Name || '';
-    document.getElementById('fPosition').textContent = (s.Role || '')
+    $('fName').textContent = s.Name || '';
+    $('fPosition').textContent = (s.Role || '')
         + (s.Classroom ? ' — ' + s.Classroom : '')
         + (s.SecondaryClassroom ? ' / ' + s.SecondaryClassroom + ' (part time)' : '');
-    document.getElementById('fEducation').textContent = s.Education || '—';
-    document.getElementById('fCreds').textContent = s.EceCredentials || '—';
+    $('fYear').textContent = sy;
+    $('fPlanDate').textContent = plan ? (plan.PlanDate || '') : new Date().toISOString().split('T')[0];
+    $('fLocation').textContent = plan ? (plan.Location || '') : 'Children of Promise — Millstadt';
+    $('fSupervisor').textContent = plan ? (plan.SupervisorName || '') : '';
+
+    // Straight from the staff record.
+    $('fEducation').textContent = s.Education || '—';
     const ece = PDSuggest.credLevel(s, 'ece'), it = PDSuggest.credLevel(s, 'it'), dir = PDSuggest.credLevel(s, 'dir');
-    document.getElementById('fGateways').textContent =
-        [ece ? 'ECE Level ' + ece : null, it ? 'Infant/Toddler Level ' + it : null,
-         dir ? 'Director Level ' + ['', 'I', 'II', 'III'][dir] : null].filter(Boolean).join(', ') || 'None on record';
-    const hrs = [];
-    if (s.SemesterHoursTotal) hrs.push(s.SemesterHoursTotal + ' credit hours total');
-    if (s.SemesterHoursEce) hrs.push(s.SemesterHoursEce + ' early childhood');
-    if (s.TranscriptOnFile) hrs.push('transcript ' + s.TranscriptOnFile.toLowerCase());
-    hrs.push((s.PdHoursYtd || 0) + ' of ' + PDSuggest.PD_HOURS_REQUIRED + ' PD hours this year');
-    document.getElementById('fHours').textContent = hrs.join(' · ');
+    $('fGateways').textContent = [ece ? 'ECE Level ' + ece : null,
+        it ? 'Infant/Toddler Level ' + it : null,
+        dir ? 'Director Level ' + ['', 'I', 'II', 'III'][dir] : null]
+        .filter(Boolean).join(', ') || 'None on record';
+    $('fHours').textContent = s.SemesterHoursTotal
+        ? s.SemesterHoursTotal + ' total, ' + (s.SemesterHoursEce || 0) + ' ECE'
+          + (s.TranscriptOnFile ? ' (transcript ' + s.TranscriptOnFile.toLowerCase() + ')' : '')
+        : 'none recorded';
+    $('fPd').textContent = (s.PdHoursYtd || 0) + ' of ' + PDSuggest.PD_HOURS_REQUIRED;
 
-    const list = arr => '<ul style="margin:0 0 0 18px;">'
-        + arr.map(t => '<li style="margin-bottom:5px;">' + esc(t) + '</li>').join('') + '</ul>';
-    document.getElementById('fNeeds').innerHTML =
-        (plan && plan.NeedsAssessment ? '<div>' + esc(plan.NeedsAssessment) + '</div>' : '') + list(sug.needs);
-    document.getElementById('fProvide').innerHTML =
-        (plan && plan.ProgramWillProvide ? '<div>' + esc(plan.ProgramWillProvide) + '</div>' : '') + list(sug.provide);
-    document.getElementById('fLongTerm').textContent = plan ? (plan.LongTermGoals || '') : '';
+    $('fStrengths').textContent = plan ? (plan.Strengths || '') : '';
+    $('fGrowth').textContent = plan ? (plan.GrowthAreas || '') : '';
+    $('fFrustrations').textContent = plan ? (plan.Frustrations || '') : '';
+    $('fFavorite').textContent = plan ? (plan.FavoriteAspect || '') : '';
 
-    // Saved goals take precedence; suggestions fill the remaining rows.
-    const rows = saved.map(g => ({ goal: g.Goal, actionSteps: g.ActionSteps, timeline: g.Timeline,
-        resources: g.Resources, evidence: g.Evidence }));
-    sug.goals.forEach(g => { if (!rows.some(r => r.goal === g.goal)) rows.push(g); });
-    while (rows.length < 4) rows.push({ goal: '', actionSteps: '', timeline: '', resources: '', evidence: '' });
-    document.getElementById('fGoals').innerHTML = rows.map(r =>
-        '<tr><td>' + esc(r.goal) + '</td><td>' + esc(r.actionSteps) + '</td><td>' + esc(r.timeline)
-        + '</td><td>' + esc(r.resources) + '</td><td>' + esc(r.evidence) + '</td></tr>').join('');
+    $('fInitialNotes').textContent = plan ? (plan.InitialNotes || '') : '';
+    $('fMidNotes').textContent = plan ? (plan.MidYearNotes || '') : '';
+    $('fEndNotes').textContent = plan ? (plan.YearEndNotes || '') : '';
+    $('fInitialStaffDate').textContent = plan ? (plan.InitialStaffSigned || '') : '';
+    $('fInitialSupDate').textContent = plan ? (plan.InitialSupervisorSigned || '') : '';
+    $('fMidStaffDate').textContent = plan ? (plan.MidYearStaffSigned || '') : '';
+    $('fMidSupDate').textContent = plan ? (plan.MidYearSupervisorSigned || '') : '';
+    $('fEndStaffDate').textContent = plan ? (plan.YearEndStaffSigned || '') : '';
+    $('fEndSupDate').textContent = plan ? (plan.YearEndSupervisorSigned || '') : '';
 
-    const pd = document.getElementById('planDate'), rd = document.getElementById('reviewDate');
-    if (plan) { pd.value = plan.PlanDate || ''; rd.value = plan.ReviewDate || ''; }
-    else if (!pd.value) {
-        pd.value = new Date().toISOString().split('T')[0];
-        /* Next review is the other cycle's due date: a mid-year plan points at
-           end-of-year, and end-of-year points at next year's mid-year. Two
-           reviews a year is the centre's own policy — PI9 sets no cadence. */
-        const other = PDSuggest.CYCLES.find(c => c.key !== cycle);
-        const nextSy = cycle === 'End-of-Year'
-            ? (parseInt(sy.split('-')[0], 10) + 1) + '-' + (parseInt(sy.split('-')[1], 10) + 1)
-            : sy;
-        rd.value = PDSuggest.cycleDueDate(other.key, nextSy);
-    }
-    document.getElementById('fPlanDate').textContent = pd.value || '';
-    document.getElementById('fReviewDate').textContent = rd.value || '';
-    document.getElementById('fFooter').textContent = 'Children of Promise LLC — Individual PD Plan — '
-        + cycle + ' ' + sy + (plan ? ', dated ' + (plan.PlanDate || 'undated') : ', not yet saved');
-    msg(plan ? cycle + ' plan on file, dated ' + (plan.PlanDate || 'undated')
-        : 'No ' + cycle + ' plan yet for this school year.');
+    goalRows = plan
+        ? GOALS.filter(g => String(g.PlanId) === String(plan.Id))
+            .sort((a, b) => (+a.SortOrder || 0) - (+b.SortOrder || 0))
+            .map(g => ({ goal: g.Goal || '', pdSupport: g.PdSupport || '',
+                measurement: g.Measurement || '', midYearReviewDate: g.MidYearReviewDate || '',
+                midYearComments: g.MidYearComments || '', yearEndComments: g.YearEndComments || '' }))
+        : [];
+    renderGoals();
+
+    // State the review position plainly, including when a review is outstanding.
+    const mid = plan && (plan.MidYearNotes || '').trim();
+    const end = plan && (plan.YearEndNotes || '').trim();
+    $('fFooter').textContent = 'Children of Promise LLC — PD Plan ' + sy
+        + (plan ? '' : ' — not yet saved');
+    msg(!plan ? 'No plan saved for ' + sy + '.'
+        : 'Saved ' + (plan.PlanDate || 'undated')
+          + ' · mid-year ' + (mid ? 'recorded' : 'OUTSTANDING')
+          + ' · year-end ' + (end ? 'recorded' : 'OUTSTANDING'));
+}
+
+// Draft goals from the credential record. Appends, so typed goals are not lost.
+function suggestGoals() {
+    if (!current) return;
+    const sug = PDSuggest.suggest(current);
+    let added = 0;
+    sug.goals.forEach(g => {
+        if (goalRows.some(r => r.goal === g.goal)) return;
+        goalRows.push({
+            goal: g.goal,
+            pdSupport: g.actionSteps + (g.resources ? ' Support: ' + g.resources + '.' : ''),
+            measurement: g.evidence + (g.timeline ? ' Timeline: ' + g.timeline + '.' : ''),
+            midYearReviewDate: PDSuggest.cycleDueDate('Mid-Year', selectedYear()),
+            midYearComments: '', yearEndComments: ''
+        });
+        added++;
+    });
+    renderGoals();
+    msg(added ? 'Added ' + added + ' suggested goal(s) — edit before saving.'
+        : 'Nothing further to suggest; this record is current against what is tracked.');
 }
 
 async function save() {
     if (!current) return;
-    const btn = document.getElementById('btnSave');
+    const btn = $('btnSave');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
+        const sy = selectedYear();
         const sug = PDSuggest.suggest(current);
         const r = await api('/api/dev-plans', { method: 'POST', body: JSON.stringify({
-            staffId: current.Id,
-            planDate: document.getElementById('planDate').value,
-            reviewDate: document.getElementById('reviewDate').value,
-            planType: document.getElementById('planType').value,
-            schoolYear: currentSchoolYear(),
+            staffId: current.Id, schoolYear: sy, planType: 'Annual',
+            planDate: $('fPlanDate').textContent.trim() || new Date().toISOString().split('T')[0],
+            location: $('fLocation').textContent.trim(),
+            supervisorName: $('fSupervisor').textContent.trim(),
+            strengths: $('fStrengths').textContent.trim(),
+            growthAreas: $('fGrowth').textContent.trim(),
+            frustrations: $('fFrustrations').textContent.trim(),
+            favoriteAspect: $('fFavorite').textContent.trim(),
+            initialNotes: $('fInitialNotes').textContent.trim(),
+            midYearNotes: $('fMidNotes').textContent.trim(),
+            yearEndNotes: $('fEndNotes').textContent.trim(),
+            // PI9 wants these two in writing; the engine supplies them.
             needsAssessment: sug.needs.join(' '),
             programWillProvide: sug.provide.join(' '),
-            longTermGoals: document.getElementById('fLongTerm').textContent || '',
-            supervisorName: 'Megan Nooney'
+            reviewDate: PDSuggest.cycleDueDate('End-of-Year', sy)
         }) });
+        if (r.status !== 200) throw new Error('HTTP ' + r.status);
         const d = await r.json();
         if (!d.success) throw new Error(d.error || 'Save failed');
-        // Persist the suggested goals so the plan is a record, not a re-render.
-        for (let i = 0; i < sug.goals.length; i++) {
-            const g = sug.goals[i];
+
+        /* Do not rely on the returned id: an older server build returned 0, which
+           silently detached goals from their plan. Re-read and match instead. */
+        let planId = d.id && d.id !== '0' ? d.id : null;
+        const after = await (await api('/api/dev-plans')).json();
+        PLANS = after.plans || []; GOALS = after.goals || [];
+        if (!planId) {
+            const mine = PLANS.filter(p => String(p.StaffId) === String(current.Id)
+                && (p.SchoolYear || '') === sy).sort((a, b) => (+b.Id) - (+a.Id));
+            planId = mine.length ? mine[0].Id : null;
+        }
+        if (!planId) throw new Error('plan saved but its id could not be resolved');
+
+        for (let i = 0; i < goalRows.length; i++) {
+            const g = goalRows[i];
+            if (!g.goal) continue;
             await api('/api/dev-goals', { method: 'POST', body: JSON.stringify({
-                planId: d.id, goal: g.goal, actionSteps: g.actionSteps, timeline: g.timeline,
-                resources: g.resources, evidence: g.evidence, status: 'Open', sortOrder: i
+                planId: planId, goal: g.goal, pdSupport: g.pdSupport, measurement: g.measurement,
+                midYearReviewDate: g.midYearReviewDate, midYearComments: g.midYearComments,
+                yearEndComments: g.yearEndComments, status: 'Open', sortOrder: i
             }) });
         }
         await load(current.Id);
@@ -337,36 +496,30 @@ async function load(selectId) {
     const [sRes, pRes] = await Promise.all([api('/api/staff'), api('/api/dev-plans').catch(() => null)]);
     STAFF = await sRes.json();
     if (pRes) { const d = await pRes.json(); PLANS = d.plans || []; GOALS = d.goals || []; }
-    const sel = document.getElementById('staffPick');
+    if (!$('yearPick').options.length) fillYearOptions();
+    const sy = selectedYear();
     const want = selectId || new URLSearchParams(location.search).get('staffId') || (STAFF[0] || {}).Id;
-    // Marks how many of the two cycles are on file, so the gap list is the dropdown.
-    const sy = currentSchoolYear();
-    sel.innerHTML = STAFF.map(s => {
-        const done = PDSuggest.cycleStatus(s.Id, PLANS, sy).filter(c => c.state === 'done').length;
-        return '<option value="' + s.Id + '">' + esc(s.Name)
-            + (done === 2 ? ' \u2713\u2713' : done === 1 ? ' \u2713 (1 of 2)' : ' \u2014 no plan')
-            + '</option>';
-    }).join('');
-    sel.value = want;
-    current = STAFF.find(s => String(s.Id) === String(sel.value)) || STAFF[0];
-    // Open on whichever cycle is outstanding, rather than always the first.
-    document.getElementById('planType').value = PDSuggest.suggestedCycle(current.Id, PLANS, sy);
+    // Marks who has no plan for the selected year, so the gap list is the dropdown.
+    $('staffPick').innerHTML = STAFF.map(s =>
+        `<option value="${s.Id}">${esc(s.Name)}${planFor(s.Id, sy) ? ' ✓' : ' — no plan'}</option>`).join('');
+    $('staffPick').value = want;
+    current = STAFF.find(s => String(s.Id) === String($('staffPick').value)) || STAFF[0];
     render();
 }
 
-document.getElementById('staffPick').addEventListener('change', e => {
+$('staffPick').addEventListener('change', e => {
     current = STAFF.find(s => String(s.Id) === String(e.target.value));
-    document.getElementById('planDate').value = '';
     render();
 });
-['planDate', 'reviewDate'].forEach(id =>
-    document.getElementById(id).addEventListener('change', render));
-document.getElementById('planType').addEventListener('change', () => {
-    document.getElementById('planDate').value = '';
-    render();
+$('yearPick').addEventListener('change', () => load(current && current.Id));
+$('btnSave').addEventListener('click', save);
+$('btnAddGoal').addEventListener('click', () => {
+    goalRows.push({ goal: '', pdSupport: '', measurement: '',
+        midYearReviewDate: PDSuggest.cycleDueDate('Mid-Year', selectedYear()),
+        midYearComments: '', yearEndComments: '' });
+    renderGoals();
 });
-document.getElementById('btnSave').addEventListener('click', save);
-document.getElementById('fLongTerm').setAttribute('contenteditable', 'true');
+$('btnSuggest').addEventListener('click', suggestGoals);
 load().catch(e => msg('Could not load: ' + e.message));
 </script>
 </body>
