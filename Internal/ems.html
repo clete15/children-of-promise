@@ -457,6 +457,9 @@ function buildBody() {
         householdSize:   val('householdSize') ? val('householdSize').value : '',
         publicBenefits:  collectBenefits(''),
         proofOfIncome:   val('proofOfIncome') ? val('proofOfIncome').checked : false,
+        // Preserves the link to the pre-enrollment intake record when enrolling
+        // from the waiting list, so risk-factor and family data stays reachable.
+        preEnrollmentId: waitlistId || null,
     };
 }
 

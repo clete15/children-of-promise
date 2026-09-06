@@ -296,13 +296,54 @@ function handleRequest(req, res) {
             let frpFood = 'Paid';
             if (benefits || isFoster || isMilitary || isPFA || income <= freeThresholds[hhSize]) frpFood = 'Free';
             else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
-            const sql = `INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,HouseholdSize,PublicBenefits,ProofOfIncomeUploaded) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${parseInt(d.householdSize)||0},${esc(d.publicBenefits)},0)`;
+            // Keep the link back to the pre-enrollment intake record so the rich
+            // family/risk-factor data stays reachable after the child is enrolled.
+            const preId = parseInt(d.preEnrollmentId);
+            const preIdVal = isNaN(preId) ? 'NULL' : preId;
+            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='PreEnrollmentId') ALTER TABLE rptMasterEnrollment ADD PreEnrollmentId INT NULL;
+                INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,HouseholdSize,PublicBenefits,ProofOfIncomeUploaded,PreEnrollmentId) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${parseInt(d.householdSize)||0},${esc(d.publicBenefits)},0,${preIdVal})`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             if (!r.data.includes('rows affected')) return sendJSON(res, 500, { error: 'No rows written: ' + r.data });
             sendJSON(res, 200, { success: true });
         });
         return;
+    }
+
+    // GET the pre-enrollment intake record linked to a student (internal - protected).
+    // Prefers the stored PreEnrollmentId; falls back to an exact child name + DOB match
+    // for students enrolled before the link existed.
+    if (req.method === 'GET' && url.startsWith('/api/student-intake/')) {
+        if (!checkAuth(req, res)) return;
+        const studentId = parseInt(url.split('/')[3]);
+        if (!studentId) return sendJSON(res, 400, { error: 'Student ID required' });
+        // Free-text columns are flattened: rows are returned as pipe-delimited lines
+        // split on newlines, so an embedded newline would corrupt the record.
+        const flat = col => `REPLACE(REPLACE(ISNULL(${col},''),CHAR(13),' '),CHAR(10),' ')`;
+        const cols = `p.Id,ISNULL(p.SubmittedAt,'') AS SubmittedAt,ISNULL(p.FirstName,'') AS ParentFirst,ISNULL(p.LastName,'') AS ParentLast,`
+            + `ISNULL(p.Phone,'') AS Phone,ISNULL(p.Email,'') AS Email,ISNULL(p.Address,'') AS Address,ISNULL(p.City,'') AS City,ISNULL(p.Zip,'') AS Zip,`
+            + `ISNULL(p.ChildName,'') AS ChildName,ISNULL(p.ChildBirthDate,'') AS ChildBirthDate,ISNULL(p.AgeGroup,'') AS AgeGroup,ISNULL(p.DaysRequested,'') AS DaysRequested,`
+            + `ISNULL(CAST(p.Score AS NVARCHAR),'') AS Score,ISNULL(p.WaitlistStatus,'') AS WaitlistStatus,`
+            + `ISNULL(p.Homeless,'') AS Homeless,ISNULL(p.FosterAdopted,'') AS FosterAdopted,ISNULL(p.IEP,'') AS IEP,ISNULL(p.EarlyIntervention,'') AS EarlyIntervention,`
+            + `ISNULL(p.AbuseHistory,'') AS AbuseHistory,ISNULL(p.MentalIllness,'') AS MentalIllness,ISNULL(p.DcfsInvolvement,'') AS DcfsInvolvement,`
+            + `ISNULL(p.SubstanceAbuse,'') AS SubstanceAbuse,ISNULL(p.CaregiverOther,'') AS CaregiverOther,ISNULL(p.FamilyDeath,'') AS FamilyDeath,`
+            + `ISNULL(p.LowBirthWeight,'') AS LowBirthWeight,ISNULL(p.ParentIncarcerated,'') AS ParentIncarcerated,ISNULL(p.TeenParent,'') AS TeenParent,`
+            + `ISNULL(p.NoHSDiploma,'') AS NoHSDiploma,ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,`
+            + `ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,ISNULL(p.PriorEarlyLearning,'') AS PriorEarlyLearning,ISNULL(p.BrightpointSubsidy,'') AS BrightpointSubsidy,`
+            + `${flat('p.LivingSituation')} AS LivingSituation,ISNULL(p.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(p.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,`
+            + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,${flat('p.Notes')} AS Notes`;
+        const sql = `SELECT TOP 1 ${cols},'linked' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${studentId}
+            UNION ALL
+            SELECT TOP 1 ${cols},'name+dob' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date) WHERE e.Id=${studentId} AND e.PreEnrollmentId IS NULL`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const keys = ['Id','SubmittedAt','ParentFirst','ParentLast','Phone','Email','Address','City','Zip','ChildName','ChildBirthDate','AgeGroup','DaysRequested','Score','WaitlistStatus','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','CaregiverOther','FamilyDeath','LowBirthWeight','ParentIncarcerated','TeenParent','NoHSDiploma','BornOutsideUS','NonEnglishHome','ActiveMilitary','PriorEarlyLearning','BrightpointSubsidy','LivingSituation','HouseholdIncome','HouseholdSize','PublicBenefits','Notes','MatchType'];
+        const line = r.data.trim().split('\n').find(l => /^\s*\d+\s*\|/.test(l));
+        if (!line) return sendJSON(res, 200, { found: false });
+        const v = line.split('|').map(x => x.trim());
+        const rec = { found: true };
+        keys.forEach((k, i) => rec[k] = v[i] || '');
+        return sendJSON(res, 200, rec);
     }
 
     // PUT update student (internal - protected)

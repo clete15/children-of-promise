@@ -61,6 +61,9 @@
         .pi-btn-secondary:hover { background:#f9fafb; }
         .pi-btn:disabled { opacity:0.5;cursor:not-allowed; }
         .pi-saved-badge { display:inline-flex;align-items:center;gap:4px;font-size:0.72rem;color:#059669;font-weight:600; }
+        /* Risk factors carried over from the pre-enrollment intake record */
+        .pi-flags { display:flex;flex-wrap:wrap;gap:6px;padding:4px 0; }
+        .pi-flag { padding:3px 9px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:0.7rem;font-weight:700;white-space:nowrap; }
 
         /* Print All container is hidden on screen; only used to build the print job */
         #printAllContainer { display:none; }
@@ -212,6 +215,11 @@
                     <div class="pi-field"><label>Military</label><div class="pi-value" id="piMilitary"></div></div>
                     <div class="pi-field"><label>Category</label><div class="pi-value" id="piCategory"></div></div>
                 </div>
+            </div>
+            <!-- Intake record pulled from the family's original pre-enrollment submission -->
+            <div class="pi-section" id="piIntakeSection">
+                <h4>From Pre-Enrollment Intake <span id="piIntakeMeta" style="font-weight:400;text-transform:none;letter-spacing:0;color:#9ca3af;font-size:0.7rem;"></span></h4>
+                <div id="piIntakeBody"></div>
             </div>
             <!-- Manual fields -->
             <div class="pi-section">
@@ -730,7 +738,87 @@ async function openInterview(studentId) {
         }
     } catch (e) { console.error('Failed to load interview', e); }
 
+    loadIntakeRecord(studentId);
+
     document.getElementById('piOverlay').classList.add('open');
+}
+
+// Risk factors captured at pre-enrollment. These feed ISBE eligibility/priority
+// determinations, so they belong in front of staff during the parent interview.
+const INTAKE_RISK_FACTORS = [
+    ['Homeless', 'Homeless / unstable housing'],
+    ['FosterAdopted', 'Foster or adopted'],
+    ['IEP', 'IEP'],
+    ['EarlyIntervention', 'Early Intervention history'],
+    ['AbuseHistory', 'Abuse / domestic violence'],
+    ['MentalIllness', 'Mental illness in home'],
+    ['DcfsInvolvement', 'DCFS involvement'],
+    ['SubstanceAbuse', 'Substance abuse in home'],
+    ['CaregiverOther', 'Other caregiver'],
+    ['FamilyDeath', 'Death in family'],
+    ['LowBirthWeight', 'Low birth weight'],
+    ['ParentIncarcerated', 'Parent incarcerated'],
+    ['TeenParent', 'Teen parent'],
+    ['NoHSDiploma', 'No HS diploma'],
+    ['BornOutsideUS', 'Born outside US'],
+    ['NonEnglishHome', 'Non-English home'],
+    ['ActiveMilitary', 'Active military'],
+];
+
+const PROGRAM_LABELS = { '0-2': 'Infant & Toddler', '2-3': '2-Year Olds', '3-5': 'Pre-School', 'ba': 'Before & Afterschool' };
+
+async function loadIntakeRecord(studentId) {
+    const meta = document.getElementById('piIntakeMeta');
+    const body = document.getElementById('piIntakeBody');
+    meta.textContent = '';
+    body.innerHTML = '<div style="font-size:0.78rem;color:#9ca3af;">Loading intake record…</div>';
+    try {
+        const res = await apiFetch('/api/student-intake/' + studentId);
+        const d = await res.json();
+        if (!d || !d.found) {
+            meta.textContent = '';
+            body.innerHTML = '<div style="font-size:0.78rem;color:#9ca3af;">No pre-enrollment record on file for this child. '
+                + 'Children enrolled before the online form went live will not have one.</div>';
+            return;
+        }
+
+        const submitted = (d.SubmittedAt || '').split(' ')[0];
+        meta.textContent = `· submitted ${submitted || 'unknown'}${d.MatchType === 'name+dob' ? ' (matched by name + DOB)' : ''}`;
+
+        const yes = v => String(v).trim().toLowerCase() === 'yes';
+        const flags = INTAKE_RISK_FACTORS.filter(([k]) => yes(d[k])).map(([, label]) =>
+            `<span class="pi-flag">${label}</span>`).join('');
+
+        const field = (label, value) =>
+            `<div class="pi-field"><label>${label}</label><div class="pi-value">${value || '—'}</div></div>`;
+
+        const parent = [d.ParentFirst, d.ParentLast].filter(Boolean).join(' ');
+        const program = PROGRAM_LABELS[d.AgeGroup] || d.AgeGroup || '';
+
+        body.innerHTML = `
+            <div class="pi-grid three" style="margin-bottom:12px;">
+                ${field('Parent / Guardian', parent)}
+                ${field('Phone', d.Phone)}
+                ${field('Email', d.Email)}
+            </div>
+            <div class="pi-grid three" style="margin-bottom:12px;">
+                ${field('Program Applied For', program)}
+                ${field('Days Requested', d.DaysRequested)}
+                ${field('Priority Score', d.Score)}
+            </div>
+            <div class="pi-grid" style="margin-bottom:12px;">
+                ${field('Living Situation', d.LivingSituation)}
+                ${field('Prior Early Learning', d.PriorEarlyLearning)}
+            </div>
+            <div class="pi-field pi-full">
+                <label>Risk Factors Reported at Intake</label>
+                <div class="pi-flags">${flags || '<span style="font-size:0.78rem;color:#9ca3af;">None reported</span>'}</div>
+            </div>
+            ${d.Notes ? `<div class="pi-field pi-full" style="margin-top:10px;"><label>Intake Notes</label><div class="pi-value" style="white-space:normal;">${d.Notes}</div></div>` : ''}`;
+    } catch (e) {
+        meta.textContent = '';
+        body.innerHTML = '<div style="font-size:0.78rem;color:#dc2626;">Could not load intake record.</div>';
+    }
 }
 
 function closeInterview() {
