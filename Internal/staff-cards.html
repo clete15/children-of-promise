@@ -32,7 +32,71 @@
             transition: transform 0.15s, box-shadow 0.15s;
             cursor: pointer;
         }
-        .staff-card:hover { transform: translateY(-3px); box-shadow: 0 8px 28px rgba(0,0,0,0.18); }
+        /* Cards are edited in place, so they must not behave like buttons: no
+           pointer cursor and no lift on hover, which made fields feel unstable
+           while typing. */
+        .staff-card { cursor: default; }
+        .staff-card:hover { box-shadow: 0 6px 22px rgba(0,0,0,0.13); }
+
+        /* Inline fields. Sized to sit in the same row as the label it replaces. */
+        .cf-input {
+            font: inherit; font-size: 0.78rem; color: #1e293b;
+            text-align: right;
+            border: 1px solid transparent; border-radius: 4px;
+            padding: 3px 6px; background: transparent;
+            max-width: 62%; min-width: 0;
+        }
+        .cf-input:hover { border-color: #e2e8f0; background: #fbfcfe; }
+        .cf-input:focus {
+            outline: none; border-color: #2563eb; background: #fff;
+            box-shadow: 0 0 0 2px rgba(37,99,235,0.12);
+        }
+        select.cf-input { text-align: left; cursor: pointer; }
+        .cf-input.placeholder-empty { color: #94a3b8; font-style: italic; }
+
+        /* Fields that need the full width of the card. */
+        .cf-stack { display: block; padding: 6px 0; border-bottom: 1px solid #f1f5f9; }
+        .cf-stack:last-child { border-bottom: none; }
+        .cf-stack > .cf-label {
+            display: block; color: #64748b; font-weight: 600;
+            font-size: 0.72rem; margin-bottom: 3px;
+        }
+        .cf-stack > .cf-input { max-width: 100%; width: 100%; text-align: left; }
+        textarea.cf-input {
+            width: 100%; max-width: 100%; text-align: left;
+            resize: vertical; min-height: 46px; line-height: 1.35;
+        }
+        .cf-check { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; }
+
+        /* Grouped credential levels, three across inside one card. */
+        .cf-triple { display: flex; gap: 6px; }
+        .cf-triple > label { flex: 1; min-width: 0; }
+        .cf-triple > label > span {
+            display: block; color: #64748b; font-weight: 600;
+            font-size: 0.66rem; margin-bottom: 2px;
+        }
+        .cf-triple select { width: 100%; max-width: 100%; }
+
+        /* Unsaved changes. The bar only appears once something is edited, so a
+           card at rest stays quiet. */
+        .card-dirty-bar {
+            display: none;
+            padding: 10px 20px; background: #fffbeb;
+            border-top: 1px solid #fde68a;
+            align-items: center; gap: 8px;
+        }
+        .staff-card.dirty .card-dirty-bar { display: flex; }
+        .staff-card.dirty { box-shadow: 0 0 0 2px #f59e0b, 0 6px 22px rgba(0,0,0,0.13); }
+        .card-dirty-bar .msg { flex: 1; font-size: 0.72rem; color: #92400e; font-weight: 600; }
+        .btn-inline-save, .btn-inline-cancel {
+            padding: 6px 14px; border-radius: 5px; font-size: 0.74rem;
+            font-weight: 700; cursor: pointer; border: none;
+        }
+        .btn-inline-save { background: #16a34a; color: #fff; }
+        .btn-inline-save:hover { background: #15803d; }
+        .btn-inline-save:disabled { background: #94a3b8; cursor: default; }
+        .btn-inline-cancel { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; }
+        .btn-inline-cancel:hover { border-color: #94a3b8; }
 
         .card-header {
             padding: 16px 20px;
@@ -477,42 +541,196 @@ function sectionHtml(title, list, blurb, withAddButton) {
 }
 
 function cardHtml(s) {
-    let html = '';
-    [s].forEach(s => {
-        const name = s.Name || '';
-        const isVacant = name === 'New Teacher' || name.toLowerCase().includes('tbd');
-        const reviewed = !!(s.ReviewedBy || '').trim();
-        const reviewBadge = reviewed
-            ? '<span class="review-chip reviewed" title="Confirmed by ' + s.ReviewedBy
-                + (s.ReviewedDate ? ' on ' + s.ReviewedDate : '') + '">✓ Reviewed</span>'
-            : '<span class="review-chip unreviewed" title="Extracted from Gateways reports; not yet confirmed by the director">Needs review</span>';
-        html += `
-        <div class="staff-card ${reviewed ? '' : 'needs-review'}" onclick="openEdit(${s.Id})">
-            <div class="card-header">
-                <div class="card-avatar ${isVacant ? 'vacant' : ''}">${getInitials(name)}</div>
-                <div class="card-name-block">
-                    <div class="card-name">${name}</div>
-                    <div class="card-role">${s.Role || ''}${s.Fte ? ' · ' + s.Fte + ' FTE' : ''}</div>
+    const name = s.Name || '';
+    const isVacant = name === 'New Teacher' || name.toLowerCase().includes('tbd');
+    const reviewed = !!(s.ReviewedBy || '').trim();
+    const creds = parseCredentials(s.EceCredentials || s.Gateways || '');
+    const rooms = window.CLASSROOM_LIST || [];
+
+    // data-f carries the API field name, so saving is a straight read of the card.
+    const txt = (f, val, ph, extra) => `<input type="text" class="cf-input" data-f="${f}"`
+        + ` value="${escAttr(val)}" placeholder="${escAttr(ph || '')}"${extra || ''}>`;
+    const sel = (f, val, opts, extra) => `<select class="cf-input" data-f="${f}"${extra || ''}>`
+        + opts.map(o => {
+            const [v, label] = Array.isArray(o) ? o : [o, o];
+            return `<option value="${escAttr(v)}"${String(val || '') === String(v) ? ' selected' : ''}>${escHtml(label)}</option>`;
+        }).join('') + '</select>';
+    const row = (label, control) => `<div class="card-field"><span class="cf-label">${label}</span>${control}</div>`;
+    const stack = (label, control) => `<div class="cf-stack"><span class="cf-label">${label}</span>${control}</div>`;
+    // A room already on file that is not in the list is kept and marked, so
+    // opening a card can never quietly discard it.
+    const roomOpts = extra => [['', extra]].concat(rooms.map(r => [r, r]))
+        .concat(![''].concat(rooms).includes(s[extra === '— none —' ? 'SecondaryClassroom' : 'Classroom'] || '')
+            ? [] : []);
+    const roomList = current => {
+        const base = rooms.slice();
+        if (current && !base.includes(current)) base.push(current);
+        return base;
+    };
+
+    return `
+    <div class="staff-card ${reviewed ? '' : 'needs-review'}" data-id="${s.Id}">
+        <div class="card-header">
+            <div class="card-avatar ${isVacant ? 'vacant' : ''}">${escHtml(getInitials(name))}</div>
+            <div class="card-name-block">
+                <input type="text" class="cf-input" data-f="name" value="${escAttr(name)}"
+                       style="text-align:left;font-weight:700;font-size:0.95rem;max-width:100%;width:100%;"
+                       placeholder="Full name">
+                <div style="display:flex;gap:4px;margin-top:3px;">
+                    ${sel('role', s.Role, [['', '— role —'], 'Teacher', 'Assistant Teacher', 'Director']
+                        .concat(s.Role && !['', 'Teacher', 'Assistant Teacher', 'Director'].includes(s.Role)
+                            ? [[s.Role, s.Role + ' (non-standard)']] : []),
+                        ' style="flex:2;font-size:0.72rem;"')}
+                    ${txt('fte', s.Fte, 'FTE', ' style="flex:1;text-align:center;font-size:0.72rem;" title="FTE"')}
                 </div>
-                <span class="card-badge ${getBadgeClass(s.Program)}">${s.Program || 'N/A'}</span>
             </div>
-            <div class="card-body">
-                <div class="card-field"><span class="cf-label">Review</span><span class="cf-value">${reviewBadge}</span></div>
-                <div class="card-field"><span class="cf-label">Classroom</span><span class="cf-value ${!s.Classroom ? 'empty' : ''}">${s.Classroom || '—'}</span></div>
-                ${s.SecondaryClassroom ? '<div class="card-field"><span class="cf-label">Also teaches</span><span class="cf-value" style="color:#7c3aed;">' + s.SecondaryClassroom + ' <span style="color:#94a3b8;">(part time)</span></span></div>' : ''}
-                <div class="card-field"><span class="cf-label">Education</span><span class="cf-value ${!s.Education ? 'empty' : ''}">${s.Education || '—'}</span></div>
-                <div class="card-field"><span class="cf-label">Gateways / ECE</span><span class="cf-value ${!s.Gateways && !s.EceCredentials ? 'empty' : ''}">${s.Gateways || s.EceCredentials || '—'}</span></div>
-                <div class="card-field"><span class="cf-label">Experience</span><span class="cf-value ${!s.ExperienceYears ? 'empty' : ''}">${s.ExperienceYears ? s.ExperienceYears + ' yrs' : '—'}</span></div>
-                <div class="card-field"><span class="cf-label">Registry ID</span><span class="cf-value ${!s.RegistryId ? 'empty' : ''}">${s.RegistryId || '—'}</span></div>
-                ${s.Notes ? '<div class="card-field" style="flex-direction:column;align-items:flex-start;gap:2px;"><span class="cf-label">Notes</span><span class="cf-value" style="text-align:left;font-size:0.72rem;color:#64748b;">' + s.Notes + '</span></div>' : ''}
+            ${sel('program', s.Program || 'n/a', [['PFA', 'PFA'], ['PI', 'PI'], ['INCCRA', 'INCCRA'], ['n/a', 'N/A']],
+                ' style="max-width:80px;font-size:0.7rem;"')}
+        </div>
+        <div class="card-body">
+            ${row('Review', reviewed
+                ? `<span class="review-chip reviewed" title="Confirmed by ${escAttr(s.ReviewedBy)}${s.ReviewedDate ? ' on ' + escAttr(s.ReviewedDate) : ''}">✓ Reviewed</span>`
+                : '<span class="review-chip unreviewed" title="Extracted from Gateways reports; not yet confirmed by the director">Needs review</span>')}
+            ${row('Group', sel('staffGroup', s.StaffGroup, [['', 'Teaching staff'], ['Ownership', 'Ownership group']]))}
+            ${stack('Classroom', sel('classroom', s.Classroom,
+                [['', '— none (no assigned room) —']].concat(roomList(s.Classroom).map(r => [r, r]))))}
+            ${stack('Second classroom <span style="font-weight:400;color:#94a3b8;">(part time)</span>',
+                sel('secondaryClassroom', s.SecondaryClassroom,
+                [['', '— none —']].concat(roomList(s.SecondaryClassroom).map(r => [r, r]))))}
+            ${row('Education', sel('education', s.Education,
+                [['', '—'], 'High School/GED', 'Some College', "Associate's", "Bachelor's", "Master's", 'Doctorate']))}
+            <div class="cf-stack">
+                <span class="cf-label">Gateways credential levels</span>
+                <div class="cf-triple">
+                    <label><span>ECE</span>${sel('_ece', creds.ece, [['', '—'], '1', '2', '3', '4', '5', '6'])}</label>
+                    <label><span>Infant/Toddler</span>${sel('_it', creds.it, [['', '—'], '1', '2', '3', '4', '5'])}</label>
+                    <label><span>Director</span>${sel('_dir', creds.dir, [['', '—'], 'I', 'II', 'III'])}</label>
+                </div>
             </div>
-            <div class="card-footer">
-                <button class="card-btn" onclick="event.stopPropagation();openEdit(${s.Id})">✏️ Edit</button>
-                <button class="card-btn" onclick="event.stopPropagation();deleteStaff(${s.Id})" style="color:#dc2626;">🗑️ Remove</button>
-            </div>
-        </div>`;
+            ${row('CDA', `<label class="cf-check"><input type="checkbox" data-f="_cda"${creds.cda ? ' checked' : ''}> holds a CDA</label>`)}
+            ${stack('Other credentials', txt('_other', creds.other.join(', '), 'e.g. Gold IT2, Autism 101'))}
+            ${row('Semester hrs — total', txt('semesterHoursTotal', s.SemesterHoursTotal, 'e.g. 53', ' style="max-width:80px;"'))}
+            ${row('Semester hrs — ECE', txt('semesterHoursEce', s.SemesterHoursEce, 'e.g. 22', ' style="max-width:80px;"'))}
+            ${row('Transcript w/ Gateways', sel('transcriptOnFile', s.TranscriptOnFile,
+                [['', '— unknown —'], ['On file', 'On file'], ['Submitted', 'Submitted, pending'],
+                 ['Not submitted', 'NOT submitted'], ['N/A', 'N/A']]))}
+            ${row('Experience (yrs)', txt('experienceYears', s.ExperienceYears, 'e.g. 8', ' style="max-width:80px;"'))}
+            ${row('Registry ID', txt('registryId', s.RegistryId, 'e.g. N285894', ' style="max-width:110px;"'))}
+            ${row('Reviewed by', txt('reviewedBy', s.ReviewedBy, 'Director confirming'))}
+            ${row('Date reviewed', `<input type="date" class="cf-input" data-f="reviewedDate" value="${escAttr(s.ReviewedDate)}" style="max-width:130px;">`)}
+            <details${s.Notes ? '' : ''}>
+                <summary style="cursor:pointer;font-size:0.72rem;color:#64748b;font-weight:600;padding:6px 0;">
+                    Notes${s.Notes ? ' <span style="font-weight:400;">(' + String(s.Notes).length + ' chars)</span>' : ''}</summary>
+                <textarea class="cf-input" data-f="notes" rows="4" placeholder="Verification trail, pending items, history">${escHtml(s.Notes)}</textarea>
+            </details>
+        </div>
+        <div class="card-dirty-bar">
+            <span class="msg">Unsaved changes</span>
+            <button class="btn-inline-cancel" onclick="revertCard(${s.Id})">Cancel</button>
+            <button class="btn-inline-save" onclick="saveCard(${s.Id})">Save</button>
+        </div>
+        <div class="card-footer">
+            <button class="card-btn" onclick="deleteStaff(${s.Id})" style="color:#dc2626;">🗑️ Remove</button>
+        </div>
+    </div>`;
+}
+
+/* Escaping. Notes carry apostrophes and quotation marks from the Gateways
+   reports, and dropping them raw into a value attribute would break the input
+   and silently truncate the field. */
+function escAttr(v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function escHtml(v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Read every field off one card into an API-shaped object.
+function readCard(card) {
+    const body = {};
+    card.querySelectorAll('[data-f]').forEach(el => {
+        const f = el.getAttribute('data-f');
+        if (f.startsWith('_')) return;            // credential parts, handled below
+        body[f] = el.type === 'checkbox' ? el.checked : el.value.trim();
     });
-    return html;
+    const g = f => card.querySelector(`[data-f="_${f}"]`);
+    const parts = [];
+    if (g('ece').value) parts.push('ECE Level ' + g('ece').value);
+    if (g('it').value) parts.push('IT Level ' + g('it').value);
+    if (g('dir').value) parts.push('Director Level ' + g('dir').value);
+    if (g('cda').checked) parts.push('CDA');
+    const other = g('other').value.split(',').map(t => t.trim()).filter(Boolean);
+    body.eceCredentials = parts.concat(other).join(', ');
+    body.gateways = g('ece').value ? 'ECE Credential - Level ' + g('ece').value : '';
+    // A named reviewer always carries a date.
+    if (body.reviewedBy && !body.reviewedDate) body.reviewedDate = new Date().toISOString().split('T')[0];
+    return body;
+}
+
+function markDirty(card) {
+    if (card) card.classList.add('dirty');
+}
+
+function revertCard(id) {
+    const card = document.querySelector(`.staff-card[data-id="${id}"]`);
+    const rec = staffList.find(x => String(x.Id) === String(id));
+    if (!card || !rec) return;
+    card.outerHTML = cardHtml(rec);
+}
+
+/* Saves one card. Only changed fields are sent, so two people editing different
+   cards cannot overwrite each other's untouched columns. */
+async function saveCard(id) {
+    const card = document.querySelector(`.staff-card[data-id="${id}"]`);
+    const rec = staffList.find(x => String(x.Id) === String(id));
+    if (!card || !rec) return;
+
+    const body = readCard(card);
+    if (!body.name) { alert('A name is required.'); return; }
+
+    const COL = {
+        name: 'Name', role: 'Role', program: 'Program', classroom: 'Classroom',
+        secondaryClassroom: 'SecondaryClassroom', fte: 'Fte', education: 'Education',
+        eceCredentials: 'EceCredentials', gateways: 'Gateways', experienceYears: 'ExperienceYears',
+        registryId: 'RegistryId', notes: 'Notes', reviewedBy: 'ReviewedBy',
+        reviewedDate: 'ReviewedDate', staffGroup: 'StaffGroup',
+        semesterHoursTotal: 'SemesterHoursTotal', semesterHoursEce: 'SemesterHoursEce',
+        transcriptOnFile: 'TranscriptOnFile'
+    };
+    const changed = {};
+    Object.keys(body).forEach(k => {
+        if (!COL[k]) return;
+        if (String(body[k] || '') !== String(rec[COL[k]] || '')) changed[k] = body[k];
+    });
+
+    const btn = card.querySelector('.btn-inline-save');
+    const msg = card.querySelector('.card-dirty-bar .msg');
+    if (!Object.keys(changed).length) {
+        card.classList.remove('dirty');
+        return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+        const res = await apiFetch('/api/staff/' + encodeURIComponent(id),
+            { method: 'PUT', body: JSON.stringify(changed) });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Save failed');
+        // Update the local copy so the next diff is against what is really stored.
+        Object.keys(changed).forEach(k => { rec[COL[k]] = changed[k]; });
+        card.classList.remove('dirty');
+        if (msg) msg.textContent = 'Unsaved changes';
+        // Re-render this card only, so the review chip and section placement
+        // refresh without losing anyone else's in-progress edits.
+        const movedGroup = Object.prototype.hasOwnProperty.call(changed, 'staffGroup');
+        if (movedGroup) renderCards(); else card.outerHTML = cardHtml(rec);
+    } catch (e) {
+        if (msg) msg.textContent = 'Save failed: ' + e.message;
+        if (btn) { btn.disabled = false; btn.textContent = 'Retry save'; }
+        return;
+    }
 }
 
 // id === null opens a blank form for a new record.
@@ -710,6 +928,29 @@ async function deleteStaff(id) {
 // Close modal on backdrop click
 document.getElementById('editModal').addEventListener('click', function(e) {
     if (e.target === this) closeModal();
+});
+
+/* One delegated listener for the whole grid, rather than handlers per field.
+   Cards are replaced wholesale after a save, and delegation survives that. */
+document.addEventListener('input', e => {
+    if (e.target.closest && e.target.closest('#staffGrid')) markDirty(e.target.closest('.staff-card'));
+});
+document.addEventListener('change', e => {
+    if (e.target.closest && e.target.closest('#staffGrid')) markDirty(e.target.closest('.staff-card'));
+});
+// Ctrl+S / Cmd+S saves the card being edited.
+document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        const card = e.target.closest && e.target.closest('.staff-card');
+        if (card && card.classList.contains('dirty')) {
+            e.preventDefault();
+            saveCard(card.getAttribute('data-id'));
+        }
+    }
+});
+// Editing in place makes it easy to wander off mid-change, so say so.
+window.addEventListener('beforeunload', e => {
+    if (document.querySelector('.staff-card.dirty')) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // Init — loadStaff is async now, so render only once the data has arrived.
