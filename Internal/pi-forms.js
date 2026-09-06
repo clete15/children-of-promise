@@ -896,7 +896,7 @@
             if (data.success) {
                 if (!trackingData[currentStudentId]) trackingData[currentStudentId] = {};
                 trackingData[currentStudentId][spec.field] = 1;
-                renderRoster();
+                refreshActiveView();
                 const badge = document.getElementById('docSavedBadge');
                 badge.style.display = 'inline-flex';
                 setTimeout(() => { badge.style.display = 'none'; }, 3000);

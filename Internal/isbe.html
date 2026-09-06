@@ -145,6 +145,39 @@
         /* Flash a roster column when jumping to it from a checklist item */
         .col-flash { background:#fef9c3 !important;transition:background 0.3s; }
 
+        /* "My Classroom" (teacher view) */
+        .cls-roompick { display:flex;align-items:center;gap:9px;padding:12px 16px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px;flex-wrap:wrap; }
+        .cls-roompick label { font-size:0.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em; }
+        .cls-roompick select { padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;font-weight:600;font-family:inherit;background:white; }
+        .cls-roompick select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .cls-roompick #classroomTeacher { font-size:0.76rem;color:#64748b; }
+        .cls-batch { border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:18px; }
+        .cls-batch-head { padding:10px 15px;background:#f8fafc;border-bottom:1px solid #e5e7eb;font-size:0.78rem;font-weight:800;color:#1e293b; }
+        .cls-batch-row { display:flex;align-items:center;gap:10px;padding:9px 15px;border-bottom:1px solid #f8fafc;font-size:0.78rem; }
+        .cls-batch-row:last-child { border-bottom:none; }
+        .cls-batch-label { font-weight:700;color:#334155;flex:1; }
+        .cls-batch-count { font-size:0.72rem;color:#92400e;background:#fffbeb;padding:3px 9px;border-radius:11px;font-weight:700;white-space:nowrap; }
+        .cls-batch-row a { color:#2563eb;text-decoration:none;font-weight:700;font-size:0.72rem;white-space:nowrap; }
+        .cls-batch-row a:hover { text-decoration:underline; }
+        .cls-alldone, .cls-empty { padding:16px;border-radius:10px;font-size:0.8rem;margin-bottom:18px; }
+        .cls-alldone { background:#f0fdf4;color:#166534;border:1px solid #bbf7d0; }
+        .cls-empty { background:#f8fafc;color:#64748b;border:1px solid #e5e7eb; }
+        .cls-cards { display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px; }
+        .cls-card { border:1px solid #e5e7eb;border-radius:10px;padding:13px 15px;background:white; }
+        .cls-card-head { display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px; }
+        .cls-name { font-size:0.88rem;font-weight:700;color:#1e293b; }
+        .cls-meta { font-size:0.69rem;color:#94a3b8;margin-top:2px; }
+        .cls-out { font-size:0.66rem;font-weight:700;color:#92400e;background:#fffbeb;padding:3px 9px;border-radius:11px;white-space:nowrap;flex-shrink:0; }
+        .cls-ok { font-size:0.66rem;font-weight:700;color:#166534;background:#f0fdf4;padding:3px 9px;border-radius:11px;white-space:nowrap;flex-shrink:0; }
+        .cls-chips { display:flex;flex-wrap:wrap;gap:5px; }
+        .cls-chip { display:inline-flex;align-items:center;gap:5px;font-size:0.69rem;font-weight:600;padding:4px 9px;border-radius:6px;border:1px solid #e2e8f0;background:white;color:#475569;text-decoration:none;white-space:nowrap; }
+        a.cls-chip:hover { border-color:#2563eb;color:#1d4ed8;background:#eff6ff; }
+        .cls-chip-done { background:#f0fdf4;border-color:#bbf7d0;color:#166534; }
+        a.cls-chip-done:hover { background:#dcfce7;border-color:#86efac;color:#166534; }
+        .cls-dl { font-size:0.62rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px; }
+        .cls-dl-overdue { background:#fef2f2;color:#b91c1c; }
+        .cls-dl-due { background:#fffbeb;color:#92400e; }
+
         /* "What Needs Doing" panel */
         .sy-header { padding:14px 18px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px; }
         .sy-year { font-size:1rem;font-weight:800;color:#1e293b; }
@@ -235,6 +268,12 @@
                 <div>🚦 What Needs<br>Doing</div>
                 <span id="startYearCount"></span>
             </button>
+            <!-- Teacher-facing. One classroom, both programs, only the tasks a
+                 teacher owns. Teachers do not think in PFA versus PI. -->
+            <button id="btnClassroom" onclick="setProgram('classroom')">
+                <div>🏫 My Classroom</div>
+                <span id="classroomCount"></span>
+            </button>
             <button class="active" id="btnPFA" onclick="setProgram('PFA')">
                 <div>📋 PFA Roster</div>
                 <span id="pfaCount"></span>
@@ -286,6 +325,15 @@
             <!-- Start of year / outstanding work -->
             <div id="startYearPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
                 <div id="startYearBody"></div>
+            </div>
+            <!-- My Classroom (teacher view) -->
+            <div id="classroomPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
+                <div class="cls-roompick">
+                    <label for="classroomRoom">Classroom</label>
+                    <select id="classroomRoom" onchange="setClassroomRoom(this.value)"></select>
+                    <span id="classroomTeacher"></span>
+                </div>
+                <div id="classroomBody"></div>
             </div>
             <!-- Screening Follow-Up: children whose screening flagged a concern -->
             <div id="followUpPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
@@ -768,7 +816,12 @@ async function init() {
         document.getElementById('piCount').textContent = piCount + ' students';
         updateFollowUpCount();
         updateStartYearCount();
-        renderRoster();
+        // Deep link, e.g. the portal's My Classroom card. Falls through to the
+        // default PFA roster for anything unrecognised.
+        const wanted = new URLSearchParams(location.search).get('view');
+        const VIEWS = ['classroom', 'startYear', 'followUp', 'PFA', 'PI', 'pfaCompliance', 'piCompliance'];
+        if (wanted && VIEWS.indexOf(wanted) !== -1) setProgram(wanted);
+        else renderRoster();
     } catch(e) {
         console.error('[INIT ERROR]', e);
         document.getElementById('isbeBody').innerHTML = '<tr><td colspan="' + (COLUMNS.length + 2) + '" style="color:red;padding:20px;">Error loading data: ' + e.message + '</td></tr>';
@@ -780,6 +833,19 @@ function getRoom(roomNum) {
     return r ? r.Room : roomNum;
 }
 
+// Re-renders whichever view is on screen. Save handlers used to call renderRoster()
+// directly, which drew into the hidden program grid when the user was actually
+// looking at My Classroom or What Needs Doing, so a just-saved form appeared to
+// do nothing.
+function refreshActiveView() {
+    if (activeProgram === 'classroom') renderClassroom();
+    else if (activeProgram === 'startYear') renderStartYear();
+    else if (activeProgram === 'followUp') renderFollowUp();
+    else if (activeProgram === 'PFA' || activeProgram === 'PI') renderRoster();
+    updateFollowUpCount();
+    updateStartYearCount();
+}
+
 function setProgram(prog) {
     activeProgram = prog;
     document.getElementById('btnPFA').classList.toggle('active', prog === 'PFA');
@@ -788,12 +854,14 @@ function setProgram(prog) {
     document.getElementById('btnPICompliance').classList.toggle('active', prog === 'piCompliance');
     document.getElementById('btnFollowUp').classList.toggle('active', prog === 'followUp');
     document.getElementById('btnStartYear').classList.toggle('active', prog === 'startYear');
+    document.getElementById('btnClassroom').classList.toggle('active', prog === 'classroom');
 
     const grid = document.getElementById('isbeRosterGrid');
     const compliance = document.getElementById('compliancePanel');
     const followUp = document.getElementById('followUpPanel');
     const startYear = document.getElementById('startYearPanel');
-    [grid, compliance, followUp, startYear].forEach(el => { el.style.display = 'none'; });
+    const classroom = document.getElementById('classroomPanel');
+    [grid, compliance, followUp, startYear, classroom].forEach(el => { el.style.display = 'none'; });
 
     if (prog === 'pfaCompliance' || prog === 'piCompliance') {
         document.getElementById('isbeTitle').textContent = prog === 'pfaCompliance' ? 'PFA Compliance' : 'PI Compliance';
@@ -810,6 +878,10 @@ function setProgram(prog) {
         document.getElementById('isbeCount').textContent = '';
         startYear.style.display = 'block';
         renderStartYear();
+    } else if (prog === 'classroom') {
+        document.getElementById('isbeTitle').textContent = 'My Classroom';
+        classroom.style.display = 'block';
+        renderClassroom();
     } else {
         document.getElementById('isbeTitle').textContent = prog + ' Roster';
         grid.style.display = 'block';
@@ -897,16 +969,16 @@ function renderFollowUp() {
    The four PICC document columns are Prevention Initiative only: PI6 and PI7 come
    from the Prevention Initiative Compliance Checklist and have no PFA counterpart. */
 const COLUMNS = [
-    { field: 'PermissionSlip', label: 'Permission<br>Slip', title: 'Parent signs consent form allowing ASQ and ASE developmental screenings to be performed on their child for the school year.' },
-    { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Complete at enrollment or beginning of year.' },
+    { field: 'PermissionSlip', teacher: true, label: 'Permission<br>Slip', title: 'Parent signs consent form allowing ASQ and ASE developmental screenings to be performed on their child for the school year.' },
+    { field: 'ParentInterview', teacher: true, label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Complete at enrollment or beginning of year.' },
     { field: 'ProofOfIncome', label: 'Proof of<br>Income', title: 'Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.' },
     { field: 'EnterSIS', label: 'Enter<br>into SIS', title: 'Enter student into the ISBE Student Information System (SIS) before beginning screenings.' },
-    { field: 'BegASQ', label: 'Beg ASQ', title: 'Administer the ASQ-3 developmental screening at the beginning of the school year. Parent completes the questionnaire; teacher scores it.' },
-    { field: 'BegASE', label: 'Beg ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the beginning of the school year. Parent completes; teacher scores and reviews results.' },
-    { field: 'MidYearReport', label: 'Mid Year<br>Report Card', title: 'Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.' },
-    { field: 'EndASQ', label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.' },
-    { field: 'EndASE', label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.' },
-    { field: 'EndYearReport', label: 'End Year<br>Report Card', title: 'Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.' },
+    { field: 'BegASQ', teacher: true, label: 'Beg ASQ', title: 'Administer the ASQ-3 developmental screening at the beginning of the school year. Parent completes the questionnaire; teacher scores it.' },
+    { field: 'BegASE', teacher: true, label: 'Beg ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the beginning of the school year. Parent completes; teacher scores and reviews results.' },
+    { field: 'MidYearReport', teacher: true, label: 'Mid Year<br>Report Card', title: 'Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.' },
+    { field: 'EndASQ', teacher: true, label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.' },
+    { field: 'EndASE', teacher: true, label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.' },
+    { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card', title: 'Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.' },
     { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', programs: ['PI'], title: 'PICC PI5.A - weighted eligibility form with income verification, dated on or before enrollment. Pre-fills from the pre-enrollment record.' },
     { field: 'ScreeningResultsShared', label: 'Results<br>Shared', docForm: 'screeningResultsShared', programs: ['PI'], title: 'PICC PI10.H - documentation that developmental screening results were shared with the parent or guardian.' },
     { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment', docForm: 'familyAssessment', programs: ['PI'], title: 'PICC PI6.A - published, research-based Family Centered Assessment conducted within 6 months of enrollment (LSP, Baby TALK, FROG).' },
@@ -1183,7 +1255,13 @@ function serializeModalForPrint(modalEl) {
 }
 
 async function printAllForColumn(field) {
-    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByRoomThenName);
+    // Scope follows the view you triggered this from. Without this, printing from
+    // My Classroom matched no one (activeProgram is 'classroom', not a program
+    // value) and printing from a roster would have spanned every room.
+    const roster = activeProgram === 'classroom'
+        ? classroomRoster(activeClassroomRoom)
+        : students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'))
+            .sort(sortByRoomThenName);
     const unchecked = roster.filter(s => !(trackingData[s.Id] || {})[field]);
     if (!unchecked.length) { alert('All forms in this column are already completed!'); return; }
 
@@ -1437,7 +1515,7 @@ async function saveInterview() {
             // Update local tracking data (auto-checks ParentInterview)
             if (!trackingData[currentInterviewStudentId]) trackingData[currentInterviewStudentId] = {};
             trackingData[currentInterviewStudentId].ParentInterview = 1;
-            renderRoster();
+            refreshActiveView();
             document.getElementById('piSavedBadge').style.display = 'inline-flex';
             setTimeout(() => { document.getElementById('piSavedBadge').style.display = 'none'; }, 3000);
         } else {
@@ -1549,7 +1627,7 @@ async function savePermissionSlip() {
         if (data.success) {
             if (!trackingData[currentPSStudentId]) trackingData[currentPSStudentId] = {};
             trackingData[currentPSStudentId].PermissionSlip = 1;
-            renderRoster();
+            refreshActiveView();
             document.getElementById('psSavedBadge').style.display = 'inline-flex';
             setTimeout(function() { document.getElementById('psSavedBadge').style.display = 'none'; }, 3000);
         } else {
@@ -1720,8 +1798,7 @@ async function saveScreening() {
                 ReferralMade: body.referralMade,
                 Flag: computeScreeningFlag(currentScrType, body),
             };
-            updateFollowUpCount();
-            if (activeProgram === 'followUp') renderFollowUp(); else renderRoster();
+            refreshActiveView();
             document.getElementById('scrSavedBadge').style.display = 'inline-flex';
             setTimeout(function() { document.getElementById('scrSavedBadge').style.display = 'none'; }, 3000);
         } else {
@@ -2073,6 +2150,173 @@ async function loadCompliance(prog) {
     }
     html += renderInstrumentSection(items, prefix, data);
     list.innerHTML = html;
+}
+
+/* ── My Classroom (teacher view) ──
+   The compliance roster answers the director's question: is every file complete
+   across a program. A teacher has a different question: what do I owe on my own
+   children this week. So this view scopes to one room, ignores the PFA/PI split
+   (a classroom usually holds both, and it is not a distinction a teacher acts
+   on), and shows only the columns that are classroom work.
+
+   It reuses the existing screening and permission-slip modals rather than
+   duplicating them, so there is one place where a screening gets entered. */
+
+const CLASSROOM_ROOM_KEY = 'cofp.classroom.room';
+
+// Columns a teacher is responsible for. Income verification, SIS entry, grant
+// reports and the PI6/PI7 family documents are office work and stay out.
+function teacherColumns() {
+    return COLUMNS.filter(c => c.teacher);
+}
+
+function classroomRoster(roomNumber) {
+    return students
+        .filter(s => (s.Active === 'Yes' || s.Active === 'YES')
+            && String(s.RoomNumber) === String(roomNumber)
+            // Only children in a tracked program have a checklist to complete.
+            && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI'))
+        .sort(sortByName);
+}
+
+// Rooms that actually hold tracked children, so the picker is not a list of
+// empty classrooms.
+function classroomOptions() {
+    const counts = {};
+    students.forEach(s => {
+        if (!(s.Active === 'Yes' || s.Active === 'YES')) return;
+        if (s.PFA_PI_na !== 'PFA' && s.PFA_PI_na !== 'PI') return;
+        const rn = String(s.RoomNumber || '');
+        if (!rn) return;
+        counts[rn] = (counts[rn] || 0) + 1;
+    });
+    return Object.keys(counts)
+        .sort((a, b) => (parseInt(a) || 9999) - (parseInt(b) || 9999))
+        .map(rn => ({ roomNumber: rn, label: getRoom(rn), count: counts[rn] }));
+}
+
+let activeClassroomRoom = null;
+
+function setClassroomRoom(roomNumber) {
+    activeClassroomRoom = roomNumber;
+    try { localStorage.setItem(CLASSROOM_ROOM_KEY, roomNumber); } catch (e) { /* private mode */ }
+    renderClassroom();
+}
+
+// The soonest deadline affecting a child, used to sort the most urgent first.
+function childUrgency(s) {
+    let worst = null;
+    ['BegASQ', 'BegASE'].forEach(field => {
+        if ((trackingData[s.Id] || {})[field]) return;
+        const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
+        const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
+        const dl = screeningDeadline(s, rec && rec.ScreeningDate);
+        if (!dl) return;
+        const rank = dl.state === 'overdue' ? 0 : dl.state === 'due' ? 1 : 2;
+        if (worst === null || rank < worst) worst = rank;
+    });
+    return worst === null ? 3 : worst;
+}
+
+function renderClassroom() {
+    const opts = classroomOptions();
+    const sel = document.getElementById('classroomRoom');
+
+    // Remember the teacher's room between visits so they land on it.
+    if (activeClassroomRoom === null) {
+        let saved = null;
+        try { saved = localStorage.getItem(CLASSROOM_ROOM_KEY); } catch (e) { /* ignore */ }
+        activeClassroomRoom = (saved && opts.some(o => o.roomNumber === saved))
+            ? saved
+            : (opts.length ? opts[0].roomNumber : '');
+    }
+
+    sel.innerHTML = opts.map(o =>
+        '<option value="' + o.roomNumber + '">' + o.label + ' (' + o.count + ')</option>').join('');
+    sel.value = activeClassroomRoom;
+
+    const room = classrooms.find(c => String(c.RoomNumber) === String(activeClassroomRoom));
+    document.getElementById('classroomTeacher').textContent = room && room.TeacherDescription
+        ? room.TeacherDescription : '';
+
+    const roster = classroomRoster(activeClassroomRoom);
+    const cols = teacherColumns();
+    document.getElementById('isbeCount').textContent = roster.length + ' children';
+    document.getElementById('classroomCount').textContent = roster.length
+        ? roster.length + ' children' : '';
+
+    const body = document.getElementById('classroomBody');
+    if (!roster.length) {
+        body.innerHTML = '<div class="cls-empty">No active PFA or PI children in this classroom.</div>';
+        return;
+    }
+
+    // Batch actions first: a teacher works a whole task at a time.
+    const batch = cols.map(col => {
+        const missing = roster.filter(s => !(trackingData[s.Id] || {})[col.field]);
+        if (!missing.length) return '';
+        const label = col.label.replace(/<br>/g, ' ');
+        const printBtn = columnHasForm(col)
+            ? '<a href="#" onclick="event.preventDefault();printAllForColumn(\'' + col.field + '\')">print all ' + missing.length + '</a>'
+            : '';
+        return '<div class="cls-batch-row"><span class="cls-batch-label">' + label + '</span>'
+            + '<span class="cls-batch-count">' + missing.length + ' to do</span>' + printBtn + '</div>';
+    }).filter(Boolean).join('');
+
+    const batchBlock = batch
+        ? '<div class="cls-batch"><div class="cls-batch-head">Outstanding for this classroom</div>' + batch + '</div>'
+        : '<div class="cls-alldone">Everything on the classroom checklist is complete for '
+            + activeSchoolYear + '. Nothing outstanding.</div>';
+
+    // Then one card per child, most urgent first.
+    const cards = roster.slice().sort((a, b) => {
+        const d = childUrgency(a) - childUrgency(b);
+        return d !== 0 ? d : sortByName(a, b);
+    }).map(s => {
+        const t = trackingData[s.Id] || {};
+        const chips = cols.map(col => {
+            const done = !!t[col.field];
+            const label = col.label.replace(/<br>/g, ' ');
+            let extra = '';
+            let action = '';
+            if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
+                const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';
+                const period = col.field.indexOf('Beg') === 0 ? 'Beginning' : 'End';
+                action = 'openScreening(' + s.Id + ',\'' + type + '\',\'' + period + '\')';
+                if (!done && period === 'Beginning') {
+                    const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
+                    const dl = screeningDeadline(s, rec && rec.ScreeningDate);
+                    if (dl && (dl.state === 'overdue' || dl.state === 'due')) {
+                        extra = '<span class="cls-dl cls-dl-' + dl.state + '">' + dl.text + '</span>';
+                    }
+                }
+            } else if (col.field === 'PermissionSlip') {
+                action = 'openPermissionSlip(' + s.Id + ')';
+            } else if (col.field === 'ParentInterview') {
+                action = 'openInterview(' + s.Id + ')';
+            }
+            const cls = 'cls-chip' + (done ? ' cls-chip-done' : '');
+            const inner = (done ? '\u2713 ' : '') + label + extra;
+            return action
+                ? '<a href="#" class="' + cls + '" onclick="event.preventDefault();' + action + '">' + inner + '</a>'
+                : '<span class="' + cls + '">' + inner + '</span>';
+        }).join('');
+
+        const outstanding = cols.filter(col => !t[col.field]).length;
+        const status = outstanding
+            ? '<span class="cls-out">' + outstanding + ' outstanding</span>'
+            : '<span class="cls-ok">complete</span>';
+
+        return '<div class="cls-card">'
+            + '<div class="cls-card-head">'
+            + '<div><div class="cls-name">' + s.Last_Name + ', ' + s.First_Name + '</div>'
+            + '<div class="cls-meta">' + (s.PFA_PI_na || '') + (s.Birth_date ? ' &middot; born ' + s.Birth_date : '')
+            + (s.Start_Date ? ' &middot; enrolled ' + s.Start_Date : '') + '</div></div>'
+            + status + '</div>'
+            + '<div class="cls-chips">' + chips + '</div></div>';
+    }).join('');
+
+    body.innerHTML = batchBlock + '<div class="cls-cards">' + cards + '</div>';
 }
 
 /* ── What Needs Doing ──
