@@ -2271,28 +2271,35 @@ ELSE
         // Attachment for anything not safely previewable, so nothing renders inline
         // that could carry script.
         const inline = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'].includes(ext);
-        let size = 0;
-        try { size = fs.statSync(full).size; } catch (e) { size = 0; }
-        console.log('[DOC] ' + size + ' ' + mime + ' ' + rel);
+        /* Read fully, then send in one write — deliberately NOT a stream.
+
+           createReadStream().pipe(res) never completes against this server's
+           HTTPS response: the request hangs with no response at all and no error
+           raised, so an error handler cannot catch it. Verified against the live
+           site — doc-index (10 KB) and the ISBE page itself (185 KB) both return
+           promptly because they read and send in one go, while any streamed file
+           times out regardless of type or size.
+
+           Buffering is fine here: the largest document in the library is a few
+           megabytes, and correctness beats memory efficiency for a handful of
+           compliance PDFs. */
+        let buf;
+        try {
+            buf = fs.readFileSync(full);
+        } catch (err) {
+            console.log('[DOC ERROR] ' + rel + ' -> ' + err.message);
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            return res.end('Could not read that document');
+        }
         res.writeHead(200, {
             'Content-Type': mime,
-            // Without a length the browser cannot tell a finished response from a
-            // stalled one, so a truncated read looks like an endless load.
-            'Content-Length': size,
+            // Lets the browser tell a finished response from a stalled one.
+            'Content-Length': buf.length,
             'Content-Disposition': (inline ? 'inline' : 'attachment')
                 + '; filename="' + path.basename(full).replace(/"/g, '') + '"',
             'X-Content-Type-Options': 'nosniff'
         });
-        const stream = fs.createReadStream(full);
-        /* An unhandled stream error leaves the response open forever — the browser
-           spins with no way to know it failed, and an uncaught error would take the
-           whole server down with it. Log it and cut the connection instead. */
-        stream.on('error', err => {
-            console.log('[DOC ERROR] ' + rel + ' -> ' + err.message);
-            res.destroy();
-        });
-        req.on('close', () => stream.destroy());
-        return stream.pipe(res);
+        return res.end(buf);
     }
 
     // Check a file out or back in. Sending a blank name checks it back in.
