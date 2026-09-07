@@ -2899,9 +2899,19 @@ function piccDocsHtml(num) {
     if (!found) return '';
     var meta = (docIndex && docIndex.meta) || {};
 
+    /* Only PDFs and images render in the browser. Word and Excel files are sent
+       as downloads, so opening them in a new tab leaves an empty tab spinning
+       while the file quietly lands in Downloads — which reads as a failure.
+       Those get a same-tab download link instead. */
+    var PREVIEWABLE = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'];
     var rows = found.files.map(function (f) {
         var out = meta[f.rel];
-        return '<li><a href="/api/doc-file?path=' + encodeURIComponent(f.rel) + '" target="_blank" rel="noopener">'
+        var dot = f.name.lastIndexOf('.');
+        var ext = dot === -1 ? '' : f.name.slice(dot).toLowerCase();
+        var preview = PREVIEWABLE.indexOf(ext) !== -1;
+        return '<li><a href="/api/doc-file?path=' + encodeURIComponent(f.rel) + '"'
+            + (preview ? ' target="_blank" rel="noopener"' : ' download="' + escapeHtml(f.name) + '"')
+            + ' title="' + (preview ? 'Opens in a new tab' : 'Downloads this file') + '">'
             + '<span>' + escapeHtml(f.name) + '</span>'
             + (f.stale ? '<span class="picc-doc-stale" title="The filename names an earlier year, so this may be last year\'s copy">old year</span>' : '')
             + (out && out.checkedOutBy
