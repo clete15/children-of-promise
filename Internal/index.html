@@ -448,7 +448,7 @@
 </div><!-- end mainContent -->
 
 <script>
-const CORRECT_PASSWORD = 'cofpadmin';
+// The password is not held here any more; the server is the only authority.
 
 // ── PASSWORD GATE ──
 function checkAuth() {
@@ -530,7 +530,7 @@ async function runDeploy() {
     btn.disabled = true;
     btn.style.background = '#a3a3a3';
     try {
-        const res = await fetch('/api/deploy', { method: 'POST', headers: { 'Authorization': 'Basic ' + btoa(':cofpadmin') } });
+        const res = await fetch('/api/deploy', { method: 'POST' });
         const json = await res.json();
         if (json.success) {
             btn.textContent = '✓ Deployed!';
@@ -553,10 +553,12 @@ async function runDeploy() {
 // Fetch alert count for the badge
 async function loadAlertCount() {
     try {
-        const AUTH = 'Basic ' + btoa(':cofpadmin');
+        // Authorization is deliberately NOT set here. The browser attaches the
+// staff Basic credentials to same-origin requests by itself, so hardcoding
+// the password would ship it to every visitor and break on every rotation.
         const [sRes, wRes] = await Promise.all([
-            fetch('/api/students', { headers: { 'Authorization': AUTH } }),
-            fetch('/api/waitinglist/count', { headers: { 'Authorization': AUTH } })
+            fetch('/api/students', { headers: {} }),
+            fetch('/api/waitinglist/count', { headers: {} })
         ]);
         if (!sRes.ok) return;
         const students = await sRes.json();

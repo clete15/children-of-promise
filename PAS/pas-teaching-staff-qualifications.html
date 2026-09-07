@@ -314,7 +314,9 @@ let CLASSROOMS = [];
 
 const STORAGE_PREFIX = 'pas_teaching_staff_quals_';
 const STAFF_COUNT = 4;
-const AUTH = 'Basic ' + btoa(':cofpadmin');
+// Authorization is deliberately NOT set here. The browser attaches the
+// staff Basic credentials to same-origin requests by itself, so hardcoding
+// the password would ship it to every visitor and break on every rotation.
 
 function getStorageKey(classroomKey) {
     return STORAGE_PREFIX + classroomKey;
@@ -323,7 +325,7 @@ function getStorageKey(classroomKey) {
 // Fetch classrooms from the server API
 async function loadClassrooms() {
     try {
-        const res = await fetch('/api/classrooms', { headers: { 'Authorization': AUTH } });
+        const res = await fetch('/api/classrooms', { headers: {} });
         if (!res.ok) throw new Error('API error');
         const rooms = await res.json();
         CLASSROOMS = rooms.map(r => ({
@@ -775,7 +777,7 @@ async function prefillFromStaff() {
     try {
         let staff;
         try {
-            const res = await fetch('/api/staff', { headers: { 'Authorization': AUTH } });
+            const res = await fetch('/api/staff', { headers: {} });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             staff = await res.json();
         } catch (e) {

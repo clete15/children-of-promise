@@ -26,7 +26,9 @@
     if (window.__deployWidgetLoaded) return;   // idempotent
     window.__deployWidgetLoaded = true;
 
-    const AUTH = 'Basic ' + btoa(':cofpadmin');
+    // Authorization is deliberately NOT set here. The browser attaches the
+// staff Basic credentials to same-origin requests by itself, so hardcoding
+// the password would ship it to every visitor and break on every rotation.
 
     function inject() {
         if (document.getElementById('deployWidget')) return;
@@ -52,7 +54,7 @@
         btn.dataset.state = 'pending';
         btn.textContent = opts.pendingText;
         try {
-            const res = await fetch(opts.url, { method: 'POST', headers: { 'Authorization': AUTH } });
+            const res = await fetch(opts.url, { method: 'POST', headers: {} });
             let json = {};
             try { json = await res.json(); } catch (e) { /* restart may cut the response short */ }
             const ok = res.ok && (json.success !== false);

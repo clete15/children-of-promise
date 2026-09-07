@@ -24,7 +24,9 @@
     'use strict';
     if (window.PasStore) return;
 
-    const AUTH = 'Basic ' + btoa(':cofpadmin');
+    // Authorization is deliberately NOT set here. The browser attaches the
+// staff Basic credentials to same-origin requests by itself, so hardcoding
+// the password would ship it to every visitor and break on every rotation.
     const ENDPOINT = '/api/pas-worksheets';
 
     // Keys of the form <prefix><scope>, where the trailing part identifies a
@@ -49,7 +51,7 @@
 
     function api(opts) {
         return fetch(ENDPOINT, Object.assign({
-            headers: { 'Authorization': AUTH, 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json' }
         }, opts));
     }
 

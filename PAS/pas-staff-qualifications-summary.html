@@ -222,13 +222,15 @@
 <script src="pas-store.js"></script>
 <script>
 const STORAGE_KEY = 'pas_teaching_staff_summary';
-const AUTH = 'Basic ' + btoa(':cofpadmin');
+// Authorization is deliberately NOT set here. The browser attaches the
+// staff Basic credentials to same-origin requests by itself, so hardcoding
+// the password would ship it to every visitor and break on every rotation.
 let CLASSROOMS = [];
 let ROW_COUNT = 8;
 
 async function loadClassroomNames() {
     try {
-        const res = await fetch('/api/classrooms', { headers: { 'Authorization': AUTH } });
+        const res = await fetch('/api/classrooms', { headers: {} });
         if (!res.ok) throw new Error('API error');
         const rooms = await res.json();
         CLASSROOMS = rooms.map(r => r.Room);

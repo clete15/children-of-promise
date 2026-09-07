@@ -20,7 +20,7 @@
 | `/` | Public website (External folder) |
 | `/parent` | Parent Portal (code-authenticated, no login) |
 | `/portal` | Admin splash page |
-| `/staff/` | Staff portal (password: `cofpadmin`, stored in localStorage with "Remember Me") |
+| `/staff/` | Staff portal (HTTP Basic; password lives ONLY in the server's `COFP_STAFF_PASSWORD` environment variable, never in code or docs) |
 | `/staff/ems.html` | Enrollment Management System |
 | `/staff/isbe.html` | ISBE PFA/PI Management |
 

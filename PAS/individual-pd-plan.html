@@ -267,9 +267,10 @@
 
    Previous plans are kept server side, so saving a year again supersedes rather
    than erases. */
-const AUTH = 'Basic ' + btoa(':cofpadmin');
-const api = (p, o) => fetch(p, Object.assign({ headers: {
-    'Authorization': AUTH, 'Content-Type': 'application/json' } }, o || {}));
+// Authorization is deliberately NOT set here. The browser attaches the
+// staff Basic credentials to same-origin requests by itself, so hardcoding
+// the password would ship it to every visitor and break on every rotation.
+const api = (p, o) => fetch(p, Object.assign({ headers: { 'Content-Type': 'application/json' } }, o || {}));
 
 let STAFF = [], PLANS = [], GOALS = [], current = null, goalRows = [];
 const $ = id => document.getElementById(id);

@@ -6,10 +6,12 @@
    ══════════════════════════════════════════════════════════════════ */
 
 // ── AUTH / API ──
-const AUTH = 'Basic ' + btoa(':cofpadmin');
+// Authorization is deliberately NOT set here. The browser attaches the
+// staff Basic credentials to same-origin requests by itself, so hardcoding
+// the password would ship it to every visitor and break on every rotation.
 
 function apiFetch(url, opts = {}) {
-    opts.headers = Object.assign({ 'Authorization': AUTH, 'Content-Type': 'application/json' }, opts.headers || {});
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
     return fetch(url, opts);
 }
 
