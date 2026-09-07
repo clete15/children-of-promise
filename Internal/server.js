@@ -901,6 +901,25 @@ function resolveDocPath(rel) {
        setx COFP_ONLYOFFICE_SECRET "a-long-random-string" /M
    The secret must match OnlyOffice's own JWT secret exactly. */
 const ONLYOFFICE_URL = (process.env.COFP_ONLYOFFICE_URL || '').replace(/\/+$/, '');
+
+/* The address OnlyOffice should use to fetch and return documents.
+
+   By default the config hands it our public HTTPS hostname, which means the
+   document server loops out to the internet and back to reach a file sitting on
+   its own disk. That hairpin frequently fails on a VPS, and the symptom is an
+   editor that loads and then reports the document as missing.
+
+   Setting this to http://localhost keeps the fetch on the box:
+       setx COFP_SELF_URL "http://localhost" /M
+
+   Safe over plain HTTP because the traffic never leaves the machine, and the
+   download is authenticated by a one-time key scoped to a single file. */
+const SELF_URL = (process.env.COFP_SELF_URL || '').replace(/\/+$/, '');
+
+/* Endpoints the document server calls, which must NOT be redirected to HTTPS.
+   OnlyOffice does not follow the redirect, so a redirect reads to it as a failed
+   download — the same "not found" symptom. */
+const OFFICE_NO_REDIRECT = ['/api/office-file', '/api/office-callback'];
 const ONLYOFFICE_SECRET = process.env.COFP_ONLYOFFICE_SECRET || '';
 const ONLYOFFICE_ON = !!(ONLYOFFICE_URL && ONLYOFFICE_SECRET);
 
@@ -1217,8 +1236,12 @@ function readBody(req, cb) {
 }
 
 const server = http.createServer((req, res) => {
-    // If HTTPS is available, redirect HTTP to HTTPS (except for ACME challenges)
-    if (sslOptions && !req.url.startsWith('/.well-known/acme-challenge')) {
+    /* If HTTPS is available, redirect HTTP to HTTPS — except for ACME challenges,
+       and except for the two endpoints the local document server calls. It does
+       not follow redirects, so redirecting those reads to it as a failed
+       download. That traffic stays on the machine, so plain HTTP is fine. */
+    if (sslOptions && !req.url.startsWith('/.well-known/acme-challenge')
+        && !OFFICE_NO_REDIRECT.some(p => req.url.startsWith(p))) {
         const host = (req.headers.host || '').split(':')[0];
         res.writeHead(301, { 'Location': `https://${host}${req.url}` });
         return res.end();
@@ -2594,7 +2617,10 @@ ELSE
         const docKey = crypto.createHash('sha1')
             .update(rel + '|' + stat.size + '|' + stat.mtimeMs).digest('hex').slice(0, 20);
 
-        const base = 'https://' + (req.headers.host || 'childrenofpromisedaycare.com');
+        /* Where OnlyOffice should fetch from and post back to. Prefer an explicit
+           COFP_SELF_URL — usually http://localhost — so the document server never
+           has to leave the machine to read a file that is already on it. */
+        const base = SELF_URL || ('https://' + (req.headers.host || 'childrenofpromisedaycare.com'));
         const config = {
             document: {
                 fileType: ext.slice(1),
