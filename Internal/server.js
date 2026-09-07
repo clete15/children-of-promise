@@ -3,6 +3,8 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+// Used for the document editor's JWT signing and its one-time file keys.
+const crypto = require('crypto');
 
 /* Prevent crashes from unhandled errors.
 
