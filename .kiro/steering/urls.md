@@ -10,6 +10,34 @@ Domain: `childrenofpromisedaycare.com`
 | Internal Staff Portal | https://childrenofpromisedaycare.com/staff/ |
 | ISBE PFA/PI Management | https://childrenofpromisedaycare.com/staff/isbe.html |
 
+## Domain & DNS — READ BEFORE TOUCHING
+
+Confirmed by WHOIS/registry lookup, Aug 2026:
+
+- **Registrar: Wix.com Ltd.** (not GoDaddy). Nameservers `NS4.WIXDNS.NET`, `NS5.WIXDNS.NET`.
+- **Renews 13 Oct 2026**, auto-renew ON (Wix shows "Renews on", which means active).
+- Domain status is `clientTransferProhibited` **and** `clientUpdateProhibited` — a registrar
+  lock. This, not Wix policy, is why the nameservers can't be changed self-service. Lifting it
+  is a Wix support request, so Cloudflare remains possible but not DIY.
+- Wix does **DNS only**. The root A record points to the VPS. No Wix site is served.
+- **The server IP is in GoDaddy's range** (`160.153.0.0/16`, GO-DADDY-COM-LLC), but the VPS
+  does **not** appear in the GoDaddy account that holds `escapeband.net`. It is a second
+  GoDaddy login, most likely under a Children of Promise email. Find it via an old GoDaddy
+  receipt naming the server — the address it was sent to is the login.
+
+### ⚠ Two buttons that will take the whole site down
+
+Both look like the helpful thing to press. Neither is.
+
+1. **Wix Domains page → "Try Again"** on the red *"Your domain is set to point away from
+   Wix"* banner. That banner is a **permanent false alarm**. Pointing away from Wix is the
+   intended setup — the real site is on the VPS. Clicking it reconnects the domain to Wix and
+   takes down the public site, the staff portal, the ISBE pages and the roster together. DNS
+   propagation makes it slow to undo.
+2. **Wix site dashboard → "Connect Domain"** under the site name. Same outcome, same reason.
+
+Wix will keep showing that error for as long as the setup is correct. Leave it alone.
+
 ## Architecture
 
 - **Server:** Node.js on Windows Server (`C:\app\Internal\server.js`), port 80 + 443 (SSL via Let's Encrypt)
@@ -50,4 +78,9 @@ Build a **Parent Interview Form** modal on the ISBE page:
 - **SSL Certificate** — ✅ Done (Let's Encrypt, auto-renews)
 - **Install SSMS locally** — ✅ Done
 - **Parent Interview Form** — Next up
-- **Cloudflare / transfer domain from Wix** — Wix won't change nameservers; SSL done directly instead
+- **Cloudflare / transfer domain from Wix** — blocked by a registrar lock
+  (`clientUpdateProhibited`), not by Wix refusing. Ask Wix support to unlock if ever wanted.
+  SSL was done directly on the server instead, so there is no pressing need. See Domain & DNS above.
+- **Server documents folder has no backup** — OneDrive was doing this invisibly and no longer
+  will. Check the (second) GoDaddy account for snapshot backups. A snapshot restores the whole
+  machine, so it is a poor way to recover one file — file-level backup wanted too.
