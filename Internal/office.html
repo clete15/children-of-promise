@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edit document &middot; Children Of Promise</title>
+<style>
+    * { box-sizing: border-box; }
+    html, body { margin:0; padding:0; height:100%; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#1e293b; }
+    #bar { height:44px;display:flex;align-items:center;gap:14px;padding:0 14px;background:#0f172a;color:#e2e8f0;font-size:0.82rem; }
+    #bar strong { font-weight:600;color:white;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:50vw; }
+    #bar a { color:#93c5fd;text-decoration:none;font-size:0.78rem; }
+    #bar a:hover { text-decoration:underline; }
+    #note { margin-left:auto;color:#94a3b8;font-size:0.74rem; }
+    #host { height:calc(100% - 44px); }
+    #msg { padding:28px;color:#e2e8f0;line-height:1.7;max-width:680px; }
+    #msg h2 { font-size:1rem;margin:0 0 12px 0; }
+    #msg code { background:#0f172a;padding:2px 6px;border-radius:4px;font-size:0.82rem;color:#fca5a5; }
+    #msg pre { background:#0f172a;padding:12px 14px;border-radius:8px;overflow-x:auto;font-size:0.78rem;color:#cbd5e1; }
+</style>
+</head>
+<body>
+
+<div id="bar">
+    <a href="javascript:window.close()">&larr; Close</a>
+    <strong id="title">Loading...</strong>
+    <span id="note"></span>
+</div>
+<div id="host"><div id="msg">Loading the editor...</div></div>
+
+<script src="/staff/auth.js"></script>
+<script>
+/* Opens one library document in OnlyOffice for editing.
+
+   Everything that matters happens server side: /api/office-config decides
+   whether the file may be edited, issues a short-lived key for the document
+   server to fetch it with, and signs the config so OnlyOffice will not act on
+   anything this page invented. Saves return through the callback in that config,
+   not through the browser — so closing this tab does not lose work.
+
+   Called as: office.html?path=<relative path inside the library> */
+
+const params = new URLSearchParams(location.search);
+const relPath = params.get('path') || '';
+
+function fail(html) {
+    document.getElementById('host').innerHTML = '<div id="msg">' + html + '</div>';
+}
+
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+(async function () {
+    if (!relPath) return fail('<h2>No document specified</h2>Open a document from the compliance checklist or the library.');
+    document.getElementById('title').textContent = relPath.split('/').pop();
+
+    // Is the feature even switched on? A clear answer beats a blank editor.
+    let status;
+    try {
+        const r = await CofpAuth.apiFetch('/api/office-status');
+        status = await r.json();
+    } catch (e) {
+        return fail('<h2>Could not reach the server</h2>Check you are signed in, then reload.');
+    }
+
+    if (!status.enabled) {
+        return fail('<h2>Editing in the browser is not set up yet</h2>'
+            + 'This server has no document editor configured, so Word and Excel files can '
+            + 'still be downloaded, edited on your machine and checked back in &mdash; but not '
+            + 'edited here.'
+            + '<p>To enable it, install OnlyOffice Docs on the server and set these, then restart:</p>'
+            + '<pre>setx COFP_ONLYOFFICE_URL "http://localhost:8080" /M\n'
+            + 'setx COFP_ONLYOFFICE_SECRET "&lt;the same secret OnlyOffice uses&gt;" /M</pre>'
+            + '<p style="color:#94a3b8;font-size:0.8rem;">Reported by the server: '
+            + esc(status.reason || 'not configured') + '</p>');
+    }
+
+    let cfg;
+    try {
+        const r = await CofpAuth.apiFetch('/api/office-config?path=' + encodeURIComponent(relPath));
+        if (!r.ok) {
+            const j = await r.json().catch(function () { return {}; });
+            return fail('<h2>Cannot open this document</h2>' + esc(j.error || ('HTTP ' + r.status)));
+        }
+        cfg = await r.json();
+    } catch (e) {
+        return fail('<h2>Could not load the editor configuration</h2>' + esc(e.message));
+    }
+
+    document.getElementById('note').textContent =
+        cfg.config.editorConfig.mode === 'edit' ? 'Changes save back to the library automatically'
+                                                : 'Read only \u2014 this type cannot be edited here';
+
+    // Load the document server's own script, then hand it the signed config.
+    const s = document.createElement('script');
+    s.src = cfg.url + '/web-apps/apps/api/documents/api.js';
+    s.onerror = function () {
+        fail('<h2>The document editor did not load</h2>'
+            + 'The server is configured to use <code>' + esc(cfg.url) + '</code> but your browser '
+            + 'could not reach it. If OnlyOffice is bound to localhost on the server, it needs to be '
+            + 'reachable from here too \u2014 either published on its own hostname or proxied through this site.');
+    };
+    s.onload = function () {
+        document.getElementById('host').innerHTML = '<div id="editor"></div>';
+        try {
+            new DocsAPI.DocEditor('editor', Object.assign({
+                width: '100%', height: '100%',
+                events: {
+                    onError: function (e) {
+                        console.error('[OnlyOffice]', e);
+                    }
+                }
+            }, cfg.config));
+        } catch (e) {
+            fail('<h2>The editor failed to start</h2>' + esc(e.message));
+        }
+    };
+    document.head.appendChild(s);
+})();
+</script>
+
+</body>
+</html>

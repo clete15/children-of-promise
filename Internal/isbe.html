@@ -3074,6 +3074,25 @@ var docIndexState = 'idle';   // idle | loading | ready | failed
 // changes, or PFA items would be matched against PI folders and find nothing.
 var docIndexProgram = null;
 
+/* Whether the server has a document editor configured. Asked once; until the
+   answer arrives no Edit buttons are offered, which is the safe default — a
+   button that cannot work is worse than no button. */
+var officeEnabled = false;
+(function askOffice() {
+    if (!window.CofpAuth) return;
+    CofpAuth.apiFetch('/api/office-status')
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+            if (d && d.enabled) {
+                officeEnabled = true;
+                // Re-render so Edit appears without needing a reload.
+                if (activeComplianceProgram === 'piCompliance'
+                    || activeComplianceProgram === 'pfaCompliance') loadCompliance();
+            }
+        })
+        .catch(function () { /* leave editing off */ });
+})();
+
 /* Filenames and staff names come off the filesystem and out of the database, so
    they are escaped before being built into markup. A document called
    "Policy <draft>.pdf" is a plausible accident, not an attack, but it would
@@ -3194,12 +3213,23 @@ function piccDocsHtml(num) {
        while the file quietly lands in Downloads — which reads as a failure.
        Those get a same-tab download link instead. */
     var PREVIEWABLE = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'];
+    // Offered only when the server reports a document editor is available, so a
+    // server without one never shows a button that cannot work.
+    var EDITABLE = ['.docx', '.xlsx', '.pptx'];
     var rows = found.files.map(function (f) {
         var out = meta[f.rel];
         var dot = f.name.lastIndexOf('.');
         var ext = dot === -1 ? '' : f.name.slice(dot).toLowerCase();
         var preview = PREVIEWABLE.indexOf(ext) !== -1;
-        return '<li><a href="/api/doc-file?path=' + encodeURIComponent(f.rel) + '"'
+        var canEdit = officeEnabled && EDITABLE.indexOf(ext) !== -1;
+        return '<li style="display:flex;align-items:center;">'
+            + (canEdit
+                ? '<a href="office.html?path=' + encodeURIComponent(f.rel) + '" target="_blank" rel="noopener" '
+                  + 'style="flex-shrink:0;margin:0 0 0 11px;padding:2px 8px;font-size:0.66rem;font-weight:700;'
+                  + 'border:1px solid #bfdbfe;border-radius:5px;text-decoration:none;" '
+                  + 'title="Edit in the browser and save straight back to the library">Edit</a>'
+                : '')
+            + '<a style="flex:1;min-width:0;" href="/api/doc-file?path=' + encodeURIComponent(f.rel) + '"'
             + (preview ? ' target="_blank" rel="noopener"' : ' download="' + escapeHtml(f.name) + '"')
             + ' title="' + (preview ? 'Opens in a new tab' : 'Downloads this file') + '">'
             + '<span>' + escapeHtml(f.name) + '</span>'
@@ -3210,6 +3240,8 @@ function piccDocsHtml(num) {
                 : '')
             + '</a></li>';
     }).join('');
+    // The list is built before the closing </li>, so the Edit link sits first in
+    // reading order but is styled to the right of the filename.
 
     var staleCount = found.files.filter(function (f) { return f.stale; }).length;
     return '<div class="picc-docs">'

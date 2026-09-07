@@ -878,6 +878,77 @@ function resolveDocPath(rel) {
     return full;
 }
 
+/* ── Office editing (OnlyOffice Docs) ───────────────────────────────────────
+   Editing a Word or Excel file in the browser needs a document server; nothing
+   in Node can render .docx faithfully. OnlyOffice Docs Community Edition does
+   the rendering, and this server supplies the file and receives it back.
+
+   The whole feature is OFF unless COFP_ONLYOFFICE_URL is set, so this code is
+   inert on a machine without it and cannot break the library.
+
+   Flow:
+     1. Browser asks us for an editor config for a document.
+     2. We return a config naming a download URL and a callback URL, signed with
+        a secret shared with OnlyOffice so neither end accepts forged requests.
+     3. OnlyOffice fetches the file from the download URL.
+     4. When the user finishes editing, OnlyOffice POSTs the callback with a URL
+        to the edited file, and we write it back into the library.
+
+   Set on the server:
+       setx COFP_ONLYOFFICE_URL "http://localhost:8080" /M
+       setx COFP_ONLYOFFICE_SECRET "a-long-random-string" /M
+   The secret must match OnlyOffice's own JWT secret exactly. */
+const ONLYOFFICE_URL = (process.env.COFP_ONLYOFFICE_URL || '').replace(/\/+$/, '');
+const ONLYOFFICE_SECRET = process.env.COFP_ONLYOFFICE_SECRET || '';
+const ONLYOFFICE_ON = !!(ONLYOFFICE_URL && ONLYOFFICE_SECRET);
+
+// Which extensions OnlyOffice can actually edit, as opposed to only display.
+const OFFICE_EDITABLE = { '.docx': 'word', '.xlsx': 'cell', '.pptx': 'slide' };
+const OFFICE_VIEWABLE = { '.doc': 'word', '.xls': 'cell', '.ppt': 'slide', '.pdf': 'word' };
+
+/* HS256 JSON Web Token, hand-rolled to avoid adding a dependency. OnlyOffice
+   accepts a standard JWT; the signature is what stops anyone who can reach the
+   document server from asking it to open arbitrary files. */
+function b64url(buf) {
+    return Buffer.from(buf).toString('base64')
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function officeJwt(payload) {
+    const header = b64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const body = b64url(JSON.stringify(payload));
+    const sig = b64url(crypto.createHmac('sha256', ONLYOFFICE_SECRET)
+        .update(header + '.' + body).digest());
+    return header + '.' + body + '.' + sig;
+}
+function officeJwtVerify(token) {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 3) return null;
+    const expect = b64url(crypto.createHmac('sha256', ONLYOFFICE_SECRET)
+        .update(parts[0] + '.' + parts[1]).digest());
+    // Constant-time compare, so a wrong signature leaks nothing by timing.
+    const a = Buffer.from(parts[2]), b = Buffer.from(expect);
+    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null;
+    try { return JSON.parse(Buffer.from(parts[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString()); }
+    catch (e) { return null; }
+}
+
+/* One-time keys let OnlyOffice fetch a document without holding staff
+   credentials. The document server is trusted to render, not to log in as a
+   member of staff — so it gets a short-lived key scoped to a single file. */
+const officeKeys = new Map();
+function officeIssueKey(relPath) {
+    const key = crypto.randomBytes(24).toString('hex');
+    officeKeys.set(key, { relPath, expires: Date.now() + 12 * 60 * 60 * 1000 });
+    // Housekeeping: drop anything expired rather than growing without bound.
+    for (const [k, v] of officeKeys) if (v.expires < Date.now()) officeKeys.delete(k);
+    return key;
+}
+function officeResolveKey(key) {
+    const e = officeKeys.get(key);
+    if (!e || e.expires < Date.now()) return null;
+    return e.relPath;
+}
+
 /* PFA numbers its items on the FILENAME, not the folder — the whole visit folder
    is flat. So a second parser is needed:
 
@@ -2348,6 +2419,154 @@ ELSE
                 n + i.files.filter(f => f.stale).length, 0)
                 + (idx.childFiles || []).filter(f => f.stale).length,
             meta
+        });
+    }
+
+    /* Is Office editing available, and can this file be edited?
+       The page asks before offering an Edit button, so a server without
+       OnlyOffice simply never shows one. */
+    if (req.method === 'GET' && url === '/api/office-status') {
+        if (!checkAuth(req, res)) return;
+        return sendJSON(res, 200, {
+            enabled: ONLYOFFICE_ON,
+            editable: Object.keys(OFFICE_EDITABLE),
+            viewable: Object.keys(OFFICE_VIEWABLE),
+            reason: ONLYOFFICE_ON ? null
+                : 'COFP_ONLYOFFICE_URL and COFP_ONLYOFFICE_SECRET are not set on the server'
+        });
+    }
+
+    /* Editor configuration for one document.
+
+       Returns what the browser hands to OnlyOffice's script: where to fetch the
+       file, where to send it back, and a signature over the whole config so the
+       document server will not act on a config we did not produce. */
+    if (req.method === 'GET' && url === '/api/office-config') {
+        if (!checkAuth(req, res)) return;
+        if (!ONLYOFFICE_ON) return sendJSON(res, 501, { error: 'Office editing is not configured on this server' });
+
+        const rel = new URLSearchParams(req.url.split('?')[1] || '').get('path');
+        const full = resolveDocPath(rel);
+        if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+            return sendJSON(res, 404, { error: 'Not found' });
+        }
+        const ext = path.extname(full).toLowerCase();
+        const docType = OFFICE_EDITABLE[ext] || OFFICE_VIEWABLE[ext];
+        if (!docType) return sendJSON(res, 400, { error: 'That file type cannot be opened in the editor' });
+
+        const key = officeIssueKey(rel);
+        const stat = fs.statSync(full);
+        /* OnlyOffice caches by document key, so it must change whenever the file
+           changes — otherwise staff reopen a stale copy from its cache. Size and
+           modified time give a key that moves with the content. */
+        const docKey = crypto.createHash('sha1')
+            .update(rel + '|' + stat.size + '|' + stat.mtimeMs).digest('hex').slice(0, 20);
+
+        const base = 'https://' + (req.headers.host || 'childrenofpromisedaycare.com');
+        const config = {
+            document: {
+                fileType: ext.slice(1),
+                key: docKey,
+                title: path.basename(full),
+                url: base + '/api/office-file?key=' + key,
+                permissions: { edit: !!OFFICE_EDITABLE[ext], download: true, print: true }
+            },
+            documentType: docType,
+            editorConfig: {
+                // Saves land back in the library through this callback.
+                callbackUrl: base + '/api/office-callback?key=' + key,
+                lang: 'en-US',
+                mode: OFFICE_EDITABLE[ext] ? 'edit' : 'view',
+                user: { id: 'staff', name: 'Children of Promise staff' },
+                customization: { forcesave: true, autosave: true, compactHeader: false }
+            }
+        };
+        config.token = officeJwt(config);
+        return sendJSON(res, 200, { url: ONLYOFFICE_URL, config: config });
+    }
+
+    /* The document server fetching a file. Authenticated by a one-time key
+       rather than staff credentials, and scoped to the single file that key was
+       issued for — so a leaked key cannot be used to browse the library. */
+    if (req.method === 'GET' && url === '/api/office-file') {
+        if (!ONLYOFFICE_ON) { res.writeHead(404); return res.end('Not found'); }
+        const key = new URLSearchParams(req.url.split('?')[1] || '').get('key');
+        const rel = officeResolveKey(key);
+        if (!rel) { res.writeHead(403); return res.end('Forbidden'); }
+        const full = resolveDocPath(rel);
+        if (!full || !fs.existsSync(full)) { res.writeHead(404); return res.end('Not found'); }
+        let buf;
+        try { buf = fs.readFileSync(full); }
+        catch (e) { res.writeHead(500); return res.end('Could not read'); }
+        res.writeHead(200, {
+            'Content-Type': MIME[path.extname(full).toLowerCase()] || 'application/octet-stream',
+            'Content-Length': buf.length
+        });
+        return res.end(buf);
+    }
+
+    /* OnlyOffice reporting the outcome of an editing session.
+
+       status 2 (ready to save) and 6 (force-save) carry a URL to the edited
+       file, which we fetch and write back into the library. Anything else is
+       informational.
+
+       The previous version is kept alongside rather than replaced: this is
+       compliance evidence, and an editing mistake must be recoverable. */
+    if (req.method === 'POST' && url.startsWith('/api/office-callback')) {
+        if (!ONLYOFFICE_ON) { res.writeHead(404); return res.end('Not found'); }
+        const key = new URLSearchParams(req.url.split('?')[1] || '').get('key');
+        const rel = officeResolveKey(key);
+        if (!rel) return sendJSON(res, 403, { error: 1 });
+
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 200, { error: 1 });
+
+            // Reject anything not signed with the shared secret.
+            if (d.token && !officeJwtVerify(d.token)) {
+                console.warn('[OFFICE] callback with a bad signature, ignored');
+                return sendJSON(res, 200, { error: 1 });
+            }
+            const status = Number(d.status);
+            if (status !== 2 && status !== 6) return sendJSON(res, 200, { error: 0 });
+            if (!d.url) return sendJSON(res, 200, { error: 0 });
+
+            const full = resolveDocPath(rel);
+            if (!full) return sendJSON(res, 200, { error: 1 });
+
+            // Fetch the edited file from the document server and write it back.
+            const lib = d.url.startsWith('https:') ? https : http;
+            lib.get(d.url, r2 => {
+                if (r2.statusCode !== 200) {
+                    console.error('[OFFICE] could not fetch the edited file: HTTP ' + r2.statusCode);
+                    r2.resume();
+                    return sendJSON(res, 200, { error: 1 });
+                }
+                const chunks = [];
+                r2.on('data', c => chunks.push(c));
+                r2.on('end', () => {
+                    const data = Buffer.concat(chunks);
+                    if (!data.length) return sendJSON(res, 200, { error: 1 });
+                    try {
+                        // Keep the version being replaced, dated, next to it.
+                        if (fs.existsSync(full)) {
+                            const ext = path.extname(full);
+                            const stem = full.slice(0, -ext.length);
+                            const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                            fs.copyFileSync(full, stem + ' (before ' + stamp + ')' + ext);
+                        }
+                        fs.writeFileSync(full, data);
+                        console.log('[OFFICE] saved ' + data.length + ' bytes -> ' + rel);
+                        return sendJSON(res, 200, { error: 0 });
+                    } catch (e) {
+                        console.error('[OFFICE] save failed: ' + e.message);
+                        return sendJSON(res, 200, { error: 1 });
+                    }
+                });
+            }).on('error', e => {
+                console.error('[OFFICE] fetch failed: ' + e.message);
+                return sendJSON(res, 200, { error: 1 });
+            });
         });
     }
 
