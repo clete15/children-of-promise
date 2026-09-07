@@ -906,6 +906,26 @@ const ONLYOFFICE_ON = !!(ONLYOFFICE_URL && ONLYOFFICE_SECRET);
 const OFFICE_EDITABLE = { '.docx': 'word', '.xlsx': 'cell', '.pptx': 'slide' };
 const OFFICE_VIEWABLE = { '.doc': 'word', '.xls': 'cell', '.ppt': 'slide', '.pdf': 'word' };
 
+/* Paths the OnlyOffice editor requests, proxied through this site so the
+   document server needs no public port. Order does not matter; these are matched
+   as prefixes. Kept in one place because a version upgrade can add to the list,
+   and a missing prefix shows up as an editor that half-loads. */
+const OFFICE_PROXY_PREFIXES = [
+    '/web-apps',            // the editor application itself
+    '/sdkjs',               // editing engine
+    '/sdkjs-plugins',
+    '/fonts',
+    '/cache',               // rendered document pieces
+    '/doc',                 // document sessions, including the co-authoring socket
+    '/coauthoring',
+    '/downloadas',
+    '/ConvertService.ashx',
+    '/FileUploader.ashx',
+    '/healthcheck',
+    '/dictionaries',
+    '/themes'
+];
+
 /* HS256 JSON Web Token, hand-rolled to avoid adding a dependency. OnlyOffice
    accepts a standard JWT; the signature is what stops anyone who can reach the
    document server from asking it to open arbitrary files. */
@@ -1211,6 +1231,72 @@ if (sslOptions) {
         handleRequest(req, res);
     });
 }
+
+/* WebSocket pass-through for the document editor.
+
+   OnlyOffice opens a socket under /doc/<key>/c/... for live editing and saving.
+   An upgrade request never reaches handleRequest, so it needs handling here or
+   the editor loads and then silently fails to save — which would look like data
+   loss rather than a configuration gap.
+
+   Raw socket splicing, because this is a tunnel: once upgraded, neither side
+   speaks HTTP any more. */
+function proxyUpgrade(req, socket, head) {
+    if (!ONLYOFFICE_ON) return socket.destroy();
+
+    /* An upgrade request never reaches handleRequest, so the null-byte and
+       traversal guard at the top of it does not apply here. Repeat it rather
+       than assume the prefix check below is enough — this path forwards to
+       another service, and a hostile path should not be relayed anywhere. */
+    if (req.url.includes('\0') || req.url.includes('%00')) return socket.destroy();
+    let decoded;
+    try { decoded = decodeURIComponent(req.url.split('?')[0]); }
+    catch (e) { return socket.destroy(); }
+    if (decoded.includes('\0') || /(^|[\\/])\.\.([\\/]|$)/.test(decoded)) return socket.destroy();
+
+    const url = req.url.split('?')[0];
+    if (!OFFICE_PROXY_PREFIXES.some(p => url === p || url.startsWith(p + '/'))) {
+        return socket.destroy();
+    }
+    const target = new URL(ONLYOFFICE_URL);
+    const lib = target.protocol === 'https:' ? https : http;
+    const headers = Object.assign({}, req.headers);
+    headers.host = target.host;
+
+    const upstream = lib.request({
+        protocol: target.protocol,
+        hostname: target.hostname,
+        port: target.port || (target.protocol === 'https:' ? 443 : 80),
+        method: req.method,
+        path: req.url,
+        headers: headers,
+        rejectUnauthorized: false
+    });
+    upstream.on('upgrade', (upRes, upSocket, upHead) => {
+        // Replay the handshake to the browser, then join the two sockets.
+        const lines = ['HTTP/1.1 101 Switching Protocols'];
+        for (const [k, v] of Object.entries(upRes.headers)) lines.push(k + ': ' + v);
+        socket.write(lines.join('\r\n') + '\r\n\r\n');
+        if (upHead && upHead.length) socket.write(upHead);
+        if (head && head.length) upSocket.write(head);
+        upSocket.pipe(socket);
+        socket.pipe(upSocket);
+        const shut = () => { try { upSocket.destroy(); } catch (e) {} try { socket.destroy(); } catch (e) {} };
+        upSocket.on('error', shut); socket.on('error', shut);
+        upSocket.on('close', shut); socket.on('close', shut);
+    });
+    upstream.on('response', () => {
+        // Upstream declined to upgrade; nothing useful to relay.
+        socket.destroy();
+    });
+    upstream.on('error', e => {
+        console.error('[OFFICE WS] ' + req.url + ' -> ' + e.message);
+        socket.destroy();
+    });
+    upstream.end();
+}
+server.on('upgrade', proxyUpgrade);
+if (httpsServer) httpsServer.on('upgrade', proxyUpgrade);
 
 function handleRequest(req, res) {
     const url = req.url.split('?')[0];
@@ -2379,6 +2465,50 @@ ELSE
     /* ── Document library ──
        Indexes the monitoring evidence folder for a program and year, grouped by
        item number so folder renames do not matter. Nothing is copied or moved. */
+        /* Reverse proxy for the document server.
+
+       OnlyOffice listens on localhost, so the server can reach it but a browser
+       on someone's laptop cannot. Rather than exposing another port to the
+       internet, its own paths are mounted on this site: the editor script loads
+       from childrenofpromisedaycare.com and the document server stays private.
+
+       These prefixes are OnlyOffice's, taken from the paths its editor requests.
+       They are mounted at the root because the editor asks for absolute paths —
+       proxying under /office/ instead would mean rewriting every URL inside its
+       JavaScript, which is brittle. None of these collide with our own routes;
+       ours are all under /api/, /staff/, /pas/ or /public/. */
+    if (ONLYOFFICE_ON && OFFICE_PROXY_PREFIXES.some(p => url === p || url.startsWith(p + '/')
+            || url.startsWith(p + '?') || (p.endsWith('.ashx') && url.startsWith(p)))) {
+        const target = new URL(ONLYOFFICE_URL);
+        const lib = target.protocol === 'https:' ? https : http;
+        const headers = Object.assign({}, req.headers);
+        // The document server should see its own host, not ours.
+        headers.host = target.host;
+        delete headers['accept-encoding'];   // no need to re-encode on the way through
+
+        const upstream = lib.request({
+            protocol: target.protocol,
+            hostname: target.hostname,
+            port: target.port || (target.protocol === 'https:' ? 443 : 80),
+            method: req.method,
+            path: req.url,
+            headers: headers,
+            rejectUnauthorized: false        // a local instance may use a self-signed cert
+        }, up => {
+            res.writeHead(up.statusCode, up.headers);
+            up.pipe(res);
+        });
+        upstream.on('error', e => {
+            console.error('[OFFICE PROXY] ' + req.method + ' ' + url + ' -> ' + e.message);
+            if (!res.headersSent) {
+                res.writeHead(502, { 'Content-Type': 'text/plain' });
+                res.end('The document editor is not reachable');
+            } else { res.destroy(); }
+        });
+        req.pipe(upstream);
+        return;
+    }
+
     /* Cheapest possible authenticated endpoint. The styled sign-in page uses it to
        ask "is this password correct?" instead of comparing against a copy held in
        the page — which is what let the password end up in the source in the first
@@ -2482,7 +2612,15 @@ ELSE
             }
         };
         config.token = officeJwt(config);
-        return sendJSON(res, 200, { url: ONLYOFFICE_URL, config: config });
+        /* The browser loads the editor from THIS site, through the proxy above —
+           an empty base means same-origin. The document server itself stays on
+           localhost with no public port. COFP_ONLYOFFICE_PUBLIC overrides this if
+           OnlyOffice is ever given its own hostname. */
+        return sendJSON(res, 200, {
+            url: process.env.COFP_ONLYOFFICE_PUBLIC || '',
+            proxied: !process.env.COFP_ONLYOFFICE_PUBLIC,
+            config: config
+        });
     }
 
     /* The document server fetching a file. Authenticated by a one-time key
