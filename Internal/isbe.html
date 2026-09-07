@@ -2161,6 +2161,218 @@ const PICC_SHAREPOINT_FOLDER = spUrl(SP_PICC_FOLDER);
 
 // Convention: PICC/<item number>, e.g. PICC/PI5. Items whose evidence already
 // lives in a differently named folder carry an explicit link instead.
+/* ── PFA Compliance Checklist (FY26) ────────────────────────────────────────
+   Transcribed from PFA-Compliance-Checklist.pdf in the library — ISBE Early
+   Childhood Block Grant 3-5 Compliance Checklist, Preschool for All / PFA
+   Expansion, dated August 2025. Wording follows the source; nothing invented.
+
+   Twenty items, not nineteen. Items 3, 17 and 18 apply only to programs run by a
+   public school district, so they are marked not-applicable here rather than
+   hidden — a monitor still asks, and "not applicable because we are a licensed
+   childcare centre" is the answer. Item 8 is the mirror image: DCFS licensure
+   applies only to childcare centres, so it applies to us and not to districts.
+
+   num matches the item number the indexer parses out of PFA filenames ("Item 1
+   - PFA Classroom Information Form.docx" -> Item1), which is how evidence
+   attaches itself. n is what staff see.
+
+   excelerate carries the cross-reference the checklist itself prints, because
+   several items are the same evidence as the ExceleRate Silver work: item 15
+   points at 4A, 4B and 4C, which is the staff qualification maths already
+   modelled on the PAS page. */
+const PFA_CHECKLIST_ITEMS = [
+    {
+        num: 'Item1', n: '1', title: 'Staff-child ratio and group size',
+        requires: 'One adult to 10 children, maximum 20 per session. Minimum 15 in an inclusive model. Children with IEPs in blended sessions count in the PFA enrollment.',
+        code: '23 Ill. Adm. Code 235.30(a)(3) and (c)',
+        subs: ['20 children per session maximum', 'Staff to child ratio is met',
+               'A waiting list system is established when the maximum number of children are enrolled'],
+        evidence: 'Class lists, waiting list or a written process for developing one.',
+        excelerate: '3B. Group Size and Staff/Child Ratio',
+        waitlistLink: true
+    },
+    {
+        num: 'Item2', n: '2', title: 'Age eligibility and complete child files',
+        requires: 'No child eligible for kindergarten (5 or older on 1 September) is enrolled, and every enrolled child has a file with all required documentation.',
+        code: '105 ILCS 5/10-20.12 · Vision 77 Ill. Adm. Code 685 · Hearing 77 Ill. Adm. Code 675 · Records 105 ILCS 5/2-3-3.13a · Birth certificate 325 ILCS 50/5 · Immunisations 105 ILCS 5/27-8.1 · Behavior support plan 23 Ill. Adm. Code 235.320 · Transition plan 23 Ill. Adm. Code 235.330',
+        subs: ['All children are age-eligible', 'Name, address, telephone number',
+               'Birth certificate showing age eligibility', 'Physical and immunisation records',
+               'Vision and hearing screening results',
+               'Demographic and family information, emergency contacts, and who the child may be released to',
+               'Proof of family income', 'Behavior support plan, if applicable',
+               'Program transition plan, if applicable'],
+        evidence: 'Income proof may be pay stubs (two most recent consecutive), WIC, SNAP, TANF, SSI, CCAP, most recent tax return, W-2, employer letter, Medicaid enrolment, or a signed statement where income is zero.'
+    },
+    {
+        num: 'Item3', n: '3', title: 'Requirements for homeless children',
+        requires: 'A written plan for homeless students covering immediate enrolment, school of origin, transportation, dispute resolution and comparable services.',
+        code: '23 Ill. Adm. Code 235.7(k) · 105 ILCS 45 · McKinney-Vento (42 USC 11431 et seq.) · ESSA State Plan',
+        na: 'Applies only to school districts. Children of Promise is a DCFS-licensed childcare centre.'
+    },
+    {
+        num: 'Item4', n: '4', title: 'Screening procedures and documentation',
+        requires: 'Screening results on file, shared with the parent or guardian, with referral where a developmental concern is identified.',
+        code: '23 Ill. Adm. Code 235.20(c)(6)(A-F)',
+        subs: ['Evidence of screening results and/or IEP',
+               'Evidence that results are shared with the parent or guardian',
+               'Evidence that children identified with developmental concerns are referred for further evaluation',
+               'Parent or guardian permission signatures',
+               'Parent interview, conducted in the home language',
+               'Exit interview form or a description of the exit interview process'],
+        evidence: 'Screening results per child, copy of the parent interview, copy of the exit interview form, copy of any referral.',
+        excelerate: '1D. Child Screening'
+    },
+    {
+        num: 'Item5', n: '5', title: 'Research-based screening instrument',
+        requires: 'A research-based instrument covering cognitive development, social skills, English proficiency, fine and gross motor skills, vocabulary, visual-motor integration, and language and speech development. It may not be created by the program.',
+        code: '23 Ill. Adm. Code 235.20(c)(6)(A-B)',
+        evidence: 'Blank copy of the developmental screening tool in use.',
+        excelerate: '1D. Child Screening'
+    },
+    {
+        num: 'Item6', n: '6', title: 'Weighted eligibility criteria',
+        requires: 'Weighted criteria that prioritise the children most at risk of academic failure, including the required priority populations.',
+        code: '23 Ill. Adm. Code 235.30(a)(2), 235.30(b)(c), 235.20(c)(4), 235.50(a)(1)(A-C)',
+        subs: ['Children with IEPs', 'Children experiencing homelessness', 'Youth in Care',
+               'Family income 50% below the federal poverty level',
+               'Parent or caregiver speaks a language other than English',
+               'Screening indicated a developmental delay without a current special education referral'],
+        evidence: 'Scoring criteria, weighted eligibility checklist in each child file, family income documentation where used.',
+        guidance: 'Eligibility criteria may not exclude children who are not toilet trained.',
+        waitlistLink: true
+    },
+    {
+        num: 'Item7', n: '7', title: 'Minimum hours and days of instruction',
+        requires: 'At least 165 days of student attendance, sessions of at least 2 hours a day five days a week, and at least 12.5 hours a week overall.',
+        code: '23 Ill. Adm. Code 235.20(c)(13) and the Request for Proposals',
+        subs: ['165 days minimum for student attendance',
+               'Family conferences, home visits and professional development do not count as attendance days',
+               'Remote learning provided where in-person time falls below the minimum'],
+        evidence: 'Program calendar, daily schedule, documentation of any remote learning activities by date.',
+        excelerate: ''
+    },
+    {
+        num: 'Item8', n: '8', title: 'Current and valid DCFS licence',
+        requires: 'A current, valid DCFS licence, posted in the centre.',
+        code: '23 Ill. Adm. Code 235.10(b)',
+        evidence: 'Copy of the current licence, or a DCFS letter showing pending approval.',
+        guidance: 'This is the item that applies to us where items 3, 17 and 18 do not: it covers childcare centres specifically, not school districts.',
+        licensePanel: true
+    },
+    {
+        num: 'Item9', n: '9', title: 'Mission statement developed cooperatively',
+        requires: 'A mission statement based on shared beliefs, developed with parents and guardians, families, staff and community representatives, and on display.',
+        code: '23 Ill. Adm. Code 235.20(c)(2)(A)',
+        evidence: 'The mission statement, and evidence it is displayed.'
+    },
+    {
+        num: 'Item10', n: '10', title: 'Research-based curriculum aligned to the IELDS',
+        requires: 'A research-based curriculum aligned with the Illinois Early Learning and Development Standards, with lesson plans showing the connection.',
+        code: '23 Ill. Adm. Code 235.2(c)(3)(A-C)',
+        subs: ['Curriculum is research-based',
+               'Curriculum aligns with the IELDS and Early English Language Development Standards where applicable',
+               'Lesson plans reference IELDS benchmarks',
+               'Lesson plans are individualised — at least 25% of children per week, and every child within each month',
+               'Worksheets are not evident as part of the curriculum'],
+        evidence: 'Curriculum materials, proof of IELDS alignment, lesson plans based on assessment data.',
+        excelerate: '1B. Curriculum'
+    },
+    {
+        num: 'Item11', n: '11', title: 'Nutritious snack or meal',
+        requires: 'A nutritious snack for a half day, or a meal for a full day, aligned with USDA Food and Nutrition guidelines and at no cost to families.',
+        code: '23 Ill. Adm. Code 235.20(c)(13)(16)',
+        subs: ['Snack offered daily for a half day; a meal for a full day programme',
+               'Aligned with USDA Food and Nutrition Guidelines',
+               'Parent or guardian is not required to provide or pay for a snack'],
+        evidence: 'Menus, meal counts, CACFP records, evidence of distributing meals.'
+    },
+    {
+        num: 'Item12', n: '12', title: 'Research-based authentic assessment',
+        requires: 'An authentic assessment system aligned with the curriculum, documenting each child\u2019s progress over time across three reporting periods.',
+        code: '23 Ill. Adm. Code 235.30(a)(1)(A-B) and 235.20(c)(7)(11)',
+        subs: ['Assessment system aligns with the curriculum and informs each child\u2019s education plan',
+               'Portfolio collections measure progress over time',
+               'Regular, ongoing observations of typical daily classroom activities',
+               'At least two benchmarks per reporting period from language arts, maths, social-emotional, science, social studies, physical, fine arts and ELL domains',
+               'Narrative summary reports shared with the parent or guardian'],
+        evidence: 'Portfolios for all enrolled children, narrative summary reports, documentation reflecting the IELDS.',
+        excelerate: '1E. Child Assessment'
+    },
+    {
+        num: 'Item13', n: '13', title: 'Transition plan and expulsion policy',
+        requires: 'A written plan for transitioning children to kindergarten, shared with parents, and a written policy prohibiting expulsion and suspension.',
+        code: '23 Ill. Adm. Code 235.30(a)(4) · Public Act 100-0105 · 23 Ill. Adm. Code 235.320',
+        subs: ['A. Written transition-to-kindergarten plan, shared with the parent or guardian',
+               'B. Written policy prohibiting expulsion and suspension per 235.320(a)'],
+        evidence: 'Transition letter to kindergarten, behaviour plan, policy document.',
+        excelerate: '2B. Transitions'
+    },
+    {
+        num: 'Item14', n: '14', title: 'Community collaboration plan and Head Start MOU',
+        requires: 'A written plan, updated yearly, outlining collaboration with the local early childhood community, and a signed Memorandum of Understanding with local Head Start.',
+        code: '23 Ill. Adm. Code 235.20(c)(8)',
+        subs: ['Written plan updated yearly', 'Signed MOU with local Head Start'],
+        evidence: 'Copy of the written plan, copy of the signed MOU, community resource guide and referral list.',
+        excelerate: '2A. Family & Community Engagement'
+    },
+    {
+        num: 'Item15', n: '15', title: 'Classroom staff licensure and credentials',
+        requires: 'PFA teachers hold a Professional Educator License with an early childhood endorsement; paraprofessionals hold a paraprofessional educator license; and every teacher and paraprofessional has a written Professional Development Plan.',
+        code: '23 Ill. Adm. Code 235.20(c)(9)(A-F), 25.25, 25.100, 25.510, 25.Appendix E',
+        subs: ['PFA teacher holds a current PEL with early childhood endorsement, or proper temporary approval',
+               'Paraprofessional holds a paraprofessional educator license',
+               'Blended PFA/ECSE classroom teacher holds early childhood special education approval unless itinerant services are provided per the IEP',
+               'Childcare centre directors hold a baccalaureate with at least 24 semester hours in child development or ECE, plus a Gateways Level II or III Illinois Director Credential',
+               'Written Professional Development Plans for each teacher and paraprofessional'],
+        evidence: 'PELs and endorsements in ELIS, paraprofessional approval, transcripts, credentials, and the written PD plans.',
+        guidance: 'The PD plans this item asks for are the ones generated by this system, on the staff development page — the same evidence PI9 uses. Director qualifications and staff development here are the same maths as ExceleRate 4A, 4B and 4C on the PAS page.',
+        excelerate: '1F. Inclusion of Children with Special Needs; 3A. Program Administration; 4A. Director Qualifications; 4B. Staff Qualifications; 4C. Staff Development'
+    },
+    {
+        num: 'Item16', n: '16', title: 'Family education and involvement',
+        requires: 'Documented opportunities for family education and involvement, and ongoing two-way communication with parents and guardians.',
+        code: '23 Ill. Adm. Code 235.20(c)(7)(A-E) and 235.20(c)(16)',
+        subs: ['Opportunities for family education and involvement are provided and documented',
+               'Ongoing two-way communication with the parent or guardian',
+               'No fees charged for field trips or registration, and families are not required to buy supplies'],
+        evidence: 'Agendas, sign-in sheets, newsletters, evidence of two-way communication.',
+        excelerate: '2A. Family & Community Engagement'
+    },
+    {
+        num: 'Item17', n: '17', title: 'Home Language Survey',
+        requires: 'A completed Home Language Survey on file for each child, signed by the parent or guardian.',
+        code: '23 Ill. Adm. Code 228.15',
+        na: 'Applies only to preschool programs administered by a public school district. Not a school district programme — no documentation needed.',
+        excelerate: '3D. Culturally and Linguistically Appropriate Practice'
+    },
+    {
+        num: 'Item18', n: '18', title: 'English language proficiency screening',
+        requires: 'Prescribed screening procedures used to assess English language proficiency for each student identified through the Home Language Survey.',
+        code: '23 Ill. Adm. Code 228.10 and 228.15(e)',
+        na: 'Applies only to preschool programs administered by a public school district.',
+        excelerate: '3D. Culturally and Linguistically Appropriate Practice'
+    },
+    {
+        num: 'Item19', n: '19', title: 'Annual program assessment and CQIP',
+        requires: 'An annual program assessment that informs both individual staff development plans and the program\u2019s continuous quality improvement plan, with a written CQIP updated yearly on file.',
+        code: '23 Ill. Adm. Code 235.20(c)(10)(17), 235.70(b)(1-4), 235.Appendix B Program Goal III',
+        subs: ['Annual program assessment informs staff development plans and the CQIP',
+               'Written continuous quality improvement plan, updated yearly, on file'],
+        evidence: 'Copy of the annual CQIP. A current updated ISBE Continuous Quality Program Improvement Plan is acceptable.',
+        excelerate: '3A. Program Administration; 3C. Continuous Quality Improvement'
+    },
+    {
+        num: 'Item20', n: '20', title: 'Support for children with IEPs',
+        requires: 'Children with disabilities participate in a variety of activities with supplementary aids, services and instructional strategies, with special education support embedded in the day.',
+        code: '23 Ill. Adm. Code 226.210(a)(b)(c)',
+        subs: ['Supplementary aids, services and instructional strategies are in place',
+               'Staff attend and participate in IEP meetings',
+               'Staff take part in professional development on serving children with IEPs in the regular classroom',
+               'Special education supports are provided in the PFA classroom and embedded into daily routines'],
+        evidence: 'Examples of supplementary aids and strategies, description of IEP meeting participation, related professional development records.'
+    }
+];
+
 function piccItemFolderUrl(num) {
     return spUrl(SP_PICC_FOLDER + '/' + num);
 }
@@ -2244,6 +2456,9 @@ async function loadCompliance(prog) {
     // The PICC only describes the Prevention Initiative. PFA has its own
     // requirements and no equivalent checklist document here, so inventing one
     // would be worse than leaving it out.
+    if (activeComplianceProgram === 'pfaCompliance') {
+        html += renderPfaChecklistSection(data);
+    }
     if (activeComplianceProgram === 'piCompliance') {
         html += renderPiccSection(data);
     }
@@ -2854,6 +3069,10 @@ function statusPill(state, text) {
    convenience laid on top. */
 var docIndex = null;
 var docIndexState = 'idle';   // idle | loading | ready | failed
+// Which program the cached index belongs to. The PI and PFA panels are never
+// shown at once, so one cache is enough — but it must reload when the tab
+// changes, or PFA items would be matched against PI folders and find nothing.
+var docIndexProgram = null;
 
 /* Filenames and staff names come off the filesystem and out of the database, so
    they are escaped before being built into markup. A document called
@@ -2865,16 +3084,24 @@ function escapeHtml(s) {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function loadDocIndex() {
+function loadDocIndex(program) {
+    program = program || (activeComplianceProgram === 'pfaCompliance' ? 'PFA' : 'PI');
+    // A cached index for the other program is worse than none.
+    if (docIndexProgram && docIndexProgram !== program) {
+        docIndex = null;
+        docIndexState = 'idle';
+    }
     if (docIndexState === 'loading' || docIndexState === 'ready') return;
+    docIndexProgram = program;
     docIndexState = 'loading';
-    fetch('/api/doc-index?program=PI&year=' + new Date().getFullYear())
+    fetch('/api/doc-index?program=' + program + '&year=' + new Date().getFullYear())
         .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
         .then(function (d) {
             docIndex = d;
             docIndexState = 'ready';
             // Re-render so the lists appear once the index lands.
-            if (activeComplianceProgram === 'piCompliance') loadCompliance();
+            if (activeComplianceProgram === 'piCompliance'
+                || activeComplianceProgram === 'pfaCompliance') loadCompliance();
         })
         .catch(function () {
             docIndexState = 'failed';
@@ -2991,6 +3218,89 @@ function piccDocsHtml(num) {
         + (staleCount ? ' &middot; ' + staleCount + ' still named for an earlier year' : '') + '</span>'
         + (found.owner ? '<span class="picc-docs-owner">' + escapeHtml(found.owner) + '</span>' : '')
         + '</div><ul>' + rows + '</ul></div>';
+}
+
+/* The PFA checklist, rendered with the same panel as the PICC so the two feel
+   like one system rather than two tools. Evidence, check-in and the wrong-year
+   warnings all come from the shared document index. */
+function renderPfaChecklistSection(data) {
+    loadDocIndex('PFA');
+
+    var applicable = PFA_CHECKLIST_ITEMS.filter(function (i) { return !i.na; });
+    var ready = 0;
+    applicable.forEach(function (item) { if (data['PFA_' + item.num]) ready++; });
+
+    var rows = PFA_CHECKLIST_ITEMS.map(function (item) {
+        var key = 'PFA_' + item.num;
+        var checked = data[key] ? 'checked' : '';
+        var dateVal = data[key + 'Date'] || '';
+        var notes = data[key + 'Notes'] || '';
+
+        var status = item.na
+            ? statusPill('info', 'not applicable')
+            : (data[key] ? statusPill('ok', 'evidence recorded') : statusPill('open', 'not recorded'));
+
+        var actions = '<a class="picc-btn" href="documents.html#' + encodeURIComponent(item.num)
+            + '" target="_blank" rel="noopener">Library</a>';
+        if (!item.na) {
+            actions += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
+                + 'Check in a file<input type="file" style="display:none;" '
+                + 'accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt" '
+                + 'onchange="uploadEvidence(\'' + item.num + '\',this)"></label>';
+        }
+        if (item.waitlistLink) actions += '<a class="picc-btn picc-btn-jump" href="waitinglist.html">Waiting list</a>';
+
+        return '<div class="picc-item">'
+            + '<div class="picc-item-top">'
+            + '<span class="picc-num">' + item.n + '</span>'
+            + '<div class="picc-item-main">'
+            + '<div class="picc-item-title">' + item.title + '</div>'
+            + '<div class="picc-item-req">' + item.requires + '</div>'
+            + (item.code ? '<div style="font-size:0.68rem;color:#94a3b8;margin-top:5px;font-variant-numeric:tabular-nums;">'
+                + escapeHtml(item.code) + '</div>' : '')
+            + '</div>'
+            + '<div class="picc-item-status">' + status + '</div>'
+            + '</div>'
+            + (item.subs ? '<details class="picc-details"><summary>What the reviewer checks ('
+                + item.subs.length + ')</summary><ul>'
+                + item.subs.map(function (s) { return '<li>' + s + '</li>'; }).join('')
+                + '</ul></details>' : '')
+            + (item.guidance ? '<div class="picc-guidance">' + item.guidance + '</div>' : '')
+            + (item.evidence ? '<div class="picc-evidence-hint"><strong>Evidence:</strong> ' + item.evidence + '</div>' : '')
+            + (item.excelerate ? '<div class="picc-evidence-hint"><strong>ExceleRate:</strong> '
+                + escapeHtml(item.excelerate) + '</div>' : '')
+            + (item.na ? '<div class="picc-na"><strong>Not applicable:</strong> ' + item.na + '</div>' : '')
+            + (item.licensePanel ? licensePanelHtml() : '')
+            + (item.na ? '' : piccDocsHtml(item.num))
+            + '<div class="picc-actions">' + actions + '</div>'
+            + (item.na ? '' : '<div class="picc-controls">'
+                + '<label class="picc-check"><input type="checkbox" ' + checked
+                + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>'
+                + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
+                + '<span id="up_' + item.num + '" style="flex-basis:100%;font-size:0.72rem;margin-top:6px;"></span>'
+                + '</div>'
+                + '<textarea class="picc-notes" placeholder="Notes for the monitor, or what is still outstanding" '
+                + 'onchange="saveComplianceNotes(\'' + key + '\',this.value)">' + notes + '</textarea>')
+            + '</div>';
+    }).join('');
+
+    return '<div class="picc-head">'
+        + '<div>'
+        + '<div class="picc-head-title">FY26 Preschool for All Compliance Checklist</div>'
+        + '<div class="picc-head-sub">' + PFA_CHECKLIST_ITEMS.length + ' items on the ISBE checklist. '
+        + (PFA_CHECKLIST_ITEMS.length - applicable.length) + ' apply only to programs run by a school '
+        + 'district (3, 17, 18), so ' + applicable.length + ' apply to a DCFS-licensed childcare centre. '
+        + 'Transcribed from the ISBE Early Childhood Block Grant 3-5 Compliance Checklist, August 2025.</div>'
+        + '</div>'
+        + '<div class="picc-readiness">'
+        + '<div class="picc-readiness-num">' + ready + ' / ' + applicable.length + '</div>'
+        + '<div class="picc-readiness-lbl">'
+        + (ready === applicable.length ? 'all evidence recorded' : (applicable.length - ready) + ' still open')
+        + '</div>'
+        + '</div>'
+        + '<a class="picc-btn picc-btn-primary" href="documents.html" target="_blank" rel="noopener">Open document library</a>'
+        + '</div>'
+        + '<div class="picc-list">' + rows + '</div>';
 }
 
 function renderPiccSection(data) {
