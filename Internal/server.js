@@ -4,8 +4,24 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-// Prevent crashes from unhandled errors
+/* Prevent crashes from unhandled errors.
+
+   With one exception: a port conflict is not a crash to recover from, it means
+   another copy of the server is already running and this one should not exist.
+   Swallowing it left the wrapper restarting every 5 seconds forever while the
+   original process carried on serving — which looked like a broken server and
+   made a "restart" appear to succeed while changing nothing.
+
+   Exiting with a non-zero code lets startup.bat stop instead of looping. */
 process.on('uncaughtException', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+        console.error('');
+        console.error('  ALREADY RUNNING: port ' + (err.port || '80/443') + ' is taken by another copy.');
+        console.error('  Not restarting — the copy already running is still serving.');
+        console.error('  To take over:  Stop-Process -Name node -Force   then  .\\startup.bat');
+        console.error('');
+        process.exit(1);
+    }
     console.error('[CRASH PREVENTED]', err.message);
 });
 process.on('unhandledRejection', (err) => {
