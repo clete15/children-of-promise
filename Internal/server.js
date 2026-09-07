@@ -53,7 +53,37 @@ const COLS = ['Last_Name','First_Name','Birth_date','Start_Date','City_Town','Da
 
 const ROOM_COLS = ['RoomNumber','Building','Room','TeacherDescription','Type','RequiredSlots','AgeRange','DCFSCapacity'];
 
-const INTERNAL_PASSWORD = 'cofpadmin';
+/* The staff password must NEVER be written into this file.
+
+   It was a plain constant here until Sep 2026, in a public GitHub repository —
+   so it was readable by anyone who found the repo, and it guards children's
+   records. Committing a secret to source control also means it stays in the
+   history after removal, which is why the old value had to be retired rather
+   than edited.
+
+   Set it on the server once, in an Administrator PowerShell:
+
+       setx COFP_STAFF_PASSWORD "the-new-password" /M
+
+   then start a NEW console (setx only affects processes started afterwards).
+
+   Refusing to start is deliberate. A default here would quietly become the
+   real password on any machine that forgot to set the variable, which is the
+   situation this replaced. */
+const INTERNAL_PASSWORD = process.env.COFP_STAFF_PASSWORD;
+if (!INTERNAL_PASSWORD) {
+    console.error('');
+    console.error('  REFUSING TO START: COFP_STAFF_PASSWORD is not set.');
+    console.error('');
+    console.error('  The staff password is no longer stored in the source code,');
+    console.error('  because this repository was public and the old one was readable.');
+    console.error('');
+    console.error('  Set it once, in an Administrator PowerShell:');
+    console.error('      setx COFP_STAFF_PASSWORD "your-new-password" /M');
+    console.error('  then open a NEW console and start the server again.');
+    console.error('');
+    process.exit(1);
+}
 
 function checkAuth(req, res) {
     const auth = req.headers['authorization'];
