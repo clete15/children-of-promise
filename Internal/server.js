@@ -1144,6 +1144,38 @@ if (sslOptions) {
 function handleRequest(req, res) {
     const url = req.url.split('?')[0];
 
+    /* Reject hostile paths once, here, rather than in each static handler.
+
+       Automated scanners probe every public IP for config files, and this server
+       was seeing requests like:
+           C:\app\External\<NUL>payment\<NUL>.env
+       A null byte historically truncated a path in C-based filesystem calls, so
+       "safe.html\0../../.env" could read something else entirely. Node rejects
+       them, but only after the request has reached a file handler — and the error
+       surfaced as noise in the console rather than a clean refusal.
+
+       Traversal is blocked here too. resolveDocPath() already confines the
+       document library, but the static handlers build paths by concatenation, so
+       the guard belongs at the door. */
+    if (req.url.includes('\0') || req.url.includes('%00')) {
+        console.warn('[BLOCKED] null byte in path from ' + (req.socket.remoteAddress || '?'));
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        return res.end('Bad request');
+    }
+    let decodedUrl = url;
+    try {
+        decodedUrl = decodeURIComponent(url);
+    } catch (e) {
+        // Malformed percent-encoding is never legitimate here.
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        return res.end('Bad request');
+    }
+    if (decodedUrl.includes('\0') || /(^|[\\/])\.\.([\\/]|$)/.test(decodedUrl)) {
+        console.warn('[BLOCKED] traversal in path: ' + decodedUrl.slice(0, 120));
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        return res.end('Bad request');
+    }
+
     if (req.method === 'OPTIONS') {
         res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,PUT', 'Access-Control-Allow-Headers': 'Content-Type' });
         return res.end();
