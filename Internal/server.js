@@ -1306,7 +1306,8 @@ function proxyUpgrade(req, socket, head) {
         hostname: target.hostname,
         port: target.port || (target.protocol === 'https:' ? 443 : 80),
         method: req.method,
-        path: req.url,
+        // Same version-prefix strip as the HTTP proxy above.
+        path: req.url.replace(OFFICE_VERSION_PREFIX, '/'),
         headers: headers,
         rejectUnauthorized: false
     });
@@ -2523,12 +2524,21 @@ ELSE
         headers.host = target.host;
         delete headers['accept-encoding'];   // no need to re-encode on the way through
 
+        /* Strip the version-and-hash prefix before forwarding.
+
+           The editor requests /9.4.0-<hash>/web-apps/... but docservice only
+           serves /web-apps/... — normally nginx rewrites that away, and this
+           install has no nginx running. Without stripping it, docservice answers
+           "Cannot GET /9.4.0-<hash>/web-apps/..." and the editor never loads.
+           The prefix is only a cache-busting device, so removing it is safe. */
+        const upstreamPath = req.url.replace(OFFICE_VERSION_PREFIX, '/');
+
         const upstream = lib.request({
             protocol: target.protocol,
             hostname: target.hostname,
             port: target.port || (target.protocol === 'https:' ? 443 : 80),
             method: req.method,
-            path: req.url,
+            path: upstreamPath,
             headers: headers,
             rejectUnauthorized: false        // a local instance may use a self-signed cert
         }, up => {
