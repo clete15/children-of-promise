@@ -2251,6 +2251,15 @@ ELSE
     /* ── Document library ──
        Indexes the monitoring evidence folder for a program and year, grouped by
        item number so folder renames do not matter. Nothing is copied or moved. */
+    /* Cheapest possible authenticated endpoint. The styled sign-in page uses it to
+       ask "is this password correct?" instead of comparing against a copy held in
+       the page — which is what let the password end up in the source in the first
+       place. Returns 200 when accepted, 401 when not, and nothing sensitive. */
+    if (req.method === 'GET' && url === '/api/whoami') {
+        if (!checkAuth(req, res)) return;
+        return sendJSON(res, 200, { ok: true });
+    }
+
     if (req.method === 'GET' && url.startsWith('/api/doc-index')) {
         if (!checkAuth(req, res)) return;
         const qs = new URLSearchParams(req.url.split('?')[1] || '');
