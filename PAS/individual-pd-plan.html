@@ -256,6 +256,7 @@
 </div>
 
 <script src="pd-suggestions.js"></script>
+<script src="/staff/auth.js"></script>
 <script>
 /* One plan per staff member per program year, with both reviews on the sheet.
 
@@ -270,7 +271,11 @@
 // Authorization is deliberately NOT set here. The browser attaches the
 // staff Basic credentials to same-origin requests by itself, so hardcoding
 // the password would ship it to every visitor and break on every rotation.
-const api = (p, o) => fetch(p, Object.assign({ headers: { 'Content-Type': 'application/json' } }, o || {}));
+const api = (p, o) => fetch(p, Object.assign({
+    headers: Object.assign({ 'Content-Type': 'application/json' },
+        // Credentials come from the Staff Portal sign-in, never from source.
+        (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {})
+}, o || {}));
 
 let STAFF = [], PLANS = [], GOALS = [], current = null, goalRows = [];
 const $ = id => document.getElementById(id);

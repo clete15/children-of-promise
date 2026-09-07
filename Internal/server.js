@@ -950,8 +950,12 @@ function indexYearFolder(programFolder, yearFolder) {
             }
             const num = docItemNumber(d.name);
             const key = num || d.name;
-            if (!out.items[key]) out.items[key] = { item: num, folders: [], files: [], owner: '' };
+            if (!out.items[key]) out.items[key] = { item: num, folders: [], folderPaths: [], files: [], owner: '' };
             out.items[key].folders.push(d.name);
+            // Relative path so the page can upload a signed copy back into this
+            // exact folder without guessing at names.
+            out.items[key].folderPaths.push(
+                path.relative(DOC_ROOT, path.join(dir, d.name)).replace(/\\/g, '/'));
             out.items[key].owner = out.items[key].owner || docOwner(d.name);
             out.items[key].files = out.items[key].files.concat(files);
         });
@@ -965,7 +969,12 @@ function indexYearFolder(programFolder, yearFolder) {
             const num = docItemNumberFromFile(f.name);
             if (!num) return;
             const full = path.join(dir, f.name);
-            if (!out.items[num]) out.items[num] = { item: num, folders: [], files: [], owner: '' };
+            if (!out.items[num]) {
+                out.items[num] = { item: num, folders: [], folderPaths: [], files: [], owner: '' };
+                // PFA keeps these loose in the visit folder, so that is where a
+                // signed copy belongs too.
+                out.items[num].folderPaths.push(path.relative(DOC_ROOT, dir).replace(/\\/g, '/'));
+            }
             out.items[num].files.push({
                 name: f.name,
                 rel: path.relative(DOC_ROOT, full).replace(/\\/g, '/'),
@@ -2308,6 +2317,101 @@ ELSE
                 + (idx.childFiles || []).filter(f => f.stale).length,
             meta
         });
+    }
+
+    /* Checks a document IN — the other half of check-out.
+
+       Takes a file from the browser and writes it into an item's evidence folder
+       in the library, so a signed or scanned page gets back into the system
+       without SharePoint. ?folder= is the item folder's path relative to
+       DOC_ROOT, confined by resolveDocPath like everything else.
+
+       Never overwrites. Compliance evidence must not be silently replaced — if a
+       name is taken, the new file gets a dated suffix and both survive, so a
+       mistaken upload can be undone by deleting rather than by recovering
+       something that is already gone. */
+    if (req.method === 'POST' && url.startsWith('/api/doc-upload')) {
+        if (!checkAuth(req, res)) return;
+        const qs = new URLSearchParams(req.url.split('?')[1] || '');
+        const folderRel = qs.get('folder') || '';
+        const folder = resolveDocPath(folderRel);
+        if (!folder || !fs.existsSync(folder) || !fs.statSync(folder).isDirectory()) {
+            return sendJSON(res, 400, { error: 'That folder is not in the library' });
+        }
+
+        const MAX = 40 * 1024 * 1024;   // a scanned multi-page PDF, generously
+        let body = [], size = 0, aborted = false;
+        req.on('data', chunk => {
+            if (aborted) return;
+            size += chunk.length;
+            if (size > MAX) {
+                aborted = true;
+                sendJSON(res, 413, { error: 'File is larger than 40 MB' });
+                req.destroy();
+                return;
+            }
+            body.push(chunk);
+        });
+        req.on('end', () => {
+            if (aborted) return;
+            const ct = req.headers['content-type'] || '';
+            const boundary = ct.split('boundary=')[1];
+            if (!boundary) return sendJSON(res, 400, { error: 'Not a file upload' });
+
+            const parts = Buffer.concat(body).toString('binary').split('--' + boundary);
+            for (const part of parts) {
+                if (!part.includes('filename=')) continue;
+                const m = part.match(/filename="([^"]*)"/);
+                if (!m || !m[1]) continue;
+
+                /* Keep the name staff recognise, but strip anything that could
+                   escape the folder: directory separators, traversal, null bytes
+                   and leading dots. */
+                let safe = path.basename(m[1].replace(/\0/g, ''))
+                    .replace(/[\\/:*?"<>|]/g, '_')
+                    .replace(/^\.+/, '')
+                    .trim();
+                if (!safe) safe = 'upload';
+
+                const ext = path.extname(safe).toLowerCase();
+                const ALLOWED = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.xlsx', '.doc', '.xls', '.txt'];
+                if (!ALLOWED.includes(ext)) {
+                    return sendJSON(res, 400, { error: 'That file type is not accepted (' + (ext || 'no extension') + ')' });
+                }
+
+                const headerEnd = part.indexOf('\r\n\r\n');
+                if (headerEnd < 0) continue;
+                const data = Buffer.from(part.slice(headerEnd + 4, part.lastIndexOf('\r\n')), 'binary');
+                if (!data.length) return sendJSON(res, 400, { error: 'That file was empty' });
+
+                // Date suffix rather than overwrite, so nothing is ever replaced.
+                let target = path.join(folder, safe);
+                if (fs.existsSync(target)) {
+                    const stem = path.basename(safe, ext);
+                    const stamp = new Date().toISOString().slice(0, 10);
+                    let n = 1;
+                    do {
+                        target = path.join(folder, stem + ' (' + stamp + (n > 1 ? ' ' + n : '') + ')' + ext);
+                        n++;
+                    } while (fs.existsSync(target) && n < 50);
+                }
+
+                try {
+                    fs.writeFileSync(target, data);
+                } catch (e) {
+                    console.error('[DOC UPLOAD]', e.message);
+                    return sendJSON(res, 500, { error: 'Could not save the file' });
+                }
+                const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
+                console.log('[DOC UPLOAD] ' + data.length + ' bytes -> ' + rel);
+                return sendJSON(res, 200, {
+                    success: true, name: path.basename(target), relPath: rel, bytes: data.length,
+                    renamed: path.basename(target) !== safe
+                });
+            }
+            sendJSON(res, 400, { error: 'No file found in the upload' });
+        });
+        return;
     }
 
     /* Serves one indexed file. The path is caller-supplied, so resolveDocPath

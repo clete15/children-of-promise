@@ -735,12 +735,16 @@
      shared state (students, trackingData) by name at call time. -->
 <script src="pi-forms.js"></script>
 
+<script src="/staff/auth.js"></script>
 <script>
 // Authorization is deliberately NOT set here. The browser attaches the
 // staff Basic credentials to same-origin requests by itself, so hardcoding
 // the password would ship it to every visitor and break on every rotation.
 function apiFetch(url, opts = {}) {
-    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' },
+        // Credentials come from the Staff Portal sign-in, never from source.
+        (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        opts.headers || {});
     return fetch(url, opts);
 }
 
@@ -1045,12 +1049,20 @@ function formLink(call, tip) {
         + '" title="' + tip + '">[form]</a>';
 }
 
-/* ── SharePoint document locations ──
-   SharePoint is the document of record. This app tracks state and links out to
-   it, so every location the page needs lives here rather than as a URL pasted
-   into the markup. Two reasons: the monitoring-visit folders carry a year in
-   their name, so the annual rollover is one edit here instead of a hunt through
-   the file; and a folder rename stops being a code change in several places.
+/* ── SharePoint document locations (LEGACY) ──
+   SharePoint is NO LONGER the document of record. The library now lives on the
+   server at C:\app\documents\Operations, is indexed by item number, and is read
+   and written through /api/doc-file and /api/doc-upload. The PICC panel opens
+   documents in place and takes signed copies back in without leaving this site.
+
+   These URLs are kept only as external references for the handful of documents
+   that genuinely still sit in SharePoint, and because the OneDrive copy remains
+   as an archive of everything up to Sep 2026. They are not the primary route to
+   anything, and new evidence should not be linked this way.
+
+   Kept centralised for the original reasons, which still hold: the visit folders
+   carry a year in their name, so an annual rollover is one edit here rather than
+   a hunt through the file, and a folder rename is not a change in many places.
 
    spUrl() builds a document-library browse URL from a path relative to the
    library root. encodeURIComponent produces exactly the %2F and %20 escaping
@@ -2875,15 +2887,64 @@ function loadDocIndex() {
    swallowing PI10. */
 function piccItemDocs(num) {
     if (!docIndex || !docIndex.items) return null;
-    var files = [], owner = '';
+    var files = [], owner = '', folderPaths = [];
     Object.keys(docIndex.items).forEach(function (key) {
         if (key !== num && key.indexOf(num + '.') !== 0) return;
         var entry = docIndex.items[key];
         files = files.concat(entry.files || []);
+        folderPaths = folderPaths.concat(entry.folderPaths || []);
         owner = owner || entry.owner || '';
     });
-    if (!files.length) return null;
-    return { files: files, owner: owner };
+    if (!files.length && !folderPaths.length) return null;
+    return { files: files, owner: owner, folderPaths: folderPaths };
+}
+
+/* Check a signed or scanned document back in.
+
+   This is the other half of check-out, and the reason SharePoint is no longer
+   needed: the file goes straight into the item's evidence folder on the server.
+   Nothing is overwritten — the server gives a duplicate name a dated suffix. */
+function uploadEvidence(num, input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var found = piccItemDocs(num);
+    var folder = found && found.folderPaths && found.folderPaths[0];
+    var status = document.getElementById('up_' + num);
+
+    var say = function (text, colour) {
+        if (!status) return;
+        status.textContent = text;
+        status.style.color = colour || '#6b7280';
+    };
+
+    if (!folder) {
+        say('No evidence folder exists for ' + num + ' yet — create it in the library first.', '#b91c1c');
+        return;
+    }
+
+    say('Uploading ' + file.name + '...');
+    var fd = new FormData();
+    fd.append('file', file);
+
+    // FormData sets its own multipart boundary, so no Content-Type here.
+    fetch('/api/doc-upload?folder=' + encodeURIComponent(folder), {
+        method: 'POST',
+        headers: (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        body: fd
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j.success) {
+            say(res.j.error || 'Upload failed', '#b91c1c');
+            return;
+        }
+        say('Checked in as ' + res.j.name
+            + (res.j.renamed ? ' (renamed — a file of that name already existed)' : ''), '#166534');
+        input.value = '';
+        // Re-read the library so the new file appears in the list straight away.
+        docIndexState = 'idle';
+        docIndex = null;
+        loadDocIndex();
+      }).catch(function () { say('Upload failed — no connection', '#b91c1c'); });
 }
 
 function piccDocsHtml(num) {
@@ -2956,7 +3017,7 @@ function renderPiccSection(data) {
         + '<div class="picc-readiness-num">' + ready + ' / ' + PICC_ITEMS.length + '</div>'
         + '<div class="picc-readiness-lbl">' + (blocked ? blocked + ' still open' : 'all evidence recorded') + '</div>'
         + '</div>'
-        + '<a class="picc-btn picc-btn-primary" href="' + PICC_SHAREPOINT_FOLDER + '" target="_blank" rel="noopener">Open PICC folder</a>'
+        + '<a class="picc-btn picc-btn-primary" href="documents.html" target="_blank" rel="noopener">Open document library</a>'
         + '</div>'
         + '<div class="picc-list">' + rows + '</div>';
 }
@@ -2987,13 +3048,22 @@ function renderPiccItem(item, data) {
 
     // Evidence buttons: item-specific pasted link wins, then a known folder, then
     // the convention folder.
+    /* Evidence lives on our own server now, so these point at the local library
+       rather than SharePoint. The old "Folder" button opened SharePoint and the
+       pasted-link box existed because that was the only way to reach a document;
+       neither is needed once the files are indexed here. */
     var evidence = '';
     (item.docs || []).forEach(function (d) {
         evidence += '<a class="picc-btn" href="' + d.url + '" target="_blank" rel="noopener">' + d.label + '</a>';
     });
-    var folder = savedLink || item.folderUrl || piccItemFolderUrl(item.num);
-    evidence += '<a class="picc-btn" href="' + folder + '" target="_blank" rel="noopener">'
-        + (savedLink ? 'Evidence link' : 'Folder') + '</a>';
+    evidence += '<a class="picc-btn" href="documents.html#' + encodeURIComponent(item.num)
+        + '" target="_blank" rel="noopener" title="Open this item in the document library">Library</a>';
+    // Check-in: a signed or scanned page goes straight back into the item folder.
+    evidence += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
+        + 'Check in a file'
+        + '<input type="file" style="display:none;" '
+        + 'accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt" '
+        + 'onchange="uploadEvidence(\'' + item.num + '\',this)"></label>';
 
     // Per-child items jump straight to the roster column that holds the evidence.
     var jumps = '';
@@ -3043,8 +3113,12 @@ function renderPiccItem(item, data) {
         + (stats ? '' : '<label class="picc-check"><input type="checkbox" ' + checked
             + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>')
         + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
-        + '<input type="url" class="picc-link-input" placeholder="Paste the SharePoint link for this item" value="'
+        /* The SharePoint link box has gone: evidence is indexed from the server's
+           own library, so there is no external URL to paste. Kept as an optional
+           external reference only where something genuinely lives elsewhere. */
+        + '<input type="url" class="picc-link-input" placeholder="Optional: link to something held outside the library" value="'
         + savedLink.replace(/"/g, '&quot;') + '" onchange="saveComplianceLink(\'' + key + '\',this.value)">'
+        + '<span id="up_' + item.num + '" style="flex-basis:100%;font-size:0.72rem;margin-top:6px;"></span>'
         + '</div>'
         + '<textarea class="picc-notes" placeholder="Notes for the monitor, or what is still outstanding" '
         + 'onchange="saveComplianceNotes(\'' + key + '\',this.value)">' + notes + '</textarea>'
@@ -3073,7 +3147,7 @@ function renderInstrumentSection(items, prefix, data) {
             + '<div class="picc-controls">'
             + linkBtn
             + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + fullKey + '\',this.value)" title="Date completed">'
-            + '<input type="url" class="picc-link-input" placeholder="Paste the SharePoint link" value="'
+            + '<input type="url" class="picc-link-input" placeholder="Optional: link to something held outside the library" value="'
             + savedLink.replace(/"/g, '&quot;') + '" onchange="saveComplianceLink(\'' + fullKey + '\',this.value)">'
             + '</div>'
             + '</div>';

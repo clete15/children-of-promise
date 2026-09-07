@@ -51,7 +51,9 @@
 
     function api(opts) {
         return fetch(ENDPOINT, Object.assign({
-            headers: { 'Content-Type': 'application/json' }
+            headers: Object.assign({ 'Content-Type': 'application/json' },
+                // Credentials come from the Staff Portal sign-in, never from source.
+                (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {})
         }, opts));
     }
 

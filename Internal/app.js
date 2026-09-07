@@ -11,7 +11,10 @@
 // the password would ship it to every visitor and break on every rotation.
 
 function apiFetch(url, opts = {}) {
-    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' },
+        // Credentials come from the Staff Portal sign-in, never from source.
+        (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        opts.headers || {});
     return fetch(url, opts);
 }
 

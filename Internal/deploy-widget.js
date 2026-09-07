@@ -54,7 +54,12 @@
         btn.dataset.state = 'pending';
         btn.textContent = opts.pendingText;
         try {
-            const res = await fetch(opts.url, { method: 'POST', headers: {} });
+            // Credentials come from the Staff Portal sign-in via the shared helper.
+            const res = await fetch(opts.url, {
+                method: 'POST',
+                headers: (window.CofpAuth && CofpAuth.header())
+                    ? { 'Authorization': CofpAuth.header() } : {}
+            });
             let json = {};
             try { json = await res.json(); } catch (e) { /* restart may cut the response short */ }
             const ok = res.ok && (json.success !== false);
