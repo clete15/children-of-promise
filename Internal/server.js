@@ -2297,7 +2297,11 @@ ELSE
             res.writeHead(404); return res.end('Not found');
         }
         const ext = path.extname(full).toLowerCase();
-        const mime = MIME_TYPES[ext] || 'application/octet-stream';
+        // The table is MIME, not MIME_TYPES. Referencing the wrong name threw a
+        // ReferenceError here before any response was written, so every request
+        // for a document that existed hung the browser indefinitely while the
+        // 404 path — which never reached this line — worked perfectly.
+        const mime = MIME[ext] || 'application/octet-stream';
         // Attachment for anything not safely previewable, so nothing renders inline
         // that could carry script.
         const inline = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'].includes(ext);
