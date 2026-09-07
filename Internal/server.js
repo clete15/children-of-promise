@@ -849,13 +849,18 @@ function indexYearFolder(programFolder, yearFolder) {
         } catch (e) { /* nothing more to report */ }
         return out;
     }
-    // PICC and PIQUET sit under the visit folder; tolerate either being absent.
-    ['PICC', 'PIQUET', ''].forEach(section => {
+    /* PICC and PIQUET sit under the visit folder; tolerate either being absent.
+       The '' pass picks up item folders left loose at the top level, but must
+       skip the named sections themselves — otherwise PICC is treated as one
+       giant item, every file is counted twice, and staleCount doubles. */
+    const NAMED = ['PICC', 'PIQUET'];
+    NAMED.concat(['']).forEach(section => {
         const dir = section ? path.join(base, section) : base;
         if (!fs.existsSync(dir)) return;
         let entries = [];
         try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
         entries.filter(e => e.isDirectory()).forEach(d => {
+            if (!section && NAMED.indexOf(d.name) !== -1) return;
             const files = [];
             const walk = p => {
                 let kids = [];
