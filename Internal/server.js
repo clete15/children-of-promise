@@ -1282,7 +1282,17 @@ if (sslOptions) {
    Raw socket splicing, because this is a tunnel: once upgraded, neither side
    speaks HTTP any more. */
 function proxyUpgrade(req, socket, head) {
-    if (!ONLYOFFICE_ON) return socket.destroy();
+    /* Logged on every path, success included.
+
+       This handler previously only logged failures, so an empty console proved
+       nothing: it could mean the upgrade never arrived, or that it arrived and
+       worked. That ambiguity cost an evening of guessing. Now the console states
+       plainly what happened to every socket. */
+    console.log('[OFFICE WS] upgrade requested: ' + req.url.slice(0, 140));
+    if (!ONLYOFFICE_ON) {
+        console.log('[OFFICE WS] refused — OnlyOffice is not configured');
+        return socket.destroy();
+    }
 
     /* An upgrade request never reaches handleRequest, so the null-byte and
        traversal guard at the top of it does not apply here. Repeat it rather
@@ -1295,7 +1305,10 @@ function proxyUpgrade(req, socket, head) {
     if (decoded.includes('\0') || /(^|[\\/])\.\.([\\/]|$)/.test(decoded)) return socket.destroy();
 
     const url = req.url.split('?')[0];
-    if (!isOfficePath(url)) return socket.destroy();
+    if (!isOfficePath(url)) {
+        console.log('[OFFICE WS] refused — "' + url + '" is not a document-server path');
+        return socket.destroy();
+    }
     const target = new URL(ONLYOFFICE_URL);
     const lib = target.protocol === 'https:' ? https : http;
     const headers = Object.assign({}, req.headers);
@@ -1315,6 +1328,7 @@ function proxyUpgrade(req, socket, head) {
         rejectUnauthorized: false
     });
     upstream.on('upgrade', (upRes, upSocket, upHead) => {
+        console.log('[OFFICE WS] connected (' + upRes.statusCode + ') ' + url);
         // Replay the handshake to the browser, then join the two sockets.
         const lines = ['HTTP/1.1 101 Switching Protocols'];
         for (const [k, v] of Object.entries(upRes.headers)) lines.push(k + ': ' + v);
@@ -1327,8 +1341,9 @@ function proxyUpgrade(req, socket, head) {
         upSocket.on('error', shut); socket.on('error', shut);
         upSocket.on('close', shut); socket.on('close', shut);
     });
-    upstream.on('response', () => {
+    upstream.on('response', up => {
         // Upstream declined to upgrade; nothing useful to relay.
+        console.log('[OFFICE WS] upstream refused to upgrade: HTTP ' + up.statusCode + ' for ' + url);
         socket.destroy();
     });
     upstream.on('error', e => {
