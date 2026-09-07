@@ -2271,13 +2271,28 @@ ELSE
         // Attachment for anything not safely previewable, so nothing renders inline
         // that could carry script.
         const inline = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'].includes(ext);
+        let size = 0;
+        try { size = fs.statSync(full).size; } catch (e) { size = 0; }
+        console.log('[DOC] ' + size + ' ' + mime + ' ' + rel);
         res.writeHead(200, {
             'Content-Type': mime,
+            // Without a length the browser cannot tell a finished response from a
+            // stalled one, so a truncated read looks like an endless load.
+            'Content-Length': size,
             'Content-Disposition': (inline ? 'inline' : 'attachment')
                 + '; filename="' + path.basename(full).replace(/"/g, '') + '"',
             'X-Content-Type-Options': 'nosniff'
         });
-        return fs.createReadStream(full).pipe(res);
+        const stream = fs.createReadStream(full);
+        /* An unhandled stream error leaves the response open forever — the browser
+           spins with no way to know it failed, and an uncaught error would take the
+           whole server down with it. Log it and cut the connection instead. */
+        stream.on('error', err => {
+            console.log('[DOC ERROR] ' + rel + ' -> ' + err.message);
+            res.destroy();
+        });
+        req.on('close', () => stream.destroy());
+        return stream.pipe(res);
     }
 
     // Check a file out or back in. Sending a blank name checks it back in.
