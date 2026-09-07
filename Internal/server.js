@@ -1299,7 +1299,10 @@ function proxyUpgrade(req, socket, head) {
     const target = new URL(ONLYOFFICE_URL);
     const lib = target.protocol === 'https:' ? https : http;
     const headers = Object.assign({}, req.headers);
-    headers.host = target.host;
+    // Same reasoning as the HTTP proxy: keep the public Host so the document
+    // server builds URLs the browser can actually reach.
+    headers['x-forwarded-host'] = req.headers.host || '';
+    headers['x-forwarded-proto'] = 'https';
 
     const upstream = lib.request({
         protocol: target.protocol,
@@ -2520,8 +2523,21 @@ ELSE
         const target = new URL(ONLYOFFICE_URL);
         const lib = target.protocol === 'https:' ? https : http;
         const headers = Object.assign({}, req.headers);
-        // The document server should see its own host, not ours.
-        headers.host = target.host;
+
+        /* Keep the ORIGINAL Host and pass the usual forwarding headers.
+
+           Rewriting Host to localhost:8080 seemed tidier, but the document server
+           builds absolute URLs from whatever Host it sees and hands them to the
+           browser. That produced
+               http://localhost:8080/cache/files/data/.../Editor.bin
+           which a laptop cannot reach — the editor loaded and then failed with a
+           connection error rather than an HTTP status.
+
+           With the public host preserved, it builds URLs on this site, which come
+           back through this proxy. */
+        headers['x-forwarded-host'] = req.headers.host || '';
+        headers['x-forwarded-proto'] = 'https';
+        headers['x-forwarded-for'] = (req.socket && req.socket.remoteAddress) || '';
         delete headers['accept-encoding'];   // no need to re-encode on the way through
 
         /* Strip the version-and-hash prefix before forwarding.
