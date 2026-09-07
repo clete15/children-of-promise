@@ -931,6 +931,21 @@ const OFFICE_VIEWABLE = { '.doc': 'word', '.xls': 'cell', '.ppt': 'slide', '.pdf
    document server needs no public port. Order does not matter; these are matched
    as prefixes. Kept in one place because a version upgrade can add to the list,
    and a missing prefix shows up as an editor that half-loads. */
+/* OnlyOffice also serves its assets under a version-and-hash prefix, e.g.
+       /9.4.0-f19a704d416ba1e465d291ae249d3c81/web-apps/...
+   That prefix changes with every release, so it cannot be listed. Matching the
+   shape instead. Missing this produced a plain "Not Found" from our own static
+   handler: the editor script loaded, then every asset it asked for 404'd. */
+// The version must be followed by a separator, not run straight into more
+// characters — otherwise /9.4.0abc/ would be treated as a version prefix.
+const OFFICE_VERSION_PREFIX = /^\/\d+\.\d+\.\d+(?:[-.][\w.-]*)?\//;
+
+function isOfficePath(url) {
+    if (OFFICE_VERSION_PREFIX.test(url)) return true;
+    return OFFICE_PROXY_PREFIXES.some(p => url === p || url.startsWith(p + '/')
+        || url.startsWith(p + '?') || (p.endsWith('.ashx') && url.startsWith(p)));
+}
+
 const OFFICE_PROXY_PREFIXES = [
     '/web-apps',            // the editor application itself
     '/sdkjs',               // editing engine
@@ -1280,9 +1295,7 @@ function proxyUpgrade(req, socket, head) {
     if (decoded.includes('\0') || /(^|[\\/])\.\.([\\/]|$)/.test(decoded)) return socket.destroy();
 
     const url = req.url.split('?')[0];
-    if (!OFFICE_PROXY_PREFIXES.some(p => url === p || url.startsWith(p + '/'))) {
-        return socket.destroy();
-    }
+    if (!isOfficePath(url)) return socket.destroy();
     const target = new URL(ONLYOFFICE_URL);
     const lib = target.protocol === 'https:' ? https : http;
     const headers = Object.assign({}, req.headers);
@@ -2502,8 +2515,7 @@ ELSE
        proxying under /office/ instead would mean rewriting every URL inside its
        JavaScript, which is brittle. None of these collide with our own routes;
        ours are all under /api/, /staff/, /pas/ or /public/. */
-    if (ONLYOFFICE_ON && OFFICE_PROXY_PREFIXES.some(p => url === p || url.startsWith(p + '/')
-            || url.startsWith(p + '?') || (p.endsWith('.ashx') && url.startsWith(p)))) {
+    if (ONLYOFFICE_ON && isOfficePath(url)) {
         const target = new URL(ONLYOFFICE_URL);
         const lib = target.protocol === 'https:' ? https : http;
         const headers = Object.assign({}, req.headers);
