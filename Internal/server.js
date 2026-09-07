@@ -832,6 +832,23 @@ function resolveDocPath(rel) {
     return full;
 }
 
+/* PFA numbers its items on the FILENAME, not the folder — the whole visit folder
+   is flat. So a second parser is needed:
+
+     "Item 1 - PFA Classroom Information Form - FY 24-25.docx" -> Item1
+     "Item 13 a) - Transition Letter to Kindergarten.docx"     -> Item13.A
+     "Item 13 B) 2024-25 C of P - Behavior Plan.docx"          -> Item13.B
+     "2025 PFA-Compliance-Checklist.pdf"                       -> null
+
+   The sub-letter must be followed by a closing paren. Without that rule
+   "Item 1 PFA - Waiting List.pdf" parses as Item1.P, because "PFA" begins with
+   a letter in exactly the position a sub-item would occupy. */
+function docItemNumberFromFile(fileName) {
+    const m = String(fileName || '').match(/^\s*Item\s*(\d+)\s*(?:([A-Za-z])\s*\))?/i);
+    if (!m) return null;
+    return 'Item' + m[1] + (m[2] ? '.' + m[2].toUpperCase() : '');
+}
+
 // Walks a year's evidence folder and groups the files by item number.
 function indexYearFolder(programFolder, yearFolder) {
     const DOC_ROOT = findDocRoot();
@@ -891,6 +908,25 @@ function indexYearFolder(programFolder, yearFolder) {
             out.items[key].folders.push(d.name);
             out.items[key].owner = out.items[key].owner || docOwner(d.name);
             out.items[key].files = out.items[key].files.concat(files);
+        });
+
+        /* Loose files sitting directly in the visit folder. PFA keeps all its
+           evidence this way, so without this pass the entire Preschool for All
+           side indexes as nothing. Attributed by filename; anything that does
+           not name an item (the checklist PDF, tables of contents, monitoring
+           guides) is left out rather than filed under a guess. */
+        entries.filter(e => e.isFile()).forEach(f => {
+            const num = docItemNumberFromFile(f.name);
+            if (!num) return;
+            const full = path.join(dir, f.name);
+            if (!out.items[num]) out.items[num] = { item: num, folders: [], files: [], owner: '' };
+            out.items[num].files.push({
+                name: f.name,
+                rel: path.relative(DOC_ROOT, full).replace(/\\/g, '/'),
+                stale: /20\d\d/.test(f.name)
+                    ? !new RegExp(yearFolder.match(/(20\d\d)/)?.[1] || '').test(f.name)
+                    : false
+            });
         });
     });
     return out;
