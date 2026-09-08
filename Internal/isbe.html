@@ -72,10 +72,12 @@
         .cf-mark { font-size:0.62rem;font-weight:800;margin-left:2px;cursor:help; }
         .cf-mark.paper { color:#b45309; }
         .cf-date { display:block;font-size:0.55rem;color:#15803d;line-height:1.1;margin-top:1px; }
-        /* Files in the library that look like this child's. */
-        .cf-files { font-size:0.62rem;font-weight:700;color:#1d4ed8;text-decoration:none;
+        /* The child's name opens their file drawer, so it has to look like a link. */
+        .cf-name { color:inherit;text-decoration:none;border-bottom:1px dotted #94a3b8; }
+        .cf-name:hover { color:#1d4ed8;border-bottom-color:#1d4ed8; }
+        /* How many files in the library look like this child's. */
+        .cf-files { font-size:0.62rem;font-weight:700;color:#1d4ed8;
                     background:#eff6ff;border-radius:7px;padding:1px 5px;margin-left:5px;white-space:nowrap; }
-        .cf-files:hover { background:#dbeafe; }
 
         /* Screening date + status shown under each screening checkbox */
         .scr-meta { display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:2px;line-height:1.2; }
@@ -544,13 +546,19 @@
             <div class="pi-section">
                 <h4>Signatures</h4>
                 <div class="pi-grid">
-                    <div class="pi-field">
+                    <!-- Signed here rather than on a printed sheet. The typed field
+                         stays as the printed name, which a signature does not replace. -->
+                    <div class="pi-field pi-full">
                         <label>Parent/Guardian Signature</label>
-                        <input type="text" id="piParentSig" placeholder="Type full name as signature">
+                        <div id="piParentSigPad"></div>
+                        <input type="text" id="piParentSig" placeholder="Printed name"
+                               style="margin-top:7px;">
                     </div>
-                    <div class="pi-field">
+                    <div class="pi-field pi-full">
                         <label>Staff Signature</label>
-                        <input type="text" id="piStaffSig" placeholder="Type full name as signature">
+                        <div id="piStaffSigPad"></div>
+                        <input type="text" id="piStaffSig" placeholder="Printed name"
+                               style="margin-top:7px;">
                     </div>
                 </div>
             </div>
@@ -614,21 +622,23 @@
             <div class="pi-section" style="margin-top:20px;">
                 <h4>Signatures</h4>
                 <div class="pi-grid">
-                    <div class="pi-field">
+                    <!-- PI10.G wants written parent permission. Taken here at drop-off
+                         instead of on a sheet that has to travel home and back. -->
+                    <div class="pi-field pi-full">
                         <label>Parent/Guardian Signature</label>
-                        <input type="text" id="psParentSig" placeholder="Type full name as signature">
+                        <div id="psParentSigPad"></div>
+                        <div style="display:flex;gap:10px;margin-top:7px;">
+                            <input type="text" id="psParentSig" placeholder="Printed name" style="flex:2;">
+                            <input type="date" id="psParentSigDate" style="flex:1;" title="Date signed">
+                        </div>
                     </div>
-                    <div class="pi-field">
-                        <label>Date</label>
-                        <input type="date" id="psParentSigDate">
-                    </div>
-                    <div class="pi-field">
+                    <div class="pi-field pi-full">
                         <label>Teacher Signature</label>
-                        <input type="text" id="psTeacherSig" placeholder="Type full name as signature">
-                    </div>
-                    <div class="pi-field">
-                        <label>Date</label>
-                        <input type="date" id="psTeacherSigDate">
+                        <div id="psTeacherSigPad"></div>
+                        <div style="display:flex;gap:10px;margin-top:7px;">
+                            <input type="text" id="psTeacherSig" placeholder="Printed name" style="flex:2;">
+                            <input type="date" id="psTeacherSigDate" style="flex:1;" title="Date signed">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -817,6 +827,10 @@
      Shared with the compliance panel and the staff portal so all three agree. -->
 <script src="child-forms.js"></script>
 
+<!-- Signature capture, so a parent can sign on screen at drop-off instead of the
+     form being printed, signed, scanned and filed by hand. -->
+<script src="sign-pad.js"></script>
+
 <script src="/staff/auth.js"></script>
 <script>
 // Authorization is deliberately NOT set here. The browser attaches the
@@ -916,7 +930,8 @@ async function setSchoolYear(year) {
             apiFetch(yearQS('/api/screening-summary')),
             // Which forms exist for this year. Never rejects; a failure leaves the
             // ticks showing as they always did rather than emptying the roster.
-            ChildForms.load(year, apiFetch)
+            ChildForms.load(year, apiFetch),
+            loadSignatures(year)
         ]);
         const tRows = await tRes.json();
         trackingData = {};
@@ -936,6 +951,114 @@ async function setSchoolYear(year) {
     else if (activeProgram === 'followUp') renderFollowUp();
     else if (activeProgram === 'startYear') renderStartYear();
 }
+/* ── Signatures ────────────────────────────────────────────────────────────
+   signatures['<studentId>|<Field>|<role>'] = { SignedName, RelPath, SignedAt }
+
+   Held for the year alongside trackingData. The images are not loaded here — only
+   the fact that one exists and where it is — because the roster needs to know which
+   forms are signed, not what the signatures look like. */
+let signatures = {};
+
+function sigKey(studentId, field, role) {
+    return String(studentId) + '|' + field + '|' + role;
+}
+
+function signatureFor(studentId, field, role) {
+    return signatures[sigKey(studentId, field, role)] || null;
+}
+
+async function loadSignatures(year) {
+    try {
+        const res = await apiFetch('/api/child-signatures?year=' + encodeURIComponent(year));
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+        signatures = {};
+        (d.signatures || []).forEach(s => {
+            signatures[sigKey(s.StudentId, s.FormField, s.Role)] = s;
+        });
+    } catch (e) {
+        // Additive: the forms still work, they just cannot show what is already signed.
+        console.warn('Could not load signatures', e);
+        signatures = {};
+    }
+}
+
+// The live pads on whichever modal is open, keyed by the element they live in.
+let sigPads = {};
+
+/* Builds a pad and shows any signature already captured.
+
+   An existing signature is drawn onto the canvas but leaves `drawn` false, so
+   saving a form again does not re-file a signature nobody re-signed. Pressing
+   Clear is what starts a new one. */
+function mountSigPad(hostId, studentId, field, role) {
+    const host = document.getElementById(hostId);
+    if (!host || !window.SignPad) return;
+    const pad = SignPad.create(host);
+    sigPads[hostId] = { pad: pad, field: field, role: role, studentId: studentId };
+
+    const existing = signatureFor(studentId, field, role);
+    if (existing && existing.RelPath) {
+        pad.showExisting('/api/doc-file?path=' + encodeURIComponent(existing.RelPath));
+        pad.setStatus('Signed' + (existing.SignedAt ? ' ' + existing.SignedAt.slice(0, 10) : '')
+            + ' \u2014 press Clear to sign again', '#166534');
+    } else {
+        pad.setStatus('Not signed yet. Hand the screen to the parent, or print and scan the '
+            + 'signed sheet into the child\u2019s file.', '#64748b');
+    }
+    // The modal was hidden when the canvas was created, so it had no size to fit to.
+    setTimeout(() => pad.refresh(), 30);
+}
+
+/* Files whatever was drawn. Returns a list of problems rather than throwing, so one
+   failed signature cannot lose the form content that saved successfully. */
+async function saveSigPads(studentId, printedNames) {
+    const problems = [];
+    const student = students.find(s => String(s.Id) === String(studentId));
+    for (const hostId of Object.keys(sigPads)) {
+        const entry = sigPads[hostId];
+        if (!entry.pad.drawn) continue;               // nothing new was drawn
+        const dataUrl = entry.pad.toDataUrl();
+        if (!dataUrl) continue;
+        try {
+            const res = await apiFetch('/api/child-signature', {
+                method: 'POST',
+                body: JSON.stringify({
+                    studentId: studentId,
+                    year: activeSchoolYear,
+                    program: student && student.PFA_PI_na === 'PFA' ? 'PFA' : 'PI',
+                    childName: student ? student.Last_Name + ', ' + student.First_Name : '',
+                    field: entry.field,
+                    role: entry.role,
+                    name: (printedNames && printedNames[entry.role]) || '',
+                    capturedOn: navigator.userAgent.slice(0, 55),
+                    dataUrl: dataUrl
+                })
+            });
+            const d = await res.json();
+            if (!res.ok || !d.success) {
+                problems.push((d && d.error) || 'signature not saved');
+                entry.pad.setStatus('\u26a0 Not saved', '#b91c1c');
+            } else {
+                signatures[sigKey(studentId, entry.field, entry.role)] = {
+                    StudentId: String(studentId), FormField: entry.field, Role: entry.role,
+                    SignedName: (printedNames && printedNames[entry.role]) || '',
+                    RelPath: d.relPath, SignedAt: new Date().toISOString().slice(0, 10)
+                };
+                entry.pad.setStatus('\u2713 Signature filed as ' + d.name, '#166534');
+                // The signature is a file in the child's folder, so the drawer's
+                // count is now out of date.
+                docIndexState = 'idle';
+                docIndex = null;
+            }
+        } catch (e) {
+            problems.push(e.message);
+            entry.pad.setStatus('\u26a0 Not saved: ' + e.message, '#b91c1c');
+        }
+    }
+    return problems;
+}
+
 let currentInterviewStudentId = null;
 
 async function init() {
@@ -951,7 +1074,8 @@ async function init() {
             loadSiteSettings(),
             // Which forms exist, so a tick with nothing behind it is visible as
             // such from the first render rather than after an interaction.
-            ChildForms.load(activeSchoolYear, apiFetch)
+            ChildForms.load(activeSchoolYear, apiFetch),
+            loadSignatures(activeSchoolYear)
         ]);
         students = await sRes.json();
         classrooms = await cRes.json();
@@ -1466,7 +1590,7 @@ function renderRoster() {
             return td + box + '</td>';
         }).join('');
         return '<tr><td class="left pin-1" style="font-weight:600;font-size:0.73rem;">'
-            + s.Last_Name + ', ' + s.First_Name + childDocsBadge(s)
+            + childNameCell(s)
             + '</td><td class="pin-2" style="font-size:0.7rem;color:var(--text-muted);">'
             + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
     }).join('');
@@ -1655,6 +1779,11 @@ async function openInterview(studentId) {
     document.getElementById('piTranslatorArrangements').value = '';
     document.getElementById('piSavedBadge').style.display = 'none';
 
+    // Fresh pads for this child, showing anything already signed.
+    sigPads = {};
+    mountSigPad('piParentSigPad', studentId, 'ParentInterview', 'parent');
+    mountSigPad('piStaffSigPad', studentId, 'ParentInterview', 'staff');
+
     // Load existing interview data if available
     try {
         const res = await apiFetch(yearQS(`/api/parent-interview/${studentId}`));
@@ -1811,7 +1940,17 @@ async function saveInterview() {
             // ...and record that a form now exists, so the cell reads as evidence on
             // file rather than as a bare tick until the next reload.
             ChildForms.mark(currentInterviewStudentId, 'ParentInterview', body.interviewDate);
+            /* Signatures go after the form content, and their failures are collected
+               rather than thrown: a signature that cannot be filed must not make a
+               successful save of the interview look like it failed. */
+            const sigProblems = await saveSigPads(currentInterviewStudentId, {
+                parent: body.parentSignature, staff: body.staffSignature
+            });
             refreshActiveView();
+            if (sigProblems.length) {
+                alert('The interview was saved, but a signature was not filed:\n\n'
+                    + sigProblems.join('\n'));
+            }
             document.getElementById('piSavedBadge').style.display = 'inline-flex';
             setTimeout(() => { document.getElementById('piSavedBadge').style.display = 'none'; }, 3000);
         } else {
@@ -1870,6 +2009,11 @@ async function openPermissionSlip(studentId) {
     document.getElementById('psTeacherSigDate').value = '';
     document.getElementById('psSavedBadge').style.display = 'none';
 
+    // Fresh pads for this child, showing anything already signed.
+    sigPads = {};
+    mountSigPad('psParentSigPad', studentId, 'PermissionSlip', 'parent');
+    mountSigPad('psTeacherSigPad', studentId, 'PermissionSlip', 'staff');
+
     // Load existing data if saved
     try {
         const res = await apiFetch(yearQS('/api/permission-slip/' + studentId));
@@ -1924,7 +2068,14 @@ async function savePermissionSlip() {
             if (!trackingData[currentPSStudentId]) trackingData[currentPSStudentId] = {};
             trackingData[currentPSStudentId].PermissionSlip = 1;
             ChildForms.mark(currentPSStudentId, 'PermissionSlip', body.signedDate);
+            const sigProblems = await saveSigPads(currentPSStudentId, {
+                parent: body.parentSignature, staff: body.teacherSignature
+            });
             refreshActiveView();
+            if (sigProblems.length) {
+                alert('The permission slip was saved, but a signature was not filed:\n\n'
+                    + sigProblems.join('\n'));
+            }
             document.getElementById('psSavedBadge').style.display = 'inline-flex';
             setTimeout(function() { document.getElementById('psSavedBadge').style.display = 'none'; }, 3000);
         } else {
@@ -2859,8 +3010,7 @@ function renderClassroom() {
 
         return '<div class="cls-card">'
             + '<div class="cls-card-head">'
-            + '<div><div class="cls-name">' + s.Last_Name + ', ' + s.First_Name
-            + childDocsBadge(s) + '</div>'
+            + '<div><div class="cls-name">' + childNameCell(s) + '</div>'
             + '<div class="cls-meta">' + (s.PFA_PI_na || '') + (s.Birth_date ? ' &middot; born ' + s.Birth_date : '')
             + (s.Start_Date ? ' &middot; enrolled ' + s.Start_Date : '') + '</div></div>'
             + status + '</div>'
@@ -3503,15 +3653,24 @@ function childDocs(student) {
     });
 }
 
-// Small marker in the student cell. Silent until the index has loaded, so a slow
-// library never makes a child look as though they have no file.
-function childDocsBadge(student) {
-    if (docIndexState !== 'ready') return '';
-    var files = childDocs(student);
-    if (!files.length) return '';
-    return ' <a href="#" class="cf-files" onclick="event.preventDefault();openChildFiles(' + student.Id + ')"'
-        + ' title="' + files.length + ' file' + (files.length === 1 ? '' : 's')
-        + ' in the library appear to be this child\'s">\u{1F4CE}' + files.length + '</a>';
+/* The child's name is the way into their file drawer.
+
+   This used to be a paperclip that appeared only when a file already matched the
+   child, which meant the way to add a child's FIRST file only existed once they
+   had one. Nobody found it, correctly, because for most children it was not there.
+
+   The name is always present, so it is always a way in. The count rides along as a
+   badge when the library has loaded and has something for them. */
+function childNameCell(student) {
+    var files = docIndexState === 'ready' ? childDocs(student) : [];
+    var badge = files.length
+        ? '<span class="cf-files" title="' + files.length + ' file'
+          + (files.length === 1 ? '' : 's') + ' in the library look like this child\u2019s">'
+          + '\u{1F4CE}' + files.length + '</span>'
+        : '';
+    return '<a href="#" class="cf-name" onclick="event.preventDefault();openChildFiles(' + student.Id + ')"'
+        + ' title="Open this child\u2019s file: signed copies, scans, and what is still outstanding">'
+        + student.Last_Name + ', ' + student.First_Name + '</a>' + badge;
 }
 
 var currentChildFilesId = null;
@@ -3522,6 +3681,14 @@ function openChildFiles(studentId) {
     currentChildFilesId = studentId;
     document.getElementById('cfilesTitle').textContent =
         'Library files \u2013 ' + s.Last_Name + ', ' + s.First_Name;
+
+    /* The drawer is reachable before the library index has arrived, now that the
+       child's name opens it. Ask for the index rather than showing an empty drawer
+       that looks like an answer. */
+    if (docIndexState === 'idle' || docIndexState === 'failed') {
+        docIndexState = 'idle';
+        loadDocIndex(activeProgram === 'PI' ? 'PI' : 'PFA');
+    }
 
     var files = childDocs(s);
     var PREVIEWABLE = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'];
@@ -3551,8 +3718,11 @@ function openChildFiles(studentId) {
     document.getElementById('cfilesBody').innerHTML =
         (files.length
             ? '<ul style="margin:0 0 12px 18px;font-size:0.82rem;">' + rows + '</ul>'
-            : '<p style="font-size:0.85rem;color:#64748b;">No file in the library has this '
-              + 'child\u2019s name in it.</p>')
+            : docIndexState === 'ready'
+                ? '<p style="font-size:0.85rem;color:#64748b;">No file in the library has this '
+                  + 'child\u2019s name in it yet.</p>'
+                : '<p style="font-size:0.85rem;color:#92400e;">Still reading the document '
+                  + 'library\u2026 reopen this in a moment. Checking a file in will still work.</p>')
         + '<p style="font-size:0.74rem;color:#64748b;line-height:1.55;">'
         + 'Matched by filename \u2014 a file has to contain both names to appear here, so one '
         + 'named differently will be missing from this list without being missing from the '

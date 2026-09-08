@@ -853,6 +853,64 @@ function isChildFileFolder(name) {
     return /child\s*or\s*family|family\s*files/i.test(String(name || ''));
 }
 
+/* The folder a child's own evidence belongs in, for a program and year.
+
+   Returns { path } on success or { error } with something a person can act on.
+   Finds the folder by the same rule the indexer uses rather than by an exact name,
+   because the real folders are named inconsistently ("Child or Family Files",
+   "Family Files 2026"). If the year folder is there but has no child folder, one is
+   created: that is the difference between signing working on a fresh year and
+   failing with a message nobody can interpret. The year folder itself is never
+   created, because getting that name wrong would scatter evidence into a directory
+   no other part of the system reads. */
+function childFilesFolder(program, year) {
+    const DOC_ROOT = findDocRoot();
+    if (!DOC_ROOT) return { error: 'The document library is not reachable from the server.' };
+    const programFolder = program === 'PFA' ? 'Preschool for All' : 'Birth to Three';
+    const y = String(year || '').replace(/[^0-9]/g, '').slice(0, 4) || String(new Date().getFullYear());
+    const yearFolder = program === 'PFA' ? 'PFA Monitoring Visit ' + y : y + ' PI Monitoring Visit';
+    const base = path.join(DOC_ROOT, programFolder, yearFolder);
+    if (!fs.existsSync(base)) {
+        return { error: 'No folder "' + programFolder + '/' + yearFolder + '" in the library yet.' };
+    }
+    let found = null;
+    try {
+        found = fs.readdirSync(base, { withFileTypes: true })
+            .filter(d => d.isDirectory() && isChildFileFolder(d.name))
+            .map(d => path.join(base, d.name))[0] || null;
+    } catch (e) { /* fall through to creating one */ }
+    if (found) return { path: found };
+    const made = path.join(base, 'Child or Family Files');
+    try {
+        fs.mkdirSync(made);
+        console.log('[DOC] created ' + path.relative(DOC_ROOT, made));
+        return { path: made };
+    } catch (e) {
+        return { error: 'Could not create a child files folder: ' + e.message };
+    }
+}
+
+// ── Captured signatures ──
+// The image is a file in the child's folder, like a scan would be; this table only
+// points at it. One row per child, year, form and role, so re-signing replaces the
+// pointer while both PNGs remain on disk.
+function childSignatureEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ChildSignatures')
+    CREATE TABLE ChildSignatures (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StudentId INT NOT NULL,
+        SchoolYear NVARCHAR(20),
+        FormField NVARCHAR(60),
+        Role NVARCHAR(20),
+        SignedName NVARCHAR(200),
+        RelPath NVARCHAR(500),
+        SignedAt DATETIME,
+        CapturedOn NVARCHAR(60)
+    );
+GO
+`;
+}
+
 /* Where superseded evidence goes. Archiving MOVES a file here rather than deleting
    it: this is compliance evidence, and a monitor may still ask for the version that
    was current last year. The leading underscore keeps it sorted away from the item
@@ -2168,6 +2226,115 @@ DROP TABLE #cf;`;
             forms[v[1]][v[0]] = { on: true, date: v[2] || '' };
         });
         return sendJSON(res, 200, { year: year, forms: forms });
+    }
+
+    /* ── Signatures captured on screen ────────────────────────────────────
+       POST /api/child-signature   { studentId, year, program, field, role, name, dataUrl }
+
+       The permission slip and the parent interview need a parent's signature. They
+       had a text box captioned "Signature" holding a typed name, so the signature
+       itself only ever existed on paper and the database held an approximation.
+
+       A drawn signature is written into the child's folder in the library as a PNG,
+       exactly where a scan of a signed sheet would go, and this table stores a
+       pointer to it. Two reasons for a file rather than a column: a monitor
+       reviewing the child's folder can see it, which a database blob would not
+       allow; and the sqlcmd transport moves long values in 200-character chunks, so
+       a 20 KB image would be several hundred rows on every read.
+
+       Nothing is overwritten. Re-signing writes a new PNG and re-points the row, so
+       the previous signature is still on disk. */
+    if (req.method === 'POST' && url === '/api/child-signature') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+
+            const studentId = parseInt(d.studentId);
+            if (!studentId) return sendJSON(res, 400, { error: 'Invalid student id' });
+
+            // Whitelisted against the checklist columns, so a signature can only ever
+            // be attached to a real form.
+            if (!ISBE_TRACKING_COLUMNS.includes(d.field)) {
+                return sendJSON(res, 400, { error: 'Unknown form: ' + d.field });
+            }
+            const role = d.role === 'staff' ? 'staff' : d.role === 'parent' ? 'parent' : null;
+            if (!role) return sendJSON(res, 400, { error: 'Role must be parent or staff' });
+
+            const year = resolveSchoolYear(d.year);
+            const program = d.program === 'PFA' ? 'PFA' : 'PI';
+
+            // data:image/png;base64,.... and nothing else. A different type would be
+            // written with a .png name and then fail to display.
+            const m = String(d.dataUrl || '').match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+            if (!m) return sendJSON(res, 400, { error: 'Expected a PNG signature' });
+            const bytes = Buffer.from(m[1], 'base64');
+            if (!bytes.length) return sendJSON(res, 400, { error: 'The signature was empty' });
+            if (bytes.length > 2 * 1024 * 1024) {
+                return sendJSON(res, 413, { error: 'That signature image is unreasonably large' });
+            }
+
+            const folder = childFilesFolder(program, year);
+            if (folder.error) return sendJSON(res, 400, { error: folder.error });
+
+            /* Named so the file says what it is without the database. Sanitised the
+               same way an upload is, because a child's name reaches the filesystem
+               here and a name with a slash in it would escape the folder. */
+            const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
+            const stamp = new Date().toISOString().slice(0, 10);
+            const base = [safe(d.childName) || ('Student ' + studentId), safe(d.field),
+                          role + ' signature', year, stamp].join(' - ');
+            let target = path.join(folder.path, base + '.png');
+            let n = 2;
+            while (fs.existsSync(target) && n < 50) {
+                target = path.join(folder.path, base + ' (' + n + ').png');
+                n++;
+            }
+            try {
+                fs.writeFileSync(target, bytes);
+            } catch (e) {
+                console.error('[SIGNATURE]', e.message);
+                return sendJSON(res, 500, { error: 'Could not save the signature file' });
+            }
+            const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
+            console.log('[SIGNATURE] ' + bytes.length + ' bytes -> ' + rel);
+
+            const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} `
+                + `AND FormField=${esc(d.field)} AND Role=${esc(role)}`;
+            const sql = childSignatureEnsureSQL()
+                + `IF EXISTS (SELECT 1 FROM ChildSignatures WHERE ${where})
+    UPDATE ChildSignatures SET SignedName=${esc(d.name)},RelPath=${esc(rel)},
+        SignedAt=GETDATE(),CapturedOn=${esc(d.capturedOn)} WHERE ${where}
+ELSE
+    INSERT INTO ChildSignatures (StudentId,SchoolYear,FormField,Role,SignedName,RelPath,SignedAt,CapturedOn)
+    VALUES (${studentId},${esc(year)},${esc(d.field)},${esc(role)},${esc(d.name)},${esc(rel)},GETDATE(),${esc(d.capturedOn)});
+`;
+            const r = runSQL(sql);
+            /* The file is already on disk at this point. Saying "saved" would be a
+               lie and saying "failed" would send someone hunting for a file that is
+               there, so it says both. */
+            if (!r.ok) {
+                return sendJSON(res, 500, {
+                    error: 'The signature image was filed as "' + path.basename(target)
+                         + '" but could not be recorded against the form: ' + r.error
+                });
+            }
+            return sendJSON(res, 200, { success: true, relPath: rel, name: path.basename(target) });
+        });
+        return;
+    }
+
+    /* Every captured signature for a year, without the images: the roster needs to
+       know which forms are signed, not what the signatures look like. */
+    if (req.method === 'GET' && url === '/api/child-signatures') {
+        if (!checkAuth(req, res)) return;
+        const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
+        const r = runSQLRows(
+            `SELECT StudentId, FormField, Role, SignedName, RelPath,
+                    CONVERT(NVARCHAR(20), SignedAt, 120) AS SignedAt
+             FROM ChildSignatures WHERE SchoolYear=${esc(year)}`,
+            childSignatureEnsureSQL());
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        return sendJSON(res, 200, { year: year, signatures: r.rows });
     }
 
     // GET parent interview for a student (internal - protected)
