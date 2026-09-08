@@ -880,12 +880,54 @@ function docMetaEnsureSQL() {
    path, so it is resolved and then checked to be genuinely inside the root —
    without that, "..\..\..\Windows\System32" would be served. Returns null on
    anything that escapes, which callers treat as 404 rather than explaining why. */
-function resolveDocPath(rel) {
-    if (!rel) return null;
-    const docRoot = findDocRoot();
+/* ── Document roots ──
+   There are two places editable documents live: the compliance library (the
+   default) and the PAS folder of handbooks and policies. Rather than a second
+   resolver, a path may carry an explicit "<rootId>:" prefix, and resolveDocPath
+   below stays the one and only boundary.
+
+   The library is deliberately left UNPREFIXED. Every DocumentMeta row, every
+   check-out record and every link already rendered by the checklist uses a bare
+   library-relative path, so prefixing it would orphan all of them.
+
+   A colon is a safe delimiter because Windows forbids it in a file name, so no
+   real relative path inside either root can contain one. */
+const DOC_ROOTS = {
+    pas: () => path.join(__dirname, '..', 'PAS')
+};
+
+function splitDocRef(ref) {
+    const s = String(ref == null ? '' : ref);
+    const m = /^([a-z][a-z0-9]*):(.*)$/.exec(s);
+    if (m && Object.prototype.hasOwnProperty.call(DOC_ROOTS, m[1])) {
+        return { rootId: m[1], rel: m[2] };
+    }
+    return { rootId: '', rel: s };
+}
+
+function docRootFor(rootId) {
+    if (!rootId) return findDocRoot();
+    const fn = DOC_ROOTS[rootId];
+    return fn ? fn() : null;
+}
+
+/* Resolves a caller-supplied path inside whichever root it names.
+
+   This is the security boundary for the whole feature, for both roots. A request
+   controls the path, so it is resolved and then checked to be genuinely inside the
+   chosen root — without that, "..\..\..\Windows\System32" would be served. An
+   unrecognised prefix is NOT treated as a root, it falls through to the library
+   and then fails containment, so a guessed prefix cannot reach anything.
+
+   Returns null on anything that escapes, which callers treat as 404 rather than
+   explaining why. */
+function resolveDocPath(ref) {
+    if (!ref) return null;
+    const { rootId, rel } = splitDocRef(ref);
+    const docRoot = docRootFor(rootId);
     if (!docRoot) return null;
     const decoded = String(rel).replace(/\\/g, '/');
-    if (decoded.includes('\0')) return null;
+    if (!decoded || decoded.includes('\0')) return null;
     const root = path.resolve(docRoot);
     const full = path.resolve(root, decoded);
     const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep;
