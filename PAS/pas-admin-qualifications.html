@@ -131,6 +131,43 @@
             .inline-field input { border-bottom: none; }
             .numbered-line input { border-bottom: none; }
             .section { border-color: #ccc; }
+            .prefill-report { display: none !important; }
+        }
+
+        /* Fill-from-staff-records button and its result panel. Same treatment as the
+           Teaching Staff Qualifications worksheet, so the two behave alike. */
+        #prefillBtn {
+            padding: 6px 14px;
+            background: #2c5282;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            font-size: 9pt;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        #prefillBtn:hover { background: #1f3f66; }
+        #prefillBtn:disabled { background: #94a3b8; cursor: default; }
+
+        .prefill-report {
+            margin: 0 0 14px;
+            padding: 12px 16px;
+            border: 1px solid #c7d7ea;
+            border-left: 4px solid #2c5282;
+            border-radius: 6px;
+            background: #f4f8fc;
+            font-size: 9pt;
+            line-height: 1.5;
+        }
+        .prefill-report h4 { margin: 0 0 8px; font-size: 9.5pt; color: #1f3f66; }
+        .prefill-report ul { margin: 4px 0 10px 18px; padding: 0; }
+        .prefill-report li { margin-bottom: 3px; }
+        .prefill-report .pr-need { color: #92400e; }
+        .prefill-report .pr-warn { color: #991b1b; }
+        .prefill-report .pr-done { color: #166534; }
+        .prefill-report .pr-close {
+            float: right; border: none; background: transparent;
+            font-size: 13pt; line-height: 1; cursor: pointer; color: #64748b;
         }
     </style>
 </head>
@@ -146,6 +183,16 @@
 <div class="description">
     The Administrator is the individual who has primary responsibility for planning, implementing, and evaluating the early childhood program. The Administrator must be located on-site if the center has four or more classrooms or a total enrollment of 60 or more full-time equivalent (FTE) children. Role titles for the Administrator vary and may include director, manager, coordinator, or principal.
 </div>
+
+<div class="no-print" style="display:flex;justify-content:flex-end;margin-bottom:10px;">
+    <button type="button" id="prefillBtn" onclick="prefillFromStaff()"
+            title="Fill this worksheet from the staff records, so you confirm instead of retyping">
+        ⤓ Fill from staff records
+    </button>
+</div>
+
+<!-- What the prefill filled, and what still needs a human. -->
+<div class="prefill-report no-print" id="prefillReport" style="display:none;"></div>
 
 <div class="info-grid">
     <div class="info-field">
@@ -328,6 +375,292 @@ document.addEventListener('input', (e) => {
         PasStore.storage.setItem(STORAGE_KEY, JSON.stringify(data));
     }
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Fill from staff records
+
+   Every value this worksheet asks for that the system already knows is pulled from
+   the staff record, so the director confirms rather than retypes. Retyping is how
+   the worksheet and the staff card end up disagreeing, and the worksheet is what
+   gets submitted.
+
+   Two things it deliberately does NOT do: it never invents a value, and it never
+   silently reinterprets one. Management coursework and professional contributions
+   are not tracked anywhere, so they are reported as needing a human rather than
+   left looking complete.
+
+   NOTE: eduField/splitExperience/credLevel below are a second copy of logic that
+   also lives in pas-teaching-staff-qualifications.html. They should move to one
+   shared file so the two cannot drift; left duplicated for now rather than
+   refactoring a working worksheet under deadline.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+/* Highest education LEVEL, not coursework attempted. "Some College" means no
+   degree completed, so the highest completed level is still high school - recorded
+   that way and flagged, because it is a judgement call the director should see. */
+function eduField(education) {
+    const e = (education || '').toLowerCase();
+    if (/doctor|phd|ed\.?d/.test(e)) return { field: 'edu_doctorate' };
+    if (/master|m\.?ed|m\.?a\b|m\.?s\b/.test(e)) return { field: 'edu_master' };
+    if (/bachelor|b\.?a\b|b\.?s\b/.test(e)) return { field: 'edu_bachelor' };
+    if (/associate|a\.?a\b|a\.?s\b/.test(e)) return { field: 'edu_associate' };
+    if (/some college|coursework/.test(e)) {
+        return { field: 'edu_hs', note: 'recorded High School/GED as the highest *completed* level '
+            + '("Some College" means no degree finished) \u2014 confirm' };
+    }
+    if (/high school|hs|ged|diploma/.test(e)) return { field: 'edu_hs' };
+    return { field: null };
+}
+
+// The Illinois Director Credential level, as a number. Roman or arabic.
+function directorCredLevel(s) {
+    const src = [s.EceCredentials, s.Gateways].filter(Boolean).join(', ');
+    const m = src.match(/Director(?:\s*Credential)?\s*-?\s*Level\s*(III|II|I|\d)/i);
+    if (!m) return 0;
+    return /^\d$/.test(m[1]) ? +m[1] : ({ I: 1, II: 2, III: 3 }[m[1].toUpperCase()] || 0);
+}
+
+/* Management experience is NOT total experience, so ExperienceYears must not be
+   copied into it - that would overstate the qualification. The notes do record when
+   someone became director ("Director since 01/2009"), so that is used instead, and
+   labelled as derived so it gets checked. */
+function managementSince(s) {
+    const text = String(s.Notes || '');
+    const m = text.match(/(?:director|administrator|admin)\b[^.;]{0,40}?since\s+(\d{1,2})\/(\d{4})/i);
+    if (!m) return null;
+    const month = parseInt(m[1], 10), year = parseInt(m[2], 10);
+    if (!(month >= 1 && month <= 12) || year < 1950) return null;
+    const now = new Date();
+    let months = (now.getFullYear() - year) * 12 + (now.getMonth() + 1 - month);
+    if (months < 0) return null;
+    return { years: Math.floor(months / 12), months: months % 12, phrase: m[0].trim() };
+}
+
+function setField(name, value) {
+    const el = document.querySelector(`[data-field="${name}"]`);
+    if (!el) return;
+    if (el.type === 'checkbox') el.checked = !!value;
+    else el.value = value;
+}
+
+function showPrefillReport(html) {
+    const el = document.getElementById('prefillReport');
+    el.innerHTML = '<button class="pr-close" onclick="document.getElementById(\'prefillReport\')'
+        + '.style.display=\'none\'" title="Dismiss">&times;</button>' + html;
+    el.style.display = 'block';
+}
+
+function escAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Anything already typed that a prefill would replace.
+function worksheetHasEntries() {
+    const name = document.querySelector('[data-field="adminName"]');
+    return !!(name && name.value.trim());
+}
+
+let staffCache = null;
+
+async function fetchStaff() {
+    if (staffCache) return staffCache;
+    const get = (window.CofpAuth && CofpAuth.apiFetch)
+        ? CofpAuth.apiFetch('/api/staff')
+        : fetch('/api/staff');
+    const res = await get;
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const staff = await res.json();
+    staffCache = Array.isArray(staff) ? staff : [];
+    return staffCache;
+}
+
+/* Who counts as the Administrator. PAS defines the role by responsibility, not job
+   title, and three people here have "Director" in their title: the on-site director
+   plus two of the ownership group. The on-site, non-ownership director is offered
+   first, with the others listed so the choice is visible and changeable rather than
+   silently made. */
+function administratorCandidates(staff) {
+    const active = staff.filter(s => s.Active === undefined || s.Active === ''
+        || s.Active === true || s.Active === 1 || s.Active === '1');
+    // Title only. Program holds PI/PFA/INCCRA, never a role, so it is not consulted.
+    const directors = active.filter(s => /director|administrator|manager/i.test(s.Role || ''));
+    // On-site and not ownership first, then by director credential, then experience.
+    return directors.sort((a, b) => {
+        const own = s => (s.StaffGroup || '') === 'Ownership' ? 1 : 0;
+        if (own(a) !== own(b)) return own(a) - own(b);
+        const lv = directorCredLevel(b) - directorCredLevel(a);
+        if (lv !== 0) return lv;
+        return (parseFloat(b.ExperienceYears) || 0) - (parseFloat(a.ExperienceYears) || 0);
+    });
+}
+
+/* chosenIndex refers to the candidate list built below. An index rather than a name
+   because a name has to survive being embedded in an onclick attribute, and one
+   containing an apostrophe would not match on the way back. */
+async function prefillFromStaff(chosenIndex) {
+    const btn = document.getElementById('prefillBtn');
+    btn.disabled = true;
+    btn.textContent = 'Loading\u2026';
+    try {
+        let staff;
+        try {
+            staff = await fetchStaff();
+        } catch (e) {
+            showPrefillReport('<h4>Could not reach the staff records</h4>'
+                + '<p class="pr-warn">The server did not answer, so nothing was changed. '
+                + 'If the site was just deployed it may still be restarting \u2014 wait a moment '
+                + 'and try again.</p><p style="color:#64748b">Details: ' + escAttr(e.message) + '</p>');
+            return;
+        }
+
+        const candidates = administratorCandidates(staff);
+        if (!candidates.length) {
+            showPrefillReport('<h4>No administrator found in the staff records</h4>'
+                + '<p>Nothing was changed. Nobody is recorded with a Director or Administrator '
+                + 'role on the Staff Cards page.</p>');
+            return;
+        }
+
+        const picked = Number.isInteger(chosenIndex) && candidates[chosenIndex];
+        const person = picked || candidates[0];
+
+        // Only ask before overwriting when this is the user's first click, not when
+        // they are deliberately switching to a different person.
+        if (!picked && worksheetHasEntries()
+            && !confirm('This worksheet already has entries.\n\n'
+                + 'Replace them with the record on file for ' + person.Name + '?')) {
+            return;
+        }
+
+        const got = [];
+        const miss = [];
+
+        setField('adminName', person.Name || '');
+        got.push('name');
+
+        const edu = eduField(person.Education);
+        ['edu_hs', 'edu_associate', 'edu_bachelor', 'edu_master', 'edu_doctorate']
+            .forEach(f => setField(f, false));
+        if (edu.field) {
+            setField(edu.field, true);
+            got.push('highest education');
+            if (edu.note) miss.push(edu.note);
+        } else {
+            miss.push('highest education level (nothing on file)');
+        }
+
+        /* Semester hours come off the transcript. General hours are the total minus
+           the ECE ones, because the form asks for them separately. */
+        const shTotal = parseFloat(person.SemesterHoursTotal);
+        const shEce = parseFloat(person.SemesterHoursEce);
+        if (isFinite(shEce)) { setField('ece_sh', String(shEce)); got.push(shEce + ' ECE sem hrs'); }
+        else miss.push('ECE semester hours \u2014 add them to the staff card from the transcript');
+        if (isFinite(shTotal) && isFinite(shEce)) {
+            setField('general_sh', String(Math.max(0, shTotal - shEce)));
+            got.push(Math.max(0, shTotal - shEce) + ' general sem hrs');
+        } else if (isFinite(shTotal)) {
+            setField('general_sh', String(shTotal));
+            miss.push('general semester hours shown as the full total, because ECE hours are not recorded');
+        } else {
+            miss.push('total semester hours \u2014 add them to the staff card from the transcript');
+        }
+        if ((person.TranscriptOnFile || '') === 'Not submitted') {
+            miss.push('transcript is NOT with Gateways \u2014 these hours are not counting toward a credential');
+        }
+
+        // Nothing in the system distinguishes management coursework from the rest.
+        setField('mgmt_sh', '');
+        miss.push('management coursework semester hours \u2014 not tracked anywhere; read them off '
+            + 'the transcript (accounting, marketing, finance, communications, technology, '
+            + 'leadership, staff development, organizational change)');
+
+        /* Only record a credential the record says was actually awarded. The notes use
+           "Pending: Director (Awaiting Work Exp)" phrasing, and a credential still in
+           progress must be answered No here, not Yes. */
+        const credSource = [person.EceCredentials, person.Gateways].filter(Boolean).join('; ');
+        const earned = credSource.replace(/\b(pending|awaiting|in ?progress|missing|expired|not )\b[^;]*/gi, '');
+        const dirLevel = directorCredLevel({ EceCredentials: earned, Gateways: '' });
+        const principal = /principal endorsement/i.test(earned);
+        const yes = document.querySelector('input[name="adminCredential"][value="yes"]');
+        const no = document.querySelector('input[name="adminCredential"][value="no"]');
+        if (dirLevel >= 1 || principal) {
+            if (yes) yes.checked = true;
+            const label = principal ? 'Principal Endorsement'
+                : 'Illinois Director Credential \u2014 Level ' + ['', 'I', 'II', 'III'][dirLevel];
+            setField('cred_type', label);
+            setField('cred_issuer', principal ? 'Illinois State Board of Education'
+                                             : 'Gateways to Opportunity');
+            got.push('administrator credential (' + label + ')');
+        } else {
+            if (no) no.checked = true;
+            setField('cred_type', '');
+            setField('cred_issuer', '');
+            got.push('administrator credential answered No');
+            const pend = (credSource + ' ' + (person.Notes || ''))
+                .match(/\b(?:pending|awaiting)\b[^.;]*/i);
+            miss.push('no awarded administrator credential on file, so this is answered <strong>No</strong>'
+                + (pend ? ' \u2014 the record shows \u201c' + escAttr(pend[0].trim()) + '\u201d, which is '
+                    + 'not the same as holding it' : ''));
+        }
+
+        /* Section 6 asks for MANAGEMENT experience. ExperienceYears is total career
+           experience including classroom years, so copying it here would overstate the
+           qualification on a submitted document. */
+        const mgmt = managementSince(person);
+        if (mgmt) {
+            setField('exp_years', String(mgmt.years));
+            setField('exp_months', String(mgmt.months));
+            got.push('management experience ' + mgmt.years + 'y ' + mgmt.months + 'm');
+            miss.push('management experience was derived from \u201c' + escAttr(mgmt.phrase)
+                + '\u201d in the notes, not from a recorded figure \u2014 confirm the start date');
+        } else {
+            setField('exp_years', '');
+            setField('exp_months', '');
+            miss.push('management experience \u2014 deliberately left blank. The '
+                + (person.ExperienceYears ? person.ExperienceYears + ' years ' : '')
+                + 'on the staff card is TOTAL experience including classroom years, and this '
+                + 'section asks only for management. Enter the years since taking an '
+                + 'administrative role');
+        }
+
+        miss.push('professional contributions in the last three years \u2014 not tracked anywhere; '
+            + 'conference presentations, training delivered to other programmes, mentoring, '
+            + 'advocacy, committee or association service');
+
+        // Persist through the shared store, same as any manual edit.
+        saveData();
+
+        let html = '<h4>Filled from the record for ' + escAttr(person.Name) + '</h4>'
+            + '<ul class="pr-done"><li>' + got.join('</li><li>') + '</li></ul>';
+
+        if (candidates.length > 1) {
+            html += '<p><strong>' + candidates.length + ' people hold a Director or Administrator '
+                + 'title.</strong> PAS wants the one with primary responsibility for planning, '
+                + 'implementing and evaluating the programme. Switch if this is the wrong person:</p>'
+                + '<p>' + candidates.map((s, i) =>
+                    s === person
+                        ? '<strong>' + escAttr(s.Name) + '</strong>'
+                        : '<button type="button" style="margin:0 6px 4px 0;padding:3px 9px;'
+                          + 'font-size:8.5pt;border:1px solid #c7d7ea;border-radius:4px;'
+                          + 'background:#fff;cursor:pointer;" onclick="prefillFromStaff(' + i + ')">'
+                          + 'use ' + escAttr(s.Name)
+                          + (s.StaffGroup === 'Ownership' ? ' (ownership)' : '') + '</button>'
+                ).join(' ') + '</p>';
+        }
+
+        html += '<h4 class="pr-need">Still needs you</h4><ul class="pr-need"><li>'
+            + miss.join('</li><li>') + '</li></ul>'
+            + '<p style="color:#475569;margin:0">Everything above came from the staff records. '
+            + 'Check it against the Gateways report before submitting \u2014 this is a starting '
+            + 'point, not a signed-off answer.</p>';
+        showPrefillReport(html);
+
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '\u2913 Fill from staff records';
+    }
+}
 
 // Initialize once saved answers have arrived from the server.
 PasStore.ready.then(loadData);

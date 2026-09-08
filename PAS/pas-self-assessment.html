@@ -601,7 +601,14 @@ const SCORE_LABELS = {
 };
 
 const STORAGE_KEY = 'pas_self_assessment';
-const SYNC_KEY = 'pas_item_scores';
+/* The key the Item Summary worksheet actually reads.
+
+   This used to be 'pas_item_scores', which nothing read: pas-item-summary-profile.html
+   loads 'pas_item_summary'. So scoring all 25 items here appeared to feed the summary
+   and in fact fed nothing, and every score had to be typed a second time by hand -
+   with the two documents free to disagree, on a pair of forms that get submitted
+   together. */
+const SYNC_KEY = 'pas_item_summary';
 
 // State
 let state = {
@@ -633,23 +640,41 @@ function saveState() {
     syncToSummaryProfile();
 }
 
-// Sync scores to PAS Item Summary Profile format
+/* Pushes the scores into the Item Summary worksheet.
+
+   This assessment is where a score is decided, so it is the source and the summary
+   is the rollup that gets submitted. The existing record is read and merged rather
+   than replaced, so the programme name, the N/A marks and any comments typed on the
+   summary itself survive.
+
+   Both sides key on the PAS item number, and the summary stores scores as strings,
+   which is why they are converted here. */
 function syncToSummaryProfile() {
-    const scoredCount = Object.keys(state.scores).length;
-    if (scoredCount > 0) {
-        // Load existing summary profile data or create new
-        let profileData = {};
-        const existing = PasStore.storage.getItem(SYNC_KEY);
-        if (existing) {
-            try { profileData = JSON.parse(existing); } catch(e) {}
-        }
-        // Update scores
-        profileData.scores = profileData.scores || {};
-        Object.keys(state.scores).forEach(key => {
-            profileData.scores[key] = String(state.scores[key]);
-        });
-        PasStore.storage.setItem(SYNC_KEY, JSON.stringify(profileData));
+    if (!Object.keys(state.scores).length) return;
+
+    let profileData = {};
+    const existing = PasStore.storage.getItem(SYNC_KEY);
+    if (existing) {
+        try { profileData = JSON.parse(existing) || {}; } catch (e) { profileData = {}; }
     }
+
+    profileData.scores = profileData.scores || {};
+    Object.keys(state.scores).forEach(key => {
+        profileData.scores[key] = String(state.scores[key]);
+    });
+
+    /* Notes carry across as the summary's comment, but only into an empty one. A
+       comment written on the summary sheet is a deliberate edit and must not be
+       overwritten by an observation typed here. */
+    profileData.comments = profileData.comments || {};
+    Object.keys(state.notes).forEach(key => {
+        const note = String(state.notes[key] || '').trim();
+        if (note && !String(profileData.comments[key] || '').trim()) {
+            profileData.comments[key] = note;
+        }
+    });
+
+    PasStore.storage.setItem(SYNC_KEY, JSON.stringify(profileData));
 }
 
 // Render current item
