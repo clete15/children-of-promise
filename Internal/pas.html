@@ -421,6 +421,20 @@ function ccNamesFrom(desc) {
         .filter(s => s.length >= 3 && !/^(n\/?a|none|tbd)$/i.test(s));
 }
 
+/* Names staff are known by day to day that do not appear on their record.
+
+   Renee Nier is "Donna" on the classroom board. Without this she reports as staffing
+   a room with no staff record at all, which is the kind of false alarm that teaches
+   people to ignore the panel. Keyed informal name -> the name on the staff record. */
+const STAFF_ALIASES = {
+    donna: 'Renee Nier'
+};
+
+/* Staff who work only in the summer programme, so their absence from the school-year
+   staff records is correct rather than a gap. Named here so the cross-check does not
+   keep reporting them, and so it is written down somewhere. */
+const SUMMER_ONLY_STAFF = ['Hannah Engel', 'Velouria White'];
+
 /* An informal first name against a staff record. Deliberately generous, because the
    cost of a missed match here is a false accusation that someone has no staff record.
 
@@ -434,6 +448,8 @@ function ccNamesFrom(desc) {
 function ccNameMatches(informal, staffName) {
     const a = String(informal || '').toLowerCase().replace(/[^a-z]/g, '');
     if (!a) return false;
+    // A known alias resolves straight to the person, before any guessing.
+    if (STAFF_ALIASES[a] && STAFF_ALIASES[a] === staffName) return true;
     return String(staffName || '').toLowerCase().split(/\s+/).filter(Boolean).some(p => {
         const b = p.replace(/[^a-z]/g, '');
         if (!b || a.length < 3 || b.length < 3) return false;
@@ -446,7 +462,9 @@ function ccNameMatches(informal, staffName) {
 function ccFindings(staff, rooms, kids) {
     const findings = [];
     const active = staff.filter(s => s.Active === undefined || s.Active === ''
-        || s.Active === true || s.Active === 1 || s.Active === '1');
+        || s.Active === true || s.Active === 1 || s.Active === '1')
+        // Summer-programme staff are correctly absent from the school-year records.
+        .filter(s => SUMMER_ONLY_STAFF.indexOf(s.Name) === -1);
 
     /* 1. Names in a room description that cannot be matched to a staff record, and
        names that match someone who is recorded in a DIFFERENT room. The second case
@@ -471,23 +489,26 @@ function ccFindings(staff, rooms, kids) {
             const servesHere = ccRoomKey(match.Classroom) === ccRoomKey(room.Room)
                 || ccRoomKey(match.SecondaryClassroom) === ccRoomKey(room.Room);
             if (!servesHere) {
+                /* Reported, not prescribed. A teacher who covers a second room part
+                   time is recorded as they actually work, and whether that counts
+                   toward the ExceleRate credential percentages is Genni's call, not
+                   this page's. So this states the position and its consequence and
+                   stops there, rather than telling anyone to change a record to
+                   produce a particular score. */
                 const isInfantToddler = /infant|toddler/i.test(room.Room);
                 findings.push({
-                    severity: 'high',
-                    what: room.Room + ' lists \u201c' + nm + '\u201d, but ' + match.Name
-                        + '\u2019s staff record puts them in \u201c'
-                        + (String(match.Classroom || '').trim() || 'no classroom') + '\u201d'
-                        + (String(match.SecondaryClassroom || '').trim()
-                            ? ' and \u201c' + match.SecondaryClassroom + '\u201d' : ''),
-                    why: 'Counting runs off the staff record, not the room description, so this room '
-                        + 'does not currently count them'
+                    severity: 'note',
+                    what: room.Room + ' lists \u201c' + nm + '\u201d, and ' + match.Name
+                        + '\u2019s staff record shows \u201c'
+                        + (String(match.Classroom || '').trim() || 'no classroom') + '\u201d',
+                    why: 'Recorded as it stands. The credential percentages are counted from the staff '
+                        + 'record, so as things are this room does not count them'
                         + (isInfantToddler
                             ? ' \u2014 and this is an infant/toddler room, which is where the ExceleRate '
-                              + '4B Infant/Toddler percentage is calculated. If they genuinely work here '
-                              + 'part time, that belongs in their Second Classroom field.'
+                              + '4B infant/toddler percentage comes from.'
                             : '.'),
-                    fix: 'Set ' + match.Name + '\u2019s classroom (or Second Classroom for a part-time '
-                        + 'assignment) to ' + room.Room + ', or take the name off the classroom.'
+                    fix: 'Nothing to change here. Genni reviews how a part-time or shared assignment '
+                        + 'is scored \u2014 this is listed so the position is visible when she does.'
                 });
             }
         });
@@ -594,6 +615,8 @@ function renderCrossCheck() {
     }
 
     const findings = ccFindings(staffRecords, rooms, kids);
+    // Notes are for information; only high and medium are things to act on.
+    const actionable = findings.filter(f => f.severity !== 'note');
     const high = findings.filter(f => f.severity === 'high').length;
 
     if (!findings.length) {
@@ -604,15 +627,20 @@ function renderCrossCheck() {
         return;
     }
 
-    const rows = findings.map(f => {
-        const c = f.severity === 'high' ? ['#fef2f2', '#fca5a5', '#991b1b'] : ['#fffbeb', '#fcd34d', '#92400e'];
+    // Actionable items first; notes read as background rather than as problems.
+    const ordered = actionable.concat(findings.filter(f => f.severity === 'note'));
+    const rows = ordered.map(f => {
+        const c = f.severity === 'high' ? ['#fef2f2', '#fca5a5', '#991b1b']
+            : f.severity === 'medium' ? ['#fffbeb', '#fcd34d', '#92400e']
+            : ['#f8fafc', '#cbd5e1', '#475569'];
         return '<div style="background:' + c[0] + ';border:1px solid ' + c[1] + ';border-left:4px solid '
             + c[2] + ';border-radius:8px;padding:10px 14px;margin-bottom:8px;">'
             + '<div style="font-size:0.8rem;font-weight:700;color:' + c[2] + ';">' + escHtml(f.what) + '</div>'
             + '<div style="font-size:0.74rem;color:#475569;line-height:1.55;margin-top:4px;">'
             + escHtml(f.why) + '</div>'
             + '<div style="font-size:0.74rem;color:#1e293b;line-height:1.55;margin-top:4px;">'
-            + '<strong>Fix:</strong> ' + escHtml(f.fix) + '</div>'
+            + '<strong>' + (f.severity === 'note' ? 'Note:' : 'Fix:') + '</strong> '
+            + escHtml(f.fix) + '</div>'
             + '</div>';
     }).join('');
 
@@ -620,8 +648,14 @@ function renderCrossCheck() {
         '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px 16px;'
         + 'margin-bottom:12px;">'
         + '<div style="font-size:0.85rem;font-weight:800;color:#1e293b;">'
-        + findings.length + ' disagreement(s) between records '
-        + padletPill(high ? 'part' : 'none', high + ' worth fixing first') + '</div>'
+        + (actionable.length
+            ? actionable.length + ' disagreement(s) to settle'
+            : 'Nothing to settle')
+        + (findings.length - actionable.length
+            ? ' \u00b7 ' + (findings.length - actionable.length) + ' recorded for review'
+            : '')
+        + ' ' + padletPill(actionable.length ? 'part' : 'done',
+            actionable.length ? high + ' worth fixing first' : '\u2713 records agree') + '</div>'
         + '<div style="font-size:0.74rem;color:#64748b;line-height:1.6;margin-top:4px;">'
         + 'The same facts are stated in the classroom list, the staff records and the enrollment '
         + 'roster. PAS worksheets and the PI and PFA rosters are all built from those, so where they '
