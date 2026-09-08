@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Page — Children of Promise</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+    body { background: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .sp-wrap { max-width: 1000px; margin: 0 auto; padding: 18px 16px 60px; }
+    .sp-bar {
+        display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+        background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+        padding: 12px 16px; margin-bottom: 16px;
+    }
+    .sp-bar select { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; }
+    .sp-card {
+        background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+        padding: 16px 18px; margin-bottom: 16px;
+    }
+    .sp-card h2 {
+        font-size: 0.95rem; font-weight: 800; color: #1e293b; margin: 0 0 4px;
+    }
+    .sp-card .sp-sub {
+        font-size: 0.76rem; color: #64748b; line-height: 1.6; margin-bottom: 12px;
+    }
+    .sp-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+    .sp-tile {
+        flex: 1 1 210px; min-width: 190px; border: 1.5px solid #e2e8f0;
+        border-radius: 9px; padding: 12px 14px; background: #f8fafc;
+    }
+    .sp-tile .lbl {
+        font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.04em; color: #64748b; margin-bottom: 4px;
+    }
+    .sp-tile .val { font-size: 1.15rem; font-weight: 800; color: #1e293b; line-height: 1.2; }
+    .sp-tile .note { font-size: 0.7rem; color: #64748b; margin-top: 5px; line-height: 1.5; }
+    .sp-tile.good { background: #f0fdf4; border-color: #86efac; }
+    .sp-tile.warn { background: #fffbeb; border-color: #fcd34d; }
+    .sp-tile.bad  { background: #fef2f2; border-color: #fca5a5; }
+    .sp-pill {
+        display: inline-block; font-size: 0.68rem; font-weight: 700;
+        padding: 2px 9px; border-radius: 11px; white-space: nowrap;
+    }
+    .sp-step {
+        border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 8px;
+        padding: 11px 14px; margin-bottom: 9px; background: #fff;
+    }
+    .sp-step .t { font-size: 0.84rem; font-weight: 700; color: #1e293b; }
+    .sp-step .d { font-size: 0.76rem; color: #475569; line-height: 1.6; margin-top: 4px; }
+    .sp-step.done { border-left-color: #16a34a; background: #f0fdf4; }
+    .sp-links { display: flex; flex-wrap: wrap; gap: 9px; }
+    .sp-link {
+        display: block; flex: 1 1 220px; min-width: 200px; text-decoration: none;
+        border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px 13px; background: #fff;
+    }
+    .sp-link:hover { border-color: #2563eb; background: #f8fbff; }
+    .sp-link .n { font-size: 0.82rem; font-weight: 700; color: #1e293b; }
+    .sp-link .s { font-size: 0.71rem; color: #64748b; margin-top: 3px; }
+    .sp-src { font-size: 0.7rem; color: #64748b; margin-top: 10px; line-height: 1.6; }
+    .sp-src a { color: #2563eb; }
+</style>
+</head>
+<body>
+
+<div class="sp-wrap">
+    <div class="sp-bar">
+        <strong style="color:#1e293b;font-size:0.9rem;">My Page</strong>
+        <select id="spStaff"><option value="">Loading…</option></select>
+        <span id="spMsg" style="font-size:0.76rem;color:#64748b;"></span>
+        <span style="flex-basis:100%;font-size:0.72rem;color:#94a3b8;">
+            Everything here comes from your staff record. If something is wrong, it is wrong
+            in the record — tell Megan rather than working around it.
+        </span>
+    </div>
+
+    <div id="spBody">
+        <div class="sp-card"><div class="sp-sub">Loading your record…</div></div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<!-- The PAS worksheet store, so this page can tell which of your forms are done. -->
+<script src="/pas/pas-store.js"></script>
+<script>
+/* ── One page per staff member ──────────────────────────────────────────────
+   Answers the questions a member of staff actually has about their own standing:
+   where my credentials are, whether my professional development hours are on track,
+   what my learning plan says, and which of my forms are outstanding.
+
+   Everything is read from the staff record, so this page never becomes a second
+   place the truth is kept. Where a figure is missing it says so rather than showing
+   a zero, because "we have not recorded it" and "you have none" are different.
+
+   On credentials it deliberately stops short of reciting benchmark tables. Staff act
+   on this for their careers, so it states only what can be sourced to Gateways and
+   links out for the detail rather than inventing requirements. */
+
+let STAFF = [];
+let TRAINING = [];
+let current = null;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* Credential level out of the free-text credential fields. Same regex the PAS pages
+   use, so this page and the ExceleRate maths cannot disagree. */
+function credLevel(s, kind) {
+    const src = [s.EceCredentials, s.Gateways].filter(Boolean).join(', ');
+    const re = kind === 'ece' ? /ECE(?:\s*Credential)?\s*-?\s*Level\s*(\d)/i
+        : kind === 'it' ? /(?:IT|ITC|Infant\s*\/?\s*Toddler)(?:\s*Credential)?\s*-?\s*Level\s*(\d)/i
+        : /Director(?:\s*Credential)?\s*-?\s*Level\s*(III|II|I|\d)/i;
+    const m = src.match(re);
+    if (!m) return 0;
+    if (kind === 'dir') return /^\d$/.test(m[1]) ? +m[1] : ({ I: 1, II: 2, III: 3 }[m[1].toUpperCase()] || 0);
+    return +m[1];
+}
+
+// What the record says is still in progress, quoted back rather than paraphrased.
+function pendingText(s) {
+    const src = [s.EceCredentials, s.Gateways, s.Notes].filter(Boolean).join(' ');
+    const m = src.match(/\b(?:pending|awaiting)\b[^.;]*/i);
+    return m ? m[0].trim() : '';
+}
+
+const PD_REQUIRED = 20;
+
+/* PD hours only count for the calendar year they were recorded against. A total with
+   no year, or last year's year, is unknown rather than zero - reporting it as zero
+   would accuse someone of having done nothing. */
+function pdHours(s) {
+    const v = String(s.PdHoursYtd || '').trim();
+    if (v === '') return null;
+    if (String(s.PdHoursYear || '').trim() !== String(new Date().getFullYear())) return null;
+    const n = parseFloat(v);
+    return isFinite(n) ? n : null;
+}
+
+function tile(cls, label, value, note) {
+    return '<div class="sp-tile ' + cls + '">'
+        + '<div class="lbl">' + esc(label) + '</div>'
+        + '<div class="val">' + value + '</div>'
+        + (note ? '<div class="note">' + note + '</div>' : '')
+        + '</div>';
+}
+
+// ── credential next steps ─────────────────────────────────────────────────
+/* Sourced, not invented:
+     - ECE Level 1 is 16 online modules through i-learning or the CCR&R, needs no
+       transcript and carries no fee, and is awarded automatically on completion.
+     - ECE Levels 2-6 come from compiling education and experience, or from completing
+       the coursework at an entitled institution.
+     - The Infant Toddler Credential requires ECE entitlement as well.
+   Anything more specific than that is left to the Gateways page rather than restated
+   here, because a wrong benchmark would send someone down the wrong path. */
+function eceSteps(s) {
+    const ece = credLevel(s, 'ece');
+    const steps = [];
+    if (!ece) {
+        steps.push({
+            done: false, t: 'Start with the ECE Credential Level 1',
+            d: 'Sixteen training modules, taken online through Gateways i-learning or locally '
+             + 'through the CCR&amp;R. No fee, and no transcript needed. It is awarded automatically '
+             + 'once all sixteen are complete and appears on your Professional Development Record. '
+             + 'You need to be a Gateways Registry member first.'
+        });
+    } else {
+        steps.push({
+            done: true, t: 'ECE Credential Level ' + ece + ' held',
+            d: 'Recorded on your staff record from the Gateways report.'
+        });
+        steps.push({
+            done: false, t: 'Next: ECE Credential Level ' + (ece + 1),
+            d: 'Levels 2 to 6 are earned either by compiling your education and experience, or by '
+             + 'completing the required coursework at an entitled institution. Which route is '
+             + 'shorter depends on the college credit you already hold, so this is worth working '
+             + 'through with Megan rather than guessing.'
+        });
+    }
+    return steps;
+}
+
+function itSteps(s) {
+    const it = credLevel(s, 'it');
+    const ece = credLevel(s, 'ece');
+    const steps = [];
+    if (it) {
+        steps.push({
+            done: true, t: 'Infant Toddler Credential Level ' + it + ' held',
+            d: 'This is what the ExceleRate infant and toddler room requirement counts.'
+        });
+        return steps;
+    }
+    /* The dependency is the thing worth saying: an ITC cannot be awarded without ECE
+       entitlement, so someone chasing both needs to know the order. */
+    if (!ece) {
+        steps.push({
+            done: false, t: 'The ECE Credential comes first',
+            d: 'The Infant Toddler Credential requires you to be entitled for the Gateways ECE '
+             + 'Credential as well, so there is no route to the ITC that skips it. Start there.'
+        });
+    } else {
+        steps.push({
+            done: true, t: 'ECE entitlement in place',
+            d: 'The Infant Toddler Credential requires ECE entitlement as well, and you have it.'
+        });
+    }
+    steps.push({
+        done: false, t: 'Infant Toddler Credential',
+        d: 'For staff with training, education and experience with children from birth to age '
+         + 'three. Apply through Gateways once the ECE side is in place.'
+    });
+    return steps;
+}
+
+// ── forms ─────────────────────────────────────────────────────────────────
+function schoolYear() {
+    const now = new Date();
+    const start = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return start + '-' + (start + 1);
+}
+
+const MY_FORMS = [
+    { key: 'pas_self_appraisal', scope: 'staff-year', href: '/pas/staff-self-appraisal.html',
+      name: 'My Self-Appraisal', note: 'Your own reflection. Complete this before your review meeting.' },
+    { key: 'pas_annual_appraisal', scope: 'staff-year', href: '/pas/annual-performance-appraisal.html',
+      name: 'Annual Performance Appraisal', note: 'Completed with your supervisor at the end of the year.' },
+    { key: 'pas_90_day_review', scope: 'staff', href: '/pas/90-day-review-form.html',
+      name: '90-Day Introductory Review', note: 'One-off, in your first three months.' },
+    { key: 'pas_classroom_observation', scope: 'staff-year', href: '/pas/classroom-observation-form.html',
+      name: 'Classroom Observation', note: 'Completed by whoever observes your room.' }
+];
+
+function formState(f, staffId) {
+    const key = f.scope === 'staff'
+        ? f.key + '__staff' + staffId
+        : f.key + '__staff' + staffId + '_' + schoolYear();
+    return !!PasStore.storage.getItem(key);
+}
+
+// ── render ────────────────────────────────────────────────────────────────
+function render() {
+    const body = $('spBody');
+    if (!current) { body.innerHTML = '<div class="sp-card"><div class="sp-sub">No staff record selected.</div></div>'; return; }
+    const s = current;
+
+    const rooms = [s.Classroom, s.SecondaryClassroom]
+        .map(v => String(v || '').trim()).filter(Boolean).join(' and ');
+    const hours = pdHours(s);
+    const pending = pendingText(s);
+    const shTotal = parseFloat(s.SemesterHoursTotal);
+    const shEce = parseFloat(s.SemesterHoursEce);
+    const transcriptMissing = String(s.TranscriptOnFile || '') === 'Not submitted';
+
+    let html = '';
+
+    // Who you are, from the record.
+    html += '<div class="sp-card">'
+        + '<h2>' + esc(s.Name) + '</h2>'
+        + '<div class="sp-sub">' + esc(s.Role || 'Role not recorded')
+        + (rooms ? ' \u00b7 ' + esc(rooms) : ' \u00b7 no classroom assigned')
+        + (s.RegistryId ? ' \u00b7 Registry ' + esc(s.RegistryId) : '')
+        + '</div>'
+        + '<div class="sp-grid">'
+        + tile(credLevel(s, 'ece') ? 'good' : 'warn', 'ECE Credential',
+            credLevel(s, 'ece') ? 'Level ' + credLevel(s, 'ece') : 'Not yet held')
+        + tile(credLevel(s, 'it') ? 'good' : '', 'Infant Toddler Credential',
+            credLevel(s, 'it') ? 'Level ' + credLevel(s, 'it') : 'Not yet held')
+        + tile(hours === null ? 'warn' : (hours >= PD_REQUIRED ? 'good' : 'warn'),
+            'PD hours in ' + new Date().getFullYear(),
+            hours === null ? 'Not recorded' : hours + ' of ' + PD_REQUIRED,
+            hours === null
+                ? 'Nothing recorded for this calendar year yet. That is not the same as none \u2014 '
+                  + 'if you have done training, it needs adding to your record.'
+                : (hours >= PD_REQUIRED
+                    ? 'You have met the 20 clock hours ExceleRate asks for this year.'
+                    : (PD_REQUIRED - hours) + ' more clock hours needed this calendar year.'))
+        + tile(isFinite(shEce) ? '' : 'warn', 'College credit on file',
+            isFinite(shTotal) ? shTotal + ' hrs' : 'Not recorded',
+            isFinite(shEce) ? shEce + ' of them in early childhood'
+                : 'Semester hours are what move you up the credential levels, so it is worth '
+                  + 'getting your transcript on file.')
+        + '</div>';
+
+    if (transcriptMissing) {
+        html += '<div class="sp-step" style="border-left-color:#dc2626;margin-top:12px;">'
+            + '<div class="t">Your transcript has not reached Gateways</div>'
+            + '<div class="d">College credit that Gateways has not received cannot count toward a '
+            + 'credential level, however many hours you have earned. Sending the transcript is '
+            + 'usually the single biggest step available.</div></div>';
+    }
+    if (pending) {
+        html += '<div class="sp-step" style="border-left-color:#d97706;margin-top:12px;">'
+            + '<div class="t">Something is in progress on your record</div>'
+            + '<div class="d">Recorded as: \u201c' + esc(pending) + '\u201d. A credential that is '
+            + 'pending does not count until it is awarded.</div></div>';
+    }
+    html += '</div>';
+
+    // Credential routes.
+    html += '<div class="sp-card">'
+        + '<h2>Next steps \u2014 Preschool (ECE) Credential</h2>'
+        + '<div class="sp-sub">The ECE Credential is what the ExceleRate preschool staff '
+        + 'requirement counts.</div>'
+        + eceSteps(s).map(st => '<div class="sp-step' + (st.done ? ' done' : '') + '">'
+            + '<div class="t">' + (st.done ? '\u2713 ' : '') + st.t + '</div>'
+            + '<div class="d">' + st.d + '</div></div>').join('')
+        + '</div>';
+
+    html += '<div class="sp-card">'
+        + '<h2>Next steps \u2014 Infant Toddler Credential</h2>'
+        + '<div class="sp-sub">Counted for staff working with children from birth to age three.</div>'
+        + itSteps(s).map(st => '<div class="sp-step' + (st.done ? ' done' : '') + '">'
+            + '<div class="t">' + (st.done ? '\u2713 ' : '') + st.t + '</div>'
+            + '<div class="d">' + st.d + '</div></div>').join('')
+        + '<div class="sp-src">Requirements above are from Gateways to Opportunity: '
+        + '<a href="https://www.ilgateways.com/credentials/ece-credential" target="_blank" rel="noopener">'
+        + 'ECE Credential</a> and '
+        + '<a href="https://www.ilgateways.com/professional-development/higher-education-programs/483-becoming-entitled-itc" target="_blank" rel="noopener">'
+        + 'becoming entitled for the ITC</a>. The level-by-level benchmarks are on those pages '
+        + 'rather than repeated here, so what you read is always current. Content summarised for '
+        + 'brevity \u2014 check the source before acting on it.</div>'
+        + '</div>';
+
+    // Training recorded against this person.
+    const mine = TRAINING.filter(t => String(t.StaffId) === String(s.Id) && (t.CompletedDate || '').trim());
+    html += '<div class="sp-card">'
+        + '<h2>Training on your record</h2>'
+        + '<div class="sp-sub">Completions recorded for ExceleRate and PICC PI9.</div>'
+        + (mine.length
+            ? '<div class="sp-grid">' + mine.map(t =>
+                tile('good', t.TrainingKey === 'howERSWorks' ? 'How ERS Works'
+                    : t.TrainingKey === 'ecers3' ? 'ECERS-3'
+                    : t.TrainingKey === 'iters3' ? 'ITERS-3' : t.TrainingKey,
+                    esc(t.CompletedDate))).join('') + '</div>'
+            : '<div class="sp-sub" style="color:#92400e;">Nothing recorded yet. '
+              + '\u201cHow ERS Works\u201d is the one ExceleRate requires of half the teaching staff.</div>')
+        + '</div>';
+
+    // Their plan and their forms.
+    html += '<div class="sp-card">'
+        + '<h2>My learning plan and forms</h2>'
+        + '<div class="sp-sub">These open with you already selected. Everything saves on screen \u2014 '
+        + 'nothing here needs printing unless you want a signed paper copy.</div>'
+        + '<div class="sp-links">'
+        + '<a class="sp-link" href="/pas/individual-pd-plan.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" rel="noopener">'
+        + '<div class="n">My Professional Development Plan</div>'
+        + '<div class="s">Your goals for the year, with mid-year and year-end reviews.</div></a>'
+        + MY_FORMS.map(f => {
+            const done = formState(f, s.Id);
+            return '<a class="sp-link" href="' + f.href + '?staffId=' + encodeURIComponent(s.Id)
+                + '" target="_blank" rel="noopener">'
+                + '<div class="n">' + esc(f.name) + ' '
+                + '<span class="sp-pill" style="background:' + (done ? '#f0fdf4' : '#f8fafc')
+                + ';color:' + (done ? '#166534' : '#64748b') + ';">'
+                + (done ? '\u2713 done' : 'not started') + '</span></div>'
+                + '<div class="s">' + esc(f.note) + '</div></a>';
+        }).join('')
+        + '</div></div>';
+
+    body.innerHTML = html;
+}
+
+async function load() {
+    try {
+        const [sRes, tRes] = await Promise.all([
+            apiFetch('/api/staff'),
+            apiFetch('/api/staff-training').catch(() => null)
+        ]);
+        if (!sRes.ok) throw new Error('staff records: HTTP ' + sRes.status);
+        STAFF = await sRes.json();
+        if (!Array.isArray(STAFF)) STAFF = [];
+        STAFF = STAFF.filter(s => String(s.Name || '').trim() && !/^new teacher$/i.test(s.Name));
+        TRAINING = tRes && tRes.ok ? await tRes.json() : [];
+        if (!Array.isArray(TRAINING)) TRAINING = [];
+
+        // Form completion is read from the shared worksheet store.
+        await PasStore.ready;
+
+        const sel = $('spStaff');
+        if (!STAFF.length) {
+            sel.innerHTML = '<option value="">No staff records found</option>';
+            $('spBody').innerHTML = '<div class="sp-card"><div class="sp-sub">No staff records to show.</div></div>';
+            return;
+        }
+        sel.innerHTML = STAFF.map(s =>
+            '<option value="' + s.Id + '">' + esc(s.Name) + '</option>').join('');
+        const wanted = new URLSearchParams(location.search).get('staffId');
+        if (wanted && STAFF.some(s => String(s.Id) === String(wanted))) sel.value = wanted;
+        current = STAFF.find(s => String(s.Id) === String(sel.value)) || STAFF[0];
+        sel.addEventListener('change', () => {
+            current = STAFF.find(s => String(s.Id) === String(sel.value));
+            render();
+        });
+        render();
+    } catch (e) {
+        $('spBody').innerHTML = '<div class="sp-card"><div class="sp-sub" style="color:#991b1b;">'
+            + 'Could not load your record: ' + esc(e.message) + '</div></div>';
+    }
+}
+
+load();
+</script>
+</body>
+</html>
