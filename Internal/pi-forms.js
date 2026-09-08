@@ -134,21 +134,45 @@
        rank the waiting list (External/preenrollment.html calcScore), so a child
        who came through that form has this whole table filled in automatically.
 
-       points     must stay in step with calcScore or the printed form will
-                  disagree with the waiting-list order it claims to explain
-       picc       priority population the criterion satisfies, where PI5.B-G
-                  names one; the checklist requires those to appear on the form
-       intakeKey  Yes/No column on the pre-enrollment record
-       derive     for criteria the intake stores as something other than Yes/No
+       points      must stay in step with calcScore or the printed form will
+                   disagree with the waiting-list order it claims to explain
+       picc        priority population the criterion satisfies, where PI5.B-G
+                   names one; the checklist requires those to appear on the form
+       intakeKey   Yes/No column on the pre-enrollment record
+       derive      for criteria the intake stores as something other than Yes/No
+       fromStudent fallback for a child with NO pre-enrollment record, read from
+                   the enrollment row the roster already holds. Returns 'Yes',
+                   'No' or '' for unknown - never a guess.
 
-       PI5.C, PI5.F and PI5.G are required priority populations that the
-       pre-enrollment form does not currently ask about, so they have no
-       intakeKey and start blank for staff to answer. */
+       PI5.C, PI5.F and PI5.G ARE now asked at intake (screeningDelayNoEi,
+       parentEll, incomeBelow50Fpl), so they pre-fill like the rest. The one
+       exception is the income question, which offers "Not sure": that answer
+       deliberately leaves the row blank rather than defaulting to No, because it
+       has to be settled from the income verification. */
+    /* Enrollment-row flags are stored as free text and have been written as 'Yes',
+       'YES', 'true' and '1' at various times. Anything unrecognised returns blank
+       rather than 'No', because "we never recorded it" and "the family said no" are
+       different answers and only one of them is safe to print on a compliance form. */
+    function yesNoOrBlank(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        if (s === 'yes' || s === 'y' || s === 'true' || s === '1') return 'Yes';
+        if (s === 'no' || s === 'n' || s === 'false' || s === '0') return 'No';
+        return '';
+    }
+
     const WEIGHTED_CRITERIA = [
         { key: 'homeless', label: 'Experiencing homelessness', points: 50, picc: 'PI5.D', intakeKey: 'Homeless' },
-        { key: 'youthInCare', label: 'Youth in Care (foster) or adopted', points: 50, picc: 'PI5.E', intakeKey: 'FosterAdopted' },
+        {
+            key: 'youthInCare', label: 'Youth in Care (foster) or adopted', points: 50, picc: 'PI5.E',
+            intakeKey: 'FosterAdopted',
+            // Foster is not its own column on the enrollment row; it is the pay category.
+            fromStudent: s => (String(s.Category || '') === 'Foster' ? 'Yes' : '')
+        },
         { key: 'earlyIntervention', label: 'Enrolled in Early Intervention with an identified delay', points: 5, picc: 'PI5.B', intakeKey: 'EarlyIntervention' },
-        { key: 'hasIep', label: 'Has an IEP', points: 5, picc: 'PI5.B', intakeKey: 'IEP' },
+        {
+            key: 'hasIep', label: 'Has an IEP', points: 5, picc: 'PI5.B', intakeKey: 'IEP',
+            fromStudent: s => yesNoOrBlank(s.IEP)
+        },
         { key: 'screeningDelayNoEi', label: 'Screening indicated a delay but no current Early Intervention referral', points: 5, picc: 'PI5.C', intakeKey: 'ScreeningDelayNoEi' },
         // The intake form offers "Not sure" on this one. Leave it unanswered rather
         // than defaulting to No, so staff settle it from the income verification.
@@ -161,7 +185,13 @@
         },
         { key: 'parentEll', label: 'Parent or caregiver is an English language learner', points: 5, picc: 'PI5.G', intakeKey: 'ParentEll' },
         { key: 'nonEnglishHome', label: 'Primary language in the home is not English', points: 5, intakeKey: 'NonEnglishHome' },
-        { key: 'publicBenefits', label: 'Receiving public benefits (WIC, Medicaid, SNAP, TANF)', points: 5, derive: d => (d.PublicBenefits ? 'Yes' : 'No') },
+        {
+            key: 'publicBenefits', label: 'Receiving public benefits (WIC, Medicaid, SNAP, TANF)', points: 5,
+            derive: d => (d.PublicBenefits ? 'Yes' : 'No'),
+            // The enrollment row carries the same benefits string, so this is
+            // answerable even without an intake record.
+            fromStudent: s => (String(s.PublicBenefits || '').trim() ? 'Yes' : '')
+        },
         { key: 'abuseHistory', label: 'Abuse or domestic violence history', points: 5, intakeKey: 'AbuseHistory' },
         { key: 'mentalIllness', label: 'Mental illness in the home', points: 5, intakeKey: 'MentalIllness' },
         { key: 'dcfsInvolvement', label: 'DCFS involvement', points: 5, intakeKey: 'DcfsInvolvement' },
@@ -173,7 +203,10 @@
         { key: 'teenParent', label: 'Teen parent', points: 5, intakeKey: 'TeenParent' },
         { key: 'noHsDiploma', label: 'Parent without a high school diploma', points: 5, intakeKey: 'NoHSDiploma' },
         { key: 'bornOutsideUs', label: 'Child or parent born outside the United States', points: 5, intakeKey: 'BornOutsideUS' },
-        { key: 'activeMilitary', label: 'Active military family', points: 5, intakeKey: 'ActiveMilitary' },
+        {
+            key: 'activeMilitary', label: 'Active military family', points: 5, intakeKey: 'ActiveMilitary',
+            fromStudent: s => yesNoOrBlank(s.Military)
+        },
         { key: 'singleParent', label: 'Single-parent household', points: 3, derive: d => (d.LivingSituation === 'Single Parent' ? 'Yes' : 'No') }
     ];
 
@@ -426,9 +459,10 @@
                 {
                     title: 'Weighted Criteria',
                     note: 'PICC PI5.B through PI5.G require the priority populations to appear on this form. '
-                        + 'Answers come from the pre-enrollment submission where one exists. Families who applied '
-                        + 'before those questions were added, and anyone who answered "Not sure" to the income '
-                        + 'question, will have blank rows that need answering here.',
+                        + 'Answers are filled from the family\u2019s pre-enrollment submission, falling back to the '
+                        + 'enrollment record for IEP, military, foster status and benefits. A row is left blank '
+                        + 'rather than set to No whenever nothing on file actually answers it \u2014 those are the '
+                        + 'ones that need you, and they are listed under the table.',
                     fields: [
                         { key: 'criteriaTable', type: 'criteria', label: 'Weighted Eligibility Criteria', items: WEIGHTED_CRITERIA },
                         { key: 'totalPoints', label: 'Total Weighted Points', type: 'text' }
@@ -439,8 +473,14 @@
                     note: 'PI5.J requires proof of income in the file, re-verified each time this form is completed. '
                         + 'If the family uses a benefit card as proof, the card must be in the parent\u2019s name, not the child\u2019s.',
                     fields: [
-                        { key: 'householdIncome', label: 'Household Income', type: 'text', default: (s, intake) => (intake && intake.HouseholdIncome) || '' },
-                        { key: 'householdSize', label: 'Household Size', type: 'text', default: (s, intake) => (intake && intake.HouseholdSize) || '' },
+                        /* Intake first, then the enrollment row. Both hold income and
+                           household size, and reading only the intake meant a child
+                           without a pre-enrollment record showed blanks that staff then
+                           retyped from the same database. */
+                        { key: 'householdIncome', label: 'Household Income', type: 'text',
+                          default: (s, intake) => (intake && intake.HouseholdIncome) || (s && s.HouseholdIncome) || '' },
+                        { key: 'householdSize', label: 'Household Size', type: 'text',
+                          default: (s, intake) => (intake && intake.HouseholdSize) || (s && s.HouseholdSize) || '' },
                         { key: 'incomeVerificationType', label: 'Proof of Income Provided', type: 'select', options: INCOME_VERIFICATION_TYPES },
                         { key: 'incomeVerificationDate', label: 'Date Income Verified', type: 'date' },
                         { key: 'benefitCardInParentName', label: 'If a Benefit Card Was Used, Is It in the Parent\u2019s Name?', type: 'select', options: YES_NO_NA, full: true }
@@ -701,20 +741,50 @@
 
         const cmp = document.getElementById('docScoreCompare');
         if (!cmp) return;
+
+        // What is still unanswered right now, recounted live rather than from the
+        // figures taken at open, so it shrinks as staff work down the table.
+        const unanswered = block.items.filter(it => {
+            const el = document.getElementById('doc_' + it.key);
+            return el && !el.value;
+        });
+        const prov = window.__docProvenance || { intake: 0, enrollment: 0 };
+
+        let html = '';
+        const filled = block.items.length - unanswered.length;
+        html += '<div>' + filled + ' of ' + block.items.length + ' criteria answered'
+            + (prov.intake ? ' \u00b7 ' + prov.intake + ' from the pre-enrollment form' : '')
+            + (prov.enrollment ? ' \u00b7 ' + prov.enrollment + ' from the enrollment record' : '')
+            + '</div>';
+
+        if (unanswered.length) {
+            /* Name them. PI5.B-G priority populations are called out separately because
+               a blank one of those is a checklist finding, not just a gap. */
+            const priority = unanswered.filter(it => it.picc);
+            html += '<div style="margin-top:4px;color:#92400e;">'
+                + '<strong>Needs an answer:</strong> '
+                + unanswered.map(it => escHtml(it.label)).join('; ')
+                + (priority.length
+                    ? '<br><strong>' + priority.length + ' of those is a required priority population ('
+                      + priority.map(it => escHtml(it.picc)).join(', ') + ')</strong> \u2014 PI5.B-G '
+                      + 'expects it to appear on this form.'
+                    : '')
+                + '</div>';
+        }
+
         const intakeScore = currentIntake && currentIntake.found ? parseInt(currentIntake.Score, 10) : NaN;
         if (isNaN(intakeScore)) {
-            cmp.textContent = 'No pre-enrollment score on file, so this total was entered by hand.';
-            return;
-        }
-        if (intakeScore === total) {
-            cmp.textContent = 'Matches the waiting-list score of ' + intakeScore + ' from the pre-enrollment record.';
+            html += '<div style="margin-top:4px;">No pre-enrollment score on file, so this total '
+                + 'stands on the answers above.</div>';
+        } else if (intakeScore === total) {
+            html += '<div style="margin-top:4px;">Matches the waiting-list score of ' + intakeScore
+                + ' from the pre-enrollment record.</div>';
         } else {
-            // Expected whenever PI5.C/F/G are answered here, since the public form
-            // does not ask those three questions yet.
-            cmp.innerHTML = 'Waiting-list score at intake was <strong>' + intakeScore
-                + '</strong>; this form totals <strong>' + total + '</strong>. '
-                + 'A difference is expected when criteria the pre-enrollment form does not ask about are answered here.';
+            html += '<div style="margin-top:4px;">Waiting-list score at intake was <strong>' + intakeScore
+                + '</strong>; this form totals <strong>' + total + '</strong>. A difference is expected '
+                + 'once something has been corrected here or answered that the family left blank.</div>';
         }
+        cmp.innerHTML = html;
     }
 
     // ── Compliance window badge ──
@@ -812,21 +882,46 @@
         const intake = currentIntake && currentIntake.found ? currentIntake : null;
         const isYes = v => String(v).trim().toLowerCase() === 'yes';
 
+        /* Where each criterion's answer came from, so the form can tell staff what it
+           filled and what still needs them. Counted rather than shown per row, to keep
+           the printed form clean. */
+        const provenance = { intake: 0, enrollment: 0, blank: [] };
+
         fields.forEach(f => {
             const el = document.getElementById('doc_' + f.key);
             if (!el || f.type === 'checkgroup') return;
             let v = '';
-            // A weighted criterion answers itself from the pre-enrollment record.
-            if (f.criterion && intake) {
+
+            if (f.criterion) {
                 const c = f.criterion;
-                if (c.derive) { try { v = c.derive(intake) || ''; } catch (e) { v = ''; } }
-                else if (c.intakeKey) v = isYes(intake[c.intakeKey]) ? 'Yes' : 'No';
+                // The pre-enrollment answer is the family's own, so it wins.
+                if (intake) {
+                    if (c.derive) { try { v = c.derive(intake) || ''; } catch (e) { v = ''; } }
+                    else if (c.intakeKey) {
+                        const raw = intake[c.intakeKey];
+                        // Blank on the record means never asked, not "No" - older
+                        // submissions predate some of these questions.
+                        v = String(raw || '').trim() ? (isYes(raw) ? 'Yes' : 'No') : '';
+                    }
+                    if (v) provenance.intake++;
+                }
+                /* No intake record, or the intake did not answer this one. Fall back to
+                   the enrollment row, which already holds IEP, military, foster status
+                   and benefits. Without this a child enrolled before the online form
+                   existed got an entirely blank sheet to retype by hand. */
+                if (!v && c.fromStudent) {
+                    try { v = c.fromStudent(student) || ''; } catch (e) { v = ''; }
+                    if (v) provenance.enrollment++;
+                }
+                if (!v) provenance.blank.push(c);
             } else if (f.default) {
                 try { v = (typeof f.default === 'function' ? f.default(student, intake) : f.default) || ''; }
                 catch (e) { v = ''; }
             }
             el.value = v;
         });
+
+        window.__docProvenance = provenance;
 
         try {
             // activeSchoolYear is owned by isbe.html; these records are per year so
