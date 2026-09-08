@@ -33,12 +33,28 @@
     // classroom. Everything else is a single program-level worksheet.
     const SCOPED_PREFIXES = ['pas_teaching_staff_quals_'];
 
+    /* Generic scope separator, for worksheets that exist once per person per year
+       rather than once for the programme: "pas_annual_appraisal__staff7_2026-2027".
+
+       A double underscore rather than another entry in SCOPED_PREFIXES, so a new
+       per-person form needs no change here at all. Safe to introduce: no existing
+       key contains "__", so nothing already stored is re-interpreted. */
+    const SCOPE_SEPARATOR = '__';
+
     // cache: "worksheet\u0000scope" -> raw JSON string, mirroring what the pages
     // previously handed to localStorage.
     const cache = new Map();
     let lastError = null;
 
     function splitKey(key) {
+        // Explicit separator wins: it is unambiguous and needs no prefix registered.
+        const at = key.indexOf(SCOPE_SEPARATOR);
+        if (at > 0) {
+            return {
+                worksheet: key.slice(0, at),
+                scope: key.slice(at + SCOPE_SEPARATOR.length)
+            };
+        }
         for (const p of SCOPED_PREFIXES) {
             if (key.indexOf(p) === 0) {
                 return { worksheet: p.replace(/_$/, ''), scope: key.slice(p.length) };
@@ -133,7 +149,12 @@
             const keys = [...cache.keys()];
             if (i < 0 || i >= keys.length) return null;
             const [worksheet, scope] = keys[i].split('\u0000');
-            return scope ? worksheet + '_' + scope : worksheet;
+            if (!scope) return worksheet;
+            /* Rebuild the key the same way it was split, or a round trip through
+               key() would not resolve back to the same worksheet. Classroom keys
+               used a bare underscore; everything else uses the explicit separator. */
+            const wasPrefixed = SCOPED_PREFIXES.some(p => p.replace(/_$/, '') === worksheet);
+            return worksheet + (wasPrefixed ? '_' : SCOPE_SEPARATOR) + scope;
         }
     };
 

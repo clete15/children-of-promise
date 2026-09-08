@@ -62,6 +62,13 @@
             border-top: 1px solid #cbd5e0; display: flex;
             justify-content: space-between; font-size: 9pt; color: #666;
         }
+        /* A narrative block that grows with what is typed, in place of a fixed number
+           of ruled lines. Underlined so it still reads as a space to write in, and
+           tall enough that a short answer does not look like a mistake. */
+        .write-area {
+            border-bottom: 1px solid #999; min-height: 4.2em; font-size: 10pt;
+            padding: 3px 2px 2px; white-space: pre-wrap; line-height: 1.55;
+        }
         @media print {
             body { padding: 0; }
             @page { margin: 0.5in 0.6in; size: letter; }
@@ -70,7 +77,6 @@
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -79,19 +85,19 @@
 
     <div class="info-grid">
         <div class="info-field">
-            <label>Employee Name:</label><div class="line"></div>
+            <label>Employee Name:</label><div class="line" data-k="employeeName"></div>
         </div>
         <div class="info-field">
-            <label>Position:</label><div class="line"></div>
+            <label>Position:</label><div class="line" data-k="position"></div>
         </div>
         <div class="info-field">
-            <label>Supervisor:</label><div class="line"></div>
+            <label>Supervisor:</label><div class="line" data-k="supervisor"></div>
         </div>
         <div class="info-field">
-            <label>Review Period:</label><div class="line"></div>
+            <label>Review Period:</label><div class="line" data-k="reviewPeriod"></div>
         </div>
         <div class="info-field">
-            <label>Date:</label><div class="line"></div>
+            <label>Date:</label><div class="line" data-k="reviewDate"></div>
         </div>
     </div>
 
@@ -110,24 +116,49 @@
             </tr>
         </thead>
         <tbody>
-            <tr><td>Job Responsibilities</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td style="width:22%"></td></tr>
-            <tr><td>Classroom Management</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
-            <tr><td>Curriculum Implementation</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
-            <tr><td>Parent Communication</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
-            <tr><td>Teamwork &amp; Collaboration</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
-            <tr><td>Professionalism</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
-            <tr><td>Safety Compliance</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td></td></tr>
+            <!-- Each row is one choice. Clicking a box ticks it and clears the rest of
+                 the row; clicking the ticked box again clears the row entirely. -->
+            <tr><td>Job Responsibilities</td>
+                <td data-radio="job" data-val="E">&#9744;</td><td data-radio="job" data-val="M">&#9744;</td>
+                <td data-radio="job" data-val="D">&#9744;</td><td data-radio="job" data-val="DNM">&#9744;</td>
+                <td style="width:22%" data-k="cJob"></td></tr>
+            <tr><td>Classroom Management</td>
+                <td data-radio="classroom" data-val="E">&#9744;</td><td data-radio="classroom" data-val="M">&#9744;</td>
+                <td data-radio="classroom" data-val="D">&#9744;</td><td data-radio="classroom" data-val="DNM">&#9744;</td>
+                <td data-k="cClassroom"></td></tr>
+            <tr><td>Curriculum Implementation</td>
+                <td data-radio="curriculum" data-val="E">&#9744;</td><td data-radio="curriculum" data-val="M">&#9744;</td>
+                <td data-radio="curriculum" data-val="D">&#9744;</td><td data-radio="curriculum" data-val="DNM">&#9744;</td>
+                <td data-k="cCurriculum"></td></tr>
+            <tr><td>Parent Communication</td>
+                <td data-radio="parents" data-val="E">&#9744;</td><td data-radio="parents" data-val="M">&#9744;</td>
+                <td data-radio="parents" data-val="D">&#9744;</td><td data-radio="parents" data-val="DNM">&#9744;</td>
+                <td data-k="cParents"></td></tr>
+            <tr><td>Teamwork &amp; Collaboration</td>
+                <td data-radio="teamwork" data-val="E">&#9744;</td><td data-radio="teamwork" data-val="M">&#9744;</td>
+                <td data-radio="teamwork" data-val="D">&#9744;</td><td data-radio="teamwork" data-val="DNM">&#9744;</td>
+                <td data-k="cTeamwork"></td></tr>
+            <tr><td>Professionalism</td>
+                <td data-radio="professionalism" data-val="E">&#9744;</td><td data-radio="professionalism" data-val="M">&#9744;</td>
+                <td data-radio="professionalism" data-val="D">&#9744;</td><td data-radio="professionalism" data-val="DNM">&#9744;</td>
+                <td data-k="cProfessionalism"></td></tr>
+            <tr><td>Safety Compliance</td>
+                <td data-radio="safety" data-val="E">&#9744;</td><td data-radio="safety" data-val="M">&#9744;</td>
+                <td data-radio="safety" data-val="D">&#9744;</td><td data-radio="safety" data-val="DNM">&#9744;</td>
+                <td data-k="cSafety"></td></tr>
         </tbody>
     </table>
 
     <div class="section-title">Narrative Summary</div>
     <div class="narrative-section">
         <p>Summary of Accomplishments:</p>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <!-- One growing area rather than three fixed rules: typing is not limited by
+             how many lines happened to be drawn. -->
+        <div class="write-area" data-k="accomplishments"></div>
     </div>
     <div class="narrative-section">
         <p>Areas for Growth:</p>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="growth"></div>
     </div>
 
     <div class="section-title">Professional Development Goals for Next Year</div>
@@ -136,23 +167,25 @@
             <tr><th style="width:5%">#</th><th>Goal</th><th style="width:25%">Target Date</th></tr>
         </thead>
         <tbody>
-            <tr><td>1</td><td></td><td></td></tr>
-            <tr><td>2</td><td></td><td></td></tr>
-            <tr><td>3</td><td></td><td></td></tr>
+            <tr><td>1</td><td data-k="goal1"></td><td data-k="goal1Target"></td></tr>
+            <tr><td>2</td><td data-k="goal2"></td><td data-k="goal2Target"></td></tr>
+            <tr><td>3</td><td data-k="goal3"></td><td data-k="goal3Target"></td></tr>
         </tbody>
     </table>
+    <p class="no-print" style="font-size:8.5pt;color:#64748b;margin-top:4px;">
+        These goals carry into the Professional Development Plan, which is where PICC PI9
+        and PAS look for them.</p>
 
     <div class="section-title">Employee Comments</div>
-    <div class="write-lines"></div><div class="write-lines"></div>
-    <div class="write-lines"></div><div class="write-lines"></div>
+    <div class="write-area" data-k="employeeComments"></div>
 
     <div class="signature-section">
-        <div class="sig-field"><label>Supervisor Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Supervisor Signature:<div class="sig-line" data-k="supervisorSignature"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="supervisorSignedDate"></div></label></div>
     </div>
     <div class="signature-section">
-        <div class="sig-field"><label>Employee Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Employee Signature:<div class="sig-line" data-k="employeeSignature"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="employeeSignedDate"></div></label></div>
     </div>
     <p style="font-size:9pt; color:#555; margin-top:8px; font-style:italic;">Employee signature indicates receipt and discussion of this appraisal, not necessarily agreement.</p>
 
@@ -160,5 +193,29 @@
         <span>PAS Documentation — Confidential</span>
         <span>Children of Promise LLC — Annual Performance Appraisal</span>
     </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* One appraisal per person per programme year. The header fields come from the staff
+   record so nobody retypes a name or a job title, and the review period is derived
+   from the year rather than being written out by hand. */
+PasForm.init({
+    key: 'pas_annual_appraisal',
+    scope: 'staff-year',
+    prefill: function (staff, year) {
+        const start = parseInt(year.slice(0, 4), 10);
+        return {
+            employeeName: staff.Name,
+            position: staff.Role + (staff.Classroom ? ' \u2014 ' + staff.Classroom : ''),
+            // The centre's own timeline puts the annual review at the end of June.
+            reviewPeriod: 'July 1, ' + start + ' \u2013 June 30, ' + (start + 1),
+            supervisor: '',
+            reviewDate: ''
+        };
+    }
+});
+</script>
 </body>
 </html>

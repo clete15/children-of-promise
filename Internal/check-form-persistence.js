@@ -35,9 +35,15 @@ const NOT_A_FORM = /^(index|parent|preenrollment|office|login)\.html$/i;
 function countFields(markup) {
     const inputs = (markup.match(/<input\b[^>]*>/gi) || []).filter(t =>
         !/type\s*=\s*["']?(button|submit|reset|hidden|file|image)/i.test(t));
+    /* data-k counts as a field. The PAS paper forms are filled in through
+       contenteditable rather than <input>, because an input prints as a bordered grey
+       box on a document that goes in a staff file. Counting only inputs reported every
+       one of those as print-only. */
     return inputs.length
         + (markup.match(/<textarea\b/gi) || []).length
-        + (markup.match(/<select\b/gi) || []).length;
+        + (markup.match(/<select\b/gi) || []).length
+        + (markup.match(/\bdata-k\s*=/gi) || []).length
+        + (markup.match(/\bdata-radio\s*=/gi) || []).length;
 }
 
 function analyse(file) {
@@ -58,7 +64,9 @@ function analyse(file) {
        much as POST: the CCAP, food-report and alerts pages all edit a student inline
        and save with PUT, and reading only POST reported them as losing your typing. */
     const savesToServer = /PasStore\.storage\.setItem/.test(html)
-        || /method:\s*['"](POST|PUT|PATCH)['"]/i.test(html);
+        || /method:\s*['"](POST|PUT|PATCH)['"]/i.test(html)
+        // PasForm.init wires up saving for the whole page on the form's behalf.
+        || /PasForm\.init\s*\(/.test(html);
     const savesLocalOnly = /localStorage\.setItem/.test(html) && !savesToServer;
     const dataField = (html.match(/data-field=/g) || []).length;
 
