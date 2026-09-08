@@ -89,12 +89,45 @@
 
 let INDEX = null;
 
+/* Whether the server has a document editor, and which extensions it will edit.
+   Asked once. Until the answer arrives no Edit button is offered, because a button
+   that cannot work is worse than no button. The list comes from the server rather
+   than being repeated here, so the two cannot disagree. */
+let officeEnabled = false;
+let officeEditable = [];
+
+/* Files whose name states an earlier year are grouped into a collapsed "Earlier
+   years" block per item rather than hidden.
+
+   Hiding them outright was the first attempt and it was wrong: the flag fires on any
+   filename whose year differs from the folder, and some of those are genuinely the
+   current evidence - the most recent Scheffel audit names 2024, the latest P&L names
+   2025. Suppressing those would hide the only copy of a live document. Grouping puts
+   this year's evidence first without ever making a file unreachable. */
+
 function esc(v) {
     return String(v == null ? '' : v)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
 }
 const msg = t => { document.getElementById('dlMsg').textContent = t || ''; };
+
+function extOf(name) {
+    const dot = String(name || '').lastIndexOf('.');
+    return dot === -1 ? '' : String(name).slice(dot).toLowerCase();
+}
+
+async function probeOffice() {
+    try {
+        const r = await apiFetch('/api/office-status');
+        if (!r.ok) return;
+        const d = await r.json();
+        officeEnabled = !!(d && d.enabled);
+        officeEditable = (d && d.editable) || [];
+    } catch (e) { /* editing stays off */ }
+}
+
+
 
 function fillYears() {
     const now = new Date();
@@ -107,12 +140,30 @@ function fillYears() {
 function fileRow(f, item) {
     const out = (INDEX.meta || {})[f.rel];
     const href = '/api/doc-file?path=' + encodeURIComponent(f.rel);
+    const ext = extOf(f.name);
+    const canEdit = officeEnabled && officeEditable.indexOf(ext) !== -1;
+
+    /* Only PDFs and images render in a browser tab. Word and Excel are sent as
+       downloads, so opening them in a new tab leaves an empty tab spinning while the
+       file quietly lands in Downloads - which reads as a failure. Those get a
+       same-tab download instead, and an Edit button when the editor is available. */
+    const PREVIEWABLE = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'];
+    const preview = PREVIEWABLE.indexOf(ext) !== -1;
+
     return '<div class="dl-file">'
-        + '<a href="' + href + '" target="_blank" rel="noopener">' + esc(f.name) + '</a>'
+        + '<a href="' + href + '"'
+        + (preview ? ' target="_blank" rel="noopener"' : ' download="' + esc(f.name) + '"')
+        + ' title="' + (preview ? 'Opens in a new tab' : 'Downloads a copy') + '">'
+        + esc(f.name) + '</a>'
         + (f.stale ? '<span class="dl-badge stale" title="The filename names a different year, so this may be carried over">older year</span>' : '')
         + (out && out.checkedOutBy
             ? '<span class="dl-badge out" title="Checked out ' + esc(out.checkedOutDate || '')
               + (out.dueBack ? ', due back ' + esc(out.dueBack) : '') + '">out: ' + esc(out.checkedOutBy) + '</span>'
+            : '')
+        + (canEdit
+            ? '<a class="dl-btn" style="text-decoration:none;" href="office.html?path='
+              + encodeURIComponent(f.rel) + '" target="_blank" rel="noopener" '
+              + 'title="Edit in the browser and save straight back to the library">Edit</a>'
             : '')
         + '<button class="dl-btn" onclick="toggleOut(\'' + esc(f.rel).replace(/'/g, "\\'") + '\',\''
         + esc(item || '') + '\')">' + (out && out.checkedOutBy ? 'Check in' : 'Check out') + '</button>'
@@ -167,24 +218,62 @@ function render() {
         + '<div class="dl-stat"><strong>' + outCount + '</strong>checked out</div>'
         + '</div>';
 
+    /* The figure that actually matters: items whose only evidence is last year's.
+       "96 naming an older year" sounds alarming but says nothing about coverage;
+       this says how many items would fail a monitoring visit today. */
+    const noCurrent = keys.filter(k => {
+        const f = INDEX.items[k].files;
+        return f.length > 0 && f.every(x => x.stale);
+    });
+
+    html += '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 14px;">'
+        + '<span style="font-size:0.75rem;color:#64748b;">'
+        + 'Each item lists this year\u2019s evidence first; copies naming an earlier year are '
+        + 'collapsed under \u201cEarlier years\u201d rather than hidden, because some of them '
+        + '\u2014 an audit or a P&amp;L \u2014 are current evidence that names a prior period.'
+        + '</span>'
+        + (noCurrent.length
+            ? '<span class="dl-badge stale" title="' + esc(noCurrent.join(', ')) + '">'
+              + noCurrent.length + ' item(s) have NO file naming this year</span>'
+            : '<span class="dl-badge" style="background:#f0fdf4;color:#166534;">'
+              + 'every item with evidence has a current-year file</span>')
+        + '</div>';
+
     keys.forEach(k => {
         const it = INDEX.items[k];
-        const stale = it.files.filter(f => f.stale).length;
+        const current = it.files.filter(f => !f.stale);
+        const earlier = it.files.filter(f => f.stale);
+        const stale = earlier.length;
         html += '<details class="dl-item">'
             + '<summary>'
             + '<span class="dl-num">' + esc(it.item || '—') + '</span>'
             + '<span>' + esc(it.folders[0].replace(/\s*-\s*[MC]\s*$/, '')) + '</span>'
             + '<span class="dl-own' + (it.owner ? '' : ' none') + '">'
             + esc(it.owner || 'no owner') + '</span>'
-            + (stale ? '<span class="dl-badge stale">' + stale + ' older year</span>' : '')
-            + '<span class="dl-cnt">' + it.files.length + ' file(s)</span>'
+            + (stale ? '<span class="dl-badge stale">' + stale + ' earlier year</span>' : '')
+            + '<span class="dl-cnt">' + current.length + ' current</span>'
             + '</summary>'
             // More than one folder means the same item was renamed across years.
             + (it.folders.length > 1
                 ? '<div class="dl-folders">Folders: ' + it.folders.map(esc).join(' · ') + '</div>' : '')
             + '<div class="dl-files">'
-            + (it.files.length ? it.files.map(f => fileRow(f, it.item)).join('')
-                : '<div style="font-size:0.78rem;color:#94a3b8;padding:6px 0;">No files yet.</div>')
+            + (current.length ? current.map(f => fileRow(f, it.item)).join('')
+                : (it.files.length
+                    /* An item whose ONLY evidence names an earlier year is the case that
+                       matters most: it looks covered and is not. Say so where it is
+                       noticed, rather than only in a summary count. */
+                    ? '<div style="font-size:0.78rem;color:#92400e;padding:6px 0;">'
+                      + 'Nothing naming ' + esc(String(INDEX.year || '')) + '. All '
+                      + it.files.length + ' file(s) here name an earlier year \u2014 either this '
+                      + 'item needs a current document, or the newest one needs renaming.</div>'
+                    : '<div style="font-size:0.78rem;color:#94a3b8;padding:6px 0;">No files yet.</div>'))
+            + (earlier.length
+                ? '<details style="margin-top:6px;">'
+                  + '<summary style="font-size:0.72rem;color:#64748b;cursor:pointer;padding:4px 0;">'
+                  + 'Earlier years (' + earlier.length + ')</summary>'
+                  + '<div style="opacity:0.75;">' + earlier.map(f => fileRow(f, it.item)).join('') + '</div>'
+                  + '</details>'
+                : '')
             + '</div></details>';
     });
 
@@ -243,7 +332,13 @@ async function load() {
 fillYears();
 document.getElementById('progPick').addEventListener('change', load);
 document.getElementById('yearPick').addEventListener('change', load);
-load();
+
+/* Ask about the editor first, then list. Doing it the other way round drew the list
+   with no Edit buttons and only grew them on the next redraw. */
+(async function () {
+    await probeOffice();
+    await load();
+})();
 </script>
 </body>
 </html>
