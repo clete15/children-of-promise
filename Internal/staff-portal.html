@@ -233,7 +233,11 @@ const MY_FORMS = [
     { key: 'pas_90_day_review', scope: 'staff', href: '/pas/90-day-review-form.html',
       name: '90-Day Introductory Review', note: 'One-off, in your first three months.' },
     { key: 'pas_classroom_observation', scope: 'staff-year', href: '/pas/classroom-observation-form.html',
-      name: 'Classroom Observation', note: 'Completed by whoever observes your room.' }
+      name: 'Classroom Observation', note: 'Completed by whoever observes your room.' },
+    { key: 'pas_new_hire_checklist', scope: 'staff', href: '/pas/new-hire-checklist.html',
+      name: 'Onboarding Checklist', note: 'One-off. Everything that had to be covered when you started.' },
+    { key: 'pas_orientation_feedback', scope: 'staff', href: '/pas/orientation-feedback-form.html',
+      name: 'Orientation Feedback', note: 'One-off. What you made of your own orientation.' }
 ];
 
 function formState(f, staffId) {
@@ -361,6 +365,13 @@ function render() {
                 + (done ? '\u2713 done' : 'not started') + '</span></div>'
                 + '<div class="s">' + esc(f.note) + '</div></a>';
         }).join('')
+        /* The staff survey is anonymous, so it cannot show done or not done against a
+           name - saying so is better than leaving people wondering why it has no tick. */
+        + '<a class="sp-link" href="/pas/staff-program-evaluation.html" target="_blank" rel="noopener">'
+        + '<div class="n">Staff Program Evaluation <span class="sp-pill" '
+        + 'style="background:#f8fafc;color:#64748b;">anonymous</span></div>'
+        + '<div class="s">Your view of how the programme is run. Responses are saved under a '
+        + 'number, not your name, so this cannot show whether you have done it.</div></a>'
         + '</div></div>';
 
     body.innerHTML = html;
