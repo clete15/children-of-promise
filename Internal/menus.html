@@ -81,6 +81,9 @@
         </div>
         <div class="menu-body">
             <div id="seasonalBanner"></div>
+            <!-- Shown only when the shared menu could NOT be read. Staying silent
+                 here is what let one laptop's copy pass for the centre's menu. -->
+            <div id="menuLoadWarning"></div>
             <div class="menu-section">
                 <div class="menu-section-title">📚 Preschool</div>
                 <div class="menu-grid" id="pfaGrid"></div>
@@ -214,9 +217,20 @@ function getMonday(d) {
 function formatDate(d) { return (d.getMonth()+1) + '/' + d.getDate(); }
 function getWeekKey() { return currentWeekStart.toISOString().split('T')[0]; }
 
-function prevWeek() { currentWeekStart.setDate(currentWeekStart.getDate() - 7); render(); loadMenus().then(() => applyTemplate(getRotatingTemplateIndex(), false)); }
-function nextWeek() { currentWeekStart.setDate(currentWeekStart.getDate() + 7); render(); loadMenus().then(() => applyTemplate(getRotatingTemplateIndex(), false)); }
-function goToThisWeek() { currentWeekStart = getMonday(new Date()); render(); loadMenus().then(() => applyTemplate(getRotatingTemplateIndex(), false)); }
+/* The rotation template is a starting point for a week nobody has filled in yet,
+   so it is applied ONLY when the week genuinely has no saved menu. Applying it
+   after a real menu loaded would quietly refill any meal that had been cleared on
+   purpose, undoing a deletion every time the page opened. */
+function showWeek() {
+    render();
+    return loadMenus().then(source => {
+        if (source === 'empty') applyTemplate(getRotatingTemplateIndex(), false);
+    });
+}
+
+function prevWeek() { currentWeekStart.setDate(currentWeekStart.getDate() - 7); showWeek(); }
+function nextWeek() { currentWeekStart.setDate(currentWeekStart.getDate() + 7); showWeek(); }
+function goToThisWeek() { currentWeekStart = getMonday(new Date()); showWeek(); }
 
 function render() {
     const dates = [];
@@ -284,16 +298,13 @@ async function saveMenus() {
                 if (el) data[section][key] = el.value;
             });
         }
-        // Update the in-memory template so future rotations use the updated menu
-        const template = TEMPLATES[section][templateIdx];
-        DAYS.forEach((day, di) => {
-            if (!template[day]) template[day] = {};
-            MEALS.forEach(meal => {
-                const mealKey = meal.replace(/\s/g,'');
-                const el = document.getElementById(`${section}_${di}_${mealKey}`);
-                if (el) template[day][mealKey] = el.value;
-            });
-        });
+        /* The in-memory rotation template is deliberately NOT updated here.
+           It used to be, which meant the browser that typed a menu saw its edits
+           carried into future weeks while every other machine kept the original
+           hardcoded template - the same menu reading differently depending on who
+           opened it. Nothing persisted that change, so it could not be shared.
+           The saved week is the record; TEMPLATES stays a fixed seed for a week
+           that has nothing saved. */
     });
     /* A local copy is kept so a failed save is recoverable rather than lost, but
        it is a safety net, NOT the record. The menu is shared across the centre —
@@ -329,42 +340,79 @@ async function saveMenus() {
     }
 }
 
+/* Writes a saved menu onto the grid.
+
+   hasOwnProperty, not truthiness: a meal deliberately cleared is stored as an
+   empty string, and skipping empties meant a deletion never reached anyone else —
+   the field stayed blank here and was then refilled from the rotation template. */
+function applyMenuData(data) {
+    ['pfa','other'].forEach(section => {
+        const sectionData = (data && data[section]) || {};
+        for (let di = 0; di < 5; di++) {
+            MEALS.forEach(meal => {
+                const key = DAYS[di] + '_' + meal.replace(/\s/g,'');
+                const el = document.getElementById(`${section}_${di}_${meal.replace(/\s/g,'')}`);
+                if (el && Object.prototype.hasOwnProperty.call(sectionData, key)) {
+                    el.value = sectionData[key];
+                }
+            });
+        }
+    });
+}
+
+function showLoadWarning(html) {
+    const el = document.getElementById('menuLoadWarning');
+    if (el) {
+        el.innerHTML = html
+            ? '<div style="background:#fef2f2;border:1.5px solid #fca5a5;color:#991b1b;'
+              + 'border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:0.8rem;'
+              + 'line-height:1.5;">' + html + '</div>'
+            : '';
+    }
+}
+
+/* Loads the week's menu. Returns how it was sourced, because the caller must know:
+   the rotation template may only be applied to a week that genuinely has no menu.
+
+   The menu is shared across the centre, so the server is the record. This used to
+   fall back to this browser's localStorage whenever the response failed a narrow
+   test - and since the server returned 200 {} for "no menu", "SQL error" and
+   "value too long to read" alike, that fallback was routine rather than rare.
+   The result was each machine showing its own copy and nobody noticing. */
 async function loadMenus() {
     const weekKey = getWeekKey();
-    // Try server first (shared across all users)
+    showLoadWarning('');
     try {
         const res = await apiFetch('/api/menus?week=' + encodeURIComponent(weekKey));
-        const data = await res.json();
-        if (data && data.pfa && Object.keys(data.pfa).length > 0) {
-            ['pfa','other'].forEach(section => {
-                const sectionData = data[section] || {};
-                for (let di = 0; di < 5; di++) {
-                    MEALS.forEach(meal => {
-                        const key = DAYS[di] + '_' + meal.replace(/\s/g,'');
-                        const el = document.getElementById(`${section}_${di}_${meal.replace(/\s/g,'')}`);
-                        if (el && sectionData[key]) el.value = sectionData[key];
-                    });
-                }
-            });
-            return;
+        if (!res.ok) {
+            throw new Error(res.status === 401 ? 'your staff sign-in has lapsed'
+                                              : 'the server returned ' + res.status);
         }
-    } catch (e) { console.error('[Menu Server Load Error]', e); }
-    // Fallback to localStorage if server returned nothing
-    const local = localStorage.getItem('menu_' + weekKey);
-    if (local) {
-        try {
-            const data = JSON.parse(local);
-            ['pfa','other'].forEach(section => {
-                const sectionData = data[section] || {};
-                for (let di = 0; di < 5; di++) {
-                    MEALS.forEach(meal => {
-                        const key = DAYS[di] + '_' + meal.replace(/\s/g,'');
-                        const el = document.getElementById(`${section}_${di}_${meal.replace(/\s/g,'')}`);
-                        if (el && sectionData[key]) el.value = sectionData[key];
-                    });
-                }
-            });
-        } catch(e) {}
+        const data = await res.json();
+        if (data && data.error) throw new Error(data.error);
+
+        if (data && data.saved) {
+            applyMenuData(data);
+            return 'server';
+        }
+        /* No menu saved for this week. Deliberately NOT falling back to the local
+           copy: an old draft from one browser reappearing as the centre's menu is
+           worse than an empty grid, because it looks authoritative. */
+        return 'empty';
+    } catch (e) {
+        // A real failure to read. The local copy is worth showing now - but labelled.
+        let usedLocal = false;
+        const local = localStorage.getItem('menu_' + weekKey);
+        if (local) {
+            try { applyMenuData(JSON.parse(local)); usedLocal = true; } catch (_) {}
+        }
+        showLoadWarning('<strong>Could not load the shared menu</strong> \u2014 ' + e.message + '. '
+            + (usedLocal
+                ? 'Showing the last copy saved from <em>this</em> browser, which may not match '
+                  + 'what the kitchen sees. Do not print this until it reloads cleanly.'
+                : 'Nothing is shown for this week.')
+            + ' Reload the page to try again.');
+        return 'error';
     }
 }
 
@@ -477,11 +525,8 @@ function printMenus() {
 }
 
 render();
-async function initMenus() {
-    await loadMenus();
-    applyTemplate(getRotatingTemplateIndex(), false);
-}
-initMenus();
+// Same rule as week navigation: template only when there is nothing saved.
+showWeek();
 
 function applyTemplate(idx, overwrite) {
     ['pfa','other'].forEach(section => {

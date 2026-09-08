@@ -1176,6 +1176,27 @@ function pasWorksheetEnsureSQL() {
 `;
 }
 
+/* ── WeeklyMenus schema ──
+   One row per week. The menu is shared across the centre — whoever opens the page
+   next must see what the kitchen actually planned — so the database is the record
+   and the browser copy is only a safety net.
+
+   Previously this DDL existed inline in the POST handler only, so a read against a
+   database without the table failed and the page fell back to whatever was in that
+   one browser. Shared here so both paths agree. */
+function weeklyMenusEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='WeeklyMenus')
+    CREATE TABLE WeeklyMenus (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        WeekKey NVARCHAR(20) NOT NULL UNIQUE,
+        PfaData NVARCHAR(MAX),
+        OtherData NVARCHAR(MAX),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+GO
+`;
+}
+
 // ── SiteSettings schema ──
 // Key/value store for facts that are true of the site regardless of school year:
 // the DCFS license, ExceleRate level, and similar. Deliberately has no
@@ -1227,12 +1248,21 @@ ${cols},
     return sql;
 }
 
+/* -f 65001 sets sqlcmd's input AND output code page to UTF-8, and it matters in
+   both directions. The script file below is written as UTF-8, so without this flag
+   sqlcmd reads it in the console code page and any accented character in a name or
+   a note is corrupted ON THE WAY IN; results come back mangled on the way out for
+   the same reason. It also makes the JSON transport below possible at all, because
+   a mis-decoded byte can produce a stray quote that breaks the JSON.
+   ASCII is unaffected, UTF-8 being a superset of it. */
+const SQLCMD_ENCODING = '-f 65001';
+
 function runSQL(sql) {
     const tmp = path.join(__dirname, '_q.sql');
     fs.writeFileSync(tmp, sql, 'utf8');
     try {
-        const out = execSync(`"C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\sqlcmd.exe" -S ${DB_SERVER} -d ${DB_NAME} -E -s "|" -W -h -1 -i "${tmp}"`,
-            { encoding: 'utf8', shell: 'cmd.exe' });
+        const out = execSync(`"C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\sqlcmd.exe" -S ${DB_SERVER} -d ${DB_NAME} -E -s "|" -W -h -1 ${SQLCMD_ENCODING} -i "${tmp}"`,
+            { encoding: 'utf8', shell: 'cmd.exe', maxBuffer: 64 * 1024 * 1024 });
         console.log('[SQL]', out.trim());
         return { ok: true, data: out };
     } catch (e) {
@@ -1240,6 +1270,99 @@ function runSQL(sql) {
         return { ok: false, error: e.stderr || e.message };
     } finally {
         try { fs.unlinkSync(tmp); } catch (_) {}
+    }
+}
+
+/* ── Reading long or free text out of SQL ──────────────────────────────────
+   sqlcmd's text output truncates any variable-length value at 256 characters by
+   default. -y raises the limit but caps at 8000 and is mutually exclusive with
+   BOTH -W and -h, which this invocation needs. So every value longer than 256
+   characters came back cut off: a week's menu JSON, a PAS worksheet payload, a
+   staff note. JSON.parse then threw and the endpoint answered {} — which the
+   pages correctly read as "nothing has been saved". The data was in the database
+   the whole time; only the read was broken, which is why saving appeared to work
+   and then the entry appeared to vanish for everyone else.
+
+   Rather than fight the display width, this carries the whole result set as JSON,
+   sliced so that no single field can reach the limit:
+
+     1. SQL builds the rows with FOR JSON PATH into one NVARCHAR(MAX).
+     2. That string is emitted in fixed-size chunks, one row each, with a sentinel
+        appended to every chunk — because -W strips trailing spaces and a slice
+        boundary can fall inside a JSON string that genuinely ends with one.
+     3. Node reassembles the chunks in order and parses once.
+
+   Verified against SQL Server 2022 with embedded pipes, CRLFs, double quotes,
+   backslashes, a 3000-character blob, accented characters and NULL. Values arrive
+   correctly typed, so txCol()/txDecode() are unnecessary on this path — their
+   whole purpose was surviving the pipe-delimited format. */
+const LONG_TEXT_CHUNK = 200;
+const LONG_TEXT_SENTINEL = '~';
+
+function jsonChunkSQL(innerSelect) {
+    /* CAST to INT because TOP rejects a non-integer, and CEILING returns numeric.
+       DATALENGTH/2 rather than LEN, because LEN ignores trailing spaces and would
+       drop them from the final chunk. sys.all_objects is only a row source, large
+       enough to number the chunks of any payload realistically stored here. */
+    /* ISNULL is essential: FOR JSON yields NULL for an empty result set, and a NULL
+       here would print as the literal text "NULL", which then fails to parse and
+       reports a server error for the ordinary case of "nothing saved yet". Coalesced
+       to an empty string so no rows reads as no rows. */
+    return `DECLARE @j NVARCHAR(MAX) = ISNULL((${innerSelect} FOR JSON PATH, INCLUDE_NULL_VALUES), N'');
+SELECT c.Seq, SUBSTRING(@j, 1 + (c.Seq - 1) * ${LONG_TEXT_CHUNK}, ${LONG_TEXT_CHUNK}) + N'${LONG_TEXT_SENTINEL}'
+FROM (
+    SELECT TOP (CAST(CASE WHEN ISNULL(DATALENGTH(@j), 0) = 0 THEN 1
+                          ELSE CEILING(DATALENGTH(@j) / 2.0 / ${LONG_TEXT_CHUNK}) END AS INT))
+           ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS Seq
+    FROM sys.all_objects
+) c
+ORDER BY c.Seq`;
+}
+
+/* Runs one SELECT and returns its rows as objects.
+
+   `ensure` is any schema DDL that must run first. It is emitted as its own batch
+   for the reason schoolYearColumnSQL() explains at length: a column added in the
+   same batch as the statement that reads it is invisible to that statement, and
+   the failure blocks the ALTER too.
+
+   Returns { ok: true, rows: [...] } or { ok: false, error }. A caller MUST
+   distinguish those two — answering with an empty result on failure is exactly
+   the bug this replaces, because "no rows" and "could not read" then look
+   identical to the page. */
+function runSQLRows(innerSelect, ensure) {
+    const sql = (ensure || '') + 'SET NOCOUNT ON;\n' + jsonChunkSQL(innerSelect);
+    const r = runSQL(sql);
+    if (!r.ok) return { ok: false, error: r.error };
+
+    const parts = [];
+    r.data.split('\n').forEach(line => {
+        const i = line.indexOf('|');
+        if (i === -1) return;
+        const seq = parseInt(line.slice(0, i).trim(), 10);
+        if (!isFinite(seq) || seq < 1) return;
+        // Strip the line ending and then the sentinel, and nothing else, so spaces
+        // that belong to the data survive.
+        let part = line.slice(i + 1).replace(/[\r\n]+$/, '');
+        if (part.endsWith(LONG_TEXT_SENTINEL)) part = part.slice(0, -1);
+        parts[seq - 1] = part;
+    });
+
+    // A hole means a chunk row went missing; parsing on would silently corrupt.
+    const missing = [];
+    for (let i = 0; i < parts.length; i++) if (parts[i] === undefined) missing.push(i + 1);
+    if (missing.length) {
+        return { ok: false, error: 'Incomplete result: chunk(s) ' + missing.join(',') + ' missing' };
+    }
+
+    const raw = parts.join('');
+    // FOR JSON returns nothing at all for an empty result set.
+    if (!raw.trim()) return { ok: true, rows: [] };
+    try {
+        const parsed = JSON.parse(raw);
+        return { ok: true, rows: Array.isArray(parsed) ? parsed : [parsed] };
+    } catch (e) {
+        return { ok: false, error: 'Could not parse the result: ' + e.message };
     }
 }
 
@@ -2367,23 +2490,37 @@ ELSE
         return;
     }
 
-    // GET weekly menus (internal - protected)
+    /* GET weekly menus (internal - protected)
+
+       Answers with a status the page can act on. The previous version returned
+       200 {} for three different situations — no menu saved, a SQL failure, and a
+       value too long to survive sqlcmd — so the page could not tell them apart and
+       fell back to its own browser copy in all three. Since a real week's menu is
+       well over the 256-character limit that used to apply, that fallback was the
+       normal case: the person who typed the menu saw it, nobody else did.
+
+       Now: 200 with saved:true when a row exists, 200 with saved:false when the
+       week genuinely has no menu, and 500 when the read failed. */
     if (req.method === 'GET' && url.startsWith('/api/menus')) {
         if (!checkAuth(req, res)) return;
-        const query = req.url.split('?')[1] || '';
-        const params = new URLSearchParams(query);
-        const week = params.get('week') || '';
-        // Read PFA and Other data separately to avoid sqlcmd line truncation
-        const r1 = runSQL(`SELECT PfaData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`);
-        const r2 = runSQL(`SELECT OtherData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`);
-        if (!r1.ok && !r2.ok) return sendJSON(res, 200, {});
-        const pfaRaw = (r1.data || '').split('\n').filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim())).join('').trim();
-        const otherRaw = (r2.data || '').split('\n').filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim())).join('').trim();
-        try {
-            const pfa = pfaRaw ? JSON.parse(pfaRaw.trim()) : {};
-            const other = otherRaw ? JSON.parse(otherRaw.trim()) : {};
-            return sendJSON(res, 200, { pfa, other });
-        } catch(e) { return sendJSON(res, 200, {}); }
+        const week = new URLSearchParams(req.url.split('?')[1] || '').get('week') || '';
+        const r = runSQLRows(
+            `SELECT PfaData, OtherData FROM WeeklyMenus WHERE WeekKey=${esc(week)}`,
+            weeklyMenusEnsureSQL());
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        if (!r.rows.length) return sendJSON(res, 200, { pfa: {}, other: {}, saved: false });
+
+        const parse = v => {
+            if (v === null || v === undefined || v === '') return {};
+            try { return JSON.parse(v); } catch (e) { return null; }
+        };
+        const pfa = parse(r.rows[0].PfaData);
+        const other = parse(r.rows[0].OtherData);
+        // Stored text that will not parse is a real fault, not an empty week.
+        if (pfa === null || other === null) {
+            return sendJSON(res, 500, { error: 'The saved menu for that week is not valid JSON' });
+        }
+        return sendJSON(res, 200, { pfa, other, saved: true });
     }
 
     // POST save weekly menus (internal - protected)
@@ -2395,15 +2532,8 @@ ELSE
             // Raw JSON; esc() does the quoting and escaping at the point of use.
             const pfaJson = JSON.stringify(d.pfa || {});
             const otherJson = JSON.stringify(d.other || {});
-            const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='WeeklyMenus')
-                CREATE TABLE WeeklyMenus (
-                    Id INT IDENTITY(1,1) PRIMARY KEY,
-                    WeekKey NVARCHAR(20) NOT NULL UNIQUE,
-                    PfaData NVARCHAR(MAX),
-                    OtherData NVARCHAR(MAX),
-                    UpdatedAt DATETIME DEFAULT GETDATE()
-                );
-                IF EXISTS (SELECT 1 FROM WeeklyMenus WHERE WeekKey=${esc(week)})
+            const sql = weeklyMenusEnsureSQL()
+                + `IF EXISTS (SELECT 1 FROM WeeklyMenus WHERE WeekKey=${esc(week)})
                     UPDATE WeeklyMenus SET PfaData=${esc(pfaJson)},OtherData=${esc(otherJson)},UpdatedAt=GETDATE() WHERE WeekKey=${esc(week)}
                 ELSE
                     INSERT INTO WeeklyMenus (WeekKey,PfaData,OtherData) VALUES (${esc(week)},${esc(pfaJson)},${esc(otherJson)})`;
@@ -2438,22 +2568,20 @@ ELSE
         const query = req.url.split('?')[1] || '';
         const params = new URLSearchParams(query);
         const year = params.get('year') || '';
-        const sql = complianceEnsureSQL()
-            + `SELECT FieldName,${txCol('FieldValue')} FROM ProgramCompliance WHERE SchoolYear=${esc(year)}`;
-        const r = runSQL(sql);
+        /* JSON transport: FieldValue is NVARCHAR(MAX) and holds the free-text note
+           staff write against a checklist item, which routinely runs past the 256
+           characters the pipe-delimited read could carry. */
+        const r = runSQLRows(
+            `SELECT FieldName, FieldValue FROM ProgramCompliance WHERE SchoolYear=${esc(year)}`,
+            complianceEnsureSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const data = {};
-        r.data.trim().split('\n')
-            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
-            .forEach(l => {
-                // Only split off the first delimiter: the value is free text that may
-                // legitimately contain an encoded pipe.
-                const i = l.indexOf('|');
-                if (i === -1) return;
-                const name = l.slice(0, i).trim();
-                const raw = txDecode(l.slice(i + 1).trim());
-                if (name) data[name] = raw === '1' ? true : raw === '0' ? false : raw;
-            });
+        r.rows.forEach(row => {
+            const name = row.FieldName;
+            if (!name) return;
+            const raw = row.FieldValue == null ? '' : String(row.FieldValue);
+            data[name] = raw === '1' ? true : raw === '0' ? false : raw;
+        });
         return sendJSON(res, 200, data);
     }
 
@@ -2464,21 +2592,24 @@ ELSE
     if (req.method === 'GET' && url === '/api/staff') {
         if (!checkAuth(req, res)) return;
         const select = ['Id'].concat(STAFF_COLUMNS.map(([c]) => c));
-        const projection = select.map(c =>
-            (c === 'Id' ? 'Id' : txCol(c))).join(',');
-        const sql = staffEnsureSQL() + 'GO\n' + staffSeedSQL() + 'GO\n'
-            + `SELECT ${projection},ISNULL(CAST(Active AS INT),1) AS Active FROM Staff WHERE ISNULL(Active,1)=1 ORDER BY Name`;
-        const r = runSQL(sql);
+        /* JSON transport. Notes is the reason: the credential trail held there runs
+           to several hundred characters per person, so the old read cut every one of
+           them off at 256. That silently broke anything reading the tail of a note —
+           including the PAS prefill, which scans Notes for "Pending: ECE, IT" to
+           avoid ticking a credential that has not actually been awarded. */
+        const r = runSQLRows(
+            `SELECT ${select.join(',')},ISNULL(CAST(Active AS INT),1) AS Active
+             FROM Staff WHERE ISNULL(Active,1)=1 ORDER BY Name`,
+            staffEnsureSQL() + 'GO\n' + staffSeedSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const keys = select.concat(['Active']);
-        const rows = r.data.trim().split('\n')
-            .filter(l => /^\s*\d+\s*\|/.test(l))
-            .map(l => {
-                const v = l.split('|').map(x => x.trim());
-                const o = {};
-                keys.forEach((k, i) => { o[k] = k === 'Id' || k === 'Active' ? v[i] : txDecode(v[i]); });
-                return o;
+        // Strings throughout, as the pages expect; null becomes '' rather than "null".
+        const rows = r.rows.map(row => {
+            const o = {};
+            select.concat(['Active']).forEach(k => {
+                o[k] = row[k] === null || row[k] === undefined ? '' : String(row[k]);
             });
+            return o;
+        });
         return sendJSON(res, 200, rows);
     }
 
@@ -3199,21 +3330,32 @@ ELSE
     // which classrooms have been completed, and the row count is small.
     if (req.method === 'GET' && url === '/api/pas-worksheets') {
         if (!checkAuth(req, res)) return;
-        const sql = pasWorksheetEnsureSQL() + 'GO\n'
-            + `SELECT Id,${txCol('WorksheetKey')},${txCol('ScopeKey')},${txCol('Payload')},${txCol('UpdatedBy')},CONVERT(NVARCHAR(20),UpdatedAt,120) AS UpdatedAt FROM PasWorksheets`;
-        const r = runSQL(sql);
+        /* Read through the JSON transport. A worksheet payload is comfortably over
+           256 characters — the teaching staff sheet alone carries about twenty
+           fields per person for four people — so under the old pipe-delimited read
+           every payload came back truncated, failed to parse, and was served as {}.
+           Saving worked; loading returned an empty sheet, on every machine
+           including the one that typed it. */
+        const r = runSQLRows(
+            `SELECT Id, WorksheetKey, ScopeKey, Payload, UpdatedBy,
+                    CONVERT(NVARCHAR(20), UpdatedAt, 120) AS UpdatedAt
+             FROM PasWorksheets`,
+            pasWorksheetEnsureSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const rows = r.data.trim().split('\n')
-            .filter(l => /^\s*\d+\s*\|/.test(l))
-            .map(l => {
-                const v = l.split('|').map(x => x.trim());
-                let payload = {};
-                try { payload = JSON.parse(txDecode(v[3]) || '{}'); } catch (e) { payload = {}; }
-                return {
-                    Id: v[0], WorksheetKey: txDecode(v[1]), ScopeKey: txDecode(v[2]),
-                    Payload: payload, UpdatedBy: txDecode(v[4]), UpdatedAt: v[5]
-                };
-            });
+        const rows = r.rows.map(row => {
+            let payload = {};
+            // Keep a single unparseable row from emptying the whole worksheet set,
+            // but say so rather than passing off {} as the saved answers.
+            let bad = false;
+            try { payload = row.Payload ? JSON.parse(row.Payload) : {}; }
+            catch (e) { bad = true; }
+            return {
+                Id: String(row.Id), WorksheetKey: row.WorksheetKey || '',
+                ScopeKey: row.ScopeKey || '', Payload: payload,
+                UpdatedBy: row.UpdatedBy || '', UpdatedAt: row.UpdatedAt || '',
+                unreadable: bad || undefined
+            };
+        });
         return sendJSON(res, 200, rows);
     }
 
