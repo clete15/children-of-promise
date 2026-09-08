@@ -166,6 +166,11 @@
                 <div class="section-title">Silver Self-Assessments — One Per Classroom</div>
                 <div id="silverAssessments"></div>
 
+                <!-- Contradictions between what PAS, PI and PFA each assert about the
+                     same facts. Computed live from the records, not written down once. -->
+                <div class="section-title">Cross-Check — PAS against PI and PFA</div>
+                <div id="crossCheck"></div>
+
                 <!-- Readiness for the Padlet upload, computed from what is actually
                      saved rather than from memory. -->
                 <div class="section-title">Padlet Submission — What Is Ready</div>
@@ -375,6 +380,254 @@ document.getElementById('pasPwForm').addEventListener('submit', function(e) {
 });
 
 checkPasAuth();
+
+/* ── Cross-check: PAS against PI and PFA ────────────────────────────────────
+   Several facts are asserted in more than one place, and a monitor reading two of
+   our documents together would notice if they disagree:
+
+     · who staffs a room  - dimClassrooms.TeacherDescription says one thing, the
+       staff records' Classroom/SecondaryClassroom say another. The PAS Teaching
+       Staff Qualifications worksheets and the ExceleRate Standard 4 percentages
+       are both built from the staff records, so a room description that disagrees
+       means the worksheet and the roster describe different classrooms.
+     · room capacity     - DCFS capacity against who is actually enrolled.
+     · a child's program - PFA_PI_na against the room's own Type. A PFA child
+       sitting in a room recorded as INCCRA undermines both programmes' rosters.
+
+   Everything here is computed from live records. Nothing is asserted that the
+   database does not currently say, and each finding names what to look at rather
+   than only that something is wrong. */
+
+// Reduce a room name to comparable tokens: "Infant/Toddler" must meet "Infants / Toddlers".
+function ccRoomKey(v) {
+    return String(v || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+        .map(w => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w))
+        .join('/');
+}
+
+/* Names in TeacherDescription are informal first names, sometimes with a note:
+   "Sue / Paige / Keyona (pt)", "Pam / Jeremy / Sara". Split on the separator, drop
+   any parenthetical, and keep what is left. */
+function ccNamesFrom(desc) {
+    const raw = String(desc || '').trim();
+    /* Bail on placeholders BEFORE splitting. "n/a" contains the same slash used as
+       the name separator, so splitting first turned it into two "names", n and a,
+       which then reported as staff with no record. */
+    if (!raw || /^(n\/?a|none|tbd|unassigned)$/i.test(raw)) return [];
+    return raw
+        .split(/[\/,&]|\band\b/i)
+        .map(s => s.replace(/\([^)]*\)/g, '').trim())
+        // Two characters cannot be a name; anything that short is punctuation debris.
+        .filter(s => s.length >= 3 && !/^(n\/?a|none|tbd)$/i.test(s));
+}
+
+/* An informal first name against a staff record. Deliberately generous, because the
+   cost of a missed match here is a false accusation that someone has no staff record.
+
+   Handles three shapes seen in the real data:
+     "Janelle" / "Janell Poenitske"   one is a prefix of the other
+     "Pam"     / "Pamela Holliday"    ditto
+     "Maddie"  / "Madeline Muir"      a nickname that DIVERGES after three letters,
+                                      so prefix matching alone is not enough
+   The three-letter fallback only applies when at least one side is short enough to
+   be a nickname, which keeps "Sue" away from "Sara" and "Jeremy" away from "Jessica". */
+function ccNameMatches(informal, staffName) {
+    const a = String(informal || '').toLowerCase().replace(/[^a-z]/g, '');
+    if (!a) return false;
+    return String(staffName || '').toLowerCase().split(/\s+/).filter(Boolean).some(p => {
+        const b = p.replace(/[^a-z]/g, '');
+        if (!b || a.length < 3 || b.length < 3) return false;
+        if (b.indexOf(a) === 0 || a.indexOf(b) === 0) return true;
+        const looksLikeNickname = a.length <= 7 || b.length <= 7;
+        return looksLikeNickname && a.slice(0, 3) === b.slice(0, 3);
+    });
+}
+
+function ccFindings(staff, rooms, kids) {
+    const findings = [];
+    const active = staff.filter(s => s.Active === undefined || s.Active === ''
+        || s.Active === true || s.Active === 1 || s.Active === '1');
+
+    /* 1. Names in a room description that cannot be matched to a staff record, and
+       names that match someone who is recorded in a DIFFERENT room. The second case
+       is the one that quietly breaks the ExceleRate infant/toddler percentage: a
+       teacher listed on the room but not assigned to it is not counted for it. */
+    rooms.forEach(room => {
+        ccNamesFrom(room.TeacherDescription).forEach(nm => {
+            const match = active.find(s => ccNameMatches(nm, s.Name));
+            if (!match) {
+                findings.push({
+                    severity: 'medium',
+                    what: '\u201c' + nm + '\u201d is listed as staffing ' + room.Room
+                        + ', but could not be matched to any staff record',
+                    why: 'The Teaching Staff Qualifications worksheet for this room, and the ExceleRate '
+                        + 'Standard 4 percentages, are both built from the staff records \u2014 so whoever '
+                        + 'this is does not appear on either. It may also just be a nickname this page '
+                        + 'could not resolve.',
+                    fix: 'Add them on Staff Cards, or correct the classroom\u2019s teacher list.'
+                });
+                return;
+            }
+            const servesHere = ccRoomKey(match.Classroom) === ccRoomKey(room.Room)
+                || ccRoomKey(match.SecondaryClassroom) === ccRoomKey(room.Room);
+            if (!servesHere) {
+                const isInfantToddler = /infant|toddler/i.test(room.Room);
+                findings.push({
+                    severity: 'high',
+                    what: room.Room + ' lists \u201c' + nm + '\u201d, but ' + match.Name
+                        + '\u2019s staff record puts them in \u201c'
+                        + (String(match.Classroom || '').trim() || 'no classroom') + '\u201d'
+                        + (String(match.SecondaryClassroom || '').trim()
+                            ? ' and \u201c' + match.SecondaryClassroom + '\u201d' : ''),
+                    why: 'Counting runs off the staff record, not the room description, so this room '
+                        + 'does not currently count them'
+                        + (isInfantToddler
+                            ? ' \u2014 and this is an infant/toddler room, which is where the ExceleRate '
+                              + '4B Infant/Toddler percentage is calculated. If they genuinely work here '
+                              + 'part time, that belongs in their Second Classroom field.'
+                            : '.'),
+                    fix: 'Set ' + match.Name + '\u2019s classroom (or Second Classroom for a part-time '
+                        + 'assignment) to ' + room.Room + ', or take the name off the classroom.'
+                });
+            }
+        });
+    });
+
+    // 2. A staff member assigned to a room that does not exist.
+    active.forEach(s => {
+        [['Classroom', s.Classroom], ['SecondaryClassroom', s.SecondaryClassroom]].forEach(([label, val]) => {
+            const v = String(val || '').trim();
+            if (!v || /^tbd$/i.test(v)) return;
+            if (!rooms.some(r => ccRoomKey(r.Room) === ccRoomKey(v))) {
+                findings.push({
+                    severity: 'high',
+                    what: s.Name + '\u2019s ' + (label === 'Classroom' ? 'classroom' : 'second classroom')
+                        + ' is recorded as \u201c' + v + '\u201d, which is not one of the classrooms',
+                    why: 'A room name that matches nothing means this person lands on no qualifications '
+                        + 'worksheet at all, and no room counts them.',
+                    fix: 'Correct the spelling on Staff Cards to match the classroom list exactly.'
+                });
+            }
+        });
+    });
+
+    // 3. Staff the records place in a room that the room's own description omits.
+    rooms.forEach(room => {
+        const named = ccNamesFrom(room.TeacherDescription);
+        const assigned = active.filter(s =>
+            ccRoomKey(s.Classroom) === ccRoomKey(room.Room)
+            || ccRoomKey(s.SecondaryClassroom) === ccRoomKey(room.Room));
+        assigned.forEach(s => {
+            if (named.length && !named.some(nm => ccNameMatches(nm, s.Name))) {
+                findings.push({
+                    severity: 'medium',
+                    what: s.Name + ' is assigned to ' + room.Room + ' on their staff record, but the '
+                        + 'classroom lists \u201c' + (room.TeacherDescription || '\u2014') + '\u201d',
+                    why: 'The two records describe different staffing for the same room.',
+                    fix: 'Decide which is current and correct the other.'
+                });
+            }
+        });
+        if (!assigned.length && named.length) {
+            findings.push({
+                severity: 'medium',
+                what: room.Room + ' lists \u201c' + room.TeacherDescription + '\u201d but no staff record '
+                    + 'is assigned to that room',
+                why: 'This room produces an empty Teaching Staff Qualifications worksheet.',
+                fix: 'Set the classroom on each of those staff members.'
+            });
+        }
+    });
+
+    // 4. Enrollment against DCFS capacity.
+    rooms.forEach(room => {
+        const cap = parseInt(room.DCFSCapacity, 10);
+        if (!isFinite(cap) || cap <= 0) return;
+        const enrolled = kids.filter(k => String(k.RoomNumber) === String(room.RoomNumber)
+            && /^yes$/i.test(String(k.Active || ''))).length;
+        if (enrolled > cap) {
+            findings.push({
+                severity: 'high',
+                what: room.Room + ' has ' + enrolled + ' active children against a DCFS capacity of ' + cap,
+                why: 'Capacity is asserted on the DCFS licence that PAS and the PICC both reference.',
+                fix: 'Move a child, or correct the capacity if the licence says otherwise.'
+            });
+        }
+    });
+
+    // 5. A child's programme against the room's own type.
+    rooms.forEach(room => {
+        const type = String(room.Type || '').trim().toUpperCase();
+        if (!type || type === 'N/A') return;
+        const mismatched = kids.filter(k => {
+            if (!/^yes$/i.test(String(k.Active || ''))) return false;
+            if (String(k.RoomNumber) !== String(room.RoomNumber)) return false;
+            const prog = String(k.PFA_PI_na || '').trim().toUpperCase();
+            return (prog === 'PFA' || prog === 'PI') && prog !== type;
+        });
+        if (mismatched.length) {
+            findings.push({
+                severity: 'medium',
+                what: mismatched.length + ' child(ren) in ' + room.Room + ' are recorded under a different '
+                    + 'programme than the room (room is ' + type + ')',
+                why: 'PI and PFA rosters are both drawn from these fields, so one of the two is counting '
+                    + 'a child it should not.',
+                fix: 'Check each child\u2019s programme on the roster against the room\u2019s type.'
+            });
+        }
+    });
+
+    return findings;
+}
+
+function renderCrossCheck() {
+    const host = document.getElementById('crossCheck');
+    if (!host) return;
+
+    const rooms = (typeof classrooms === 'undefined' ? [] : classrooms).filter(c => c.Room);
+    const kids = (typeof students === 'undefined' ? [] : students);
+    if (!staffRecords.length || !rooms.length) {
+        host.innerHTML = '<div style="padding:14px;background:#f8fafc;border:1px solid #e2e8f0;'
+            + 'border-radius:8px;font-size:0.8rem;color:#64748b;">'
+            + 'Staff or classroom records have not loaded, so nothing can be cross-checked yet.</div>';
+        return;
+    }
+
+    const findings = ccFindings(staffRecords, rooms, kids);
+    const high = findings.filter(f => f.severity === 'high').length;
+
+    if (!findings.length) {
+        host.innerHTML = '<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;'
+            + 'padding:14px 16px;margin-bottom:14px;font-size:0.8rem;color:#166534;">'
+            + '<strong>\u2713 No contradictions found.</strong> Room staffing, capacity and each '
+            + 'child\u2019s programme agree across the classroom, staff and enrollment records.</div>';
+        return;
+    }
+
+    const rows = findings.map(f => {
+        const c = f.severity === 'high' ? ['#fef2f2', '#fca5a5', '#991b1b'] : ['#fffbeb', '#fcd34d', '#92400e'];
+        return '<div style="background:' + c[0] + ';border:1px solid ' + c[1] + ';border-left:4px solid '
+            + c[2] + ';border-radius:8px;padding:10px 14px;margin-bottom:8px;">'
+            + '<div style="font-size:0.8rem;font-weight:700;color:' + c[2] + ';">' + escHtml(f.what) + '</div>'
+            + '<div style="font-size:0.74rem;color:#475569;line-height:1.55;margin-top:4px;">'
+            + escHtml(f.why) + '</div>'
+            + '<div style="font-size:0.74rem;color:#1e293b;line-height:1.55;margin-top:4px;">'
+            + '<strong>Fix:</strong> ' + escHtml(f.fix) + '</div>'
+            + '</div>';
+    }).join('');
+
+    host.innerHTML =
+        '<div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:14px 16px;'
+        + 'margin-bottom:12px;">'
+        + '<div style="font-size:0.85rem;font-weight:800;color:#1e293b;">'
+        + findings.length + ' disagreement(s) between records '
+        + padletPill(high ? 'part' : 'none', high + ' worth fixing first') + '</div>'
+        + '<div style="font-size:0.74rem;color:#64748b;line-height:1.6;margin-top:4px;">'
+        + 'The same facts are stated in the classroom list, the staff records and the enrollment '
+        + 'roster. PAS worksheets and the PI and PFA rosters are all built from those, so where they '
+        + 'disagree, two of our own documents disagree. Fix the record, not the document.</div></div>'
+        + rows;
+}
 
 /* ── Padlet submission readiness ────────────────────────────────────────────
    Five worksheets go to the Padlet, matching the five official PAS forms held as
@@ -1390,6 +1643,8 @@ async function loadTrainingData() {
     renderTrainingReqs();
     renderTrainingMatrix();
     renderSilverAssessments();
+    // Needs staff, classrooms and students, all of which loadTrainingData has by now.
+    renderCrossCheck();
 })();
 </script>
 <!-- Deploy / Restart controls while this area is under active development. -->
