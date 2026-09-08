@@ -38,6 +38,56 @@ Both look like the helpful thing to press. Neither is.
 
 Wix will keep showing that error for as long as the setup is correct. Leave it alone.
 
+## Office editing (OnlyOffice Docs) — hard-won, read before touching
+
+Word and Excel files in the document library open and save in the browser.
+Working as of 7 Sep 2026. Four things had to be true at once; each one broke it
+alone, and the symptoms all looked like the same vague error.
+
+**1. nginx must listen on 8080, not 80.**
+`C:\Program Files\ONLYOFFICE\DocumentServer\nginx\conf\ds.conf`, lines 3-4:
+```
+listen 0.0.0.0:8080;
+listen [::]:8080 default_server;
+```
+The installer sets 80, which our node server already owns, so nginx silently
+failed to start on a loop since installation. A `.bak` of the original is beside
+it. **An OnlyOffice upgrade will almost certainly reset this to 80** — that is
+the first thing to check if editing ever stops working. Symptom: assets 404, and
+`nginx\Proxy_*.err.log` fills with `bind() to 0.0.0.0:80 failed (10013)`.
+
+**2. Environment variables on the server** (all `setx ... /M`, then a NEW console
+before restarting node — `setx` only reaches processes started afterwards):
+```
+COFP_ONLYOFFICE_URL      http://localhost:8080
+COFP_ONLYOFFICE_SECRET   must equal services.CoAuthoring.secret.inbox.string
+                         in C:\Program Files\ONLYOFFICE\DocumentServer\config\local.json
+COFP_SELF_URL            https://childrenofpromisedaycare.com
+```
+Copy the secret with PowerShell rather than typing it; verify with
+`$s -eq $env:COFP_ONLYOFFICE_SECRET`.
+
+**3. The proxy must PRESERVE the incoming Host header.** Rewriting it to
+`localhost:8080` makes the document server build absolute URLs from that, and
+hand them to the browser — which cannot reach the server's localhost. Symptom:
+`Editor.bin` fails with `net::ERR_CONNECTION_*`.
+
+**4. The proxy must NOT strip the `/<version>-<hash>/` path prefix.** That prefix
+is nginx's own cache-busting scheme and nginx redirects unversioned paths back to
+versioned ones, so stripping creates a loop. Symptom: the editor's service worker
+fails with `net::ERR_FAILED` on its asset JSON files. Stripping WAS correct while
+nginx was dead and docservice answered alone — it became wrong the moment nginx
+started, which is the trap.
+
+Diagnosing: the server console logs `[OFFICE WS]` for every socket (success
+included) and `[OFFICE PROXY]` for proxy failures. The browser Console tab is
+more informative than the Network tab for editor faults. Service workers cache
+hard — always hard-refresh, and use incognito to rule out a stale one.
+
+Saves return through `/api/office-callback` and **keep the previous version**
+alongside as `name (before YYYY-MM-DD-HH-MM-SS).ext`. Nothing overwrites
+compliance evidence irrecoverably.
+
 ## Architecture
 
 - **Server:** Node.js on Windows Server (`C:\app\Internal\server.js`), port 80 + 443 (SSL via Let's Encrypt)
