@@ -85,6 +85,16 @@
             });
     }
 
+    /* Records a form that has just been saved, so the cell turns from "ticked by
+       hand" to "form on file" on the spot. The save handlers already update the
+       tick locally for the same reason; without this the box would go green only
+       after a reload, which reads as the save not having worked. */
+    function mark(studentId, field, date) {
+        var id = String(studentId);
+        if (!forms[id]) forms[id] = {};
+        forms[id][field] = { on: true, date: date || '' };
+    }
+
     function hasForm(studentId, field) {
         var rec = forms[String(studentId)];
         return !!(rec && rec[field] && rec[field].on);
@@ -169,6 +179,7 @@
         isBacked: isBacked,
         hasForm: hasForm,
         formDate: formDate,
+        mark: mark,
         state: state,
         isDone: isDone,
         rollup: rollup,

@@ -996,6 +996,12 @@
             if (data.success) {
                 if (!trackingData[currentStudentId]) trackingData[currentStudentId] = {};
                 trackingData[currentStudentId][spec.field] = 1;
+                /* Record that the document itself now exists, not just that the box is
+                   ticked. Without this the cell would stay amber ("ticked, nothing
+                   saved") until a reload, immediately after a successful save. */
+                if (window.ChildForms) {
+                    ChildForms.mark(currentStudentId, spec.field, body[spec.primaryDate] || '');
+                }
                 refreshActiveView();
                 const badge = document.getElementById('docSavedBadge');
                 badge.style.display = 'inline-flex';

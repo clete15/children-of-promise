@@ -29,6 +29,21 @@
         tr:hover { background:#f8fafc; }
         input[type=checkbox] { width:auto;accent-color:var(--primary);cursor:pointer; }
 
+        /* ── Is there a form behind this tick? ──
+           A tick and a completed form were the same colour, so a file with nothing
+           in it looked identical to one that would pass a review. Three states now:
+             .cf-form       a record exists      green accent
+             .cf-tick-only  ticked, nothing behind it   amber, with a marker
+             .cf-none       neither              plain
+           Amber rather than red on purpose: a hand tick is usually a form done on
+           paper, which is allowed. It needs to be visible, not treated as an error. */
+        td.cf-form input[type=checkbox] { accent-color:#16a34a; }
+        td.cf-tick-only { background:#fffdf5; }
+        td.cf-tick-only input[type=checkbox] { accent-color:#d97706; }
+        .cf-mark { font-size:0.62rem;font-weight:800;margin-left:2px;cursor:help; }
+        .cf-mark.paper { color:#b45309; }
+        .cf-date { display:block;font-size:0.55rem;color:#15803d;line-height:1.1;margin-top:1px; }
+
         /* Screening date + status shown under each screening checkbox */
         .scr-meta { display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:2px;line-height:1.2; }
         .scr-date { font-size:0.58rem;color:var(--text-muted);white-space:nowrap; }
@@ -189,6 +204,9 @@
         .cls-chip-done { background:#f0fdf4;border-color:#bbf7d0;color:#166534; }
         a.cls-chip-done:hover { background:#dcfce7;border-color:#86efac;color:#166534; }
         .cls-dl { font-size:0.62rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px; }
+        /* Ticked with nothing saved behind it. Amber, not red: done on paper is allowed. */
+        .cls-paper { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;
+                     background:#fffbeb;color:#b45309;cursor:help; }
         .cls-dl-overdue { background:#fef2f2;color:#b91c1c; }
         .cls-dl-due { background:#fffbeb;color:#92400e; }
 
@@ -735,6 +753,10 @@
      shared state (students, trackingData) by name at call time. -->
 <script src="pi-forms.js"></script>
 
+<!-- Which per-child forms actually exist, as opposed to which boxes are ticked.
+     Shared with the compliance panel and the staff portal so all three agree. -->
+<script src="child-forms.js"></script>
+
 <script src="/staff/auth.js"></script>
 <script>
 // Authorization is deliberately NOT set here. The browser attaches the
@@ -746,6 +768,35 @@ function apiFetch(url, opts = {}) {
         (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
         opts.headers || {});
     return fetch(url, opts);
+}
+
+/* If child-forms.js did not load, fall back to the behaviour this page had before
+   it existed: a tick is a tick. This roster is the operational core of both grant
+   programs and a half-applied deployment must not leave it blank. Every checklist
+   field reports as unbacked, so nothing renders as a false problem either. */
+if (!window.ChildForms) {
+    console.warn('child-forms.js did not load; ticks will not be checked against saved forms.');
+    window.ChildForms = {
+        load: function () { return Promise.resolve(null); },
+        isBacked: function () { return false; },
+        hasForm: function () { return false; },
+        formDate: function () { return ''; },
+        mark: function () {},
+        state: function (id, field, ticked) { return ticked ? 'tick' : 'none'; },
+        isDone: function (id, field, ticked) { return !!ticked; },
+        // Counts ticks, which is exactly what the compliance panel did before.
+        rollup: function (fields, roster, tracking) {
+            if (!fields || !fields.length) return null;
+            var missing = roster.filter(function (s) {
+                var t = (tracking && tracking[s.Id]) || {};
+                return fields.some(function (f) { return !t[f]; });
+            });
+            return { total: roster.length, complete: roster.length - missing.length,
+                     missing: missing, unbacked: [], fields: fields.slice() };
+        },
+        indexItems: function () { return {}; },
+        loadState: 'failed'
+    };
 }
 
 let students = [];
@@ -802,7 +853,10 @@ async function setSchoolYear(year) {
     try {
         const [tRes, scrRes] = await Promise.all([
             apiFetch(yearQS('/api/isbe-tracking')),
-            apiFetch(yearQS('/api/screening-summary'))
+            apiFetch(yearQS('/api/screening-summary')),
+            // Which forms exist for this year. Never rejects; a failure leaves the
+            // ticks showing as they always did rather than emptying the roster.
+            ChildForms.load(year, apiFetch)
         ]);
         const tRows = await tRes.json();
         trackingData = {};
@@ -834,7 +888,10 @@ async function init() {
             apiFetch('/api/classrooms'),
             apiFetch(yearQS('/api/isbe-tracking')),
             apiFetch(yearQS('/api/screening-summary')),
-            loadSiteSettings()
+            loadSiteSettings(),
+            // Which forms exist, so a tick with nothing behind it is visible as
+            // such from the first render rather than after an interaction.
+            ChildForms.load(activeSchoolYear, apiFetch)
         ]);
         students = await sRes.json();
         classrooms = await cRes.json();
@@ -1227,6 +1284,37 @@ function screeningDeadline(student, screeningDate, year) {
     return { state: 'ok', text: left + 'd left' };
 }
 
+/* ── The checklist cell ────────────────────────────────────────────────────
+   One builder for every column, so the roster and the classroom view can never
+   disagree about what a tick means.
+
+   The box stays clickable on every column, including the ones with a form. A
+   parent interview done on paper and filed is legitimate evidence, and taking
+   away the ability to record it would push people to lie to the form instead.
+   What changes is that the cell now says which kind of tick it is. */
+function cellClass(student, field) {
+    const st = ChildForms.state(student.Id, field, !!(trackingData[student.Id] || {})[field]);
+    return st === 'form' ? 'cf-form' : st === 'tick-only' ? 'cf-tick-only' : '';
+}
+
+function checkBox(student, field) {
+    const ticked = !!(trackingData[student.Id] || {})[field];
+    const st = ChildForms.state(student.Id, field, ticked);
+    let title = 'Toggle checkbox';
+    let mark = '';
+    if (st === 'form') {
+        const d = ChildForms.formDate(student.Id, field);
+        title = 'Form on file' + (d ? ', dated ' + d : '') + '. Saved in the system.';
+    } else if (st === 'tick-only') {
+        title = 'Ticked, but no form is saved for this child. If it was done on paper, '
+              + 'that is fine \u2014 the paper is the evidence. Otherwise open the form.';
+        mark = '<span class="cf-mark paper" title="' + title + '">\u25B2</span>';
+    }
+    return '<input type="checkbox" ' + (ticked ? 'checked' : '')
+        + ' onchange="saveField(' + student.Id + ',\'' + field + '\',this.checked)"'
+        + ' title="' + title + '">' + mark;
+}
+
 // Small date + status line rendered under a screening checkbox.
 function screeningMeta(student, type, period, isBeginning) {
     const rec = (screeningData[student.Id] || {})[type + '|' + period];
@@ -1265,41 +1353,43 @@ function renderRoster() {
         const t = trackingData[s.Id] || {};
         const cells = cols.map(c => {
             const f = c.field;
-            const box = '<input type="checkbox" ' + (t[f] ? 'checked' : '')
-                + ' onchange="saveField(' + s.Id + ',\'' + f + '\',this.checked)" title="Toggle checkbox">';
+            const box = checkBox(s, f);
+            // Green, amber or plain, depending on whether a form is actually behind
+            // the tick. Applied to the cell so the whole box reads at a glance.
+            const td = '<td' + (cellClass(s, f) ? ' class="' + cellClass(s, f) + '"' : '') + '>';
 
             if (f === 'ParentInterview') {
-                return '<td>' + box + formLink('openInterview(' + s.Id + ')', 'Open Parent Interview Form') + '</td>';
+                return td + box + formLink('openInterview(' + s.Id + ')', 'Open Parent Interview Form') + '</td>';
             }
             if (f === 'PermissionSlip') {
-                return '<td>' + box + formLink('openPermissionSlip(' + s.Id + ')', 'Open Permission Slip Form') + '</td>';
+                return td + box + formLink('openPermissionSlip(' + s.Id + ')', 'Open Permission Slip Form') + '</td>';
             }
             if (f === 'BegASQ' || f === 'EndASQ') {
                 const period = f === 'BegASQ' ? 'Beginning' : 'End';
-                return '<td>' + box
+                return td + box
                     + formLink('openScreening(' + s.Id + ',\'ASQ-3\',\'' + period + '\')', 'Open ASQ-3 Score Entry')
                     + screeningMeta(s, 'ASQ-3', period, f === 'BegASQ') + '</td>';
             }
             if (f === 'BegASE' || f === 'EndASE') {
                 const period = f === 'BegASE' ? 'Beginning' : 'End';
-                return '<td>' + box
+                return td + box
                     + formLink('openScreening(' + s.Id + ',\'ASQ:SE-2\',\'' + period + '\')', 'Open ASQ:SE-2 Score Entry')
                     + screeningMeta(s, 'ASQ:SE-2', period, f === 'BegASE') + '</td>';
             }
             // PICC document forms are all rendered by the same engine.
             if (c.docForm) {
                 const spec = window.DOC_FORM_SPECS[c.docForm];
-                return '<td>' + box
+                return td + box
                     + formLink('openDocForm(\'' + c.docForm + '\',' + s.Id + ')',
                         'Open ' + (spec ? spec.title : 'form')) + '</td>';
             }
             if (f === 'GrantPerfReport') {
                 const href = GRANT_REPORT_LINKS[activeProgram];
-                if (!href) return '<td>' + box + '</td>';
-                return '<td>' + box + '<a href="' + href + '" target="_blank" style="' + LINK_STYLE
+                if (!href) return td + box + '</td>';
+                return td + box + '<a href="' + href + '" target="_blank" style="' + LINK_STYLE
                     + '" title="Open the Grant Periodic Performance Report in SharePoint">[doc]</a></td>';
             }
-            return '<td>' + box + '</td>';
+            return td + box + '</td>';
         }).join('');
         return '<tr><td class="left" style="font-weight:600;font-size:0.73rem;">' + s.Last_Name + ', ' + s.First_Name + '</td><td style="font-size:0.7rem;color:var(--text-muted);">' + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
     }).join('');
@@ -1307,7 +1397,11 @@ function renderRoster() {
     // "Print All" footer row, one cell per column that can produce a form.
     const printAllCells = cols.map(c => {
         if (!columnHasForm(c)) return '<td></td>';
-        const uncheckedCount = roster.filter(s => !(trackingData[s.Id] || {})[c.field]).length;
+        /* Counts children who still need this form, which now includes a child whose
+           box is ticked with nothing saved: they have no form in the system, so a
+           blank one to work from is exactly what they need. */
+        const uncheckedCount = roster.filter(s =>
+            !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field])).length;
         if (uncheckedCount > 0) {
             return '<td><a href="#" onclick="event.preventDefault();printAllForColumn(\'' + c.field + '\')" style="font-size:0.6rem;color:#2563eb;text-decoration:none;font-weight:700;white-space:nowrap;" title="Print all unchecked forms for this column">🖨️ All (' + uncheckedCount + ')</a></td>';
         }
@@ -1611,6 +1705,9 @@ async function saveInterview() {
             // Update local tracking data (auto-checks ParentInterview)
             if (!trackingData[currentInterviewStudentId]) trackingData[currentInterviewStudentId] = {};
             trackingData[currentInterviewStudentId].ParentInterview = 1;
+            // ...and record that a form now exists, so the cell reads as evidence on
+            // file rather than as a bare tick until the next reload.
+            ChildForms.mark(currentInterviewStudentId, 'ParentInterview', body.interviewDate);
             refreshActiveView();
             document.getElementById('piSavedBadge').style.display = 'inline-flex';
             setTimeout(() => { document.getElementById('piSavedBadge').style.display = 'none'; }, 3000);
@@ -1723,6 +1820,7 @@ async function savePermissionSlip() {
         if (data.success) {
             if (!trackingData[currentPSStudentId]) trackingData[currentPSStudentId] = {};
             trackingData[currentPSStudentId].PermissionSlip = 1;
+            ChildForms.mark(currentPSStudentId, 'PermissionSlip', body.signedDate);
             refreshActiveView();
             document.getElementById('psSavedBadge').style.display = 'inline-flex';
             setTimeout(function() { document.getElementById('psSavedBadge').style.display = 'none'; }, 3000);
@@ -1882,6 +1980,7 @@ async function saveScreening() {
             if (fieldName) {
                 if (!trackingData[currentScrStudentId]) trackingData[currentScrStudentId] = {};
                 trackingData[currentScrStudentId][fieldName] = 1;
+                ChildForms.mark(currentScrStudentId, fieldName, body.screeningDate);
             }
             // Keep the inline date/concern/referral badges and the follow-up list in
             // sync without a page reload.
@@ -2569,7 +2668,11 @@ function renderClassroom() {
 
     // Batch actions first: a teacher works a whole task at a time.
     const batch = cols.map(col => {
-        const missing = roster.filter(s => !(trackingData[s.Id] || {})[col.field]);
+        // Outstanding means no form on file, so a box ticked with nothing behind it
+        // still appears here. This is the same rule the roster and the compliance
+        // roll-up use; the three views disagreeing is what made the ticks useless.
+        const missing = roster.filter(s =>
+            !ChildForms.isDone(s.Id, col.field, !!(trackingData[s.Id] || {})[col.field]));
         if (!missing.length) return '';
         const label = col.label.replace(/<br>/g, ' ');
         const printBtn = columnHasForm(col)
@@ -2591,9 +2694,15 @@ function renderClassroom() {
     }).map(s => {
         const t = trackingData[s.Id] || {};
         const chips = cols.map(col => {
-            const done = !!t[col.field];
+            const st = ChildForms.state(s.Id, col.field, !!t[col.field]);
+            const done = st === 'form' || st === 'tick' || st === 'unknown';
             const label = col.label.replace(/<br>/g, ' ');
-            let extra = '';
+            // A tick with no form behind it is its own state, not "done" and not
+            // "nothing done". Marked so the teacher knows which of the two it is.
+            let extra = st === 'tick-only'
+                ? '<span class="cls-paper" title="Ticked, but nothing is saved here. '
+                  + 'If it was done on paper that is fine; otherwise open the form.">on paper?</span>'
+                : '';
             let action = '';
             if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
                 const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';
@@ -2607,7 +2716,9 @@ function renderClassroom() {
                         const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
                         const dl = screeningDeadline(s, rec && rec.ScreeningDate, activeSchoolYear);
                         if (dl && (dl.state === 'overdue' || dl.state === 'due')) {
-                            extra = '<span class="cls-dl cls-dl-' + dl.state + '">' + dl.text + '</span>';
+                            // Appended, so a deadline badge does not wipe out the
+                            // "on paper?" marker when both apply to the same chip.
+                            extra += '<span class="cls-dl cls-dl-' + dl.state + '">' + dl.text + '</span>';
                         }
                     }
                 }
@@ -2623,7 +2734,8 @@ function renderClassroom() {
                 : '<span class="' + cls + '">' + inner + '</span>';
         }).join('');
 
-        const outstanding = cols.filter(col => !t[col.field]).length;
+        const outstanding = cols.filter(col =>
+            !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
         const status = outstanding
             ? '<span class="cls-out">' + outstanding + ' outstanding</span>'
             : '<span class="cls-ok">complete</span>';
