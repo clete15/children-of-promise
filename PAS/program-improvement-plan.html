@@ -76,7 +76,6 @@
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -85,25 +84,29 @@
 
     <div class="info-grid">
         <div class="info-field">
-            <label>Program Year:</label><div class="line"></div>
+            <label>Program Year:</label><div class="line" data-k="programYear"></div>
         </div>
         <div class="info-field">
-            <label>Date Created:</label><div class="line"></div>
+            <label>Date Created:</label><div class="line" data-k="dateCreated"></div>
         </div>
         <div class="info-field">
-            <label>Administrator:</label><div class="line"></div>
+            <label>Administrator:</label><div class="line" data-k="administrator"></div>
         </div>
     </div>
 
     <div class="section-title">Data Sources Used</div>
     <div class="checkbox-grid">
-        <div class="checkbox-item">&#9633; Parent Surveys</div>
-        <div class="checkbox-item">&#9633; Staff Surveys</div>
-        <div class="checkbox-item">&#9633; Assessment Data</div>
-        <div class="checkbox-item">&#9633; Observation Data</div>
-        <div class="checkbox-item">&#9633; Licensing Reports</div>
-        <div class="checkbox-item">&#9633; Other: ____________</div>
+        <div class="checkbox-item"><span data-radio="srcParent" data-val="yes">&#9633;</span> Parent Surveys</div>
+        <div class="checkbox-item"><span data-radio="srcStaff" data-val="yes">&#9633;</span> Staff Surveys</div>
+        <div class="checkbox-item"><span data-radio="srcAssessment" data-val="yes">&#9633;</span> Assessment Data</div>
+        <div class="checkbox-item"><span data-radio="srcObservation" data-val="yes">&#9633;</span> Observation Data</div>
+        <div class="checkbox-item"><span data-radio="srcLicensing" data-val="yes">&#9633;</span> Licensing Reports</div>
+        <div class="checkbox-item"><span data-radio="srcOther" data-val="yes">&#9633;</span> Other:
+            <span class="line" data-k="srcOtherText" style="flex:1;border-bottom:1px solid #999;min-width:70px;"></span>
+        </div>
     </div>
+    <!-- What the surveys already hold, so a data source is not ticked from memory. -->
+    <div class="no-print" id="sourceNote" style="font-size:8.5pt;color:#64748b;margin:-12px 0 14px;"></div>
 
     <div class="section-title">Improvement Areas</div>
     <table class="pip-table">
@@ -118,39 +121,89 @@
                 <th style="width:15%">Evidence of Progress</th>
             </tr>
         </thead>
-        <tbody>
-            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-        </tbody>
+        <!-- Eight rows, generated so the field names stay in step with the columns. -->
+        <tbody id="pipBody"></tbody>
     </table>
 
     <div class="section-title">Quarterly Review Dates</div>
     <div class="review-grid">
         <div class="info-field">
-            <label>Q1:</label><div class="line"></div>
+            <label>Q1:</label><div class="line" data-k="q1"></div>
         </div>
         <div class="info-field">
-            <label>Q2:</label><div class="line"></div>
+            <label>Q2:</label><div class="line" data-k="q2"></div>
         </div>
         <div class="info-field">
-            <label>Q3:</label><div class="line"></div>
+            <label>Q3:</label><div class="line" data-k="q3"></div>
         </div>
         <div class="info-field">
-            <label>Q4:</label><div class="line"></div>
+            <label>Q4:</label><div class="line" data-k="q4"></div>
         </div>
     </div>
 
     <div class="signature-section">
-        <div class="sig-field"><label>Administrator Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Administrator Signature:<div class="sig-line" data-k="adminSig"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="adminSigDate"></div></label></div>
     </div>
 
     <div class="footer">
         <span>PAS Documentation — Confidential</span>
         <span>Children of Promise LLC — Program Improvement Plan</span>
     </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* One plan per program year, so the year picker in the toolbar chooses which plan is on
+   screen and last year's plan stays where it was put. */
+
+const PIP_ROWS = 8;
+const PIP_COLS = ['area', 'status', 'goal', 'steps', 'timeline', 'who', 'evidence'];
+
+document.getElementById('pipBody').innerHTML = Array.from({ length: PIP_ROWS }, (_, i) =>
+    '<tr>' + PIP_COLS.map(c => '<td data-k="' + c + (i + 1) + '"></td>').join('') + '</tr>'
+).join('');
+
+/* Empty rows are dropped when printing so a filed plan is not padded with blank grid. */
+window.addEventListener('beforeprint', function () {
+    document.querySelectorAll('#pipBody tr').forEach(tr => {
+        const used = [...tr.querySelectorAll('[data-k]')].some(td => td.innerText.trim());
+        tr.style.display = used ? '' : 'none';
+    });
+});
+window.addEventListener('afterprint', function () {
+    document.querySelectorAll('#pipBody tr').forEach(tr => { tr.style.display = ''; });
+});
+
+/* The data sources are ticked by hand, but the page says how many survey responses are
+   actually recorded, so "Parent Surveys" is not ticked on the strength of a memory. */
+function countRecords(key) {
+    const raw = PasStore.storage.getItem(key + '__index');
+    if (!raw) return 0;
+    try {
+        const list = JSON.parse(raw);
+        return Array.isArray(list) ? list.length : 0;
+    } catch (e) { return 0; }
+}
+
+function describeSources() {
+    const note = document.getElementById('sourceNote');
+    if (!note) return;
+    const parents = countRecords('pas_parent_survey');
+    const staff = countRecords('pas_staff_program_eval');
+    note.textContent = 'Recorded here so far: ' + parents + ' parent survey response(s), '
+        + staff + ' staff program evaluation response(s).';
+}
+
+PasForm.init({
+    key: 'pas_improvement_plan',
+    scope: 'year',
+    prefill: function (staff, year) {
+        return { programYear: year || '' };
+    },
+    onLoad: describeSources
+});
+</script>
 </body>
 </html>

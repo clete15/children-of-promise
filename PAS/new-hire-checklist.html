@@ -42,17 +42,24 @@
             font-size: 10pt; padding: 4px 0 4px 24px;
             position: relative; border-bottom: 1px solid #f0f0f0;
         }
-        .checklist li::before {
-            content: "\2610";
-            position: absolute; left: 0; top: 4px;
+        /* The box is a real element now so it can be clicked, rather than a ::before mark. */
+        .checklist li .box {
+            position: absolute; left: 0; top: 3px;
             font-size: 13pt; line-height: 1;
         }
         .checklist li .date-col {
-            float: right; width: 100px;
+            float: right; width: 110px;
             border-bottom: 1px solid #ccc;
-            font-size: 9pt; color: #666;
-            text-align: center;
+            font-size: 9pt; color: #444;
+            text-align: center; min-height: 1.2em;
         }
+        /* A faint prompt on screen only, so the empty date space is obviously clickable
+           without printing the word "date" on a filed document. */
+        .checklist li .date-col:empty::after { content: 'date'; color: #c0c6cf; }
+        .checklist li .hint {
+            display: block; font-size: 8.5pt; color: #166534; margin-top: 2px;
+        }
+        .done-note { font-size: 9pt; color: #64748b; margin: -8px 0 14px; }
         .signature-section {
             margin-top: 25px; display: grid;
             grid-template-columns: 2fr 1fr; gap: 24px;
@@ -70,11 +77,11 @@
             body { padding: 0; }
             @page { margin: 0.4in 0.5in; size: letter; }
             .no-print { display: none; }
+            .checklist li .date-col:empty::after { content: ''; }
         }
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -83,110 +90,180 @@
 
     <div class="info-grid">
         <div class="info-field">
-            <label>Employee Name:</label><div class="line"></div>
+            <label>Employee Name:</label><div class="line" data-k="employeeName"></div>
         </div>
         <div class="info-field">
-            <label>Position:</label><div class="line"></div>
+            <label>Position:</label><div class="line" data-k="position"></div>
         </div>
         <div class="info-field">
-            <label>Hire Date:</label><div class="line"></div>
+            <label>Hire Date:</label><div class="line" data-k="hireDate"></div>
         </div>
         <div class="info-field">
-            <label>Supervisor:</label><div class="line"></div>
+            <label>Supervisor:</label><div class="line" data-k="supervisor"></div>
         </div>
         <div class="info-field">
-            <label>Mentor Assigned:</label><div class="line"></div>
+            <label>Mentor Assigned:</label><div class="line" data-k="mentor"></div>
         </div>
         <div class="info-field">
-            <label>Orientation Dates:</label><div class="line"></div>
+            <label>Orientation Dates:</label><div class="line" data-k="orientationDates"></div>
         </div>
     </div>
 
-    <div class="section-title">Pre-Start (Before First Day)</div>
-    <ul class="checklist">
-        <li>Offer letter signed and returned <span class="date-col">Date: ____</span></li>
-        <li>Background check completed <span class="date-col">Date: ____</span></li>
-        <li>W-4 and I-9 forms completed <span class="date-col">Date: ____</span></li>
-        <li>Emergency contact information collected <span class="date-col">Date: ____</span></li>
-        <li>Assign mentor/buddy <span class="date-col">Date: ____</span></li>
-        <li>Prepare workspace/classroom access <span class="date-col">Date: ____</span></li>
-        <li>Schedule orientation dates <span class="date-col">Date: ____</span></li>
-    </ul>
+    <!-- Where the hire date came from, and how much of the list is ticked. -->
+    <div class="no-print done-note" id="progressNote"></div>
 
-    <div class="section-title">Day 1–3: Orientation Week 1</div>
-    <ul class="checklist">
-        <li>Welcome and building tour <span class="date-col">Date: ____</span></li>
-        <li>Introduce to all staff members <span class="date-col">Date: ____</span></li>
-        <li>Provide Employee Handbook <span class="date-col">Date: ____</span></li>
-        <li>Provide Parent Handbook <span class="date-col">Date: ____</span></li>
-        <li>Review job description <span class="date-col">Date: ____</span></li>
-        <li>Review personnel policies <span class="date-col">Date: ____</span></li>
-        <li>Review health and safety procedures <span class="date-col">Date: ____</span></li>
-        <li>Set up Brightwheel account <span class="date-col">Date: ____</span></li>
-        <li>Set up email/technology access <span class="date-col">Date: ____</span></li>
-        <li>Review emergency procedures and exits <span class="date-col">Date: ____</span></li>
-    </ul>
-
-    <div class="section-title">Day 4–10: Orientation Week 2</div>
-    <ul class="checklist">
-        <li>Observe in assigned classroom <span class="date-col">Date: ____</span></li>
-        <li>Meet children and families <span class="date-col">Date: ____</span></li>
-        <li>Review curriculum (Creative Curriculum) <span class="date-col">Date: ____</span></li>
-        <li>Review assessment tools (Teaching Strategies, ASQ) <span class="date-col">Date: ____</span></li>
-        <li>Review classroom daily schedule <span class="date-col">Date: ____</span></li>
-        <li>Review behavior guidance policies <span class="date-col">Date: ____</span></li>
-        <li>Review food program procedures <span class="date-col">Date: ____</span></li>
-        <li>Review allergy/medical condition protocols <span class="date-col">Date: ____</span></li>
-        <li>Review sign-in/sign-out procedures <span class="date-col">Date: ____</span></li>
-    </ul>
-
-    <div class="section-title">Within 30 Days</div>
-    <ul class="checklist">
-        <li>Complete CPR/First Aid certification (if not current) <span class="date-col">Date: ____</span></li>
-        <li>Complete mandatory reporter training <span class="date-col">Date: ____</span></li>
-        <li>Complete food handler certification <span class="date-col">Date: ____</span></li>
-        <li>Complete initial required training modules <span class="date-col">Date: ____</span></li>
-        <li>Mentor check-in meeting #1 <span class="date-col">Date: ____</span></li>
-        <li>Register on Gateways to Opportunity <span class="date-col">Date: ____</span></li>
-    </ul>
-
-    <div class="section-title">Within 60 Days</div>
-    <ul class="checklist">
-        <li>Mentor check-in meeting #2 <span class="date-col">Date: ____</span></li>
-        <li>Begin Individual Professional Development Plan <span class="date-col">Date: ____</span></li>
-        <li>First classroom observation by supervisor <span class="date-col">Date: ____</span></li>
-        <li>Review of initial performance <span class="date-col">Date: ____</span></li>
-    </ul>
-
-    <div class="section-title">Within 90 Days</div>
-    <ul class="checklist">
-        <li>90-Day Introductory Review completed <span class="date-col">Date: ____</span></li>
-        <li>Orientation Feedback Form completed <span class="date-col">Date: ____</span></li>
-        <li>Individual Professional Development Plan finalized <span class="date-col">Date: ____</span></li>
-        <li>Decision: extend to regular employment / extend probation / terminate <span class="date-col">Date: ____</span></li>
-        <li>Mentor assignment concluded or extended <span class="date-col">Date: ____</span></li>
-    </ul>
-
-    <div class="section-title">Ongoing (First Year)</div>
-    <ul class="checklist">
-        <li>Jan 15 OR Jun 30: First formal performance evaluation <span class="date-col">Date: ____</span></li>
-        <li>Complete minimum 20 hours professional development <span class="date-col">Date: ____</span></li>
-        <li>Attend all-staff meetings <span class="date-col">Date: ____</span></li>
-        <li>Complete Staff Program Evaluation Survey (when distributed) <span class="date-col">Date: ____</span></li>
-    </ul>
+    <!-- The list is rendered from the data below so every item has a stable name and a
+         completion date that saves with it. -->
+    <div id="lists"></div>
 
     <div class="signature-section">
-        <div class="sig-field"><label>Supervisor Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Supervisor Signature:<div class="sig-line" data-k="supervisorSig"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="supervisorSigDate"></div></label></div>
     </div>
     <div class="signature-section">
-        <div class="sig-field"><label>Employee Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Employee Signature:<div class="sig-line" data-k="employeeSig"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="employeeSigDate"></div></label></div>
     </div>
 
     <div class="footer">
         <span>PAS Documentation — Confidential</span>
         <span>Children of Promise LLC — New Employee Onboarding Checklist</span>
     </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* One record per person: onboarding happens once. Scope is 'staff', so the toolbar's
+   dropdown doubles as the list of who has an onboarding record and who does not.
+
+   Each item carries an explicit id rather than relying on its position, so re-ordering
+   or inserting a step later cannot silently re-point a saved tick at a different task.
+   Each tick has its own single-cell group, which behaves as a checkbox: click to tick,
+   click again to clear. */
+
+const SECTIONS = [
+    { title: 'Pre-Start (Before First Day)', items: [
+        ['offerLetter', 'Offer letter signed and returned'],
+        ['backgroundCheck', 'Background check completed'],
+        ['w4i9', 'W-4 and I-9 forms completed'],
+        ['emergencyContact', 'Emergency contact information collected'],
+        ['assignMentor', 'Assign mentor/buddy'],
+        ['workspace', 'Prepare workspace/classroom access'],
+        ['scheduleOrientation', 'Schedule orientation dates']
+    ] },
+    { title: 'Day 1\u20133: Orientation Week 1', items: [
+        ['tour', 'Welcome and building tour'],
+        ['introStaff', 'Introduce to all staff members'],
+        ['employeeHandbook', 'Provide Employee Handbook'],
+        ['parentHandbook', 'Provide Parent Handbook'],
+        ['jobDescription', 'Review job description'],
+        ['personnelPolicies', 'Review personnel policies'],
+        ['healthSafety', 'Review health and safety procedures'],
+        ['brightwheel', 'Set up Brightwheel account'],
+        ['emailAccess', 'Set up email/technology access'],
+        ['emergencyProcedures', 'Review emergency procedures and exits']
+    ] },
+    { title: 'Day 4\u201310: Orientation Week 2', items: [
+        ['observeClassroom', 'Observe in assigned classroom'],
+        ['meetFamilies', 'Meet children and families'],
+        ['curriculum', 'Review curriculum (Creative Curriculum)'],
+        ['assessmentTools', 'Review assessment tools (Teaching Strategies, ASQ)'],
+        ['dailySchedule', 'Review classroom daily schedule'],
+        ['behaviorGuidance', 'Review behavior guidance policies'],
+        ['foodProgram', 'Review food program procedures'],
+        ['allergyProtocols', 'Review allergy/medical condition protocols'],
+        ['signInOut', 'Review sign-in/sign-out procedures']
+    ] },
+    { title: 'Within 30 Days', items: [
+        ['cprFirstAid', 'Complete CPR/First Aid certification (if not current)'],
+        ['mandatedReporter', 'Complete mandatory reporter training'],
+        ['foodHandler', 'Complete food handler certification'],
+        ['initialModules', 'Complete initial required training modules'],
+        ['mentorCheckIn1', 'Mentor check-in meeting #1'],
+        ['gatewaysRegistry', 'Register on Gateways to Opportunity']
+    ] },
+    { title: 'Within 60 Days', items: [
+        ['mentorCheckIn2', 'Mentor check-in meeting #2'],
+        ['pdPlanStarted', 'Begin Individual Professional Development Plan'],
+        ['firstObservation', 'First classroom observation by supervisor'],
+        ['initialPerformance', 'Review of initial performance']
+    ] },
+    { title: 'Within 90 Days', items: [
+        ['ninetyDayReview', '90-Day Introductory Review completed'],
+        ['orientationFeedback', 'Orientation Feedback Form completed'],
+        ['pdPlanFinal', 'Individual Professional Development Plan finalized'],
+        ['employmentDecision', 'Decision: extend to regular employment / extend probation / terminate'],
+        ['mentorConcluded', 'Mentor assignment concluded or extended']
+    ] },
+    { title: 'Ongoing (First Year)', items: [
+        ['firstEvaluation', 'Jan 15 OR Jun 30: First formal performance evaluation'],
+        ['pdHours20', 'Complete minimum 20 hours professional development'],
+        ['staffMeetings', 'Attend all-staff meetings'],
+        ['programEvaluation', 'Complete Staff Program Evaluation Survey (when distributed)']
+    ] }
+];
+
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.getElementById('lists').innerHTML = SECTIONS.map(sec =>
+    '<div class="section-title">' + esc(sec.title) + '</div><ul class="checklist">'
+    + sec.items.map(([id, text]) =>
+        '<li><span class="box" data-radio="chk_' + id + '" data-val="yes">\u2610</span>'
+        + '<span class="date-col" data-k="date_' + id + '"></span>'
+        + esc(text)
+        + '<span class="hint" id="hint_' + id + '"></span></li>').join('')
+    + '</ul>').join('');
+
+const TOTAL = SECTIONS.reduce((n, s) => n + s.items.length, 0);
+
+function ticked() {
+    return [...document.querySelectorAll('.checklist [data-radio]')]
+        .filter(el => el.textContent.trim() === '\u2611').length;
+}
+
+let hireText = '';
+function updateProgress() {
+    const note = document.getElementById('progressNote');
+    if (note) note.textContent = hireText + ticked() + ' of ' + TOTAL + ' steps ticked.';
+}
+
+PasForm.init({
+    key: 'pas_new_hire_checklist',
+    scope: 'staff',
+    prefill: function (staff) {
+        const hire = PasForm.hireDate(staff);
+        hireText = hire
+            ? 'Hire date read from the staff notes'
+              + (hire.precision === 'month' ? ' (month only, so the day is approximate). ' : '. ')
+            : 'No start date could be read from this staff record. ';
+
+        /* What the staff record already shows is offered as a note rather than as a tick:
+           a registry id proves registration, but nothing else on the record proves a step
+           on this list was actually done, and a wrongly pre-ticked compliance box is worse
+           than an empty one. */
+        const reg = document.getElementById('hint_gatewaysRegistry');
+        if (reg) {
+            reg.textContent = String(staff.RegistryId || '').trim()
+                ? 'Registry ID ' + staff.RegistryId + ' is already on the staff record.'
+                : '';
+        }
+
+        return {
+            employeeName: staff.Name,
+            position: PasForm.position(staff),
+            hireDate: hire ? PasForm.fmtDate(hire.d) : ''
+        };
+    },
+    onLoad: updateProgress
+});
+
+document.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('.checklist [data-radio]')) updateProgress();
+});
+</script>
 </body>
 </html>

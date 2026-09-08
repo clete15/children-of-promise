@@ -46,8 +46,10 @@
         table th { background-color: #edf2f7; font-weight: 600; color: #2c5282; }
         table td:first-child { text-align: left; width: 40%; }
         .rating-header { font-size: 8pt; }
-        .write-lines {
-            border-bottom: 1px solid #999; height: 1.4em; margin-bottom: 6px;
+        /* Grows with the answer instead of stopping at the ruled lines. */
+        .write-area {
+            border-bottom: 1px solid #999; min-height: 4.2em;
+            margin-bottom: 6px; white-space: pre-wrap; font-size: 10pt;
         }
         .narrative-section { margin-bottom: 14px; }
         .narrative-section p { font-weight: 600; margin-bottom: 6px; font-size: 10pt; }
@@ -64,7 +66,6 @@
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -75,14 +76,24 @@
         This survey is anonymous. Please do not write your name. Your honest feedback helps us improve our program for staff, children, and families.
     </div>
 
+    <!-- Anonymity is the point of this form, so responses are numbered rather than tied to
+         a staff member. Nothing here records who filled it in. -->
+    <div class="anon-note no-print" style="font-style:normal;background:#fffbeb;border-color:#fcd34d;">
+        Responses are saved under a number, not a name. Choose <strong>New response</strong> in the
+        bar above before you start, and leave the name fields alone.
+    </div>
+
     <div class="info-grid">
         <div class="info-field">
-            <label>Date:</label><div class="line"></div>
+            <label>Date:</label><div class="line" data-k="date"></div>
         </div>
         <div class="info-field">
             <label>Position Type:</label>
-            <div class="line" style="font-size:9pt;">(Lead Teacher / Assistant / Admin / Other)</div>
+            <div class="line" data-k="positionType"></div>
         </div>
+    </div>
+    <div class="no-print" style="font-size:8.5pt;color:#64748b;margin:-12px 0 14px;">
+        Position type: Lead Teacher / Assistant / Admin / Other.
     </div>
 
     <div class="section-title">Program Rating</div>
@@ -99,35 +110,119 @@
                 <th class="rating-header">5<br>Strongly<br>Agree</th>
             </tr>
         </thead>
-        <tbody>
-            <tr><td>Communication from administration is clear and timely</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td></tr>
-            <tr><td>I have adequate professional development opportunities</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td></tr>
-            <tr><td>The work environment is positive and supportive</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td></tr>
-            <tr><td>I have the resources and materials I need</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td></tr>
-            <tr><td>Teamwork and collaboration are encouraged</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td></tr>
-            <tr><td>I feel valued as a team member</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td></tr>
-            <tr><td>I receive support for parent engagement</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td></tr>
-            <tr><td>The facility is safe and well-maintained</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td><td>&#9633;</td></tr>
-        </tbody>
+        <!-- Generated from the statement list below so the row names cannot drift. -->
+        <tbody id="ratingBody"></tbody>
     </table>
 
     <div class="section-title">Open-Ended Feedback</div>
     <div class="narrative-section">
         <p>What does the program do well?</p>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="doesWell"></div>
     </div>
     <div class="narrative-section">
         <p>What improvements would you suggest?</p>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="improvements"></div>
     </div>
     <div class="narrative-section">
         <p>Additional comments:</p>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="comments"></div>
     </div>
+
+    <!-- The analysis step: what every saved response adds up to. On screen only, since a
+         printed blank survey should not carry other people's answers. -->
+    <div class="no-print" id="summary" style="margin-top:24px;"></div>
 
     <div class="footer">
         <span>PAS Documentation — Confidential</span>
         <span>Children of Promise LLC — Staff Program Evaluation</span>
     </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* Anonymous, so one record per response rather than one per staff member: nothing stored
+   links a response to a person. Responses are labelled by year and number.
+
+   The summary underneath reads every saved response and averages it, which is the part
+   PAS actually asks for - collecting surveys is not the same as analysing them. */
+
+const STATEMENTS = [
+    ['comms', 'Communication from administration is clear and timely'],
+    ['pd', 'I have adequate professional development opportunities'],
+    ['environment', 'The work environment is positive and supportive'],
+    ['resources', 'I have the resources and materials I need'],
+    ['teamwork', 'Teamwork and collaboration are encouraged'],
+    ['valued', 'I feel valued as a team member'],
+    ['parentSupport', 'I receive support for parent engagement'],
+    ['facility', 'The facility is safe and well-maintained']
+];
+
+const KEY = 'pas_staff_program_eval';
+
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.getElementById('ratingBody').innerHTML = STATEMENTS.map(([id, text]) =>
+    '<tr><td>' + esc(text) + '</td>'
+    + [1, 2, 3, 4, 5].map(v =>
+        '<td data-radio="' + id + '" data-val="' + v + '">&#9633;</td>').join('')
+    + '</tr>').join('');
+
+function savedResponses() {
+    const raw = PasStore.storage.getItem(KEY + '__index');
+    if (!raw) return [];
+    let index = [];
+    try { index = JSON.parse(raw) || []; } catch (e) { return []; }
+    if (!Array.isArray(index)) return [];
+    return index.map(r => {
+        const body = PasStore.storage.getItem(KEY + '__' + r.id);
+        if (!body) return null;
+        try { return JSON.parse(body); } catch (e) { return null; }
+    }).filter(Boolean);
+}
+
+function renderSummary() {
+    const box = document.getElementById('summary');
+    if (!box) return;
+    const all = savedResponses();
+    if (!all.length) {
+        box.innerHTML = '<div class="section-title">Summary of responses</div>'
+            + '<p style="font-size:9.5pt;color:#64748b;">No responses saved yet.</p>';
+        return;
+    }
+    const rows = STATEMENTS.map(([id, text]) => {
+        const vals = all.map(r => parseInt((r.ratings || {})[id], 10))
+            .filter(n => n >= 1 && n <= 5);
+        const avg = vals.length ? (vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+        return '<tr><td style="text-align:left;">' + esc(text) + '</td>'
+            + '<td>' + (avg === null ? '\u2014' : avg.toFixed(1)) + '</td>'
+            + '<td>' + vals.length + '</td></tr>';
+    }).join('');
+    box.innerHTML = '<div class="section-title">Summary of responses</div>'
+        + '<p style="font-size:9pt;color:#64748b;margin-bottom:8px;">'
+        + all.length + ' response(s) saved. An average counts only the responses that '
+        + 'answered that statement, so the count is shown beside it.</p>'
+        + '<table><thead><tr><th>Statement</th><th style="width:80px;">Average</th>'
+        + '<th style="width:80px;">Answers</th></tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+PasForm.init({
+    key: KEY,
+    scope: 'list',
+    listLabel: 'Response',
+    // Numbered, not named: the label must not identify who answered.
+    newDefault: function () {
+        return PasForm.schoolYear() + ' \u2014 response ' + (PasForm.records.length + 1);
+    },
+    prefill: function () {
+        return { date: new Date().toLocaleDateString('en-US',
+            { year: 'numeric', month: 'short', day: 'numeric' }) };
+    },
+    onLoad: renderSummary
+});
+</script>
 </body>
 </html>
