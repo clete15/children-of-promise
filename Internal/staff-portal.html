@@ -102,6 +102,7 @@
 
 let STAFF = [];
 let TRAINING = [];
+let ROOMS = [];
 let current = null;
 
 const $ = id => document.getElementById(id);
@@ -346,6 +347,48 @@ function render() {
               + '\u201cHow ERS Works\u201d is the one ExceleRate requires of half the teaching staff.</div>')
         + '</div>';
 
+    /* ── Their classroom ──
+       The compliance work for a child is done on the roster, and until now there was
+       no route from a staff member to their own room: they had to open the ISBE page
+       and pick a room from a list of all of them. The link carries the room, so they
+       land on their children rather than on whichever room was looked at last.
+
+       Room names on a staff record are the exact dimClassrooms names (the staff card
+       page uses a dropdown for precisely this reason), so an exact match is right
+       here; anything unmatched is named without a link rather than guessed at. */
+    const myRooms = [s.Classroom, s.SecondaryClassroom]
+        .map(v => String(v || '').trim()).filter(Boolean)
+        .map(name => {
+            const room = ROOMS.find(r => String(r.Room || '').trim() === name);
+            return { name: name, roomNumber: room ? String(room.RoomNumber) : null,
+                     secondary: name === String(s.SecondaryClassroom || '').trim() };
+        });
+
+    html += '<div class="sp-card">'
+        + '<h2>My classroom</h2>'
+        + (myRooms.length
+            ? '<div class="sp-sub">Your children\u2019s screenings, permission slips and parent '
+              + 'interviews. Everything opens and saves here, and a signed paper copy can be '
+              + 'checked in against the child.</div>'
+              + '<div class="sp-links">'
+              + myRooms.map(r => (r.roomNumber
+                    ? '<a class="sp-link" href="isbe.html?view=classroom&room='
+                      + encodeURIComponent(r.roomNumber) + '" target="_blank" rel="noopener">'
+                    : '<div class="sp-link">')
+                  + '<div class="n">' + esc(r.name)
+                  + (r.secondary ? ' <span class="sp-pill" style="background:#f8fafc;color:#64748b;">'
+                      + 'part time</span>' : '') + '</div>'
+                  + '<div class="s">' + (r.roomNumber
+                      ? 'Opens your room\u2019s checklist, one card per child.'
+                      : 'This room name is not in the classroom list, so it cannot be opened '
+                        + 'directly \u2014 worth correcting on the staff record.') + '</div>'
+                  + (r.roomNumber ? '</a>' : '</div>')).join('')
+              + '</div>'
+            : '<div class="sp-sub">No classroom is recorded against your staff record, so there '
+              + 'is no room checklist to open. If you are assigned to a room, it needs adding '
+              + 'to your record.</div>')
+        + '</div>';
+
     // Their plan and their forms.
     html += '<div class="sp-card">'
         + '<h2>My learning plan and forms</h2>'
@@ -379,9 +422,13 @@ function render() {
 
 async function load() {
     try {
-        const [sRes, tRes] = await Promise.all([
+        const [sRes, tRes, rRes] = await Promise.all([
             apiFetch('/api/staff'),
-            apiFetch('/api/staff-training').catch(() => null)
+            apiFetch('/api/staff-training').catch(() => null),
+            // Rooms, so an assigned classroom name can be turned into the room number
+            // the roster is keyed on. Optional: without it the classroom card simply
+            // names the room instead of linking to it.
+            apiFetch('/api/classrooms').catch(() => null)
         ]);
         if (!sRes.ok) throw new Error('staff records: HTTP ' + sRes.status);
         STAFF = await sRes.json();
@@ -389,6 +436,8 @@ async function load() {
         STAFF = STAFF.filter(s => String(s.Name || '').trim() && !/^new teacher$/i.test(s.Name));
         TRAINING = tRes && tRes.ok ? await tRes.json() : [];
         if (!Array.isArray(TRAINING)) TRAINING = [];
+        ROOMS = rRes && rRes.ok ? await rRes.json() : [];
+        if (!Array.isArray(ROOMS)) ROOMS = [];
 
         // Form completion is read from the shared worksheet store.
         await PasStore.ready;

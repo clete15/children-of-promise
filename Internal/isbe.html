@@ -948,8 +948,17 @@ async function init() {
         updateStartYearCount();
         // Deep link, e.g. the portal's My Classroom card. Falls through to the
         // default PFA roster for anything unrecognised.
-        const wanted = new URLSearchParams(location.search).get('view');
+        const params = new URLSearchParams(location.search);
+        const wanted = params.get('view');
         const VIEWS = ['classroom', 'startYear', 'followUp', 'PFA', 'PI', 'pfaCompliance', 'piCompliance'];
+        /* A room can be named in the link, so the staff portal can send someone
+           straight to their own classroom rather than to whichever room they last
+           looked at. Set before setProgram so the first render is already correct,
+           and only when the room actually has children in one of the programs. */
+        const roomWanted = params.get('room');
+        if (roomWanted && classroomOptions().some(o => o.roomNumber === String(roomWanted))) {
+            activeClassroomRoom = String(roomWanted);
+        }
         if (wanted && VIEWS.indexOf(wanted) !== -1) setProgram(wanted);
         else renderRoster();
     } catch(e) {
