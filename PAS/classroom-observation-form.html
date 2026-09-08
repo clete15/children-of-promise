@@ -59,6 +59,11 @@
             border-top: 1px solid #cbd5e0; display: flex;
             justify-content: space-between; font-size: 9pt; color: #666;
         }
+        /* Grows with what is typed, in place of a fixed number of ruled lines. */
+        .write-area {
+            border-bottom: 1px solid #999; min-height: 3.6em; font-size: 10pt;
+            padding: 3px 2px 2px; white-space: pre-wrap; line-height: 1.55;
+        }
         @media print {
             body { padding: 0; }
             @page { margin: 0.5in 0.6in; size: letter; }
@@ -67,7 +72,6 @@
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -76,19 +80,19 @@
 
     <div class="info-grid">
         <div class="info-field">
-            <label>Teacher:</label><div class="line"></div>
+            <label>Teacher:</label><div class="line" data-k="teacher"></div>
         </div>
         <div class="info-field">
-            <label>Classroom:</label><div class="line"></div>
+            <label>Classroom:</label><div class="line" data-k="classroom"></div>
         </div>
         <div class="info-field">
-            <label>Observer:</label><div class="line"></div>
+            <label>Observer:</label><div class="line" data-k="observer"></div>
         </div>
         <div class="info-field">
-            <label>Date/Time:</label><div class="line"></div>
+            <label>Date/Time:</label><div class="line" data-k="dateTime"></div>
         </div>
         <div class="info-field">
-            <label>Duration:</label><div class="line"></div>
+            <label>Duration:</label><div class="line" data-k="duration"></div>
         </div>
     </div>
 
@@ -96,55 +100,55 @@
 
     <div class="obs-area">
         <h3>Learning Environment</h3>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="learningEnvironment"></div>
     </div>
 
     <div class="obs-area">
         <h3>Teacher-Child Interactions</h3>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="interactions"></div>
     </div>
 
     <div class="obs-area">
         <h3>Curriculum Delivery</h3>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="curriculum"></div>
     </div>
 
     <div class="obs-area">
         <h3>Transitions</h3>
-        <div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="transitions"></div>
     </div>
 
     <div class="obs-area">
         <h3>Behavior Guidance</h3>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="behaviorGuidance"></div>
     </div>
 
     <div class="obs-area">
         <h3>Health &amp; Safety Practices</h3>
-        <div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="healthSafety"></div>
     </div>
 
     <div class="section-title">Summary</div>
     <div class="narrative-section">
         <p>Strengths Observed:</p>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="strengths"></div>
     </div>
     <div class="narrative-section">
         <p>Areas for Growth:</p>
-        <div class="write-lines"></div><div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="growth"></div>
     </div>
     <div class="narrative-section">
         <p>Follow-Up Actions:</p>
-        <div class="write-lines"></div><div class="write-lines"></div>
+        <div class="write-area" data-k="followUp"></div>
     </div>
 
     <div class="signature-section">
-        <div class="sig-field"><label>Observer Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Observer Signature:<div class="sig-line" data-k="observerSignature"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="observerSignedDate"></div></label></div>
     </div>
     <div class="signature-section">
-        <div class="sig-field"><label>Teacher Signature:<div class="sig-line"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line"></div></label></div>
+        <div class="sig-field"><label>Teacher Signature:<div class="sig-line" data-k="teacherSignature"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="teacherSignedDate"></div></label></div>
     </div>
     <p style="font-size:9pt; color:#555; margin-top:8px; font-style:italic;">Teacher signature indicates this observation was reviewed and discussed.</p>
 
@@ -152,5 +156,35 @@
         <span>PAS Documentation — Confidential</span>
         <span>Children of Promise LLC — Classroom Observation</span>
     </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* One observation record per teacher per year.
+
+   A classroom can be observed more than once in a year, and this holds one record.
+   That is a deliberate simplification rather than an oversight: a repeating set would
+   need its own table, and the immediate need is that an observation stops being a
+   sheet of paper. If more than one per year is wanted, the date field distinguishes
+   them and the next step is a per-observation record. */
+PasForm.init({
+    key: 'pas_classroom_observation',
+    scope: 'staff-year',
+    prefill: function (staff) {
+        return {
+            teacher: staff.Name,
+            // Both rooms where someone is scheduled across two, since an observation
+            // is of a room and the reader needs to know which.
+            classroom: [staff.Classroom, staff.SecondaryClassroom]
+                .map(function (v) { return String(v || '').trim(); })
+                .filter(Boolean).join(' / '),
+            observer: '',
+            dateTime: '',
+            duration: ''
+        };
+    }
+});
+</script>
 </body>
 </html>

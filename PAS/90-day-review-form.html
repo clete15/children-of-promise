@@ -103,6 +103,16 @@
             height: 1.4em;
             margin-bottom: 6px;
         }
+        /* Grows with what is typed, in place of a fixed number of ruled lines. */
+        .write-area {
+            border-bottom: 1px solid #999; min-height: 3.8em; font-size: 10pt;
+            padding: 3px 2px 2px; white-space: pre-wrap; line-height: 1.55;
+        }
+        /* A short blank inside a sentence, for the probation duration. */
+        .inline-blank {
+            display: inline-block; min-width: 90px; border-bottom: 1px solid #999;
+            padding: 0 3px;
+        }
         .recommendation-section {
             margin-top: 16px;
             margin-bottom: 16px;
@@ -159,7 +169,6 @@
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -169,25 +178,29 @@
     <div class="info-grid">
         <div class="info-field">
             <label>Employee Name:</label>
-            <div class="line"></div>
+            <div class="line" data-k="employeeName"></div>
         </div>
         <div class="info-field">
             <label>Position:</label>
-            <div class="line"></div>
+            <div class="line" data-k="position"></div>
         </div>
         <div class="info-field">
             <label>Supervisor:</label>
-            <div class="line"></div>
+            <div class="line" data-k="supervisor"></div>
         </div>
         <div class="info-field">
             <label>Hire Date:</label>
-            <div class="line"></div>
+            <div class="line" data-k="hireDate"></div>
         </div>
         <div class="info-field">
             <label>Review Date:</label>
-            <div class="line"></div>
+            <div class="line" data-k="reviewDate"></div>
         </div>
     </div>
+    <!-- Filled by the page when a start date can be read off the staff record, so the
+         due date is not worked out by hand. Says where it came from, because it is
+         derived from the notes rather than from a recorded hire-date field. -->
+    <div class="no-print" id="dueNote" style="font-size:8.5pt;color:#64748b;margin:-10px 0 14px;"></div>
 
     <div class="section-title">Performance Assessment</div>
     <p style="font-size:9pt; margin-bottom:8px; color:#555;">Rate each area: 1 = Unsatisfactory, 2 = Needs Improvement, 3 = Meets Expectations, 4 = Exceeds Expectations, 5 = Outstanding</p>
@@ -205,68 +218,69 @@
             </tr>
         </thead>
         <tbody>
+            <!-- One choice per row. Click to tick; click the ticked box to clear. -->
             <tr>
                 <td>Job Knowledge</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td style="width:20%"></td>
+                <td data-radio="jobKnowledge" data-val="1">&#9744;</td>
+                <td data-radio="jobKnowledge" data-val="2">&#9744;</td>
+                <td data-radio="jobKnowledge" data-val="3">&#9744;</td>
+                <td data-radio="jobKnowledge" data-val="4">&#9744;</td>
+                <td data-radio="jobKnowledge" data-val="5">&#9744;</td>
+                <td style="width:20%" data-k="cJobKnowledge"></td>
             </tr>
             <tr>
                 <td>Quality of Work</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td></td>
+                <td data-radio="quality" data-val="1">&#9744;</td>
+                <td data-radio="quality" data-val="2">&#9744;</td>
+                <td data-radio="quality" data-val="3">&#9744;</td>
+                <td data-radio="quality" data-val="4">&#9744;</td>
+                <td data-radio="quality" data-val="5">&#9744;</td>
+                <td data-k="cQuality"></td>
             </tr>
             <tr>
                 <td>Attendance &amp; Punctuality</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td></td>
+                <td data-radio="attendance" data-val="1">&#9744;</td>
+                <td data-radio="attendance" data-val="2">&#9744;</td>
+                <td data-radio="attendance" data-val="3">&#9744;</td>
+                <td data-radio="attendance" data-val="4">&#9744;</td>
+                <td data-radio="attendance" data-val="5">&#9744;</td>
+                <td data-k="cAttendance"></td>
             </tr>
             <tr>
                 <td>Teamwork &amp; Collaboration</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td></td>
+                <td data-radio="teamwork" data-val="1">&#9744;</td>
+                <td data-radio="teamwork" data-val="2">&#9744;</td>
+                <td data-radio="teamwork" data-val="3">&#9744;</td>
+                <td data-radio="teamwork" data-val="4">&#9744;</td>
+                <td data-radio="teamwork" data-val="5">&#9744;</td>
+                <td data-k="cTeamwork"></td>
             </tr>
             <tr>
                 <td>Communication Skills</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td></td>
+                <td data-radio="communication" data-val="1">&#9744;</td>
+                <td data-radio="communication" data-val="2">&#9744;</td>
+                <td data-radio="communication" data-val="3">&#9744;</td>
+                <td data-radio="communication" data-val="4">&#9744;</td>
+                <td data-radio="communication" data-val="5">&#9744;</td>
+                <td data-k="cCommunication"></td>
             </tr>
             <tr>
                 <td>Initiative &amp; Self-Direction</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td></td>
+                <td data-radio="initiative" data-val="1">&#9744;</td>
+                <td data-radio="initiative" data-val="2">&#9744;</td>
+                <td data-radio="initiative" data-val="3">&#9744;</td>
+                <td data-radio="initiative" data-val="4">&#9744;</td>
+                <td data-radio="initiative" data-val="5">&#9744;</td>
+                <td data-k="cInitiative"></td>
             </tr>
             <tr>
                 <td>Adherence to Policies &amp; Procedures</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td></td>
+                <td data-radio="policies" data-val="1">&#9744;</td>
+                <td data-radio="policies" data-val="2">&#9744;</td>
+                <td data-radio="policies" data-val="3">&#9744;</td>
+                <td data-radio="policies" data-val="4">&#9744;</td>
+                <td data-radio="policies" data-val="5">&#9744;</td>
+                <td data-k="cPolicies"></td>
             </tr>
         </tbody>
     </table>
@@ -275,46 +289,48 @@
 
     <div class="narrative-section">
         <p>Strengths Observed:</p>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
+        <div class="write-area" data-k="strengths"></div>
     </div>
 
     <div class="narrative-section">
         <p>Areas for Growth:</p>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
+        <div class="write-area" data-k="growth"></div>
     </div>
 
     <div class="narrative-section">
         <p>Goals for Next Review Period:</p>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
+        <div class="write-area" data-k="goals"></div>
     </div>
 
     <div class="recommendation-section">
         <p>Recommendation:</p>
-        <div class="recommendation-option">&#9633; Extend to regular employment status</div>
-        <div class="recommendation-option">&#9633; Extend introductory/probationary period (specify duration: ___________)</div>
-        <div class="recommendation-option">&#9633; Terminate employment</div>
+        <!-- One recommendation, so the three options share a group. -->
+        <div class="recommendation-option">
+            <span data-radio="recommendation" data-val="regular">&#9744;</span>
+            Extend to regular employment status</div>
+        <div class="recommendation-option">
+            <span data-radio="recommendation" data-val="extend">&#9744;</span>
+            Extend introductory/probationary period (duration:
+            <span class="inline-blank" data-k="extendDuration"></span>)</div>
+        <div class="recommendation-option">
+            <span data-radio="recommendation" data-val="terminate">&#9744;</span>
+            Terminate employment</div>
     </div>
 
     <div class="signature-section">
         <div class="sig-field">
-            <label>Supervisor Signature:<div class="sig-line"></div></label>
+            <label>Supervisor Signature:<div class="sig-line" data-k="supervisorSignature"></div></label>
         </div>
         <div class="sig-field">
-            <label>Date:<div class="sig-line"></div></label>
+            <label>Date:<div class="sig-line" data-k="supervisorSignedDate"></div></label>
         </div>
     </div>
     <div class="signature-section">
         <div class="sig-field">
-            <label>Employee Signature:<div class="sig-line"></div></label>
+            <label>Employee Signature:<div class="sig-line" data-k="employeeSignature"></div></label>
         </div>
         <div class="sig-field">
-            <label>Date:<div class="sig-line"></div></label>
+            <label>Date:<div class="sig-line" data-k="employeeSignedDate"></div></label>
         </div>
     </div>
     <p style="font-size:9pt; color:#555; margin-top:8px; font-style:italic;">Employee signature indicates receipt and discussion of this review, not necessarily agreement.</p>
@@ -323,5 +339,63 @@
         <span>PAS Documentation — Confidential</span>
         <span>Children of Promise LLC — 90-Day Introductory Review</span>
     </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* One record per person, not per year: the introductory review happens once.
+
+   There is no hire-date column on the staff record, but the notes consistently carry
+   "At CofP since 10/15/2012" or "since 01/2016", so the start date is read from there
+   and the 90-day date computed from it. Derived rather than recorded, so the page says
+   where the date came from instead of presenting it as fact. */
+function hireDateFromNotes(notes) {
+    const text = String(notes || '');
+    // Full date first, so "10/15/2012" is not read as October 2015.
+    let m = text.match(/since\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+    if (m) return { d: new Date(+m[3], +m[1] - 1, +m[2]), precision: 'day' };
+    m = text.match(/since\s+(\d{1,2})\/(\d{4})/i);
+    if (m) return { d: new Date(+m[2], +m[1] - 1, 1), precision: 'month' };
+    return null;
+}
+
+function fmt(d) {
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+PasForm.init({
+    key: 'pas_90_day_review',
+    scope: 'staff',
+    prefill: function (staff) {
+        const hire = hireDateFromNotes(staff.Notes);
+        const note = document.getElementById('dueNote');
+        if (!hire) {
+            if (note) {
+                note.textContent = 'No start date could be read from this staff record, so the '
+                    + 'hire and review dates need filling in by hand.';
+            }
+            return { employeeName: staff.Name, position: staff.Role, supervisor: '', hireDate: '', reviewDate: '' };
+        }
+        const due = new Date(hire.d.getTime());
+        due.setDate(due.getDate() + 90);
+        const overdue = due < new Date();
+        if (note) {
+            note.textContent = 'Start date read from the staff notes'
+                + (hire.precision === 'month' ? ' (month only, so the day is approximate)' : '')
+                + '. 90 days falls on ' + fmt(due) + '.'
+                + (overdue ? ' That date has passed \u2014 this review is retrospective.' : '');
+            note.style.color = overdue ? '#92400e' : '#64748b';
+        }
+        return {
+            employeeName: staff.Name,
+            position: staff.Role + (staff.Classroom ? ' \u2014 ' + staff.Classroom : ''),
+            supervisor: '',
+            hireDate: fmt(hire.d),
+            reviewDate: fmt(due)
+        };
+    }
+});
+</script>
 </body>
 </html>
