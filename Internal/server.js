@@ -1322,8 +1322,8 @@ function proxyUpgrade(req, socket, head) {
         hostname: target.hostname,
         port: target.port || (target.protocol === 'https:' ? 443 : 80),
         method: req.method,
-        // Same version-prefix strip as the HTTP proxy above.
-        path: req.url.replace(OFFICE_VERSION_PREFIX, '/'),
+        // Untouched, same as the HTTP proxy: nginx owns the version prefix.
+        path: req.url,
         headers: headers,
         rejectUnauthorized: false
     });
@@ -2555,14 +2555,18 @@ ELSE
         headers['x-forwarded-for'] = (req.socket && req.socket.remoteAddress) || '';
         delete headers['accept-encoding'];   // no need to re-encode on the way through
 
-        /* Strip the version-and-hash prefix before forwarding.
+        /* Forward the path UNTOUCHED, version prefix included.
 
-           The editor requests /9.4.0-<hash>/web-apps/... but docservice only
-           serves /web-apps/... — normally nginx rewrites that away, and this
-           install has no nginx running. Without stripping it, docservice answers
-           "Cannot GET /9.4.0-<hash>/web-apps/..." and the editor never loads.
-           The prefix is only a cache-busting device, so removing it is safe. */
-        const upstreamPath = req.url.replace(OFFICE_VERSION_PREFIX, '/');
+           An earlier version stripped the /9.4.0-<hash>/ prefix, because with
+           nginx dead only docservice was answering and it serves /web-apps/...
+           without the prefix. Once nginx was running that became actively wrong:
+           the prefix is nginx's OWN cache-busting scheme, and it redirects
+           unversioned paths back to versioned ones. Stripping therefore produced
+           a redirect loop, which surfaced as the editor's service worker failing
+           with net::ERR_FAILED on its asset JSON files.
+
+           nginx understands the prefix. Leave it alone. */
+        const upstreamPath = req.url;
 
         const upstream = lib.request({
             protocol: target.protocol,
