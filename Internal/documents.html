@@ -167,7 +167,70 @@ function fileRow(f, item) {
             : '')
         + '<button class="dl-btn" onclick="toggleOut(\'' + esc(f.rel).replace(/'/g, "\\'") + '\',\''
         + esc(item || '') + '\')">' + (out && out.checkedOutBy ? 'Check in' : 'Check out') + '</button>'
+        /* Offered only on files naming an earlier year. Archiving current-year
+           evidence is almost always a mistake, so the button is not there to click. */
+        + (f.stale
+            ? '<button class="dl-btn" onclick="archiveFile(\'' + esc(f.rel).replace(/'/g, "\\'") + '\')" '
+              + 'title="Move this superseded copy into the archive. It is moved, never deleted.">'
+              + 'Archive</button>'
+            : '')
         + '</div>';
+}
+
+/* Moves one superseded file into the archive.
+
+   Confirmed first, because it changes the shared folder for everyone. The file is
+   moved rather than deleted, so undoing it means moving it back out of _Archive. */
+async function archiveFile(rel) {
+    const name = rel.split('/').pop();
+    if (!confirm('Archive "' + name + '"?\n\n'
+        + 'It moves into the _Archive folder inside this monitoring visit and stops '
+        + 'appearing in the list. Nothing is deleted \u2014 it can be moved back.')) return;
+    msg('Archiving\u2026');
+    try {
+        const res = await apiFetch('/api/doc-archive', {
+            method: 'POST', body: JSON.stringify({ relPath: rel })
+        });
+        const d = await res.json();
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        await load();
+        msg('Archived to ' + d.archivedTo);
+    } catch (e) {
+        msg('');
+        alert('Could not archive that file: ' + e.message);
+    }
+}
+
+/* Archives every earlier-year file in one item, one request each so a single
+   failure does not take the rest with it, and reports what actually happened. */
+async function archiveItemEarlier(itemKey) {
+    const it = INDEX.items[itemKey];
+    if (!it) return;
+    const earlier = it.files.filter(f => f.stale);
+    if (!earlier.length) return;
+
+    if (!confirm('Archive ' + earlier.length + ' earlier-year file(s) from this item?\n\n'
+        + earlier.map(f => '  \u2022 ' + f.name).join('\n')
+        + '\n\nThey move into the _Archive folder. Nothing is deleted.')) return;
+
+    let done = 0;
+    const failed = [];
+    for (const f of earlier) {
+        msg('Archiving ' + (done + failed.length + 1) + ' of ' + earlier.length + '\u2026');
+        try {
+            const res = await apiFetch('/api/doc-archive', {
+                method: 'POST', body: JSON.stringify({ relPath: f.rel })
+            });
+            const d = await res.json();
+            if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+            done++;
+        } catch (e) {
+            failed.push(f.name + ': ' + e.message);
+        }
+    }
+    await load();
+    msg(done + ' archived' + (failed.length ? ', ' + failed.length + ' failed' : ''));
+    if (failed.length) alert('These could not be archived:\n\n' + failed.join('\n'));
 }
 
 function render() {
@@ -271,6 +334,17 @@ function render() {
                 ? '<details style="margin-top:6px;">'
                   + '<summary style="font-size:0.72rem;color:#64748b;cursor:pointer;padding:4px 0;">'
                   + 'Earlier years (' + earlier.length + ')</summary>'
+                  /* Bulk archive is offered only where a current-year file already
+                     exists. Archiving the last copy would empty the item, so that
+                     case is deliberately left to the per-file button. */
+                  + (current.length
+                      ? '<div style="padding:4px 0 8px;"><button class="dl-btn" onclick="archiveItemEarlier(\''
+                        + esc(k).replace(/'/g, "\\'") + '\')" '
+                        + 'title="Move all superseded copies for this item into the archive">'
+                        + 'Archive all ' + earlier.length + '</button></div>'
+                      : '<div style="padding:4px 0 8px;font-size:0.72rem;color:#92400e;">'
+                        + 'No current-year file for this item yet, so these are not offered for bulk '
+                        + 'archiving \u2014 archiving them would leave the item with no evidence at all.</div>')
                   + '<div style="opacity:0.75;">' + earlier.map(f => fileRow(f, it.item)).join('') + '</div>'
                   + '</details>'
                 : '')

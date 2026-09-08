@@ -853,6 +853,39 @@ function isChildFileFolder(name) {
     return /child\s*or\s*family|family\s*files/i.test(String(name || ''));
 }
 
+/* Where superseded evidence goes. Archiving MOVES a file here rather than deleting
+   it: this is compliance evidence, and a monitor may still ask for the version that
+   was current last year. The leading underscore keeps it sorted away from the item
+   folders and gives the indexer one simple rule to skip. */
+const DOC_ARCHIVE_DIR = '_Archive';
+
+function isArchiveFolder(name) {
+    return String(name || '').trim().toLowerCase() === DOC_ARCHIVE_DIR.toLowerCase();
+}
+
+/* Where a given evidence file should be archived to, as a library-relative folder.
+
+   Layout is "<program>/<visit folder>/<item folder…>/<file>", so the archive goes at
+   "<program>/<visit folder>/_Archive/<item folder…>". Keeping the originating folder
+   name inside the archive answers the only question anyone browsing it will have:
+   which checklist item was this evidence for.
+
+   Pure so it can be tested without touching the filesystem. Returns { archiveRel }
+   or { error } — never a guess, because the caller is about to move a file. */
+function archiveTargetFor(rel) {
+    const clean = String(rel || '').replace(/\\/g, '/').replace(/^\/+/, '');
+    if (!clean) return { error: 'relPath required' };
+    const parts = clean.split('/').filter(Boolean);
+    if (parts.some(isArchiveFolder)) return { error: 'That file is already archived' };
+    // program / visit folder / …at least one more segment for the file itself
+    if (parts.length < 3) {
+        return { error: 'That file is not inside a monitoring visit folder' };
+    }
+    const visitRel = parts.slice(0, 2).join('/');
+    const originRel = parts.slice(2, -1).join('/');   // '' for a file loose in the visit folder
+    return { archiveRel: [visitRel, DOC_ARCHIVE_DIR, originRel].filter(Boolean).join('/') };
+}
+
 /* Checked-out state, and any note attached to a file. Only rows that need one
    exist: an unremarkable file has no row, so "no row" means available. Keyed on
    the path relative to DOC_ROOT so a file keeps its history if the tree moves. */
@@ -1106,13 +1139,17 @@ function indexYearFolder(programFolder, yearFolder) {
         try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
         entries.filter(e => e.isDirectory()).forEach(d => {
             if (!section && NAMED.indexOf(d.name) !== -1) return;
+            // Archived evidence is skipped everywhere, at every depth. Without this
+            // an archived file would keep appearing in the list it was archived out
+            // of, so archiving would look like it had done nothing.
+            if (isArchiveFolder(d.name)) return;
             const files = [];
             const walk = p => {
                 let kids = [];
                 try { kids = fs.readdirSync(p, { withFileTypes: true }); } catch (e) { return; }
                 kids.forEach(k => {
                     const full = path.join(p, k.name);
-                    if (k.isDirectory()) return walk(full);
+                    if (k.isDirectory()) return isArchiveFolder(k.name) ? undefined : walk(full);
                     files.push({
                         name: k.name,
                         rel: path.relative(DOC_ROOT, full).replace(/\\/g, '/'),
@@ -3125,6 +3162,66 @@ ELSE
             'X-Content-Type-Options': 'nosniff'
         });
         return res.end(buf);
+    }
+
+    /* Archives one evidence file.
+
+       MOVES it into an _Archive folder beside the item folder it came from. It never
+       deletes and never overwrites: if the name is taken in the archive, the incoming
+       copy gets a dated suffix, so a mistake is undone by moving the file back rather
+       than by recovering something that is already gone.
+
+       The original folder name is preserved inside the archive, because "which item
+       was this evidence for" is the question anyone looking in there will have. */
+    if (req.method === 'POST' && url === '/api/doc-archive') {
+        if (!checkAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const rel = String(d.relPath || '').trim();
+            if (!rel) return sendJSON(res, 400, { error: 'relPath required' });
+
+            const full = resolveDocPath(rel);
+            if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+                return sendJSON(res, 404, { error: 'That file is not in the library' });
+            }
+            const root = findDocRoot();
+            if (!root) return sendJSON(res, 500, { error: 'The document library is not reachable' });
+
+            const plan = archiveTargetFor(rel);
+            if (plan.error) return sendJSON(res, 400, { error: plan.error });
+            const archiveDir = resolveDocPath(plan.archiveRel);
+            if (!archiveDir) return sendJSON(res, 400, { error: 'Could not place that file in the archive' });
+
+            try {
+                fs.mkdirSync(archiveDir, { recursive: true });
+                const base = path.basename(full);
+                let target = path.join(archiveDir, base);
+                if (fs.existsSync(target)) {
+                    const ext = path.extname(base);
+                    const stem = base.slice(0, base.length - ext.length);
+                    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                    target = path.join(archiveDir, stem + ' (archived ' + stamp + ')' + ext);
+                }
+                /* rename first: it is atomic on the same volume. Falls back to
+                   copy-then-unlink only if the archive somehow lands elsewhere, and
+                   the copy is verified before the original is removed. */
+                try {
+                    fs.renameSync(full, target);
+                } catch (e) {
+                    fs.copyFileSync(full, target);
+                    if (!fs.existsSync(target) || fs.statSync(target).size !== fs.statSync(full).size) {
+                        return sendJSON(res, 500, { error: 'Copy into the archive did not verify; nothing was removed' });
+                    }
+                    fs.unlinkSync(full);
+                }
+                const newRel = path.relative(path.resolve(root), target).replace(/\\/g, '/');
+                console.log('[ARCHIVE] ' + rel + '  ->  ' + newRel);
+                return sendJSON(res, 200, { success: true, archivedTo: newRel });
+            } catch (e) {
+                console.error('[ARCHIVE] failed for ' + rel + ': ' + e.message);
+                return sendJSON(res, 500, { error: 'Could not archive that file: ' + e.message });
+            }
+        });
     }
 
     // Check a file out or back in. Sending a blank name checks it back in.
