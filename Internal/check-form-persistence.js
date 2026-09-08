@@ -30,6 +30,12 @@ const out = [];
 // Pages that are navigation, auth or public-facing rather than a form to complete.
 const NOT_A_FORM = /^(index|parent|preenrollment|office|login)\.html$/i;
 
+/* A page can declare that it only displays records and has nothing to fill in, by
+   carrying this marker. Without it, a page whose one control is a "whose page am I
+   looking at" picker gets reported as typing that vanishes - which is wrong, and a
+   false alarm in this report is what stops anyone reading it. */
+const READ_ONLY_MARKER = /form-audit:\s*read-only/i;
+
 /* Counts data-entry fields in a chunk of markup. Buttons, hidden inputs and file
    pickers are not data entry. */
 function countFields(markup) {
@@ -71,7 +77,10 @@ function analyse(file) {
     const dataField = (html.match(/data-field=/g) || []).length;
 
     let verdict, severity;
-    if (fieldCount === 0) {
+    if (READ_ONLY_MARKER.test(html)) {
+        verdict = 'read-only view of records held elsewhere';
+        severity = 'none';
+    } else if (fieldCount === 0) {
         verdict = hasPrint ? 'PRINT-ONLY - no fields to fill in on screen' : 'reference page, no fields';
         severity = hasPrint ? 'high' : 'none';
     } else if (savesToServer) {
