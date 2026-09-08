@@ -2931,6 +2931,12 @@ ELSE
             missing: idx.missing, items: idx.items,
             childFolder: idx.childFolder || null,
             childFileCount: (idx.childFiles || []).length,
+            /* The files themselves, not just how many. documents.html has always told
+               people to open per-child evidence "from the child's row on the roster",
+               but the roster had no way to know what was in this folder. Sent in full
+               so the roster can match a file to a child without a request per child;
+               the folder holds tens of files, not thousands. */
+            childFiles: idx.childFiles || [],
             staleCount: Object.values(idx.items).reduce((n, i) =>
                 n + i.files.filter(f => f.stale).length, 0)
                 + (idx.childFiles || []).filter(f => f.stale).length,

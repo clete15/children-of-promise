@@ -43,6 +43,10 @@
         .cf-mark { font-size:0.62rem;font-weight:800;margin-left:2px;cursor:help; }
         .cf-mark.paper { color:#b45309; }
         .cf-date { display:block;font-size:0.55rem;color:#15803d;line-height:1.1;margin-top:1px; }
+        /* Files in the library that look like this child's. */
+        .cf-files { font-size:0.62rem;font-weight:700;color:#1d4ed8;text-decoration:none;
+                    background:#eff6ff;border-radius:7px;padding:1px 5px;margin-left:5px;white-space:nowrap; }
+        .cf-files:hover { background:#dbeafe; }
 
         /* Screening date + status shown under each screening checkbox */
         .scr-meta { display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:2px;line-height:1.2; }
@@ -139,6 +143,10 @@
         .picc-none { background:#f1f5f9;color:#64748b; }
         .picc-info { background:#eff6ff;color:#1d4ed8; }
         .picc-missing { font-size:0.72rem;color:#b91c1c;background:#fef2f2;border-radius:6px;padding:7px 10px;margin-top:9px;line-height:1.5; }
+        /* Ticked with nothing saved: a question, not a failure, so amber not red. */
+        .picc-unbacked { font-size:0.72rem;color:#92400e;background:#fffbeb;border:1px solid #fde68a;
+                         border-radius:6px;padding:7px 10px;margin-top:7px;line-height:1.5; }
+        .picc-unbacked-why { display:block;color:#a16207;font-size:0.68rem;margin-top:3px; }
         .picc-details { margin-top:9px; }
         .picc-details summary { font-size:0.72rem;font-weight:700;color:#1d4ed8;cursor:pointer; }
         .picc-details ul { margin:7px 0 0 18px;padding:0;font-size:0.73rem;color:#475569;line-height:1.6; }
@@ -746,6 +754,29 @@
     </div>
 </div>
 
+<!-- One child's evidence in the document library. The library has always held a
+     "Child or Family Files" folder, and the library page told people to open it
+     from the child's row here, but the roster had no way to show it. -->
+<div class="pi-overlay" id="cfilesOverlay">
+    <div class="pi-modal" style="max-width:640px;">
+        <div class="pi-modal-header">
+            <h3 id="cfilesTitle">Files</h3>
+            <button class="pi-close" onclick="closeChildFiles()" aria-label="Close">&times;</button>
+        </div>
+        <div class="pi-modal-body" id="cfilesBody"></div>
+        <div class="pi-modal-footer">
+            <label class="pi-btn pi-btn-secondary" style="cursor:pointer;"
+                   title="Add a signed or scanned document to this child's file">
+                Check in a file for this child
+                <input type="file" style="display:none;" id="cfilesUpload"
+                       accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt"
+                       onchange="uploadChildFile(this)">
+            </label>
+            <button class="pi-btn pi-btn-primary" onclick="closeChildFiles()">Close</button>
+        </div>
+    </div>
+</div>
+
 <!-- Hidden container used to build a single multi-form print job (Print All) -->
 <div id="printAllContainer"></div>
 
@@ -1341,6 +1372,11 @@ function screeningMeta(student, type, period, isBeginning) {
 
 function renderRoster() {
     renderRosterHead();
+    /* The library index drives the per-child file marker. Loaded here as well as by
+       the compliance views, because a teacher working the roster should not have to
+       visit the compliance page first for their children's files to appear. It is
+       cached and re-renders the active view when it lands. */
+    loadDocIndex(activeProgram === 'PI' ? 'PI' : 'PFA');
     const cols = visibleColumns();
     const span = cols.length + 2;  // + Student and Room
 
@@ -1391,7 +1427,9 @@ function renderRoster() {
             }
             return td + box + '</td>';
         }).join('');
-        return '<tr><td class="left" style="font-weight:600;font-size:0.73rem;">' + s.Last_Name + ', ' + s.First_Name + '</td><td style="font-size:0.7rem;color:var(--text-muted);">' + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
+        return '<tr><td class="left" style="font-weight:600;font-size:0.73rem;">'
+            + s.Last_Name + ', ' + s.First_Name + childDocsBadge(s)
+            + '</td><td style="font-size:0.7rem;color:var(--text-muted);">' + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
     }).join('');
 
     // "Print All" footer row, one cell per column that can produce a form.
@@ -2300,6 +2338,11 @@ const PFA_CHECKLIST_ITEMS = [
                'Demographic and family information, emergency contacts, and who the child may be released to',
                'Proof of family income', 'Behavior support plan, if applicable',
                'Program transition plan, if applicable'],
+        /* Only the parts of this item the roster actually tracks. The rest of a
+           complete file (birth certificate, immunisations, vision and hearing) is
+           not held here, so this roll-up is a partial answer and the sub-list above
+           remains the full one. Named from the sub-item "Proof of family income". */
+        childFields: ['ProofOfIncome'],
         evidence: 'Income proof may be pay stubs (two most recent consecutive), WIC, SNAP, TANF, SSI, CCAP, most recent tax return, W-2, employer letter, Medicaid enrolment, or a signed statement where income is zero.'
     },
     {
@@ -2318,6 +2361,11 @@ const PFA_CHECKLIST_ITEMS = [
                'Parent or guardian permission signatures',
                'Parent interview, conducted in the home language',
                'Exit interview form or a description of the exit interview process'],
+        /* Each taken from a sub-item above: screening results (ASQ-3 and ASQ:SE-2),
+           permission signatures, and the parent interview. Results-shared and exit
+           interview have no roster column on the PFA side, so they are not counted;
+           the sub-list stays the complete picture. */
+        childFields: ['PermissionSlip', 'ParentInterview', 'BegASQ', 'BegASE'],
         evidence: 'Screening results per child, copy of the parent interview, copy of the exit interview form, copy of any referral.',
         excelerate: '1D. Child Screening'
     },
@@ -2394,6 +2442,10 @@ const PFA_CHECKLIST_ITEMS = [
                'Regular, ongoing observations of typical daily classroom activities',
                'At least two benchmarks per reporting period from language arts, maths, social-emotional, science, social studies, physical, fine arts and ELL domains',
                'Narrative summary reports shared with the parent or guardian'],
+        /* From the last sub-item: the report cards are the narrative summaries that
+           go to parents. The roster tracks two of the three reporting periods, so
+           this counts the sending of them, not the quality of the portfolios. */
+        childFields: ['MidYearReport', 'EndYearReport'],
         evidence: 'Portfolios for all enrolled children, narrative summary reports, documentation reflecting the IELDS.',
         excelerate: '1E. Child Assessment'
     },
@@ -2742,7 +2794,8 @@ function renderClassroom() {
 
         return '<div class="cls-card">'
             + '<div class="cls-card-head">'
-            + '<div><div class="cls-name">' + s.Last_Name + ', ' + s.First_Name + '</div>'
+            + '<div><div class="cls-name">' + s.Last_Name + ', ' + s.First_Name
+            + childDocsBadge(s) + '</div>'
             + '<div class="cls-meta">' + (s.PFA_PI_na || '') + (s.Birth_date ? ' &middot; born ' + s.Birth_date : '')
             + (s.Start_Date ? ' &middot; enrolled ' + s.Start_Date : '') + '</div></div>'
             + status + '</div>'
@@ -3150,23 +3203,74 @@ function saveLicenseField(which, value) {
     updateStartYearCount();
 }
 
-// Live per-child evidence roll-up for an item backed by roster columns. Counts a
-// child as complete only when every backing column is ticked, so the number
-// answers "how many files would pass" rather than "how many boxes are ticked".
-function piccChildStats(item) {
+/* Live per-child evidence roll-up for an item backed by roster columns.
+
+   Counts a child as complete only when every backing column has a form actually
+   saved, so the number answers "how many files would survive a review" rather
+   than "how many boxes are ticked". It used to be the latter, which meant a
+   drawer with nothing in it could report as fully compliant.
+
+   Children whose box is ticked with nothing behind it come back separately in
+   .unbacked. They are not counted as complete, but they are not the same problem
+   as a child with nothing at all: the usual explanation is a form completed on
+   paper, which is allowed, and the panel says so rather than calling it a fault.
+
+   program defaults to PI because the PICC is Prevention Initiative; the PFA
+   checklist passes its own. */
+function piccChildStats(item, program) {
     if (!item.childFields) return null;
+    var prog = program || 'PI';
     var roster = students.filter(function (s) {
-        return s.PFA_PI_na === 'PI' && (s.Active === 'Yes' || s.Active === 'YES');
+        return s.PFA_PI_na === prog && (s.Active === 'Yes' || s.Active === 'YES');
     });
-    var missing = roster.filter(function (s) {
-        var t = trackingData[s.Id] || {};
-        return item.childFields.some(function (f) { return !t[f]; });
-    });
-    return { total: roster.length, complete: roster.length - missing.length, missing: missing };
+    return ChildForms.rollup(item.childFields, roster, trackingData);
 }
 
 function statusPill(state, text) {
     return '<span class="picc-pill picc-' + state + '">' + text + '</span>';
+}
+
+/* ── Per-child evidence, rendered the same way on both checklists ──────────
+   Extracted so the PFA and PICC panels cannot drift into describing the same
+   situation differently. Both call these; neither owns them. */
+
+function childNameList(list) {
+    return list.slice(0, 6).map(function (s) { return s.Last_Name + ', ' + s.First_Name; }).join(' &middot; ')
+        + (list.length > 6 ? ' &middot; +' + (list.length - 6) + ' more' : '');
+}
+
+/* Two lists, because they need two different actions. "Nothing on file" means do
+   the work. "Ticked but not saved here" means either the paper is in the cabinet,
+   in which case say so in the notes, or somebody ticked a box early. Naming the
+   children is the point: an assessor pulls files at random, so the ones worth
+   checking first are the ones listed. */
+function childStatsNote(stats) {
+    if (!stats) return '';
+    var out = '';
+    var unbackedIds = (stats.unbacked || []).map(function (s) { return s.Id; });
+    var nothing = stats.missing.filter(function (s) { return unbackedIds.indexOf(s.Id) === -1; });
+    if (nothing.length) {
+        out += '<div class="picc-missing"><strong>Nothing on file:</strong> '
+            + childNameList(nothing) + '</div>';
+    }
+    if (unbackedIds.length) {
+        out += '<div class="picc-unbacked"><strong>Ticked, but no form saved here:</strong> '
+            + childNameList(stats.unbacked)
+            + '<span class="picc-unbacked-why">If these were completed on paper and filed, note that below '
+            + '\u2014 the paper is the evidence. Otherwise the box is ahead of the work.</span></div>';
+    }
+    return out;
+}
+
+// Straight to the roster column holding this item's per-child evidence.
+function childFieldJumps(item) {
+    if (!item.childFields) return '';
+    return item.childFields.map(function (f) {
+        var col = COLUMNS.find(function (c) { return c.field === f; });
+        if (!col) return '';
+        return '<a class="picc-btn picc-btn-jump" href="#" onclick="event.preventDefault();jumpToRosterColumn(\'' + f + '\')">'
+            + col.label.replace(/<br>/g, ' ') + '</a>';
+    }).join('');
 }
 
 /* ── Document library, joined to the checklist by item number ──────────────
@@ -3230,9 +3334,12 @@ function loadDocIndex(program) {
         .then(function (d) {
             docIndex = d;
             docIndexState = 'ready';
-            // Re-render so the lists appear once the index lands.
+            // Re-render so the lists appear once the index lands. The roster and the
+            // classroom view need this too now that they show a per-child file marker;
+            // without it the markers appeared only after the next interaction.
             if (activeComplianceProgram === 'piCompliance'
                 || activeComplianceProgram === 'pfaCompliance') loadCompliance();
+            else refreshActiveView();
         })
         .catch(function () {
             docIndexState = 'failed';
@@ -3305,6 +3412,153 @@ function uploadEvidence(num, input) {
       }).catch(function () { say('Upload failed — no connection', '#b91c1c'); });
 }
 
+/* ── One child's files in the library ─────────────────────────────────────
+   The library keeps a "Child or Family Files" folder alongside the numbered item
+   folders, and documents.html has always said to open it from the child's row on
+   this roster. There was no such link, so the folder was effectively write-only.
+
+   Files are matched to a child BY FILENAME, which is a guess, not a fact. There
+   is nothing in the library tying a file to a student id, so the rule is: the
+   name must contain both the first and last name. That misses "N. Smith ASQ.pdf"
+   and would wrongly claim a file naming two siblings. It is stated as a guess
+   wherever it is shown, and the whole folder stays one click away, so a file this
+   misses is never hidden. */
+function normaliseName(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z]+/g, ' ').trim();
+}
+
+function childDocs(student) {
+    if (!docIndex || !docIndex.childFiles || !student) return [];
+    var first = normaliseName(student.First_Name);
+    var last = normaliseName(student.Last_Name);
+    if (!first || !last) return [];
+    return docIndex.childFiles.filter(function (f) {
+        var n = ' ' + normaliseName(f.name) + ' ';
+        return n.indexOf(' ' + first + ' ') !== -1 && n.indexOf(' ' + last + ' ') !== -1;
+    });
+}
+
+// Small marker in the student cell. Silent until the index has loaded, so a slow
+// library never makes a child look as though they have no file.
+function childDocsBadge(student) {
+    if (docIndexState !== 'ready') return '';
+    var files = childDocs(student);
+    if (!files.length) return '';
+    return ' <a href="#" class="cf-files" onclick="event.preventDefault();openChildFiles(' + student.Id + ')"'
+        + ' title="' + files.length + ' file' + (files.length === 1 ? '' : 's')
+        + ' in the library appear to be this child\'s">\u{1F4CE}' + files.length + '</a>';
+}
+
+var currentChildFilesId = null;
+
+function openChildFiles(studentId) {
+    var s = students.find(function (x) { return String(x.Id) === String(studentId); });
+    if (!s) return;
+    currentChildFilesId = studentId;
+    document.getElementById('cfilesTitle').textContent =
+        'Library files \u2013 ' + s.Last_Name + ', ' + s.First_Name;
+
+    var files = childDocs(s);
+    var PREVIEWABLE = ['.pdf', '.png', '.jpg', '.jpeg', '.txt'];
+    var EDITABLE = ['.docx', '.xlsx', '.pptx'];
+    var meta = (docIndex && docIndex.meta) || {};
+
+    var rows = files.map(function (f) {
+        var dot = f.name.lastIndexOf('.');
+        var ext = dot === -1 ? '' : f.name.slice(dot).toLowerCase();
+        var out = meta[f.rel];
+        return '<li style="margin-bottom:7px;">'
+            + '<a href="/api/doc-file?path=' + encodeURIComponent(f.rel) + '"'
+            + (PREVIEWABLE.indexOf(ext) !== -1
+                ? ' target="_blank" rel="noopener"' : ' download="' + escapeHtml(f.name) + '"')
+            + '>' + escapeHtml(f.name) + '</a>'
+            + (officeEnabled && EDITABLE.indexOf(ext) !== -1
+                ? ' <a class="picc-btn" style="padding:1px 7px;font-size:0.66rem;" href="office.html?path='
+                  + encodeURIComponent(f.rel) + '" target="_blank" rel="noopener"'
+                  + ' title="Edit in the browser and save straight back to the library">Edit</a>'
+                : '')
+            + (out && out.checkedOutBy
+                ? ' <span class="picc-doc-out">out: ' + escapeHtml(out.checkedOutBy) + '</span>' : '')
+            + (f.stale ? ' <span class="picc-doc-stale">old year</span>' : '')
+            + '</li>';
+    }).join('');
+
+    document.getElementById('cfilesBody').innerHTML =
+        (files.length
+            ? '<ul style="margin:0 0 12px 18px;font-size:0.82rem;">' + rows + '</ul>'
+            : '<p style="font-size:0.85rem;color:#64748b;">No file in the library has this '
+              + 'child\u2019s name in it.</p>')
+        + '<p style="font-size:0.74rem;color:#64748b;line-height:1.55;">'
+        + 'Matched by filename \u2014 a file has to contain both names to appear here, so one '
+        + 'named differently will be missing from this list without being missing from the '
+        + 'folder. '
+        + (docIndex && docIndex.childFolder
+            ? 'The whole folder (' + docIndex.childFolder.count + ' files) is in the '
+              + '<a href="documents.html" target="_blank" rel="noopener">document library</a>.'
+            : '')
+        + '</p>'
+        + '<p id="cfilesStatus" style="font-size:0.76rem;margin-top:8px;"></p>';
+
+    document.getElementById('cfilesOverlay').classList.add('open');
+}
+
+function closeChildFiles() {
+    document.getElementById('cfilesOverlay').classList.remove('open');
+    currentChildFilesId = null;
+}
+
+/* Check a document in against a child. Goes to the same "Child or Family Files"
+   folder the library already uses, through the same endpoint as item evidence, so
+   there is one way in and one place it lands. The child's name is prepended to the
+   filename when it is not already there, because the filename is the only thing
+   tying the file to the child. */
+function uploadChildFile(input) {
+    var file = input.files && input.files[0];
+    if (!file || !currentChildFilesId) return;
+    var s = students.find(function (x) { return String(x.Id) === String(currentChildFilesId); });
+    var status = document.getElementById('cfilesStatus');
+    var say = function (t, c) { if (status) { status.textContent = t; status.style.color = c || '#64748b'; } };
+
+    if (!docIndex || !docIndex.childFolder) {
+        say('No "Child or Family Files" folder exists in this year\u2019s library yet \u2014 '
+            + 'create it there first.', '#b91c1c');
+        return;
+    }
+    /* The index reports the child folder by name, not by path, so rebuild it the
+       way the server lays the library out: program / year folder / folder name.
+       Rebuilt rather than taken from an existing file's path, because that path may
+       point into a subfolder and there may be no files yet at all. */
+    var folder = [docIndex.program, docIndex.folder, docIndex.childFolder.name].join('/');
+
+    var dot = file.name.lastIndexOf('.');
+    var ext = dot === -1 ? '' : file.name.slice(dot);
+    var stem = dot === -1 ? file.name : file.name.slice(0, dot);
+    var flat = normaliseName(stem);
+    var already = flat.indexOf(normaliseName(s.Last_Name)) !== -1
+        && flat.indexOf(normaliseName(s.First_Name)) !== -1;
+    // Prepended when absent, because the filename is the only thing tying the file
+    // to the child; a scan called "img_0421.pdf" would be unfindable otherwise.
+    var name = already ? file.name : s.Last_Name + ', ' + s.First_Name + ' - ' + stem + ext;
+
+    var fd = new FormData();
+    fd.append('file', file, name);
+    say('Uploading ' + name + '\u2026');
+    fetch('/api/doc-upload?folder=' + encodeURIComponent(folder), {
+        method: 'POST',
+        headers: (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        body: fd
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j.success) { say(res.j.error || 'Upload failed', '#b91c1c'); return; }
+        say('Checked in as ' + res.j.name, '#166534');
+        input.value = '';
+        // Re-read the library, then redraw this child's list and the roster marker.
+        docIndexState = 'idle';
+        docIndex = null;
+        loadDocIndex();
+      }).catch(function () { say('Upload failed \u2014 no connection', '#b91c1c'); });
+}
+
 function piccDocsHtml(num) {
     // Quiet while loading: an empty item is indistinguishable from a slow one,
     // and guessing wrong in either direction is worse than saying nothing.
@@ -3371,18 +3625,36 @@ function renderPfaChecklistSection(data) {
     loadDocIndex('PFA');
 
     var applicable = PFA_CHECKLIST_ITEMS.filter(function (i) { return !i.na; });
+    /* An item backed by per-child evidence is ready when every PFA child's file is,
+       not when someone ticked "evidence assembled". Same rule as the PICC side, so
+       the two checklists cannot report on different bases. */
     var ready = 0;
-    applicable.forEach(function (item) { if (data['PFA_' + item.num]) ready++; });
+    applicable.forEach(function (item) {
+        var st = piccChildStats(item, 'PFA');
+        if (st) { if (st.total && st.complete === st.total) ready++; return; }
+        if (data['PFA_' + item.num]) ready++;
+    });
 
     var rows = PFA_CHECKLIST_ITEMS.map(function (item) {
         var key = 'PFA_' + item.num;
         var checked = data[key] ? 'checked' : '';
         var dateVal = data[key + 'Date'] || '';
         var notes = data[key + 'Notes'] || '';
+        var stats = item.na ? null : piccChildStats(item, 'PFA');
 
-        var status = item.na
-            ? statusPill('info', 'not applicable')
-            : (data[key] ? statusPill('ok', 'evidence recorded') : statusPill('open', 'not recorded'));
+        var status;
+        if (item.na) status = statusPill('info', 'not applicable');
+        else if (stats) {
+            status = !stats.total
+                ? statusPill('none', 'no active PFA children')
+                : statusPill(stats.complete === stats.total ? 'ok' : 'open',
+                    stats.complete + ' of ' + stats.total + ' files complete');
+            if (stats.unbacked.length) {
+                status += statusPill('info', stats.unbacked.length + ' ticked, no form saved');
+            }
+        } else {
+            status = data[key] ? statusPill('ok', 'evidence recorded') : statusPill('open', 'not recorded');
+        }
 
         var actions = '<a class="picc-btn" href="documents.html#' + encodeURIComponent(item.num)
             + '" target="_blank" rel="noopener">Library</a>';
@@ -3393,6 +3665,9 @@ function renderPfaChecklistSection(data) {
                 + 'onchange="uploadEvidence(\'' + item.num + '\',this)"></label>';
         }
         if (item.waitlistLink) actions += '<a class="picc-btn picc-btn-jump" href="waitinglist.html">Waiting list</a>';
+        // Same jump links as the PICC side, so a PFA item backed by roster columns
+        // gets you to the column rather than leaving you to find it.
+        actions += childFieldJumps(item);
 
         return '<div class="picc-item">'
             + '<div class="picc-item-top">'
@@ -3405,6 +3680,7 @@ function renderPfaChecklistSection(data) {
             + '</div>'
             + '<div class="picc-item-status">' + status + '</div>'
             + '</div>'
+            + childStatsNote(stats)
             + (item.subs ? '<details class="picc-details"><summary>What the reviewer checks ('
                 + item.subs.length + ')</summary><ul>'
                 + item.subs.map(function (s) { return '<li>' + s + '</li>'; }).join('')
@@ -3418,8 +3694,10 @@ function renderPfaChecklistSection(data) {
             + (item.na ? '' : piccDocsHtml(item.num))
             + '<div class="picc-actions">' + actions + '</div>'
             + (item.na ? '' : '<div class="picc-controls">'
-                + '<label class="picc-check"><input type="checkbox" ' + checked
-                + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>'
+                // No manual tick where the children's files decide it: two sources for
+                // one answer is how the roster got into this state to begin with.
+                + (stats ? '' : '<label class="picc-check"><input type="checkbox" ' + checked
+                    + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>')
                 + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
                 + '<span id="up_' + item.num + '" style="flex-basis:100%;font-size:0.72rem;margin-top:6px;"></span>'
                 + '</div>'
@@ -3490,6 +3768,13 @@ function renderPiccItem(item, data) {
         if (!stats.total) status = statusPill('none', 'no active PI children');
         else if (stats.complete === stats.total) status = statusPill('ok', stats.total + ' of ' + stats.total + ' files complete');
         else status = statusPill('open', stats.complete + ' of ' + stats.total + ' files complete');
+        /* Ticked with nothing saved gets its own pill. Folding these into the
+           "complete" number is what let an empty drawer read as compliant, and
+           folding them into "missing" would be just as wrong for a family whose
+           paperwork is sitting signed in a filing cabinet. */
+        if (stats.unbacked && stats.unbacked.length) {
+            status += statusPill('info', stats.unbacked.length + ' ticked, no form saved');
+        }
     } else if (item.licensePanel) {
         // CB2 status comes from the license expiry, not a manual checkbox.
         var ls = licenseStatus();
@@ -3520,15 +3805,7 @@ function renderPiccItem(item, data) {
         + 'onchange="uploadEvidence(\'' + item.num + '\',this)"></label>';
 
     // Per-child items jump straight to the roster column that holds the evidence.
-    var jumps = '';
-    if (item.childFields) {
-        item.childFields.forEach(function (f) {
-            var col = COLUMNS.find(function (c) { return c.field === f; });
-            if (!col) return;
-            jumps += '<a class="picc-btn picc-btn-jump" href="#" onclick="event.preventDefault();jumpToRosterColumn(\'' + f + '\')">'
-                + col.label.replace(/<br>/g, ' ') + '</a>';
-        });
-    }
+    var jumps = childFieldJumps(item);
     if (item.waitlistLink) {
         jumps += '<a class="picc-btn picc-btn-jump" href="waitinglist.html">Waiting list</a>';
     }
@@ -3536,12 +3813,7 @@ function renderPiccItem(item, data) {
         jumps += '<a class="picc-btn picc-btn-jump" href="#" onclick="event.preventDefault();setProgram(\'followUp\')">Screening follow-up</a>';
     }
 
-    var missingNote = '';
-    if (stats && stats.missing.length) {
-        var names = stats.missing.slice(0, 6).map(function (s) { return s.Last_Name + ', ' + s.First_Name; }).join(' &middot; ');
-        missingNote = '<div class="picc-missing"><strong>Missing:</strong> ' + names
-            + (stats.missing.length > 6 ? ' &middot; +' + (stats.missing.length - 6) + ' more' : '') + '</div>';
-    }
+    var missingNote = childStatsNote(stats);
 
     return '<div class="picc-item">'
         + '<div class="picc-item-top">'
