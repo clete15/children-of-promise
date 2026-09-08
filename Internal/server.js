@@ -2091,6 +2091,85 @@ function handleRequest(req, res) {
         return sendJSON(res, 200, rows);
     }
 
+    /* ── Which per-child forms actually exist ──────────────────────────────
+       GET /api/child-forms?year=YYYY-YYYY
+
+       ISBETracking holds a tick per checklist column. A tick is set when a form is
+       saved, but it is an independent boolean: nothing stops it being ticked by hand
+       with no form behind it, and nothing unticks it if the record is later removed.
+       So the roster could show a completed checklist for a file that has nothing in
+       it — which is precisely the thing a monitoring visit looks for.
+
+       This reports the other half: for each child, which forms have a record. The
+       roster then shows "form on file" and "ticked by hand" as the different things
+       they are, and the compliance panel can count real evidence rather than ticks.
+
+       Keyed by ISBETracking column name so the client's registry maps straight onto
+       a checkbox with nothing in between to get out of step.
+
+       Every table is guarded on existing AND queried through EXEC. Deferred name
+       resolution covers a missing table but not a missing column, so without the
+       dynamic call a table that predates one of these columns would fail the whole
+       batch rather than just its own line. */
+    if (req.method === 'GET' && url === '/api/child-forms') {
+        if (!checkAuth(req, res)) return;
+        const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
+
+        // Field, table, date column, and any extra WHERE. Year is already validated
+        // to \d{4}-\d{4} by resolveSchoolYear, so it is safe inside the quoted SQL.
+        const sources = [
+            ['ParentInterview', 'ParentInterviews', 'InterviewDate', ''],
+            ['PermissionSlip', 'PermissionSlips', 'SignedDate', ''],
+            ['BegASQ', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ-3'' AND Period=''Beginning''"],
+            ['EndASQ', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ-3'' AND Period=''End''"],
+            ['BegASE', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ:SE-2'' AND Period=''Beginning''"],
+            ['EndASE', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ:SE-2'' AND Period=''End''"]
+        ];
+
+        /* The PICC document forms come from their own declaration rather than being
+           listed again here, so adding a seventh form needs no change in this handler.
+           Its date is the first column named like a date; a form without one still
+           reports as present, just undated. */
+        Object.keys(PI_DOC_FORMS).forEach(k => {
+            const cfg = PI_DOC_FORMS[k];
+            const dateCol = (cfg.columns.find(([name]) => /Date$/.test(name)) || [null])[0];
+            sources.push([cfg.trackingColumn, cfg.table, dateCol, '']);
+        });
+
+        // Tables touched here get the SchoolYear migration first, for the same reason
+        // every other reader does: without it an older table fails forever.
+        const tables = [...new Set(sources.map(([, table]) => table))];
+        let sql = tables.map(t => schoolYearColumnSQL(t)).join('')
+            + `IF OBJECT_ID('tempdb..#cf') IS NOT NULL DROP TABLE #cf;
+CREATE TABLE #cf (Field NVARCHAR(60), StudentId INT, Dt NVARCHAR(40));
+`;
+        sources.forEach(([field, table, dateCol, extra]) => {
+            const dateExpr = dateCol ? `ISNULL(CAST(${dateCol} AS NVARCHAR(40)),'''')` : `''''`;
+            // Quotes are doubled once, because these strings are read by SQL Server
+            // one level deep inside EXEC. Doubling twice makes the year literal
+            // '' + 2026-2027 + '' and the batch fails to parse.
+            sql += `IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='${table}')
+    EXEC('INSERT INTO #cf (Field,StudentId,Dt) SELECT ''${field}'', StudentId, ${dateExpr} FROM ${table} WHERE SchoolYear=''${year}''${extra}');
+`;
+        });
+        // MAX picks a date over a blank one where a child somehow has two rows.
+        sql += `SELECT Field, StudentId, MAX(Dt) AS Dt FROM #cf GROUP BY Field, StudentId;
+DROP TABLE #cf;`;
+
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+
+        const forms = {};
+        r.data.trim().split('\n').forEach(l => {
+            // Data lines only: "<Field> | <StudentId> | <Dt>".
+            const v = l.split('|').map(x => x.trim());
+            if (v.length < 2 || !/^\d+$/.test(v[1])) return;
+            if (!forms[v[1]]) forms[v[1]] = {};
+            forms[v[1]][v[0]] = { on: true, date: v[2] || '' };
+        });
+        return sendJSON(res, 200, { year: year, forms: forms });
+    }
+
     // GET parent interview for a student (internal - protected)
     if (req.method === 'GET' && url.startsWith('/api/parent-interview/')) {
         if (!checkAuth(req, res)) return;
