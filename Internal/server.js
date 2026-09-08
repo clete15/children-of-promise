@@ -182,6 +182,16 @@ function resolveSchoolYear(v) {
 
 // Adds SchoolYear to a table that predates it, backfills existing rows, and
 // returns the DDL. Safe to re-run.
+//
+// Ends with GO, and every caller depends on that. SQL Server compiles an entire
+// batch before executing any of it, and deferred name resolution covers a missing
+// TABLE but not a missing COLUMN on a table that already exists. So "ALTER TABLE
+// ADD SchoolYear" followed in the SAME batch by "SELECT ... WHERE SchoolYear=..."
+// fails to compile - and because compilation fails, the ALTER never runs either.
+// That is a permanent deadlock, not a transient error: the migration can never
+// apply, and every request logs "Invalid column name 'SchoolYear'" forever. It is
+// exactly what happened to ISBETracking's 11 newer columns. This function is the
+// last DDL in every caller, so terminating the batch here fixes all of them.
 function schoolYearColumnSQL(table) {
     // Guarded on the table existing as well as the column, because callers run
     // this before a SELECT that may be the first thing to touch the table.
@@ -191,6 +201,7 @@ BEGIN
     EXEC('ALTER TABLE ${table} ADD SchoolYear NVARCHAR(20)');
     EXEC('UPDATE ${table} SET SchoolYear=''${LEGACY_SCHOOL_YEAR}'' WHERE SchoolYear IS NULL');
 END;
+GO
 `;
 }
 
@@ -220,6 +231,8 @@ function isbeTrackingEnsureSQL() {
     for (const c of ISBE_TRACKING_COLUMNS) {
         sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ISBETracking' AND COLUMN_NAME='${c}') ALTER TABLE ISBETracking ADD ${c} BIT DEFAULT 0;\n`;
     }
+    // schoolYearColumnSQL ends the batch, which is what lets the ALTERs above be
+    // visible to the caller's SELECT. Without that the healing code deadlocked.
     sql += schoolYearColumnSQL('ISBETracking');
     return sql;
 }
@@ -1208,6 +1221,8 @@ ${cols},
     for (const [name, type] of cfg.columns) {
         sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='${cfg.table}' AND COLUMN_NAME='${name}') ALTER TABLE ${cfg.table} ADD ${name} ${type};\n`;
     }
+    // Ends the batch, so the forward migration above is visible to the caller's
+    // SELECT. The self-migrating column list is useless otherwise.
     sql += schoolYearColumnSQL(cfg.table);
     return sql;
 }
