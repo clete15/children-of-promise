@@ -33,13 +33,23 @@
             margin-top: 16px; margin-bottom: 8px;
             border-bottom: 1px solid #cbd5e0; padding-bottom: 4px;
         }
-        .write-lines {
-            border-bottom: 1px solid #999; height: 1.4em; margin-bottom: 6px;
+        /* Grows with what is typed rather than stopping at the ruled lines. */
+        .write-area {
+            border-bottom: 1px solid #999; min-height: 4.2em;
+            margin-bottom: 6px; white-space: pre-wrap; font-size: 10pt;
         }
         .attendees-box {
             border: 1px solid #cbd5e0; padding: 10px;
             min-height: 60px; margin-bottom: 16px;
         }
+        .att-grid {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 2px 12px; font-size: 9.5pt;
+        }
+        .att-item { display: flex; align-items: baseline; gap: 6px; }
+        .att-item .box { font-size: 12pt; line-height: 1; }
+        .att-other { margin-top: 8px; display: flex; align-items: baseline; gap: 8px; font-size: 9.5pt; }
+        .att-other .line { flex: 1; border-bottom: 1px solid #999; min-height: 1.2em; }
         .minutes-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
         .minutes-table th, .minutes-table td {
             border: 1px solid #cbd5e0; padding: 6px 8px;
@@ -61,11 +71,13 @@
             body { padding: 0; }
             @page { margin: 0.5in 0.6in; size: letter; }
             .no-print { display: none; }
+            /* Rows nobody typed in are dropped on paper, so a printed copy is not
+               half blank grid. They still exist on screen for the next entry. */
+            .minutes-table tr.row-empty { display: none; }
         }
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -74,21 +86,32 @@
 
     <div class="info-grid">
         <div class="info-field">
-            <label>Meeting Date:</label><div class="line"></div>
+            <label>Meeting Date:</label><div class="line" data-k="meetingDate"></div>
         </div>
         <div class="info-field">
-            <label>Time:</label><div class="line"></div>
+            <label>Time:</label><div class="line" data-k="time"></div>
         </div>
         <div class="info-field">
-            <label>Location:</label><div class="line"></div>
+            <label>Location:</label><div class="line" data-k="location"></div>
         </div>
         <div class="info-field">
-            <label>Facilitator:</label><div class="line"></div>
+            <label>Facilitator:</label><div class="line" data-k="facilitator"></div>
         </div>
     </div>
 
     <div class="section-title">Attendees</div>
-    <div class="attendees-box"></div>
+    <!-- Filled from the staff list, so attendance is ticked rather than written out and
+         the names always match the personnel records an assessor would cross-check. -->
+    <div class="attendees-box">
+        <div class="att-grid" id="attGrid">
+            <span style="color:#64748b;font-size:9.5pt;">Loading staff list…</span>
+        </div>
+        <div class="att-other">
+            <label style="font-weight:600;">Others present:</label>
+            <div class="line" data-k="attendeesOther"></div>
+        </div>
+    </div>
+    <div class="no-print" id="attCount" style="font-size:8.5pt;color:#64748b;margin:-10px 0 14px;"></div>
 
     <div class="section-title">Agenda Items</div>
     <table class="minutes-table">
@@ -101,31 +124,24 @@
                 <th style="width:15%">Due Date</th>
             </tr>
         </thead>
-        <tbody>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            <tr><td></td><td></td><td></td><td></td><td></td></tr>
-        </tbody>
+        <!-- Ten rows, generated so the field names cannot drift out of step. -->
+        <tbody id="agendaBody"></tbody>
     </table>
 
     <div class="section-title">Follow-Up from Previous Meeting</div>
-    <div class="write-lines"></div><div class="write-lines"></div>
-    <div class="write-lines"></div><div class="write-lines"></div>
+    <div class="write-area" data-k="followUp"></div>
 
     <div class="section-title">Next Meeting</div>
     <div class="info-field" style="margin-bottom:16px;">
-        <label>Date/Time:</label><div class="line"></div>
+        <label>Date/Time:</label><div class="line" data-k="nextMeeting"></div>
     </div>
 
     <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:16px;">
         <div class="info-field">
-            <label>Minutes Prepared By:</label><div class="line"></div>
+            <label>Minutes Prepared By:</label><div class="line" data-k="preparedBy"></div>
         </div>
         <div class="info-field">
-            <label>Date Distributed:</label><div class="line"></div>
+            <label>Date Distributed:</label><div class="line" data-k="dateDistributed"></div>
         </div>
     </div>
 
@@ -133,5 +149,102 @@
         <span>PAS Documentation — Confidential</span>
         <span>Children of Promise LLC — Staff Meeting Minutes</span>
     </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* Staff meetings happen repeatedly, so this holds one record per meeting rather than one
+   per year: picking a meeting from the toolbar opens that set of minutes, and "New
+   meeting" starts a fresh one. Nothing is ever typed over.
+
+   Attendance is ticked off the real staff list instead of being written out by hand. Each
+   name is its own single-cell rating group, which gives checkbox behaviour (click to tick,
+   click again to clear) with no extra plumbing, and the group name carries the staff id so
+   a rename never orphans the tick. */
+
+const ROWS = 10;
+const COLS = ['topic', 'notes', 'action', 'responsible', 'due'];
+
+document.getElementById('agendaBody').innerHTML = Array.from({ length: ROWS }, (_, i) =>
+    '<tr>' + COLS.map(c => '<td data-k="' + c + (i + 1) + '"></td>').join('') + '</tr>'
+).join('');
+
+function todayLabel() {
+    return new Date().toLocaleDateString('en-US',
+        { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/* Empty rows are hidden when printing so a paper copy is not mostly blank grid. */
+window.addEventListener('beforeprint', function () {
+    document.querySelectorAll('#agendaBody tr').forEach(tr => {
+        const used = [...tr.querySelectorAll('[data-k]')].some(td => td.innerText.trim());
+        tr.classList.toggle('row-empty', !used);
+    });
+});
+
+function auth() {
+    return (window.CofpAuth && CofpAuth.header())
+        ? { 'Authorization': CofpAuth.header() } : {};
+}
+
+function esc(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function buildAttendees() {
+    const grid = document.getElementById('attGrid');
+    let staff = [];
+    try {
+        const res = await fetch('/api/staff', { headers: auth() });
+        if (res.ok) staff = await res.json();
+        if (!Array.isArray(staff)) staff = [];
+    } catch (e) { staff = []; }
+
+    staff = staff.filter(s => String(s.Name || '').trim() && !/^new teacher$/i.test(s.Name));
+
+    if (!staff.length) {
+        // No list is no reason to lose the section: fall back to typing the names.
+        grid.innerHTML = '<div style="grid-column:1/-1;font-size:9.5pt;color:#92400e;">'
+            + 'Staff list unavailable \u2014 type the names present below.</div>'
+            + '<div class="line" data-k="attendeesTyped" '
+            + 'style="grid-column:1/-1;border-bottom:1px solid #999;min-height:1.4em;"></div>';
+        return;
+    }
+
+    grid.innerHTML = staff.map(s =>
+        '<div class="att-item"><span class="box" data-radio="att' + s.Id + '" data-val="yes">'
+        + '\u2610</span><span>' + esc(s.Name) + '</span></div>').join('');
+}
+
+/* A count on screen makes an obviously wrong attendance list easy to spot. */
+function updateCount() {
+    const total = document.querySelectorAll('#attGrid [data-radio]').length;
+    if (!total) return;
+    const ticked = [...document.querySelectorAll('#attGrid [data-radio]')]
+        .filter(el => el.textContent.trim() === '\u2611').length;
+    const el = document.getElementById('attCount');
+    if (el) el.textContent = ticked + ' of ' + total + ' staff ticked as present.';
+}
+
+buildAttendees().then(function () {
+    return PasForm.init({
+        key: 'pas_meeting_minutes',
+        scope: 'list',
+        listLabel: 'Meeting',
+        newDefault: todayLabel,
+        prefill: function (staff, label) {
+            // The label is the meeting date, so the date field fills itself in.
+            return { meetingDate: label || '' };
+        },
+        onLoad: updateCount
+    });
+}).then(function () {
+    document.addEventListener('click', function (e) {
+        if (e.target.closest && e.target.closest('#attGrid [data-radio]')) updateCount();
+    });
+});
+</script>
 </body>
 </html>

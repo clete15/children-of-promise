@@ -100,10 +100,13 @@
             margin-bottom: 6px;
             font-size: 10pt;
         }
-        .write-lines {
+        /* Grows with the answer rather than stopping at however many rules were drawn. */
+        .write-area {
             border-bottom: 1px solid #999;
-            height: 1.4em;
+            min-height: 4.2em;
             margin-bottom: 6px;
+            white-space: pre-wrap;
+            font-size: 10pt;
         }
         .signature-section {
             margin-top: 30px;
@@ -145,7 +148,6 @@
     </style>
 </head>
 <body>
-<button onclick="window.print()" class="no-print" style="position:fixed;top:16px;right:16px;padding:10px 20px;background:#2c5282;color:white;border:none;border-radius:6px;font-size:10pt;font-weight:600;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.2);">🖨️ Print</button>
     <div class="header">
         <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
         <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
@@ -155,21 +157,25 @@
     <div class="info-grid">
         <div class="info-field">
             <label>Employee Name:</label>
-            <div class="line"></div>
+            <div class="line" data-k="employeeName"></div>
         </div>
         <div class="info-field">
             <label>Position:</label>
-            <div class="line"></div>
+            <div class="line" data-k="position"></div>
         </div>
         <div class="info-field">
             <label>Hire Date:</label>
-            <div class="line"></div>
+            <div class="line" data-k="hireDate"></div>
         </div>
         <div class="info-field">
             <label>Orientation Dates:</label>
-            <div class="line"></div>
+            <div class="line" data-k="orientationDates"></div>
         </div>
     </div>
+
+    <!-- Where the hire date came from, since it is read out of the notes rather than
+         held in a field of its own. -->
+    <div class="no-print" id="hireNote" style="font-size:8.5pt;color:#64748b;margin:-12px 0 14px;"></div>
 
     <div class="section-title">Orientation Experience Rating</div>
     <p style="font-size:9pt; margin-bottom:8px; color:#555;">Please rate each area on a scale of 1 to 5 (1 = Poor, 2 = Fair, 3 = Average, 4 = Good, 5 = Excellent)</p>
@@ -188,35 +194,35 @@
         <tbody>
             <tr>
                 <td>Clarity of job expectations and responsibilities</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
+                <td data-radio="expectations" data-val="1">&#9633;</td>
+                <td data-radio="expectations" data-val="2">&#9633;</td>
+                <td data-radio="expectations" data-val="3">&#9633;</td>
+                <td data-radio="expectations" data-val="4">&#9633;</td>
+                <td data-radio="expectations" data-val="5">&#9633;</td>
             </tr>
             <tr>
                 <td>Helpfulness of assigned mentor/buddy</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
+                <td data-radio="mentor" data-val="1">&#9633;</td>
+                <td data-radio="mentor" data-val="2">&#9633;</td>
+                <td data-radio="mentor" data-val="3">&#9633;</td>
+                <td data-radio="mentor" data-val="4">&#9633;</td>
+                <td data-radio="mentor" data-val="5">&#9633;</td>
             </tr>
             <tr>
                 <td>Quality of training materials provided</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
+                <td data-radio="materials" data-val="1">&#9633;</td>
+                <td data-radio="materials" data-val="2">&#9633;</td>
+                <td data-radio="materials" data-val="3">&#9633;</td>
+                <td data-radio="materials" data-val="4">&#9633;</td>
+                <td data-radio="materials" data-val="5">&#9633;</td>
             </tr>
             <tr>
                 <td>Comfort level after completing orientation</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
-                <td>&#9633;</td>
+                <td data-radio="comfort" data-val="1">&#9633;</td>
+                <td data-radio="comfort" data-val="2">&#9633;</td>
+                <td data-radio="comfort" data-val="3">&#9633;</td>
+                <td data-radio="comfort" data-val="4">&#9633;</td>
+                <td data-radio="comfort" data-val="5">&#9633;</td>
             </tr>
         </tbody>
     </table>
@@ -225,37 +231,30 @@
 
     <div class="open-question">
         <p>1. What aspect of orientation was most helpful to you?</p>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
+        <div class="write-area" data-k="mostHelpful"></div>
     </div>
 
     <div class="open-question">
         <p>2. What could be improved about the orientation process?</p>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
+        <div class="write-area" data-k="improve"></div>
     </div>
 
     <div class="open-question">
         <p>3. Did you feel welcomed and supported by the team?</p>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
+        <div class="write-area" data-k="welcomed"></div>
     </div>
 
     <div class="open-question">
         <p>4. Were there any topics you expected to be covered that were not addressed?</p>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
-        <div class="write-lines"></div>
+        <div class="write-area" data-k="notCovered"></div>
     </div>
 
     <div class="signature-section">
         <div class="sig-field">
-            <label>Employee Signature:<div class="sig-line"></div></label>
+            <label>Employee Signature:<div class="sig-line" data-k="employeeSig"></div></label>
         </div>
         <div class="sig-field">
-            <label>Date:<div class="sig-line"></div></label>
+            <label>Date:<div class="sig-line" data-k="employeeSigDate"></div></label>
         </div>
     </div>
 
@@ -263,5 +262,39 @@
         <span>PAS Documentation — Confidential</span>
         <span>Children of Promise LLC — Orientation Feedback Form</span>
     </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* One record per person, not per year: orientation happens once per employee. Someone
+   rehired later would overwrite their earlier feedback, which is a limitation worth
+   knowing about but not worth a second table for a centre this size.
+
+   The hire date is read from the staff notes rather than typed, and the page says so,
+   because there is no hire-date column to read it from. */
+PasForm.init({
+    key: 'pas_orientation_feedback',
+    scope: 'staff',
+    prefill: function (staff) {
+        const hire = PasForm.hireDate(staff);
+        const note = document.getElementById('hireNote');
+        if (note) {
+            note.textContent = hire
+                ? 'Hire date read from the staff notes'
+                  + (hire.precision === 'month' ? ' (month only, so the day is approximate).' : '.')
+                  + ' Orientation dates need filling in.'
+                : 'No start date could be read from this staff record, so the hire date needs '
+                  + 'filling in by hand.';
+        }
+        return {
+            employeeName: staff.Name,
+            position: PasForm.position(staff),
+            hireDate: hire ? PasForm.fmtDate(hire.d) : '',
+            orientationDates: ''
+        };
+    }
+});
+</script>
 </body>
 </html>

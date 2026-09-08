@@ -346,29 +346,16 @@
 <script>
 /* One record per person, not per year: the introductory review happens once.
 
-   There is no hire-date column on the staff record, but the notes consistently carry
-   "At CofP since 10/15/2012" or "since 01/2016", so the start date is read from there
-   and the 90-day date computed from it. Derived rather than recorded, so the page says
-   where the date came from instead of presenting it as fact. */
-function hireDateFromNotes(notes) {
-    const text = String(notes || '');
-    // Full date first, so "10/15/2012" is not read as October 2015.
-    let m = text.match(/since\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
-    if (m) return { d: new Date(+m[3], +m[1] - 1, +m[2]), precision: 'day' };
-    m = text.match(/since\s+(\d{1,2})\/(\d{4})/i);
-    if (m) return { d: new Date(+m[2], +m[1] - 1, 1), precision: 'month' };
-    return null;
-}
-
-function fmt(d) {
-    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-}
+   The start date is derived from the staff notes (PasForm.hireDate) because there is no
+   hire-date column, and the 90-day date is computed from it. Derived rather than
+   recorded, so the page says where the date came from instead of presenting it as fact. */
+const fmt = PasForm.fmtDate;
 
 PasForm.init({
     key: 'pas_90_day_review',
     scope: 'staff',
     prefill: function (staff) {
-        const hire = hireDateFromNotes(staff.Notes);
+        const hire = PasForm.hireDate(staff);
         const note = document.getElementById('dueNote');
         if (!hire) {
             if (note) {

@@ -38,6 +38,8 @@
     let cfg = null;
     let staffList = [];
     let current = null;          // selected staff record, when the form is per-person
+    let records = [];            // {id,label} index, when the form holds many records
+    let recordId = null;         // which of them is on screen
 
     const $ = id => document.getElementById(id);
     const esc = s => String(s == null ? '' : s)
@@ -55,6 +57,31 @@
         const out = [];
         for (let s = start; s >= start - 2; s--) out.push(s + '-' + (s + 1));
         return out;
+    }
+
+    /* There is no hire-date column on the staff record, but the notes consistently
+       carry "At CofP since 10/15/2012" or "since 01/2016", so a start date can be read
+       from there. Returns the precision as well, because a month-only note gives a day
+       that was assumed rather than recorded and any form showing it should say so.
+       Returns null rather than guessing when nothing can be read. */
+    function hireDate(staff) {
+        const text = String((staff && staff.Notes) || '');
+        // Full date first, so "10/15/2012" is not read as October 2015.
+        let m = text.match(/since\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+        if (m) return { d: new Date(+m[3], +m[1] - 1, +m[2]), precision: 'day' };
+        m = text.match(/since\s+(\d{1,2})\/(\d{4})/i);
+        if (m) return { d: new Date(+m[2], +m[1] - 1, 1), precision: 'month' };
+        return null;
+    }
+
+    function fmtDate(d) {
+        return d ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+    }
+
+    /* Role and room read as one line on a form asking for a position. */
+    function position(staff) {
+        if (!staff) return '';
+        return (staff.Role || '') + (staff.Classroom ? ' \u2014 ' + staff.Classroom : '');
     }
 
     function api(url, opts) {
@@ -78,7 +105,67 @@
             return cfg.key + '__staff' + current.Id;
         }
         if (cfg.scope === 'year') return cfg.key + '__' + year;
+        if (cfg.scope === 'list') return recordId ? cfg.key + '__' + recordId : null;
         return cfg.key;
+    }
+
+    /* ── many records of the same form ────────────────────────────────────
+       Meeting minutes and survey responses happen repeatedly, so one row per year
+       would mean each new one overwrote the last. These keep an index of records
+       alongside them: the index is a list of {id, label} and each record is stored
+       under its own id. The id is generated rather than taken from the label, so a
+       label containing a slash or a name can never break the storage key. */
+    function indexKey() { return cfg.key + '__index'; }
+
+    function loadIndex() {
+        records = [];
+        const raw = PasStore.storage.getItem(indexKey());
+        if (!raw) return;
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                records = parsed.filter(r => r && r.id).map(r => ({
+                    id: String(r.id), label: String(r.label || r.id)
+                }));
+            }
+        } catch (e) { records = []; }
+    }
+
+    function saveIndex() {
+        PasStore.storage.setItem(indexKey(), JSON.stringify(records));
+    }
+
+    function newId() {
+        // Short, unique, and safe in a storage key.
+        let id = 'r' + Date.now().toString(36);
+        while (records.some(r => r.id === id)) id += 'x';
+        return id;
+    }
+
+    function renderRecordPicker() {
+        const sel = $('pfRecord');
+        if (!sel) return;
+        const label = cfg.listLabel || 'Record';
+        sel.innerHTML =
+            '<option value="">' + (records.length ? '\u2014 choose \u2014' : 'None yet \u2014 add one') + '</option>'
+            + records.map(r => '<option value="' + esc(r.id) + '">' + esc(r.label) + '</option>').join('')
+            + '<option value="__new">\uff0b New ' + esc(label.toLowerCase()) + '\u2026</option>';
+        sel.value = recordId || '';
+    }
+
+    function addRecord() {
+        const label = cfg.listLabel || 'Record';
+        const suggestion = cfg.newDefault ? cfg.newDefault() : '';
+        const answer = prompt('Name this ' + label.toLowerCase()
+            + ' so it can be found again (a date works well):', suggestion);
+        if (answer === null) return false;           // cancelled
+        const text = answer.trim() || suggestion || label + ' ' + (records.length + 1);
+        const rec = { id: newId(), label: text };
+        records.unshift(rec);                        // newest first: that is what gets opened
+        saveIndex();
+        recordId = rec.id;
+        renderRecordPicker();
+        return true;
     }
 
     // ── reading and writing the page ──────────────────────────────────────
@@ -132,7 +219,13 @@
     // ── save and load ─────────────────────────────────────────────────────
     async function save() {
         const key = storageKey();
-        if (!key) { setStatus('Choose a staff member first', '#b91c1c'); return; }
+        if (!key) {
+            setStatus(cfg.scope === 'list'
+                ? 'Add a ' + (cfg.listLabel || 'record').toLowerCase() + ' first, so this has '
+                  + 'somewhere to be filed'
+                : 'Choose a staff member first', '#b91c1c');
+            return;
+        }
         const btn = $('pfSave');
         if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
         try {
@@ -141,6 +234,10 @@
                 // Stamp who it belongs to, so a row is identifiable on its own.
                 payload.staffId = String(current.Id);
                 payload.staffName = current.Name;
+            }
+            if (cfg.scope === 'list') {
+                const rec = records.find(r => r.id === recordId);
+                if (rec) payload.recordLabel = rec.label;
             }
             payload.savedAt = new Date().toISOString();
             /* setItem writes through to the server and alerts on failure, so a
@@ -165,9 +262,17 @@
             if (raw) { try { saved = JSON.parse(raw); } catch (e) { saved = null; } }
         }
 
-        // Prefill from the staff record first, then let anything saved win.
-        if (cfg.prefill && current) {
-            const pre = cfg.prefill(current, $('pfYear') ? $('pfYear').value : schoolYear()) || {};
+        /* Prefill first, then let anything saved win, so a correction someone typed is
+           never undone by the derived value it replaced. Per-staff forms only prefill
+           once a person is selected; the second argument is the year, or the record
+           label for a form that holds many records. */
+        const perStaff = cfg.scope === 'staff-year' || cfg.scope === 'staff';
+        if (cfg.prefill && (current || !perStaff)) {
+            const rec = records.find(r => r.id === recordId);
+            const context = cfg.scope === 'list'
+                ? (rec ? rec.label : '')
+                : ($('pfYear') ? $('pfYear').value : schoolYear());
+            const pre = cfg.prefill(current, context) || {};
             Object.keys(pre).forEach(k => {
                 const el = document.querySelector('[data-k="' + k + '"]');
                 if (el) el.textContent = pre[k] == null ? '' : String(pre[k]);
@@ -176,6 +281,15 @@
         if (saved) apply(saved);
 
         dirty = false;
+        // Lets a page refresh anything it derives from the page, such as a count.
+        if (cfg.onLoad) { try { cfg.onLoad(); } catch (e) { /* never block loading */ } }
+        if (!key) {
+            setStatus(cfg.scope === 'list'
+                ? 'Choose one of the saved ' + (cfg.listLabel || 'record').toLowerCase()
+                  + 's above, or add a new one'
+                : 'Choose a staff member first', '#64748b');
+            return;
+        }
         setStatus(saved ? 'Saved copy loaded' : 'Nothing saved yet for this selection', '#64748b');
     }
 
@@ -187,6 +301,9 @@
             + (perStaff
                 ? '<strong>Staff:</strong> <select id="pfStaff"><option value="">Loading\u2026</option></select>'
                 : '')
+            + (cfg.scope === 'list'
+                ? '<strong>' + esc(cfg.listLabel || 'Record') + ':</strong> <select id="pfRecord"></select>'
+                : '')
             + (perYear
                 ? ' <label>Year <select id="pfYear">'
                   + yearOptions().map(y => '<option value="' + y + '">' + y + '</option>').join('')
@@ -196,7 +313,12 @@
             + ' <button id="pfPrint" class="pf-btn pf-print">\ud83d\udda8\ufe0f Print</button>'
             + ' <span id="pfStatus" class="pf-status"></span>'
             + '<span class="pf-hint">Click any underlined space to type. Nothing needs printing '
-            + 'unless you want a signed paper copy.</span>'
+            + 'unless you want a signed paper copy.'
+            + (cfg.scope === 'list'
+                ? ' Each ' + esc((cfg.listLabel || 'record').toLowerCase())
+                  + ' is kept separately \u2014 add a new one rather than typing over an old one.'
+                : '')
+            + '</span>'
             + '</div>';
     }
 
@@ -262,6 +384,26 @@
 
         await PasStore.ready;
 
+        if (cfg.scope === 'list') {
+            loadIndex();
+            // Open the newest on arrival: that is nearly always the one being worked on.
+            recordId = records.length ? records[0].id : null;
+            renderRecordPicker();
+            const sel = $('pfRecord');
+            sel.addEventListener('change', () => {
+                if (dirty && !confirm('You have unsaved changes. Switch anyway and lose them?')) {
+                    sel.value = recordId || '';
+                    return;
+                }
+                if (sel.value === '__new') {
+                    if (!addRecord()) { sel.value = recordId || ''; return; }
+                } else {
+                    recordId = sel.value || null;
+                }
+                loadCurrent();
+            });
+        }
+
         if (cfg.scope === 'staff-year' || cfg.scope === 'staff') {
             try {
                 const res = await api('/api/staff');
@@ -325,6 +467,12 @@
         get staff() { return staffList; },
         save: save,
         reload: loadCurrent,
-        refreshPickerMarks: refreshPickerMarks
+        refreshPickerMarks: refreshPickerMarks,
+        // Derivations several forms need, kept in one place so they cannot drift apart.
+        hireDate: hireDate,
+        fmtDate: fmtDate,
+        position: position,
+        // The saved records of a list-scoped form, for a page that wants to summarise them.
+        get records() { return records.slice(); }
     };
 })();
