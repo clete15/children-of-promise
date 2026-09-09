@@ -991,11 +991,16 @@ let sigPads = {};
    An existing signature is drawn onto the canvas but leaves `drawn` false, so
    saving a form again does not re-file a signature nobody re-signed. Pressing
    Clear is what starts a new one. */
-function mountSigPad(hostId, studentId, field, role) {
+function mountSigPad(hostId, studentId, field, role, opts) {
     const host = document.getElementById(hostId);
     if (!host || !window.SignPad) return;
+    opts = opts || {};
     const pad = SignPad.create(host);
-    sigPads[hostId] = { pad: pad, field: field, role: role, studentId: studentId };
+    // label/printedName/dateField are read back when the document is built, so the
+    // caption under each signature says who signed and when.
+    sigPads[hostId] = { pad: pad, field: field, role: role, studentId: studentId,
+                        label: opts.label || '', printedName: opts.printedName || '',
+                        dateField: opts.dateField || '' };
 
     const existing = signatureFor(studentId, field, role);
     if (existing && existing.RelPath) {
@@ -1010,53 +1015,75 @@ function mountSigPad(hostId, studentId, field, role) {
     setTimeout(() => pad.refresh(), 30);
 }
 
-/* Files whatever was drawn. Returns a list of problems rather than throwing, so one
-   failed signature cannot lose the form content that saved successfully. */
-async function saveSigPads(studentId, printedNames) {
-    const problems = [];
+/* Files the signed form.
+
+   An unsigned form stays work in progress: it lives in its own table and shows on
+   the roster, and nothing is written to the child's folder. The moment it is signed,
+   the whole document goes into the folder as a PDF with the signatures on it — the
+   same artefact printing, signing and scanning would have produced.
+
+   `content` describes what the document should say: { formTitle, rows, blocks }.
+   Each form supplies its own, because the printable content is genuinely per-form,
+   but the filing, naming and recording is shared.
+
+   Returns a list of problems rather than throwing, so a document that cannot be
+   filed never makes a successful save of the form look like it failed. */
+async function fileSignedForm(studentId, field, content) {
+    const drawn = Object.keys(sigPads)
+        .map(k => sigPads[k])
+        .filter(e => e.field === field && e.pad.drawn);
+    if (!drawn.length) return [];        // nothing new signed, nothing to file
+
     const student = students.find(s => String(s.Id) === String(studentId));
-    for (const hostId of Object.keys(sigPads)) {
-        const entry = sigPads[hostId];
-        if (!entry.pad.drawn) continue;               // nothing new was drawn
-        const dataUrl = entry.pad.toDataUrl();
-        if (!dataUrl) continue;
-        try {
-            const res = await apiFetch('/api/child-signature', {
-                method: 'POST',
-                body: JSON.stringify({
-                    studentId: studentId,
-                    year: activeSchoolYear,
-                    program: student && student.PFA_PI_na === 'PFA' ? 'PFA' : 'PI',
-                    childName: student ? student.Last_Name + ', ' + student.First_Name : '',
-                    field: entry.field,
-                    role: entry.role,
-                    name: (printedNames && printedNames[entry.role]) || '',
-                    capturedOn: navigator.userAgent.slice(0, 55),
-                    dataUrl: dataUrl
-                })
-            });
-            const d = await res.json();
-            if (!res.ok || !d.success) {
-                problems.push((d && d.error) || 'signature not saved');
-                entry.pad.setStatus('\u26a0 Not saved', '#b91c1c');
-            } else {
-                signatures[sigKey(studentId, entry.field, entry.role)] = {
-                    StudentId: String(studentId), FormField: entry.field, Role: entry.role,
-                    SignedName: (printedNames && printedNames[entry.role]) || '',
-                    RelPath: d.relPath, SignedAt: new Date().toISOString().slice(0, 10)
-                };
-                entry.pad.setStatus('\u2713 Signature filed as ' + d.name, '#166534');
-                // The signature is a file in the child's folder, so the drawer's
-                // count is now out of date.
-                docIndexState = 'idle';
-                docIndex = null;
-            }
-        } catch (e) {
-            problems.push(e.message);
-            entry.pad.setStatus('\u26a0 Not saved: ' + e.message, '#b91c1c');
+    const payload = {
+        studentId: studentId,
+        year: activeSchoolYear,
+        program: student && student.PFA_PI_na === 'PFA' ? 'PFA' : 'PI',
+        childName: student ? student.Last_Name + ', ' + student.First_Name : '',
+        field: field,
+        formTitle: content.formTitle,
+        rows: content.rows || [],
+        blocks: content.blocks || [],
+        capturedOn: navigator.userAgent.slice(0, 55),
+        signatures: []
+    };
+    drawn.forEach(e => {
+        const url = e.pad.toDataUrl();
+        if (!url) return;
+        payload.signatures.push({
+            role: e.role, label: e.label,
+            name: e.printedName ? (document.getElementById(e.printedName) || {}).value || '' : '',
+            date: e.dateField ? (document.getElementById(e.dateField) || {}).value || '' : '',
+            dataUrl: url
+        });
+    });
+    if (!payload.signatures.length) return [];
+
+    try {
+        const res = await apiFetch('/api/child-signed-form', {
+            method: 'POST', body: JSON.stringify(payload)
+        });
+        const d = await res.json();
+        if (!res.ok || !d.success) {
+            drawn.forEach(e => e.pad.setStatus('\u26a0 Not filed', '#b91c1c'));
+            return [(d && d.error) || 'the signed document was not filed'];
         }
+        payload.signatures.forEach(s => {
+            signatures[sigKey(studentId, field, s.role)] = {
+                StudentId: String(studentId), FormField: field, Role: s.role,
+                SignedName: s.name, RelPath: d.relPath,
+                SignedAt: new Date().toISOString().slice(0, 10)
+            };
+        });
+        drawn.forEach(e => e.pad.setStatus('\u2713 Filed as ' + d.name, '#166534'));
+        // The PDF is a new file in the child's folder, so the drawer's count is stale.
+        docIndexState = 'idle';
+        docIndex = null;
+        return [];
+    } catch (e) {
+        drawn.forEach(p => p.pad.setStatus('\u26a0 Not filed: ' + e.message, '#b91c1c'));
+        return [e.message];
     }
-    return problems;
 }
 
 let currentInterviewStudentId = null;
@@ -1781,8 +1808,10 @@ async function openInterview(studentId) {
 
     // Fresh pads for this child, showing anything already signed.
     sigPads = {};
-    mountSigPad('piParentSigPad', studentId, 'ParentInterview', 'parent');
-    mountSigPad('piStaffSigPad', studentId, 'ParentInterview', 'staff');
+    mountSigPad('piParentSigPad', studentId, 'ParentInterview', 'parent',
+        { label: 'Parent/Guardian signature', printedName: 'piParentSig', dateField: 'piDate' });
+    mountSigPad('piStaffSigPad', studentId, 'ParentInterview', 'staff',
+        { label: 'Staff signature', printedName: 'piStaffSig', dateField: 'piDate' });
 
     // Load existing interview data if available
     try {
@@ -1940,15 +1969,30 @@ async function saveInterview() {
             // ...and record that a form now exists, so the cell reads as evidence on
             // file rather than as a bare tick until the next reload.
             ChildForms.mark(currentInterviewStudentId, 'ParentInterview', body.interviewDate);
-            /* Signatures go after the form content, and their failures are collected
-               rather than thrown: a signature that cannot be filed must not make a
-               successful save of the interview look like it failed. */
-            const sigProblems = await saveSigPads(currentInterviewStudentId, {
-                parent: body.parentSignature, staff: body.staffSignature
+            /* Filing the signed PDF comes after the content is saved, and its
+               failures are collected rather than thrown: a document that cannot be
+               filed must not make a successful save look like it failed. */
+            const student = students.find(s => String(s.Id) === String(currentInterviewStudentId));
+            const sigProblems = await fileSignedForm(currentInterviewStudentId, 'ParentInterview', {
+                formTitle: 'Parent Interview',
+                rows: [
+                    { label: 'Child', value: student ? student.Last_Name + ', ' + student.First_Name : '' },
+                    { label: 'Date of birth', value: student ? (student.Birth_date || '') : '' },
+                    { label: 'Interview date', value: body.interviewDate },
+                    { label: 'Preferred language', value: body.preferredLanguage },
+                    { label: 'Translator needed', value: body.translatorNeeded },
+                    { label: 'Translator arrangements', value: body.translatorArrangements }
+                ],
+                blocks: [
+                    { heading: 'Parent goals for their child', text: body.parentGoals },
+                    { heading: 'Parent concerns', text: body.parentConcerns },
+                    { heading: 'Child strengths', text: body.childStrengths },
+                    { heading: 'Notes', text: body.notes }
+                ]
             });
             refreshActiveView();
             if (sigProblems.length) {
-                alert('The interview was saved, but a signature was not filed:\n\n'
+                alert('The interview was saved, but the signed copy was not filed:\n\n'
                     + sigProblems.join('\n'));
             }
             document.getElementById('piSavedBadge').style.display = 'inline-flex';
@@ -2011,8 +2055,12 @@ async function openPermissionSlip(studentId) {
 
     // Fresh pads for this child, showing anything already signed.
     sigPads = {};
-    mountSigPad('psParentSigPad', studentId, 'PermissionSlip', 'parent');
-    mountSigPad('psTeacherSigPad', studentId, 'PermissionSlip', 'staff');
+    mountSigPad('psParentSigPad', studentId, 'PermissionSlip', 'parent',
+        { label: 'Parent/Guardian signature', printedName: 'psParentSig',
+          dateField: 'psParentSigDate' });
+    mountSigPad('psTeacherSigPad', studentId, 'PermissionSlip', 'staff',
+        { label: 'Teacher signature', printedName: 'psTeacherSig',
+          dateField: 'psTeacherSigDate' });
 
     // Load existing data if saved
     try {
@@ -2068,12 +2116,28 @@ async function savePermissionSlip() {
             if (!trackingData[currentPSStudentId]) trackingData[currentPSStudentId] = {};
             trackingData[currentPSStudentId].PermissionSlip = 1;
             ChildForms.mark(currentPSStudentId, 'PermissionSlip', body.signedDate);
-            const sigProblems = await saveSigPads(currentPSStudentId, {
-                parent: body.parentSignature, staff: body.teacherSignature
+            const psStudent = students.find(s => String(s.Id) === String(currentPSStudentId));
+            const sigProblems = await fileSignedForm(currentPSStudentId, 'PermissionSlip', {
+                formTitle: 'Permission for Developmental Screening',
+                rows: [
+                    { label: 'Child', value: psStudent ? psStudent.Last_Name + ', ' + psStudent.First_Name : '' },
+                    { label: 'Date of birth', value: psStudent ? (psStudent.Birth_date || '') : '' },
+                    { label: 'Parent/Guardian', value: body.parentName },
+                    { label: 'School year', value: body.schoolYear },
+                    { label: 'Teacher', value: body.teacher },
+                    { label: 'Date', value: body.signedDate }
+                ],
+                blocks: [
+                    { heading: 'Permission granted', text: 'I give permission for the ASQ-3 '
+                        + 'developmental screening and the ASQ:SE-2 social-emotional screening to be '
+                        + 'completed for my child during the school year shown above. I understand '
+                        + 'that the results will be shared with me, and that a referral for further '
+                        + 'evaluation may be recommended if a concern is identified.' }
+                ]
             });
             refreshActiveView();
             if (sigProblems.length) {
-                alert('The permission slip was saved, but a signature was not filed:\n\n'
+                alert('The permission slip was saved, but the signed copy was not filed:\n\n'
                     + sigProblems.join('\n'));
             }
             document.getElementById('psSavedBadge').style.display = 'inline-flex';

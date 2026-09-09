@@ -6,6 +6,11 @@ const { execSync } = require('child_process');
 // Used for the document editor's JWT signing and its one-time file keys.
 const crypto = require('crypto');
 
+/* Writes a signed compliance form as a PDF. Hand-rolled rather than a dependency,
+   because this project takes none; see pdf-form.js for what that costs and why the
+   trade is worth it here. */
+const { buildFormPdf } = require('./pdf-form.js');
+
 /* Prevent crashes from unhandled errors.
 
    With one exception: a port conflict is not a crash to recover from, it means
@@ -891,9 +896,10 @@ function childFilesFolder(program, year) {
 }
 
 // ── Captured signatures ──
-// The image is a file in the child's folder, like a scan would be; this table only
-// points at it. One row per child, year, form and role, so re-signing replaces the
-// pointer while both PNGs remain on disk.
+// The signed document is a PDF in the child's folder, exactly where a scan of a
+// signed sheet would go; this table only points at it. One row per child, year, form
+// and role, and the roles of one form point at the same PDF. Re-signing re-points
+// the rows and leaves every previously signed PDF on disk.
 function childSignatureEnsureSQL() {
     return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ChildSignatures')
     CREATE TABLE ChildSignatures (
@@ -2228,97 +2234,130 @@ DROP TABLE #cf;`;
         return sendJSON(res, 200, { year: year, forms: forms });
     }
 
-    /* ── Signatures captured on screen ────────────────────────────────────
-       POST /api/child-signature   { studentId, year, program, field, role, name, dataUrl }
+    /* ── Filing a signed form ─────────────────────────────────────────────
+       POST /api/child-signed-form
 
-       The permission slip and the parent interview need a parent's signature. They
-       had a text box captioned "Signature" holding a typed name, so the signature
-       itself only ever existed on paper and the database held an approximation.
+       An unsigned form is work in progress: its content lives in its own table and
+       shows on the roster. Nothing goes into the child's folder, because a half
+       finished document is not evidence.
 
-       A drawn signature is written into the child's folder in the library as a PNG,
-       exactly where a scan of a signed sheet would go, and this table stores a
-       pointer to it. Two reasons for a file rather than a column: a monitor
-       reviewing the child's folder can see it, which a database blob would not
-       allow; and the sqlcmd transport moves long values in 200-character chunks, so
-       a 20 KB image would be several hundred rows on every read.
+       Once it is signed, THE WHOLE FORM is written into the child's folder as a PDF,
+       with the signatures drawn on it. That is the artefact a monitor reviews, and
+       it is the same thing that would have been produced by printing the form,
+       signing it and scanning it back in — without the paper.
 
-       Nothing is overwritten. Re-signing writes a new PNG and re-points the row, so
-       the previous signature is still on disk. */
-    if (req.method === 'POST' && url === '/api/child-signature') {
+       A PDF rather than the signature image on its own: a signature in a folder with
+       no form around it proves nothing. A PDF rather than a database column: a
+       monitor reviewing the folder can open it, and the sqlcmd transport moves long
+       values in 200-character chunks, so an embedded document would be hundreds of
+       rows on every read.
+
+       ChildSignatures stores one row per signing role, both pointing at the same
+       PDF. Nothing is overwritten: re-signing writes a new PDF and re-points the
+       rows, so every version that was ever signed stays on disk. */
+    if (req.method === 'POST' && url === '/api/child-signed-form') {
         if (!checkAuth(req, res)) return;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
 
             const studentId = parseInt(d.studentId);
             if (!studentId) return sendJSON(res, 400, { error: 'Invalid student id' });
-
-            // Whitelisted against the checklist columns, so a signature can only ever
-            // be attached to a real form.
+            // Whitelisted against the checklist columns, so a signed document can
+            // only ever be filed against a real form.
             if (!ISBE_TRACKING_COLUMNS.includes(d.field)) {
                 return sendJSON(res, 400, { error: 'Unknown form: ' + d.field });
             }
-            const role = d.role === 'staff' ? 'staff' : d.role === 'parent' ? 'parent' : null;
-            if (!role) return sendJSON(res, 400, { error: 'Role must be parent or staff' });
-
             const year = resolveSchoolYear(d.year);
             const program = d.program === 'PFA' ? 'PFA' : 'PI';
 
-            // data:image/png;base64,.... and nothing else. A different type would be
-            // written with a .png name and then fail to display.
-            const m = String(d.dataUrl || '').match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
-            if (!m) return sendJSON(res, 400, { error: 'Expected a PNG signature' });
-            const bytes = Buffer.from(m[1], 'base64');
-            if (!bytes.length) return sendJSON(res, 400, { error: 'The signature was empty' });
-            if (bytes.length > 2 * 1024 * 1024) {
-                return sendJSON(res, 413, { error: 'That signature image is unreasonably large' });
+            const incoming = Array.isArray(d.signatures) ? d.signatures : [];
+            const signatures = [];
+            for (const s of incoming) {
+                const role = s.role === 'staff' ? 'staff' : s.role === 'parent' ? 'parent' : null;
+                if (!role) return sendJSON(res, 400, { error: 'Role must be parent or staff' });
+                const m = String(s.dataUrl || '').match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
+                if (!m) return sendJSON(res, 400, { error: 'Expected a JPEG signature' });
+                const bytes = Buffer.from(m[1], 'base64');
+                if (!bytes.length) return sendJSON(res, 400, { error: 'A signature was empty' });
+                if (bytes.length > 2 * 1024 * 1024) {
+                    return sendJSON(res, 413, { error: 'A signature image is unreasonably large' });
+                }
+                signatures.push({ role: role, label: String(s.label || ''), name: String(s.name || ''),
+                                  date: String(s.date || ''), jpeg: bytes });
+            }
+            if (!signatures.length) {
+                return sendJSON(res, 400, { error: 'Nothing was signed, so there is nothing to file' });
             }
 
             const folder = childFilesFolder(program, year);
             if (folder.error) return sendJSON(res, 400, { error: folder.error });
 
-            /* Named so the file says what it is without the database. Sanitised the
-               same way an upload is, because a child's name reaches the filesystem
-               here and a name with a slash in it would escape the folder. */
+            let pdf;
+            try {
+                pdf = buildFormPdf({
+                    title: String(d.formTitle || d.field),
+                    subtitle: 'Children of Promise LLC \u2014 '
+                        + (program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative')
+                        + ' \u2014 ' + year,
+                    rows: Array.isArray(d.rows) ? d.rows : [],
+                    blocks: Array.isArray(d.blocks) ? d.blocks : [],
+                    signatures: signatures,
+                    footer: 'Signed electronically in the Children of Promise staff portal on '
+                        + new Date().toLocaleString('en-US')
+                });
+            } catch (e) {
+                // A signature that cannot be embedded must not produce a document
+                // that looks signed and is not.
+                return sendJSON(res, 400, { error: 'Could not build the document: ' + e.message });
+            }
+
+            /* Named so the file says what it is without the database, and sanitised
+               the same way an upload is: a child's name reaches the filesystem here,
+               and a name containing a slash would escape the folder. */
             const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
             const stamp = new Date().toISOString().slice(0, 10);
-            const base = [safe(d.childName) || ('Student ' + studentId), safe(d.field),
-                          role + ' signature', year, stamp].join(' - ');
-            let target = path.join(folder.path, base + '.png');
+            const base = [safe(d.childName) || ('Student ' + studentId),
+                          safe(d.formTitle || d.field), year, 'signed ' + stamp].join(' - ');
+            let target = path.join(folder.path, base + '.pdf');
             let n = 2;
             while (fs.existsSync(target) && n < 50) {
-                target = path.join(folder.path, base + ' (' + n + ').png');
+                target = path.join(folder.path, base + ' (' + n + ').pdf');
                 n++;
             }
             try {
-                fs.writeFileSync(target, bytes);
+                fs.writeFileSync(target, pdf);
             } catch (e) {
-                console.error('[SIGNATURE]', e.message);
-                return sendJSON(res, 500, { error: 'Could not save the signature file' });
+                console.error('[SIGNED FORM]', e.message);
+                return sendJSON(res, 500, { error: 'Could not write the signed document' });
             }
             const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
-            console.log('[SIGNATURE] ' + bytes.length + ' bytes -> ' + rel);
+            console.log('[SIGNED FORM] ' + pdf.length + ' bytes -> ' + rel);
 
-            const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} `
-                + `AND FormField=${esc(d.field)} AND Role=${esc(role)}`;
-            const sql = childSignatureEnsureSQL()
-                + `IF EXISTS (SELECT 1 FROM ChildSignatures WHERE ${where})
-    UPDATE ChildSignatures SET SignedName=${esc(d.name)},RelPath=${esc(rel)},
+            let sql = childSignatureEnsureSQL();
+            signatures.forEach(s => {
+                const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} `
+                    + `AND FormField=${esc(d.field)} AND Role=${esc(s.role)}`;
+                sql += `IF EXISTS (SELECT 1 FROM ChildSignatures WHERE ${where})
+    UPDATE ChildSignatures SET SignedName=${esc(s.name)},RelPath=${esc(rel)},
         SignedAt=GETDATE(),CapturedOn=${esc(d.capturedOn)} WHERE ${where}
 ELSE
     INSERT INTO ChildSignatures (StudentId,SchoolYear,FormField,Role,SignedName,RelPath,SignedAt,CapturedOn)
-    VALUES (${studentId},${esc(year)},${esc(d.field)},${esc(role)},${esc(d.name)},${esc(rel)},GETDATE(),${esc(d.capturedOn)});
+    VALUES (${studentId},${esc(year)},${esc(d.field)},${esc(s.role)},${esc(s.name)},${esc(rel)},GETDATE(),${esc(d.capturedOn)});
 `;
+            });
             const r = runSQL(sql);
-            /* The file is already on disk at this point. Saying "saved" would be a
-               lie and saying "failed" would send someone hunting for a file that is
-               there, so it says both. */
+            /* The document is already on disk at this point. Reporting a plain
+               failure would send someone hunting for a file that is there, so it
+               names the file it wrote. */
             if (!r.ok) {
                 return sendJSON(res, 500, {
-                    error: 'The signature image was filed as "' + path.basename(target)
+                    error: 'The signed document was filed as "' + path.basename(target)
                          + '" but could not be recorded against the form: ' + r.error
                 });
             }
-            return sendJSON(res, 200, { success: true, relPath: rel, name: path.basename(target) });
+            return sendJSON(res, 200, {
+                success: true, relPath: rel, name: path.basename(target), bytes: pdf.length
+            });
         });
         return;
     }

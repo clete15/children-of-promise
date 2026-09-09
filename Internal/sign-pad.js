@@ -200,7 +200,11 @@
             octx.fillStyle = '#ffffff';
             octx.fillRect(0, 0, out.width, out.height);
             octx.drawImage(canvas, minX, minY, out.width, out.height, 0, 0, out.width, out.height);
-            return out.toDataURL('image/png');
+            /* JPEG, not PNG, because the signed form is filed as a PDF and a PDF can
+               embed JPEG bytes verbatim. A PNG would have to be decoded, un-filtered
+               and re-compressed on the server for no gain: this is black ink on
+               white, where JPEG artefacts are invisible at this quality. */
+            return out.toDataURL('image/jpeg', 0.92);
         }
 
         var api = {
