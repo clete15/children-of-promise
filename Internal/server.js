@@ -1545,10 +1545,28 @@ const server = http.createServer((req, res) => {
     handleRequest(req, res);
 });
 
-// HTTPS server
+/* HTTPS server.
+
+   The HSTS header is what stops the staff sign-in fault recurring. An http://
+   bookmark still reaches the 301 above, but a browser drops the Authorization
+   header when following a redirect that changes scheme, so the credential check
+   arrived with nothing attached and the server answered 401 — the right password
+   reported as wrong. Once a browser has seen this header it rewrites http:// to
+   https:// on its own, before the request leaves the machine, so the credential
+   never has a redirect to be stripped by. The guard in auth.js covers the first
+   visit, before this header has been cached; this covers every visit after.
+
+   No includeSubDomains and no preload. Everything we serve is on the apex, so
+   subdomains would be a promise about hosts that do not exist, and preloading is
+   difficult to reverse. max-age is six months, which browsers honour and refresh
+   on each visit. The tradeoff to know about: for that window browsers will refuse
+   to fall back to plain HTTP for this host, so a lapsed certificate becomes a
+   hard outage rather than an insecure page. Let's Encrypt renews automatically,
+   so the exposure is a renewal failure going unnoticed. */
 let httpsServer = null;
 if (sslOptions) {
     httpsServer = https.createServer(sslOptions, (req, res) => {
+        res.setHeader('Strict-Transport-Security', 'max-age=15552000');
         handleRequest(req, res);
     });
 }

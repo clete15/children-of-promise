@@ -16,6 +16,37 @@
    present in the source, so rotating it on the server simply asks everyone to
    sign in again instead of breaking the site. */
 (function () {
+    /* ── HTTPS FIRST, BEFORE ANY CREDENTIAL MOVES ──
+       Reaching a staff page over http:// made the correct password report as
+       wrong. Every request below uses a RELATIVE url, so on an http:// page it
+       goes out as http:// too, meets the server's 301 to https, and the browser
+       strips the Authorization header when a redirect changes origin — a scheme
+       change counts as one. The server then saw no credentials and answered 401,
+       which the sign-in page shows as "That password was not accepted."
+
+       Nothing was wrong with the password; it was being removed in transit. This
+       became possible the day the certificate was installed, because before that
+       sslOptions was falsy, there was no redirect, and http:// worked end to end.
+       Every old http:// bookmark kept loading the page fine — only the credential
+       check broke, which is why it read as a password problem.
+
+       So swap scheme before anything else runs. This lives here rather than on
+       the portal page because every page that sends credentials loads this file,
+       including the PAS pages via /staff/auth.js; a bookmark straight to
+       isbe.html or roster.html had the same fault.
+
+       replace() rather than assign() keeps the http:// url out of history, so
+       Back cannot land on it and autocomplete stops offering it. hostname rather
+       than host drops any explicit :80 so the result is plain https on 443.
+       localhost is left alone — there is no certificate in development. */
+    var h = location.hostname;
+    if (location.protocol === 'http:'
+        && h !== 'localhost' && h !== '127.0.0.1' && h !== '[::1]') {
+        location.replace('https://' + h + location.pathname
+            + location.search + location.hash);
+        return;   // stop here; the page is being replaced
+    }
+
     if (window.CofpAuth) return;
 
     var KEY = 'copStaffPw';
