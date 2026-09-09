@@ -108,21 +108,260 @@ if (!INTERNAL_PASSWORD) {
     process.exit(1);
 }
 
-function checkAuth(req, res) {
+/* The password out of a Basic header, or ''.
+
+   Pulled out so the shared-password check below and the per-staff actor
+   resolution further down read the header the same way. Both used to be able to
+   disagree about what counts as a credential, which is the sort of difference
+   that only shows up as one endpoint letting someone in and another not. */
+function basicPassword(req) {
     const auth = req.headers['authorization'];
-    if (!auth || !auth.startsWith('Basic ')) {
-        res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Children Of Promise Staff"' });
-        res.end('Unauthorized');
-        return false;
-    }
-    const decoded = Buffer.from(auth.slice(6), 'base64').toString();
-    const password = decoded.split(':')[1];
-    if (password !== INTERNAL_PASSWORD) {
+    if (!auth || !auth.startsWith('Basic ')) return '';
+    try {
+        // The username half is ignored; only the password is checked.
+        return Buffer.from(auth.slice(6), 'base64').toString().split(':')[1] || '';
+    } catch (e) { return ''; }
+}
+
+function checkAuth(req, res) {
+    // A missing header and a wrong password are the same answer to the caller, so
+    // they share one branch rather than two identical ones.
+    if (basicPassword(req) !== INTERNAL_PASSWORD) {
         res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Children Of Promise Staff"' });
         res.end('Unauthorized');
         return false;
     }
     return true;
+}
+
+/* ── Per-staff sign-in ──────────────────────────────────────────────────────
+
+   The shared password says someone is allowed in. It cannot say who they are, so
+   nothing built on it could ever serve one person their own file and not their
+   colleague's. This adds identity alongside it rather than replacing it: the
+   shared password continues to mean "the director", and a signed-in staff member
+   is a second kind of caller with a much narrower reach.
+
+   Passwords are never stored, only scrypt hashes with a per-row random salt, so
+   two people picking the same password do not produce the same hash and a copy of
+   the database does not hand over anyone's password. */
+
+const PW_KEYLEN = 64;
+
+function newSalt() {
+    return crypto.randomBytes(16).toString('hex');
+}
+
+function hashPassword(password, salt) {
+    return crypto.scryptSync(String(password), String(salt), PW_KEYLEN).toString('hex');
+}
+
+/* Constant-time comparison. A plain === leaks how much of a value matched through
+   how long it took to answer, which over enough attempts narrows down a secret. */
+function secretsMatch(a, b) {
+    const ba = Buffer.from(String(a == null ? '' : a), 'utf8');
+    const bb = Buffer.from(String(b == null ? '' : b), 'utf8');
+    // timingSafeEqual throws on a length mismatch, and the length of a hash is
+    // fixed anyway, so an unequal length is simply not a match.
+    if (ba.length !== bb.length || ba.length === 0) return false;
+    return crypto.timingSafeEqual(ba, bb);
+}
+
+/* The day-one credential: first name plus the initial of the last name.
+   "Keyona Hentz" -> "KeyonaH". A single-word name has no initial to add, so it
+   stands alone rather than producing a trailing letter that is not there. */
+function enrolmentCode(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '';
+    if (parts.length === 1) return parts[0];
+    return parts[0] + parts[parts.length - 1][0].toUpperCase();
+}
+
+/* Sessions are signed rather than stored, so signing in costs no table and no
+   cleanup job. The token carries the staff id and an expiry, and the signature is
+   what makes it unforgeable — without it a staff member could simply edit the id
+   in their own token and become someone else.
+
+   COFP_SESSION_SECRET keeps sessions valid across a restart. Without it a key is
+   generated at boot, which is safe but means every deploy signs staff out. */
+const SESSION_TTL_MS = 12 * 60 * 60 * 1000;   // a working day, then sign in again
+const SESSION_SECRET = process.env.COFP_SESSION_SECRET || crypto.randomBytes(32).toString('hex');
+if (!process.env.COFP_SESSION_SECRET) {
+    console.log('[STAFF AUTH] COFP_SESSION_SECRET is not set, so staff sessions are signed with');
+    console.log('             a key made at startup and every restart signs staff out. To keep');
+    console.log('             them signed in across deploys, set it once:');
+    console.log('               setx COFP_SESSION_SECRET "<a long random string>" /M');
+}
+
+function signSession(staffId) {
+    const body = String(staffId) + '.' + (Date.now() + SESSION_TTL_MS);
+    return body + '.' + crypto.createHmac('sha256', SESSION_SECRET).update(body).digest('hex');
+}
+
+// The staff id a token vouches for, or null if it is forged, malformed or expired.
+function readSession(token) {
+    const parts = String(token || '').split('.');
+    if (parts.length !== 3) return null;
+    const body = parts[0] + '.' + parts[1];
+    const expect = crypto.createHmac('sha256', SESSION_SECRET).update(body).digest('hex');
+    if (!secretsMatch(parts[2], expect)) return null;
+    if (!/^\d+$/.test(parts[1]) || Date.now() > parseInt(parts[1], 10)) return null;
+    const id = parseInt(parts[0], 10);
+    return id > 0 ? id : null;
+}
+
+/* Who is asking? Either the director by shared password, or one specific staff
+   member by signed token, or nobody.
+
+   Deliberately never reads a staff id from the query string or the body. That is
+   the whole point: an id the caller supplies is a request, not an identity, and
+   treating it as one is how "my page" becomes "anyone's page". */
+function resolveActor(req) {
+    if (basicPassword(req) === INTERNAL_PASSWORD) {
+        return { director: true, staffId: null };
+    }
+    const id = readSession(req.headers['x-staff-token']);
+    if (id) return { director: false, staffId: id };
+    return null;
+}
+
+/* Guard for the endpoints that either kind of caller may reach. Answers 401 and
+   returns null when nobody is signed in, so callers can `if (!actor) return;`. */
+function requireActor(req, res) {
+    const actor = resolveActor(req);
+    if (!actor) {
+        sendJSON(res, 401, { error: 'Sign in first' });
+        return null;
+    }
+    return actor;
+}
+
+/* May this caller see or change this staff member's record?
+   The director may reach anyone; a staff member only themselves. */
+function actorMayTouch(actor, staffId) {
+    if (!actor) return false;
+    if (actor.director) return true;
+    return String(actor.staffId) === String(staffId);
+}
+
+/* ── Whose is it? ──────────────────────────────────────────────────────────
+
+   The per-person PAS forms and the development plans were built for a single
+   caller who could see everything, so ownership was never something the server
+   had to answer. It does now, and these three are the answer.
+
+   No new columns were needed. The per-person worksheets already record who they
+   belong to in their scope key, and a plan already carries a StaffId — the
+   information was there, it simply had nobody asking. */
+
+/* The staff member a PAS worksheet scope belongs to, or null when it belongs to
+   the programme rather than a person.
+
+   pas-store.js builds these from the "__" separator, so
+   "pas_annual_appraisal__staff7_2026-2027" is stored as worksheet
+   "pas_annual_appraisal" with scope "staff7_2026-2027". A classroom scope
+   ("Infant") or an empty one names no person and stays with the director. */
+function pasScopeStaffId(scopeKey) {
+    const m = /^staff(\d+)(?:_|$)/.exec(String(scopeKey || '').trim());
+    return m ? parseInt(m[1], 10) : null;
+}
+
+// The staff member a development plan is for, or null if there is no such plan.
+function devPlanStaffId(planId) {
+    const id = parseInt(planId, 10);
+    if (!id) return { ok: true, staffId: null };
+    const r = runSQLRows(`SELECT StaffId FROM StaffDevelopmentPlan WHERE Id=${id}`,
+        staffDevPlanEnsureSQL() + 'GO\n');
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, staffId: r.rows[0] ? parseInt(r.rows[0].StaffId, 10) : null };
+}
+
+/* The staff member a goal belongs to, reached through its plan. A goal names only
+   its plan, so ownership has to be followed one step rather than read directly. */
+function devGoalStaffId(goalId) {
+    const id = parseInt(goalId, 10);
+    if (!id) return { ok: true, staffId: null };
+    const r = runSQLRows(
+        `SELECT p.StaffId AS StaffId FROM StaffDevelopmentGoal g
+         JOIN StaffDevelopmentPlan p ON p.Id = g.PlanId WHERE g.Id=${id}`,
+        staffDevPlanEnsureSQL() + 'GO\n');
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, staffId: r.rows[0] ? parseInt(r.rows[0].StaffId, 10) : null };
+}
+
+/* Gives every staff member an account if they do not have one yet.
+
+   Run on demand rather than at boot, the way the rest of the schema work here is,
+   so a fresh database or a newly hired member of staff heals itself on the next
+   sign-in instead of needing a migration to be remembered.
+
+   The first password is the login name, so there is one thing to tell someone
+   rather than two: "you are MollyE and your password is MollyE, change it when you
+   get in". MustChangePassword is set with it, so that arrangement cannot outlive
+   the first sign-in.
+
+   The placeholder row is skipped. "New Teacher" is a slot on the staff list, not a
+   person, and handing it an account would leave a working login named after a
+   vacancy. */
+function ensureStaffCredentials() {
+    const r = runSQLRows(
+        `SELECT Id, Name, ISNULL(LoginName,'') AS LoginName,
+                CASE WHEN ISNULL(PasswordHash,'') = '' THEN 0 ELSE 1 END AS HasPassword
+         FROM Staff`,
+        staffEnsureSQL() + 'GO\n');
+    if (!r.ok) return { ok: false, error: r.error };
+
+    const taken = new Set(r.rows
+        .map(x => String(x.LoginName || '').trim().toLowerCase())
+        .filter(Boolean));
+    const updates = [];
+
+    r.rows.forEach(row => {
+        if (row.HasPassword && String(row.LoginName || '').trim()) return;
+        const name = String(row.Name || '').trim();
+        if (!name || /^new teacher$/i.test(name)) return;
+
+        let login = String(row.LoginName || '').trim() || enrolmentCode(name);
+        if (!login) return;
+        /* Two people can derive the same code — any second Sara with an H surname
+           would — and a duplicate login is one person unable to sign in at all. A
+           number is appended rather than more of the surname, because the second
+           letter collides just as easily and the result stops being predictable
+           either way. The director can rename it afterwards. */
+        if (taken.has(login.toLowerCase()) && !String(row.LoginName || '').trim()) {
+            let n = 2;
+            while (taken.has((login + n).toLowerCase())) n++;
+            login = login + n;
+        }
+        taken.add(login.toLowerCase());
+
+        const salt = newSalt();
+        updates.push({ id: row.Id, login: login, salt: salt, hash: hashPassword(login, salt) });
+    });
+
+    if (!updates.length) return { ok: true, seeded: 0 };
+    const sql = updates.map(u =>
+        `UPDATE Staff SET LoginName=${esc(u.login)}, PasswordHash=${esc(u.hash)},`
+        + ` PasswordSalt=${esc(u.salt)}, MustChangePassword=1 WHERE Id=${parseInt(u.id, 10)};`
+    ).join('\n');
+    const w = runSQL(sql);
+    if (!w.ok) return { ok: false, error: w.error };
+    console.log('[STAFF AUTH] enrolled ' + updates.length + ' staff account(s): '
+        + updates.map(u => u.login).join(', '));
+    return { ok: true, seeded: updates.length };
+}
+
+/* Reads one staff member's credential row by login name.
+   Returns { ok, row } where row is null for an unknown name. */
+function staffCredentialRow(loginName) {
+    const r = runSQLRows(
+        `SELECT Id, Name, ISNULL(LoginName,'') AS LoginName,
+                ISNULL(PasswordHash,'') AS PasswordHash,
+                ISNULL(PasswordSalt,'') AS PasswordSalt,
+                ISNULL(CAST(MustChangePassword AS INT), 1) AS MustChangePassword
+         FROM Staff WHERE LOWER(LoginName) = ${esc(String(loginName || '').trim().toLowerCase())}`);
+    if (!r.ok) return { ok: false, error: r.error };
+    return { ok: true, row: r.rows[0] || null };
 }
 
 function esc(v) {
@@ -566,6 +805,54 @@ GO
    toward the requirement when this matches the present calendar year. */
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PdHoursYear')
     ALTER TABLE Staff ADD PdHoursYear NVARCHAR(10);
+GO
+/* ── Per-staff sign-in ──
+
+   Until now the site had one shared password and therefore no idea WHO was using
+   it. That was tolerable while every page showed the same centre-wide compliance
+   data, and stopped being tolerable once a staff member can open their own file:
+   W4s and background check authorisations carry social security numbers, dates of
+   birth and home addresses, so "which person is asking" has to be answerable
+   before those can be served.
+
+   Only a hash is stored, never the password. Scrypt with a per-row random salt,
+   so two people who choose the same password do not collide, and a copy of the
+   database does not hand over anyone's password.
+
+   MustChangePassword starts at 1 because the first credential is derived from the
+   person's own name (FirstnameL). That is deliberately guessable — it exists so
+   the system can be handed out on day one without a password conversation for
+   each of fourteen people — which is exactly why it must not survive first use.
+   Every colleague can work out that value on sight, so while it stands it is an
+   enrolment code and not a secret.
+
+   These columns are deliberately NOT in STAFF_COLUMNS. That list drives the
+   staff SELECT, INSERT and UPDATE together, so adding them there would publish
+   the hash through GET /api/staff and let anyone overwrite it through the PUT. */
+/* The name typed at sign-in, seeded from the same FirstnameL rule as the first
+   password but stored rather than derived. It has to be stable: a derived login
+   name would change the day someone's surname does, and one already has — the
+   record reads Paige Holliday while her transcript is filed as Paige Turner. A
+   stored value also lets a collision be resolved by hand, which a rule cannot. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='LoginName')
+    ALTER TABLE Staff ADD LoginName NVARCHAR(80);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PasswordHash')
+    ALTER TABLE Staff ADD PasswordHash NVARCHAR(300);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PasswordSalt')
+    ALTER TABLE Staff ADD PasswordSalt NVARCHAR(120);
+GO
+/* Defaults to 1 so every row that predates this column — which is all of them —
+   is treated as still holding its enrolment code and is made to change it. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='MustChangePassword')
+    ALTER TABLE Staff ADD MustChangePassword BIT DEFAULT 1;
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PasswordSetDate')
+    ALTER TABLE Staff ADD PasswordSetDate NVARCHAR(30);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='LastLoginDate')
+    ALTER TABLE Staff ADD LastLoginDate NVARCHAR(30);
 `;
 }
 
@@ -581,6 +868,173 @@ const STAFF_COLUMNS = [
     ['TranscriptOnFile', 'transcriptOnFile'], ['PdHoursYtd', 'pdHoursYtd'],
     ['PdHoursYear', 'pdHoursYear']
 ];
+
+/* What a staff member may change on their OWN record. Everything else on the card
+   stays with the director.
+
+   The split is by who the fact belongs to. A person knows their own transcript,
+   registry number and credential levels, and chasing them for those beats the
+   director transcribing fourteen sets of them — that gap is real, seven of ten
+   teaching records have no semester hours at all.
+
+   Role, classroom, FTE, programme and staff group are assignments rather than
+   facts about the person, so they are not self-service: someone moving themselves
+   into a classroom would change the ratio and credential calculations that the
+   ExceleRate and PAS figures are built from.
+
+   Notes is excluded on purpose too. It carries the verification trail — who
+   checked a credential and when — so it is evidence about the record rather than
+   part of it. */
+const STAFF_SELF_EDITABLE = new Set([
+    'education', 'eceCredentials', 'gateways', 'registryId', 'experienceYears',
+    'semesterHoursTotal', 'semesterHoursEce', 'transcriptOnFile',
+    'pdHoursYtd', 'pdHoursYear'
+]);
+
+/* ── A staff member's own files ─────────────────────────────────────────────
+
+   The personnel folders live in the document library on the server, under Staff:
+   transcripts, Gateways education reports, applications, W4s, background check
+   authorisations, goal plans and work history forms.
+
+   Which file belongs to whom is recorded explicitly, in a table, and never
+   decided by reading the filename at the moment someone asks. That is the whole
+   design, and the reason is that the filenames cannot carry the answer:
+
+     - "Transcript - Paige Turner.pdf" belongs to the person the record now calls
+       Paige Holliday. Only a human knows that.
+     - "Transcript - Janelle Poenetske.pdf" is Janell Poenitske, misspelt in both
+       halves of the name.
+     - Eight files are spelled "Transcipt".
+     - There are transcripts for Hannah Engel, Khrystynna Holyk and Raquel Smith,
+       none of whom are on the current roster.
+
+   A fuzzy match good enough to catch those is also loose enough to hand one
+   person another person's W4, and a W4 carries a social security number. So the
+   filename is used only to PROPOSE a link for the director to confirm, and an
+   unconfirmed file is shown to nobody but the director. */
+function staffFileLinksEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StaffFileLinks')
+    CREATE TABLE StaffFileLinks (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StaffId INT NOT NULL,
+        RelPath NVARCHAR(500) NOT NULL,
+        LinkedBy NVARCHAR(200),
+        LinkedDate NVARCHAR(30),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        CONSTRAINT UQ_StaffFileLink UNIQUE(RelPath)
+    );
+`;
+}
+
+/* The Staff folder inside the library, and the categories within it.
+
+   Listed explicitly rather than by walking whatever is there, so a folder added
+   later for something that is not a personnel file cannot start appearing on
+   people's pages on its own. Anything outside this list is reported to the
+   director as unrecognised instead. */
+const STAFF_DOC_ROOT_FOLDER = 'Staff';
+const STAFF_DOC_CATEGORIES = [
+    ['Staff Transcripts', 'Transcript'],
+    ['Staff Gateways Education Reports', 'Gateways education report'],
+    ['Staff Applications', 'Application'],
+    ['Staff Work History Forms', 'Work history form'],
+    ['Staff Goal Plans', 'Goal plan'],
+    ['Staff W4s', 'W4'],
+    ['Staff Authorization for Background Check', 'Background check authorisation']
+];
+
+/* Every file under Staff, with the category it came from.
+   Returns { ok, files } so a missing library is distinguishable from an empty one. */
+function listStaffFolderFiles() {
+    const DOC_ROOT = findDocRoot();
+    if (!DOC_ROOT) return { ok: false, error: 'The document library is not reachable from the server.' };
+    const base = path.join(DOC_ROOT, STAFF_DOC_ROOT_FOLDER);
+    if (!fs.existsSync(base)) {
+        return { ok: false, error: 'No "' + STAFF_DOC_ROOT_FOLDER + '" folder in the document library.' };
+    }
+    const files = [];
+    STAFF_DOC_CATEGORIES.forEach(([folder, label]) => {
+        const dir = path.join(base, folder);
+        if (!fs.existsSync(dir)) return;
+        let entries = [];
+        try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (e) { return; }
+        entries.forEach(e => {
+            if (!e.isFile()) return;
+            files.push({
+                name: e.name,
+                category: label,
+                folder: folder,
+                rel: (STAFF_DOC_ROOT_FOLDER + '/' + folder + '/' + e.name)
+            });
+        });
+    });
+    return { ok: true, files: files };
+}
+
+/* Levenshtein distance, capped: anything past the cap is simply "too different"
+   and the exact number does not matter. Hand-rolled because this project takes no
+   dependencies, and it is only ever run over short name tokens. */
+function editDistance(a, b, cap) {
+    a = String(a || ''); b = String(b || '');
+    if (Math.abs(a.length - b.length) > cap) return cap + 1;
+    let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+    for (let i = 1; i <= a.length; i++) {
+        const cur = [i];
+        let best = i;
+        for (let j = 1; j <= b.length; j++) {
+            cur[j] = Math.min(
+                prev[j] + 1,
+                cur[j - 1] + 1,
+                prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)
+            );
+            if (cur[j] < best) best = cur[j];
+        }
+        if (best > cap) return cap + 1;
+        prev = cur;
+    }
+    return prev[b.length];
+}
+
+function nameWords(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z]+/g, ' ')
+        .split(' ').filter(w => w.length > 1);
+}
+
+/* How well a filename appears to name this staff member, as something a person
+   can read and agree or disagree with. Never used to grant access on its own.
+
+   'firm'  — both names present, allowing a letter or two of misspelling
+   'weak'  — only the first name matches
+   null    — no reason to connect them */
+function proposeStaffMatch(fileName, staffName) {
+    const fileWords = nameWords(fileName);
+    const parts = nameWords(staffName);
+    if (!fileWords.length || !parts.length) return null;
+    const first = parts[0];
+    const last = parts.length > 1 ? parts[parts.length - 1] : '';
+
+    const near = (target) => fileWords.some(w =>
+        w === target
+        || (target.length >= 5 && (w.startsWith(target) || target.startsWith(w)))
+        || editDistance(w, target, target.length >= 6 ? 2 : 1) <= (target.length >= 6 ? 2 : 1));
+
+    const firstHit = near(first);
+    if (!firstHit) return null;
+    if (last && near(last)) return { confidence: 'firm', why: 'first and last name both match' };
+    return { confidence: 'weak', why: 'first name matches, surname does not' };
+}
+
+// Files already assigned, as { rel: staffId }.
+function staffFileLinkMap() {
+    const r = runSQLRows(
+        `SELECT StaffId, RelPath FROM StaffFileLinks`,
+        staffFileLinksEnsureSQL() + 'GO\n');
+    if (!r.ok) return { ok: false, error: r.error };
+    const byPath = {};
+    r.rows.forEach(row => { byPath[String(row.RelPath)] = String(row.StaffId); });
+    return { ok: true, byPath: byPath };
+}
 
 /* One-time migration payload: the staff list that used to be hardcoded in
    staff-cards.html as DEFAULT_STAFF. Inserted only when the table is empty, so
@@ -2967,21 +3421,356 @@ ELSE
         return sendJSON(res, 200, data);
     }
 
+    /* GET the files belonging to a staff member.
+
+       A staff member gets exactly the files confirmed as theirs. The director gets
+       the same for whoever is asked about, plus the unassigned ones and what the
+       filenames suggest, which is the screen where confirming happens.
+
+       A staff member never receives a proposal. An unconfirmed file might be
+       someone else's, and "probably yours" is not a standard worth applying to a
+       document with a social security number in it. */
+    if (req.method === 'GET' && url === '/api/staff-files') {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+
+        const asked = parseInt(new URLSearchParams(req.url.split('?')[1] || '').get('staffId') || 0, 10);
+        // The id is only honoured for the director. For a staff member it comes
+        // from the token, so a hand-edited URL changes nothing.
+        const staffId = actor.director ? asked : parseInt(actor.staffId, 10);
+        if (actor.director && !staffId) {
+            return sendJSON(res, 400, { error: 'Which staff member?' });
+        }
+
+        const links = staffFileLinkMap();
+        if (!links.ok) return sendJSON(res, 500, { error: links.error });
+
+        const listed = listStaffFolderFiles();
+        if (!listed.ok) {
+            /* The library being unreachable is not "no files". Saying so matters:
+               a staff member told they have no transcript on file would go and
+               request a new one from their college for no reason. */
+            return sendJSON(res, 200, {
+                staffId: String(staffId), libraryReachable: false,
+                reason: listed.error, mine: [], unassigned: [], suggestions: []
+            });
+        }
+
+        const mine = listed.files.filter(f => links.byPath[f.rel] === String(staffId));
+        const body = {
+            staffId: String(staffId),
+            libraryReachable: true,
+            mine: mine.map(f => ({ name: f.name, category: f.category, rel: f.rel }))
+        };
+
+        if (actor.director) {
+            const r = runSQLRows(`SELECT Id, ISNULL(Name,'') AS Name FROM Staff WHERE ISNULL(Active,1)=1`,
+                staffEnsureSQL() + 'GO\n');
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            const target = r.rows.find(x => String(x.Id) === String(staffId));
+
+            const unassigned = listed.files.filter(f => !links.byPath[f.rel]);
+            body.unassigned = unassigned.map(f => {
+                // What this filename looks like across the whole roster, best first,
+                // so a file can be filed against the right person in one pass.
+                const guesses = r.rows
+                    .map(s => {
+                        const m = proposeStaffMatch(f.name, s.Name);
+                        return m ? { staffId: String(s.Id), name: String(s.Name), confidence: m.confidence, why: m.why } : null;
+                    })
+                    .filter(Boolean)
+                    .sort((a, b) => (a.confidence === b.confidence ? 0 : a.confidence === 'firm' ? -1 : 1));
+                return { name: f.name, category: f.category, rel: f.rel, guesses: guesses };
+            });
+            // Called out separately: a file matching nobody is usually a former
+            // member of staff, and leaving it silent looks like an oversight.
+            body.matchesNobody = body.unassigned
+                .filter(f => !f.guesses.length)
+                .map(f => ({ name: f.name, category: f.category }));
+            body.suggestedForTarget = target
+                ? body.unassigned
+                    .filter(f => f.guesses.some(g => String(g.staffId) === String(staffId)))
+                    .map(f => ({
+                        name: f.name, category: f.category, rel: f.rel,
+                        confidence: (f.guesses.find(g => String(g.staffId) === String(staffId)) || {}).confidence
+                    }))
+                : [];
+        }
+
+        return sendJSON(res, 200, body);
+    }
+
+    /* POST link a file to a staff member, or unlink it by sending no staffId.
+       Director only: this is the confirmation step, so it cannot be self-served. */
+    if (req.method === 'POST' && url === '/api/staff-file-link') {
+        if (!checkAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const rel = String((d && d.rel) || '').replace(/\\/g, '/').trim();
+            if (!rel) return sendJSON(res, 400, { error: 'Which file?' });
+
+            /* Confined to the Staff folder and required to exist. Without the first
+               check this endpoint would file any path in the library — including a
+               child's record — against a staff member, and then serve it to them. */
+            if (!rel.startsWith(STAFF_DOC_ROOT_FOLDER + '/')) {
+                return sendJSON(res, 400, { error: 'That file is not in the Staff folder' });
+            }
+            const full = resolveDocPath(rel);
+            if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+                return sendJSON(res, 404, { error: 'No such file in the library' });
+            }
+
+            const staffId = parseInt((d && d.staffId) || 0, 10);
+            if (!staffId) {
+                const w = runSQL(staffFileLinksEnsureSQL() + 'GO\n'
+                    + `DELETE FROM StaffFileLinks WHERE RelPath=${esc(rel)}`);
+                if (!w.ok) return sendJSON(res, 500, { error: w.error });
+                return sendJSON(res, 200, { success: true, linked: false });
+            }
+
+            /* One owner per file, so re-filing replaces rather than adds. A file
+               with two owners would show up on two people's pages, and the second
+               person seeing it is the failure this whole table exists to prevent. */
+            const w = runSQL(staffFileLinksEnsureSQL() + 'GO\n'
+                + `DELETE FROM StaffFileLinks WHERE RelPath=${esc(rel)};\n`
+                + `INSERT INTO StaffFileLinks (StaffId, RelPath, LinkedBy, LinkedDate) VALUES (`
+                + `${staffId}, ${esc(rel)}, ${esc('director')}, ${esc(new Date().toISOString())})`);
+            if (!w.ok) return sendJSON(res, 500, { error: w.error });
+            return sendJSON(res, 200, { success: true, linked: true });
+        });
+    }
+
+    /* GET one personnel file.
+
+       Separate from /api/doc-file because that one answers to the shared password
+       and hands over anything in the library. This one asks whose file it is first,
+       so a staff member can only ever pull a document confirmed as theirs. */
+    if (req.method === 'GET' && url.startsWith('/api/staff-file-download')) {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        const rel = String(new URLSearchParams(req.url.split('?')[1] || '').get('path') || '')
+            .replace(/\\/g, '/').trim();
+        if (!rel.startsWith(STAFF_DOC_ROOT_FOLDER + '/')) {
+            res.writeHead(404); return res.end('Not found');
+        }
+
+        if (!actor.director) {
+            const links = staffFileLinkMap();
+            if (!links.ok) return sendJSON(res, 500, { error: links.error });
+            if (links.byPath[rel] !== String(actor.staffId)) {
+                // Deliberately 404 and not 403: whether a file exists at all is
+                // not something to confirm to someone it does not belong to.
+                res.writeHead(404); return res.end('Not found');
+            }
+        }
+
+        const full = resolveDocPath(rel);
+        if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+            res.writeHead(404); return res.end('Not found');
+        }
+        const ext = path.extname(full).toLowerCase();
+        // Read fully then send in one write. Streaming never completes against this
+        // server's HTTPS response — see the note on /api/doc-file.
+        let buf;
+        try {
+            buf = fs.readFileSync(full);
+        } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            return res.end('Could not read that document');
+        }
+        res.writeHead(200, {
+            'Content-Type': MIME[ext] || 'application/octet-stream',
+            'Content-Length': buf.length,
+            'Content-Disposition': (['.pdf', '.png', '.jpg', '.jpeg', '.txt'].includes(ext)
+                ? 'inline' : 'attachment')
+                + '; filename="' + path.basename(full).replace(/"/g, '') + '"',
+            'X-Content-Type-Options': 'nosniff'
+        });
+        return res.end(buf);
+    }
+
+    /* POST staff sign-in. The only endpoint here that is reachable without a
+       credential, because it is the one that issues them.
+
+       Answers the same "that did not match" for an unknown login name and a wrong
+       password. Distinguishing them would let anyone confirm who works here by
+       trying names, and the roster is not something a public page should hand out.
+
+       The staff list is deliberately not returned by this endpoint either, for the
+       same reason: someone signing in types their name, they do not pick it from a
+       list of everybody. */
+    if (req.method === 'POST' && url === '/api/staff-login') {
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const login = String((d && d.login) || '').trim();
+            const password = String((d && d.password) || '');
+            if (!login || !password) {
+                return sendJSON(res, 400, { error: 'Enter your name and password' });
+            }
+
+            // Enrols anyone who does not have an account yet, including a new hire.
+            const seeded = ensureStaffCredentials();
+            if (!seeded.ok) return sendJSON(res, 500, { error: seeded.error });
+
+            const got = staffCredentialRow(login);
+            if (!got.ok) return sendJSON(res, 500, { error: got.error });
+
+            /* A missing row still costs a hash, so a wrong name and a wrong password
+               take the same time to answer. Skipping the work for an unknown name
+               would make the roster readable from the response time alone. */
+            const row = got.row;
+            const salt = row ? row.PasswordSalt : 'absent';
+            const expect = row ? row.PasswordHash : hashPassword('no such account', 'absent');
+            const ok = !!row && secretsMatch(hashPassword(password, salt), expect);
+            if (!ok) return sendJSON(res, 401, { error: 'That name and password did not match' });
+
+            runSQL(`UPDATE Staff SET LastLoginDate=${esc(new Date().toISOString())}`
+                + ` WHERE Id=${parseInt(row.Id, 10)}`);
+
+            return sendJSON(res, 200, {
+                token: signSession(row.Id),
+                staffId: String(row.Id),
+                name: String(row.Name || ''),
+                // The page uses this to insist on a new password before anything else.
+                mustChangePassword: String(row.MustChangePassword) === '1'
+            });
+        });
+    }
+
+    /* POST a new password for the signed-in staff member.
+
+       Requires the current password even though the token already proves who they
+       are, so a borrowed screen cannot be used to lock the owner out of their own
+       account. The director route is separate: a reset goes back to the enrolment
+       code rather than to a password the director chooses and knows. */
+    if (req.method === 'POST' && url === '/api/staff-password') {
+        const actor = resolveActor(req);
+        if (!actor || actor.director) {
+            // The director has no personal password here; there is nothing to change.
+            return sendJSON(res, 401, { error: 'Sign in as a staff member first' });
+        }
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const current = String((d && d.current) || '');
+            const next = String((d && d.next) || '');
+
+            /* Length only. A rule demanding punctuation and digits pushes people to
+               write the result on a sticky note, which is a worse outcome than a
+               long simple phrase. Ten characters is the floor because the value it
+               replaces is a first name plus a letter. */
+            if (next.length < 10) {
+                return sendJSON(res, 400, { error: 'Use at least 10 characters' });
+            }
+
+            const r = runSQLRows(
+                `SELECT Id, ISNULL(Name,'') AS Name, ISNULL(LoginName,'') AS LoginName,
+                        ISNULL(PasswordHash,'') AS PasswordHash,
+                        ISNULL(PasswordSalt,'') AS PasswordSalt
+                 FROM Staff WHERE Id=${parseInt(actor.staffId, 10)}`);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            const row = r.rows[0];
+            if (!row) return sendJSON(res, 404, { error: 'Staff record not found' });
+
+            if (!secretsMatch(hashPassword(current, row.PasswordSalt), row.PasswordHash)) {
+                return sendJSON(res, 401, { error: 'That current password did not match' });
+            }
+            // Blocks setting it straight back to the value everyone can derive.
+            if (next.trim().toLowerCase() === String(row.LoginName || '').trim().toLowerCase()) {
+                return sendJSON(res, 400, {
+                    error: 'That is your sign-in name, which your colleagues can guess. Pick something else.'
+                });
+            }
+
+            const salt = newSalt();
+            const w = runSQL(`UPDATE Staff SET PasswordHash=${esc(hashPassword(next, salt))},`
+                + ` PasswordSalt=${esc(salt)}, MustChangePassword=0,`
+                + ` PasswordSetDate=${esc(new Date().toISOString())}`
+                + ` WHERE Id=${parseInt(actor.staffId, 10)}`);
+            if (!w.ok) return sendJSON(res, 500, { error: w.error });
+            return sendJSON(res, 200, { success: true });
+        });
+    }
+
+    /* GET who the caller is, so a page can tell a staff member from the director
+       without guessing. Deliberately thin: identity only, no record. */
+    if (req.method === 'GET' && url === '/api/staff-whoami') {
+        const actor = resolveActor(req);
+        if (!actor) return sendJSON(res, 401, { error: 'Sign in first' });
+        if (actor.director) return sendJSON(res, 200, { director: true });
+        const r = runSQLRows(
+            `SELECT Id, ISNULL(Name,'') AS Name, ISNULL(LoginName,'') AS LoginName,
+                    ISNULL(CAST(MustChangePassword AS INT),1) AS MustChangePassword
+             FROM Staff WHERE Id=${parseInt(actor.staffId, 10)}`);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        const row = r.rows[0];
+        if (!row) return sendJSON(res, 404, { error: 'Staff record not found' });
+        return sendJSON(res, 200, {
+            director: false,
+            staffId: String(row.Id),
+            name: String(row.Name || ''),
+            loginName: String(row.LoginName || ''),
+            mustChangePassword: String(row.MustChangePassword) === '1'
+        });
+    }
+
+    /* POST reset a staff member back to their enrolment code. Director only.
+
+       Resets to the derived code rather than to something the director invents, so
+       nobody ends up knowing a colleague's standing password, and the reset lands
+       the person back in the forced-change flow. */
+    if (req.method === 'POST' && url === '/api/staff-password-reset') {
+        if (!checkAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const staffId = parseInt((d && d.staffId) || 0, 10);
+            if (!staffId) return sendJSON(res, 400, { error: 'Which staff member?' });
+            const r = runSQLRows(
+                `SELECT Id, ISNULL(Name,'') AS Name, ISNULL(LoginName,'') AS LoginName
+                 FROM Staff WHERE Id=${staffId}`);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            const row = r.rows[0];
+            if (!row) return sendJSON(res, 404, { error: 'Staff record not found' });
+            const code = String(row.LoginName || '').trim() || enrolmentCode(row.Name);
+            if (!code) return sendJSON(res, 400, { error: 'That record has no name to derive a code from' });
+            const salt = newSalt();
+            const w = runSQL(`UPDATE Staff SET LoginName=${esc(code)},`
+                + ` PasswordHash=${esc(hashPassword(code, salt))}, PasswordSalt=${esc(salt)},`
+                + ` MustChangePassword=1 WHERE Id=${staffId}`);
+            if (!w.ok) return sendJSON(res, 500, { error: w.error });
+            return sendJSON(res, 200, { success: true, loginName: code, password: code });
+        });
+    }
+
     // GET staff (internal - protected)
     // Ensure, seed-if-empty and select are separated by GO because the seed and
     // the select reference a table the first batch may have only just created;
     // SQL Server compiles a whole batch up front, so they cannot share one.
     if (req.method === 'GET' && url === '/api/staff') {
-        if (!checkAuth(req, res)) return;
+        /* Either caller may ask, and the answer is scoped to who they are: the
+           director gets the roster, a staff member gets one row — their own.
+
+           Scoping the existing endpoint rather than adding a personal one keeps a
+           single definition of what a staff record is, and means the pages need no
+           change: My Page reads an array either way, so for a staff member the
+           chooser simply has nothing to choose. It also fails safe. A new endpoint
+           would have left this one as it was, and this one is the one every page
+           already calls. */
+        const actor = requireActor(req, res);
+        if (!actor) return;
         const select = ['Id'].concat(STAFF_COLUMNS.map(([c]) => c));
         /* JSON transport. Notes is the reason: the credential trail held there runs
            to several hundred characters per person, so the old read cut every one of
            them off at 256. That silently broke anything reading the tail of a note —
            including the PAS prefill, which scans Notes for "Pending: ECE, IT" to
            avoid ticking a credential that has not actually been awarded. */
+        // Parsed to an integer and interpolated, so the scope cannot be widened by
+        // anything a caller sends — the id comes from the signed token, not the URL.
+        const scope = actor.director
+            ? 'ISNULL(Active,1)=1'
+            : `Id=${parseInt(actor.staffId, 10)}`;
         const r = runSQLRows(
             `SELECT ${select.join(',')},ISNULL(CAST(Active AS INT),1) AS Active
-             FROM Staff WHERE ISNULL(Active,1)=1 ORDER BY Name`,
+             FROM Staff WHERE ${scope} ORDER BY Name`,
             staffEnsureSQL() + 'GO\n' + staffSeedSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         // Strings throughout, as the pages expect; null becomes '' rather than "null".
@@ -3012,24 +3801,54 @@ ELSE
         return;
     }
 
-    // PUT update staff member (internal - protected)
+    // PUT update staff member. The director may edit anyone; a staff member may
+    // edit their own record, and only the fields listed in STAFF_SELF_EDITABLE.
     if (req.method === 'PUT' && url.startsWith('/api/staff/')) {
-        if (!checkAuth(req, res)) return;
+        const actor = requireActor(req, res);
+        if (!actor) return;
         const id = parseInt(url.split('/')[3]);
         if (!id) return sendJSON(res, 400, { error: 'Staff id required' });
+        if (!actorMayTouch(actor, id)) {
+            return sendJSON(res, 403, { error: 'You can only change your own record' });
+        }
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             // Only update the fields actually supplied, so a partial save (for
             // example marking a record reviewed) cannot blank the rest.
-            const sets = STAFF_COLUMNS
-                .filter(([, key]) => d[key] !== undefined)
-                .map(([c, key]) => `${c}=${esc(d[key])}`);
+            const supplied = STAFF_COLUMNS.filter(([, key]) => d[key] !== undefined);
+
+            /* Refuse the whole request rather than quietly dropping the fields a
+               staff member may not set. A partial save that silently ignores half
+               of what was sent looks like it worked and is worse than an error. */
+            if (!actor.director) {
+                const refused = supplied
+                    .filter(([, key]) => !STAFF_SELF_EDITABLE.has(key))
+                    .map(([, key]) => key);
+                if (refused.length) {
+                    return sendJSON(res, 403, {
+                        error: 'Only the director can change: ' + refused.join(', ')
+                    });
+                }
+            }
+
+            const sets = supplied.map(([c, key]) => `${c}=${esc(d[key])}`);
             if (!sets.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+
+            /* A staff member editing their own qualifications puts the record back
+               to unreviewed. These figures feed the ExceleRate proportions and the
+               PAS worksheets, and the record has carried ReviewedBy/ReviewedDate
+               since the seed data was machine-extracted precisely so a human
+               confirms before it backs a compliance claim. Self-reported data has
+               the same standing, so it re-enters the same queue. */
+            if (!actor.director) {
+                sets.push('ReviewedBy=NULL', 'ReviewedDate=NULL');
+            }
+
             const sql = staffEnsureSQL() + 'GO\n'
                 + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
-            sendJSON(res, 200, { success: true });
+            sendJSON(res, 200, { success: true, reviewCleared: !actor.director });
         });
         return;
     }
@@ -3559,7 +4378,8 @@ ELSE
        history. The caller picks the current one; the server does not hide the
        older versions, because they are the evidence of timelines PI9 asks for. */
     if (req.method === 'GET' && url === '/api/dev-plans') {
-        if (!checkAuth(req, res)) return;
+        const actor = requireActor(req, res);
+        if (!actor) return;
         const pCols = ['Id'].concat(DEVPLAN_COLUMNS.map(([c]) => c));
         const gCols = ['Id'].concat(DEVGOAL_COLUMNS.map(([c]) => c));
         const r = runSQL(staffDevPlanEnsureSQL() + 'GO\n'
@@ -3579,17 +4399,39 @@ ELSE
             gCols.forEach((c, i) => { o[c] = /^(Id|PlanId|SortOrder)$/.test(c) ? v[i] : txDecode(v[i]); });
             return o;
         }));
+
+        /* A staff member sees their own plans and the goals hanging off them, and
+           nothing else. Goals are filtered by the surviving plan ids rather than by
+           staff id, because a goal records only which plan it belongs to — filtering
+           them independently would either leak a colleague's goals or orphan the
+           person's own. Superseded versions of their own plan are kept: the dated
+           history is what PI9 asks for, and it is their history. */
+        if (!actor.director) {
+            const mine = parseInt(actor.staffId, 10);
+            const myPlans = plans.filter(p => parseInt(p.StaffId, 10) === mine);
+            const myPlanIds = new Set(myPlans.map(p => String(p.Id)));
+            return sendJSON(res, 200, {
+                plans: myPlans,
+                goals: goals.filter(x => myPlanIds.has(String(x.PlanId)))
+            });
+        }
         return sendJSON(res, 200, { plans, goals });
     }
 
     // POST a new plan. Any existing active plan for that person is superseded
     // rather than deleted, so the dated history survives.
     if (req.method === 'POST' && url === '/api/dev-plans') {
-        if (!checkAuth(req, res)) return;
+        const actor = requireActor(req, res);
+        if (!actor) return;
         return readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const staffId = parseInt(d.staffId);
             if (!staffId) return sendJSON(res, 400, { error: 'staffId required' });
+            // Writing a plan for somebody else would also supersede their current
+            // one, so this refuses rather than quietly filing it under the caller.
+            if (!actorMayTouch(actor, staffId)) {
+                return sendJSON(res, 403, { error: 'You can only write your own plan' });
+            }
             const cols = DEVPLAN_COLUMNS.map(([c]) => c).join(',');
             const vals = DEVPLAN_COLUMNS.map(([c, key]) =>
                 c === 'StaffId' ? staffId
@@ -3619,9 +4461,17 @@ ELSE
     // PUT edits a plan in place, for correcting the current one without
     // generating a spurious new version.
     if (req.method === 'PUT' && url.startsWith('/api/dev-plans/')) {
-        if (!checkAuth(req, res)) return;
+        const actor = requireActor(req, res);
+        if (!actor) return;
         const id = parseInt(url.split('/')[3]);
         if (!id) return sendJSON(res, 400, { error: 'Plan id required' });
+        if (!actor.director) {
+            const owner = devPlanStaffId(id);
+            if (!owner.ok) return sendJSON(res, 500, { error: owner.error });
+            if (!actorMayTouch(actor, owner.staffId)) {
+                return sendJSON(res, 403, { error: 'That plan is not yours' });
+            }
+        }
         return readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const sets = DEVPLAN_COLUMNS.filter(([, key]) => d[key] !== undefined)
@@ -3636,10 +4486,25 @@ ELSE
 
     // Goals: upsert by id, or insert when no id is supplied.
     if (req.method === 'POST' && url === '/api/dev-goals') {
-        if (!checkAuth(req, res)) return;
+        const actor = requireActor(req, res);
+        if (!actor) return;
         return readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const id = parseInt(d.id);
+
+            /* Ownership is followed through the plan, because a goal names only its
+               plan. Checked for both shapes of this request: editing an existing
+               goal is reached through the goal, adding a new one through the plan it
+               is being added to. Missing the second would leave a staff member able
+               to append goals to a colleague's plan. */
+            if (!actor.director) {
+                const owner = id ? devGoalStaffId(id) : devPlanStaffId(d.planId);
+                if (!owner.ok) return sendJSON(res, 500, { error: owner.error });
+                if (!actorMayTouch(actor, owner.staffId)) {
+                    return sendJSON(res, 403, { error: 'That plan is not yours' });
+                }
+            }
+
             let sql;
             if (id) {
                 const sets = DEVGOAL_COLUMNS.filter(([, key]) => d[key] !== undefined)
@@ -3666,9 +4531,17 @@ ELSE
     }
 
     if (req.method === 'DELETE' && url.startsWith('/api/dev-goals/')) {
-        if (!checkAuth(req, res)) return;
+        const actor = requireActor(req, res);
+        if (!actor) return;
         const id = parseInt(url.split('/')[3]);
         if (!id) return sendJSON(res, 400, { error: 'Goal id required' });
+        if (!actor.director) {
+            const owner = devGoalStaffId(id);
+            if (!owner.ok) return sendJSON(res, 500, { error: owner.error });
+            if (!actorMayTouch(actor, owner.staffId)) {
+                return sendJSON(res, 403, { error: 'That plan is not yours' });
+            }
+        }
         const r = runSQL(staffDevPlanEnsureSQL() + 'GO\n'
             + `DELETE FROM StaffDevelopmentGoal WHERE Id=${id}`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
@@ -3777,7 +4650,8 @@ ELSE
     // Returns every saved worksheet. The pages need the full set anyway to show
     // which classrooms have been completed, and the row count is small.
     if (req.method === 'GET' && url === '/api/pas-worksheets') {
-        if (!checkAuth(req, res)) return;
+        const actor = requireActor(req, res);
+        if (!actor) return;
         /* Read through the JSON transport. A worksheet payload is comfortably over
            256 characters — the teaching staff sheet alone carries about twenty
            fields per person for four people — so under the old pipe-delimited read
@@ -3790,7 +4664,21 @@ ELSE
              FROM PasWorksheets`,
             pasWorksheetEnsureSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const rows = r.rows.map(row => {
+
+        /* A staff member receives only the worksheets that are about them: their
+           self-appraisal, their 90-day review, their observation. The programme
+           worksheets and the classroom sheets are the director's, and a colleague's
+           appraisal is nobody else's business at all.
+
+           Filtered here rather than in the WHERE clause because the scope is parsed
+           rather than matched — "staff7" must not also mean "staff71" — and because
+           the chunked JSON read above is the one thing on this endpoint that has
+           already broken once. Nothing filtered out leaves the server. */
+        const visible = actor.director
+            ? r.rows
+            : r.rows.filter(row => pasScopeStaffId(row.ScopeKey) === parseInt(actor.staffId, 10));
+
+        const rows = visible.map(row => {
             let payload = {};
             // Keep a single unparseable row from emptying the whole worksheet set,
             // but say so rather than passing off {} as the saved answers.
@@ -3811,12 +4699,30 @@ ELSE
     // An empty payload deletes the row, which is what the pages' "clear" action
     // means; that keeps "no row" as the single meaning of not started.
     if (req.method === 'POST' && url === '/api/pas-worksheets') {
-        if (!checkAuth(req, res)) return;
+        const actor = requireActor(req, res);
+        if (!actor) return;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const worksheet = String(d.worksheet || '').trim();
             if (!worksheet || worksheet.length > 60) return sendJSON(res, 400, { error: 'worksheet key required, max 60 chars' });
             const scope = String(d.scope || '').trim().slice(0, 60);
+
+            /* A staff member may only write a worksheet scoped to themselves. That
+               rules out the programme worksheets and the classroom sheets, which
+               have no person in their scope, as well as anything belonging to a
+               colleague.
+
+               Worth being explicit about the empty scope: a blank one is the PAS
+               self-assessment for the whole centre, so without this check a staff
+               member saving their own appraisal under a mistyped key could
+               overwrite the submission the centre is assessed on. */
+            if (!actor.director
+                && pasScopeStaffId(scope) !== parseInt(actor.staffId, 10)) {
+                return sendJSON(res, 403, {
+                    error: 'You can only save your own forms. This one belongs to the centre '
+                         + 'or to someone else, so Megan needs to fill it in.'
+                });
+            }
 
             const payloadObj = d.payload && typeof d.payload === 'object' ? d.payload : null;
             const hasAnswers = payloadObj && Object.keys(payloadObj).some(k => {
@@ -4082,6 +4988,20 @@ ELSE
             res.end(data);
         });
         return;
+    }
+
+    /* A short address for the staff sign-in page: /me.
+
+       It exists to be said out loud and written on a noticeboard, which the real
+       path is not. Served rather than redirected so the address bar keeps the short
+       form. The page itself carries no data — it posts credentials and receives a
+       token — so it needs no gate of its own. */
+    if (url === '/me' || url === '/me/') {
+        return fs.readFile(path.join(__dirname, 'my-portal.html'), (err, data) => {
+            if (err) { res.writeHead(404); return res.end('Not found'); }
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(data);
+        });
     }
 
     // PAS static files (protected - served under /pas/)

@@ -10,10 +10,15 @@
 // staff Basic credentials to same-origin requests by itself, so hardcoding
 // the password would ship it to every visitor and break on every rotation.
 
+/* Credentials come from a sign-in, never from source. Asking CofpAuth for the
+   whole header set rather than just the Basic one is what lets an individual staff
+   member use these pages: their browser carries a session token instead of the
+   shared password, and the server scopes the answer to them. Reading only the
+   Basic header here would have left every page working for the director and
+   silently unauthorised for everyone else. */
 function apiFetch(url, opts = {}) {
     opts.headers = Object.assign({ 'Content-Type': 'application/json' },
-        // Credentials come from the Staff Portal sign-in, never from source.
-        (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
         opts.headers || {});
     return fetch(url, opts);
 }

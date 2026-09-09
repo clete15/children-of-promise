@@ -268,13 +268,13 @@
 
    Previous plans are kept server side, so saving a year again supersedes rather
    than erases. */
-// Authorization is deliberately NOT set here. The browser attaches the
-// staff Basic credentials to same-origin requests by itself, so hardcoding
-// the password would ship it to every visitor and break on every rotation.
+/* Credentials come from a sign-in, never from source. The whole header set rather
+   than the Basic one alone, so a staff member signed in as themselves can open and
+   save their own plan — the server returns only their plans and accepts writes only
+   against them. */
 const api = (p, o) => fetch(p, Object.assign({
     headers: Object.assign({ 'Content-Type': 'application/json' },
-        // Credentials come from the Staff Portal sign-in, never from source.
-        (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {})
+        (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {})
 }, o || {}));
 
 let STAFF = [], PLANS = [], GOALS = [], current = null, goalRows = [];

@@ -69,9 +69,18 @@
 <div class="sp-wrap">
     <div class="sp-bar">
         <strong style="color:#1e293b;font-size:0.9rem;">My Page</strong>
+        <!-- The chooser is the director's control. A staff member sees their own name
+             instead, because there is nothing for them to choose: the server sends
+             them one record, their own. -->
         <select id="spStaff"><option value="">Loading…</option></select>
+        <strong id="spWhoName" style="display:none;color:#1e293b;font-size:0.9rem;"></strong>
         <span id="spMsg" style="font-size:0.76rem;color:#64748b;"></span>
-        <span style="flex-basis:100%;font-size:0.72rem;color:#94a3b8;">
+        <span id="spStaffActions" style="display:none;margin-left:auto;font-size:0.76rem;">
+            <a href="#" id="spChangePw" style="color:#2563eb;font-weight:600;">Change my password</a>
+            &nbsp;·&nbsp;
+            <a href="#" id="spSignOut" style="color:#64748b;font-weight:600;">Sign out</a>
+        </span>
+        <span id="spBarNote" style="flex-basis:100%;font-size:0.72rem;color:#94a3b8;">
             Everything here comes from your staff record. If something is wrong, it is wrong
             in the record — tell Megan rather than working around it.
         </span>
@@ -104,6 +113,11 @@ let STAFF = [];
 let TRAINING = [];
 let ROOMS = [];
 let current = null;
+/* Who the SERVER says is looking. Never inferred from the page, because what this
+   page shows and what a person is allowed to change both hang off it. */
+let WHO = null;
+// Files for whoever is currently displayed, or null while they are being fetched.
+let FILES = null;
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -248,6 +262,185 @@ function formState(f, staffId) {
     return !!PasStore.storage.getItem(key);
 }
 
+// ── my files ──────────────────────────────────────────────────────────────
+/* The personnel documents held for this person: transcript, Gateways report,
+   application, work history, goal plan, W4, background check authorisation.
+
+   Only files a human has confirmed as theirs appear. The filenames in the library
+   cannot be trusted to say whose they are — one transcript is filed under a former
+   surname, another has both names misspelt — and a guess that is wrong here means
+   handing someone a colleague's W4. So the server proposes and the director
+   confirms, and until then a file belongs to nobody.
+
+   For the director this card is also where that confirming happens. */
+function filesCard() {
+    // The id is the target of the "My Files" entry on the portal landing page.
+    let html = '<div class="sp-card" id="files"><h2>My files</h2>';
+
+    if (!FILES) {
+        return html + '<div class="sp-sub">Looking for your documents…</div></div>';
+    }
+    if (FILES.error) {
+        return html + '<div class="sp-sub" style="color:#991b1b;">Could not read the document '
+            + 'library: ' + esc(FILES.error) + '</div></div>';
+    }
+    /* "The library is not reachable" is not "you have no transcript". Someone told
+       the second thing would go and order a replacement from their college. */
+    if (FILES.libraryReachable === false) {
+        return html + '<div class="sp-sub" style="color:#92400e;">The document library is not '
+            + 'reachable from the server right now, so this cannot say what is on file. '
+            + esc(FILES.reason || '') + '</div></div>';
+    }
+
+    const mine = FILES.mine || [];
+    html += '<div class="sp-sub">Your own paperwork, as held by the centre. '
+        + 'These open in your browser.</div>';
+
+    if (mine.length) {
+        html += '<div class="sp-links">' + mine.map(f =>
+            '<a class="sp-link" href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
+            + '" target="_blank" rel="noopener">'
+            + '<div class="n">' + esc(f.category) + '</div>'
+            + '<div class="s">' + esc(f.name) + '</div></a>').join('') + '</div>';
+    } else {
+        html += '<div class="sp-sub" style="color:#92400e;">Nothing is filed against you yet. '
+            + 'If you have handed documents in, they may be in the library but not yet '
+            + 'matched to your name — ask Megan to check.</div>';
+    }
+
+    // ── the director's confirming step ──
+    if (WHO && WHO.director) {
+        const suggested = FILES.suggestedForTarget || [];
+        if (suggested.length) {
+            html += '<div style="margin-top:14px;"><h2 style="font-size:0.86rem;">'
+                + 'Looks like it belongs to this person</h2>'
+                + '<div class="sp-sub">Read the filename before confirming. A firm match means '
+                + 'both names line up; a weak one means only the first name did.</div>';
+            suggested.forEach(f => {
+                html += '<div class="sp-step" style="border-left-color:'
+                    + (f.confidence === 'firm' ? '#16a34a' : '#d97706') + ';">'
+                    + '<div class="t">' + esc(f.name) + '</div>'
+                    + '<div class="d">' + esc(f.category) + ' &nbsp;·&nbsp; '
+                    + (f.confidence === 'firm' ? 'firm match' : 'weak match — first name only')
+                    + ' &nbsp; <a href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
+                    + '" target="_blank" rel="noopener">open it</a>'
+                    + ' &nbsp; <button type="button" class="sp-link-btn" data-rel="' + esc(f.rel)
+                    + '" style="padding:3px 10px;font-size:0.72rem;font-weight:700;border:none;'
+                    + 'border-radius:5px;background:#2563eb;color:#fff;cursor:pointer;">'
+                    + 'This is theirs</button></div></div>';
+            });
+            html += '</div>';
+        }
+
+        const unassigned = FILES.unassigned || [];
+        if (unassigned.length) {
+            html += '<div style="margin-top:14px;"><h2 style="font-size:0.86rem;">'
+                + 'Not filed against anyone (' + unassigned.length + ')</h2>'
+                + '<div class="sp-sub">Until one of these is assigned, nobody sees it on their '
+                + 'own page.</div>';
+            unassigned.forEach(f => {
+                const opts = STAFF.map(s => {
+                    const g = (f.guesses || []).find(x => String(x.staffId) === String(s.Id));
+                    return '<option value="' + s.Id + '">' + esc(s.Name)
+                        + (g ? (g.confidence === 'firm' ? '  ✓ likely' : '  ~ maybe') : '')
+                        + '</option>';
+                }).join('');
+                html += '<div class="sp-step">'
+                    + '<div class="t">' + esc(f.name) + '</div>'
+                    + '<div class="d">' + esc(f.category)
+                    + ' &nbsp; <a href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
+                    + '" target="_blank" rel="noopener">open it</a><br>'
+                    + '<select class="sp-assign-who" data-rel="' + esc(f.rel)
+                    + '" style="margin-top:6px;padding:4px 8px;font-size:0.78rem;">'
+                    + '<option value="">— file it against —</option>' + opts + '</select> '
+                    + '<button type="button" class="sp-assign-btn" data-rel="' + esc(f.rel)
+                    + '" style="padding:4px 10px;font-size:0.72rem;font-weight:700;border:none;'
+                    + 'border-radius:5px;background:#334155;color:#fff;cursor:pointer;">File it</button>'
+                    + '</div></div>';
+            });
+            html += '</div>';
+        }
+
+        const nobody = FILES.matchesNobody || [];
+        if (nobody.length) {
+            html += '<div class="sp-sub" style="margin-top:12px;color:#92400e;">'
+                + nobody.length + ' document' + (nobody.length > 1 ? 's match' : ' matches')
+                + ' nobody on the current roster, which usually means a former member of '
+                + 'staff: ' + nobody.map(f => esc(f.name)).join(', ') + '</div>';
+        }
+    }
+
+    return html + '</div>';
+}
+
+// ── what this person can correct themselves ───────────────────────────────
+/* The fields a person knows better than the office does: their transcript hours,
+   registry number, credential levels and education. Seven of ten teaching records
+   have no semester hours at all, and chasing fourteen people for them beats one
+   person transcribing them.
+
+   Role, room, FTE and programme are absent deliberately. Those are assignments,
+   not facts about the person, and they feed the ratio and credential calculations
+   the ExceleRate and PAS figures are built on. The server enforces the same list,
+   so this form is a convenience and not the control. */
+const EDU_OPTIONS = ['', 'High School/GED', 'Some College', "Associate's", "Bachelor's", "Master's", 'Doctorate'];
+const TRANSCRIPT_OPTIONS = ['', 'On file with Gateways', 'Not submitted'];
+
+function selfEditCard(s) {
+    const mayEdit = WHO && (WHO.director || String(WHO.staffId) === String(s.Id));
+    if (!mayEdit) return '';
+
+    const field = (id, label, value, hint) =>
+        '<div class="sp-tile" style="background:#fff;">'
+        + '<div class="lbl"><label for="' + id + '">' + esc(label) + '</label></div>'
+        + '<input id="' + id + '" value="' + esc(value || '') + '" '
+        + 'style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #cbd5e1;'
+        + 'border-radius:5px;font-size:0.88rem;font-family:inherit;">'
+        + (hint ? '<div class="note">' + hint + '</div>' : '') + '</div>';
+
+    const picker = (id, label, value, options, hint) =>
+        '<div class="sp-tile" style="background:#fff;">'
+        + '<div class="lbl"><label for="' + id + '">' + esc(label) + '</label></div>'
+        + '<select id="' + id + '" style="width:100%;box-sizing:border-box;padding:6px 8px;'
+        + 'border:1px solid #cbd5e1;border-radius:5px;font-size:0.88rem;font-family:inherit;">'
+        + options.map(o => '<option value="' + esc(o) + '"'
+            + (String(value || '') === o ? ' selected' : '') + '>'
+            + (o === '' ? '— not recorded —' : esc(o)) + '</option>').join('')
+        + '</select>'
+        + (hint ? '<div class="note">' + hint + '</div>' : '') + '</div>';
+
+    return '<div class="sp-card">'
+        + '<h2>Keep my record right</h2>'
+        + '<div class="sp-sub">These are the things you know better than the office does. '
+        + 'Saving marks the record as needing Megan\u2019s check again, because these figures '
+        + 'back the centre\u2019s compliance reporting.</div>'
+        + '<div class="sp-grid">'
+        + picker('edEducation', 'Highest completed education', s.Education, EDU_OPTIONS,
+            'The highest level you actually finished. Coursework without a degree is "Some College".')
+        + field('edRegistryId', 'Gateways Registry number', s.RegistryId,
+            'The N-number on your Gateways record.')
+        + field('edEce', 'Credentials held', s.EceCredentials,
+            'For example "ECE Level 2, CDA". Leave off anything still pending.')
+        + field('edGateways', 'Gateways credential', s.Gateways, 'As it appears on your Gateways record.')
+        + field('edExperience', 'Years of experience', s.ExperienceYears, 'Decimals are fine, e.g. 9.5.')
+        + field('edShTotal', 'Total semester hours', s.SemesterHoursTotal,
+            'All college credit on your transcript.')
+        + field('edShEce', 'Of those, early childhood hours', s.SemesterHoursEce,
+            'These are the ones that move you up the credential levels.')
+        + picker('edTranscript', 'Has Gateways got your transcript?', s.TranscriptOnFile,
+            TRANSCRIPT_OPTIONS, 'Hours Gateways never received cannot count toward a credential.')
+        + field('edPdHours', 'PD clock hours this year', s.PdHoursYtd, 'Against the 20 ExceleRate asks for.')
+        + field('edPdYear', 'Which calendar year those hours are for', s.PdHoursYear,
+            'So last year\u2019s total is not read as this year\u2019s.')
+        + '</div>'
+        + '<div style="margin-top:12px;display:flex;align-items:center;gap:12px;">'
+        + '<button type="button" id="edSave" style="padding:9px 16px;border:none;border-radius:7px;'
+        + 'background:#2563eb;color:#fff;font-size:0.85rem;font-weight:700;cursor:pointer;">'
+        + 'Save my changes</button>'
+        + '<span id="edMsg" style="font-size:0.78rem;"></span>'
+        + '</div></div>';
+}
+
 // ── render ────────────────────────────────────────────────────────────────
 function render() {
     const body = $('spBody');
@@ -389,6 +582,10 @@ function render() {
               + 'to your record.</div>')
         + '</div>';
 
+    // Their own paperwork, then the parts of the record they can correct.
+    html += filesCard();
+    html += selfEditCard(s);
+
     // Their plan and their forms.
     html += '<div class="sp-card">'
         + '<h2>My learning plan and forms</h2>'
@@ -418,10 +615,136 @@ function render() {
         + '</div></div>';
 
     body.innerHTML = html;
+    // Handlers are attached after every render, because the markup above replaces
+    // the elements they belong to each time.
+    wireCardActions();
+}
+
+/* Buttons inside the rendered cards: saving the editable fields, and the director's
+   file assignment. Attached fresh each render rather than delegated, so a stale
+   handler cannot act on a card that has been redrawn for a different person. */
+function wireCardActions() {
+    const save = $('edSave');
+    if (save) save.addEventListener('click', saveMyRecord);
+
+    document.querySelectorAll('.sp-link-btn').forEach(btn => {
+        btn.addEventListener('click', () => assignFile(btn.getAttribute('data-rel'), current.Id, btn));
+    });
+    document.querySelectorAll('.sp-assign-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const rel = btn.getAttribute('data-rel');
+            const sel = document.querySelector('.sp-assign-who[data-rel="' + rel.replace(/"/g, '\\"') + '"]');
+            const who = sel ? sel.value : '';
+            if (!who) { btn.textContent = 'Pick a name first'; setTimeout(() => btn.textContent = 'File it', 1800); return; }
+            assignFile(rel, who, btn);
+        });
+    });
+}
+
+async function assignFile(rel, staffId, btn) {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Filing…';
+    try {
+        const res = await apiFetch('/api/staff-file-link', {
+            method: 'POST',
+            body: JSON.stringify({ rel: rel, staffId: staffId })
+        });
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error || 'HTTP ' + res.status);
+        // Re-read rather than patching the page, so what is shown is what was stored.
+        await loadFiles(current.Id);
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Failed — ' + (e.message || 'try again');
+        setTimeout(() => { btn.textContent = original; }, 2600);
+    }
+}
+
+async function saveMyRecord() {
+    const btn = $('edSave');
+    const msg = $('edMsg');
+    if (!current) return;
+
+    const payload = {
+        education: $('edEducation').value,
+        registryId: $('edRegistryId').value.trim(),
+        eceCredentials: $('edEce').value.trim(),
+        gateways: $('edGateways').value.trim(),
+        experienceYears: $('edExperience').value.trim(),
+        semesterHoursTotal: $('edShTotal').value.trim(),
+        semesterHoursEce: $('edShEce').value.trim(),
+        transcriptOnFile: $('edTranscript').value,
+        pdHoursYtd: $('edPdHours').value.trim(),
+        pdHoursYear: $('edPdYear').value.trim()
+    };
+
+    /* Caught here because it is the mistake that makes the number meaningless: ECE
+       hours are a subset of the total, so more of them than there are hours at all
+       is a typo rather than a fact. */
+    const total = parseFloat(payload.semesterHoursTotal);
+    const ece = parseFloat(payload.semesterHoursEce);
+    if (isFinite(total) && isFinite(ece) && ece > total) {
+        msg.style.color = '#991b1b';
+        msg.textContent = 'Early childhood hours cannot be more than your total hours.';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    msg.textContent = '';
+    try {
+        const res = await apiFetch('/api/staff/' + encodeURIComponent(current.Id), {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+        });
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error || 'HTTP ' + res.status);
+
+        // Keep the copy this page is drawing from in step with what was saved.
+        Object.keys(payload).forEach(k => {
+            const col = { education: 'Education', registryId: 'RegistryId',
+                eceCredentials: 'EceCredentials', gateways: 'Gateways',
+                experienceYears: 'ExperienceYears', semesterHoursTotal: 'SemesterHoursTotal',
+                semesterHoursEce: 'SemesterHoursEce', transcriptOnFile: 'TranscriptOnFile',
+                pdHoursYtd: 'PdHoursYtd', pdHoursYear: 'PdHoursYear' }[k];
+            if (col) current[col] = payload[k];
+        });
+        msg.style.color = '#166534';
+        msg.textContent = body.reviewCleared
+            ? 'Saved. Megan will see it as needing a check.'
+            : 'Saved.';
+        // Redraw so the credential tiles and next steps reflect the new figures.
+        setTimeout(render, 900);
+    } catch (e) {
+        msg.style.color = '#991b1b';
+        msg.textContent = e.message || 'Could not save.';
+        btn.disabled = false;
+        btn.textContent = 'Save my changes';
+    }
+}
+
+/* Fetches the files for whoever is on screen and redraws once they arrive.
+
+   Kept out of load() because it runs again every time the director changes who they
+   are looking at. Failure is recorded rather than thrown: a file listing that cannot
+   be read must not blank the credential and classroom cards around it. */
+async function loadFiles(staffId) {
+    FILES = null;
+    try {
+        const res = await apiFetch('/api/staff-files?staffId=' + encodeURIComponent(staffId));
+        FILES = res.ok ? await res.json() : { error: 'HTTP ' + res.status };
+    } catch (e) {
+        FILES = { error: e.message || 'could not reach the server' };
+    }
+    render();
 }
 
 async function load() {
     try {
+        // Identity first, and on its own: everything below is shaped by the answer.
+        WHO = (window.CofpAuth && CofpAuth.whoAmI) ? await CofpAuth.whoAmI() : null;
+
         const [sRes, tRes, rRes] = await Promise.all([
             apiFetch('/api/staff'),
             apiFetch('/api/staff-training').catch(() => null),
@@ -456,13 +779,54 @@ async function load() {
         sel.addEventListener('change', () => {
             current = STAFF.find(s => String(s.Id) === String(sel.value));
             render();
+            loadFiles(current.Id);
         });
+
+        /* A staff member gets their name where the chooser was. The server already
+           sent them one record, so hiding the control is honesty about what they
+           have rather than a restriction added on top of it — there is genuinely
+           nothing else for them to look at. */
+        if (WHO && WHO.director === false) {
+            $('spStaff').style.display = 'none';
+            $('spWhoName').style.display = '';
+            $('spWhoName').textContent = WHO.name || (current && current.Name) || '';
+            $('spStaffActions').style.display = '';
+            $('spBarNote').textContent = 'This is your own record. You can correct your '
+                + 'qualifications here; your room and role are set by Megan.';
+        }
+
         render();
+        if (current) loadFiles(current.Id);
     } catch (e) {
         $('spBody').innerHTML = '<div class="sp-card"><div class="sp-sub" style="color:#991b1b;">'
             + 'Could not load your record: ' + esc(e.message) + '</div></div>';
     }
 }
+
+/* Bar actions, for a staff member signed in as themselves. Attached once: these
+   elements live in the page shell rather than the rendered body. */
+$('spSignOut').addEventListener('click', e => {
+    e.preventDefault();
+    if (window.CofpAuth) CofpAuth.staffLogout();
+    location.replace('/me');
+});
+
+/* Changing a password again later reuses the sign-in page rather than growing a
+   second copy of the same form here. It already knows how to ask for the current
+   one and enforce the same rules, and one implementation cannot drift from itself. */
+$('spChangePw').addEventListener('click', e => {
+    e.preventDefault();
+    const current = prompt('Your current password:');
+    if (!current) return;
+    const next = prompt('Your new password (at least 10 characters):');
+    if (!next) return;
+    if (next.length < 10) return alert('That is under 10 characters, so it was not changed.');
+    const again = prompt('Type the new one again:');
+    if (next !== again) return alert('Those did not match, so nothing was changed.');
+    CofpAuth.staffChangePassword(current, next)
+        .then(() => alert('Changed. Use the new one next time you sign in.'))
+        .catch(err => alert(err.message || 'Could not change it.'));
+});
 
 load();
 </script>

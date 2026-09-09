@@ -50,6 +50,13 @@
     if (window.CofpAuth) return;
 
     var KEY = 'copStaffPw';
+    /* A signed-in staff member's session token. Separate from the shared password
+       because they mean different things to the server: the password says "the
+       director", the token says which individual. Kept apart so one cannot be
+       mistaken for the other, and so signing a staff member out does not disturb
+       a director signed in on the same browser. */
+    var TOKEN_KEY = 'copStaffToken';
+    var TOKEN_NAME_KEY = 'copStaffTokenName';
 
     function stored() {
         try {
@@ -57,10 +64,37 @@
         } catch (e) { return ''; }
     }
 
+    function token() {
+        try {
+            return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
+        } catch (e) { return ''; }
+    }
+
+    function tokenName() {
+        try {
+            return localStorage.getItem(TOKEN_NAME_KEY) || sessionStorage.getItem(TOKEN_NAME_KEY) || '';
+        } catch (e) { return ''; }
+    }
+
     function header() {
         var pw = stored();
         // The server ignores the username half and checks only the password.
         return pw ? 'Basic ' + btoa(':' + pw) : null;
+    }
+
+    /* Every credential this browser holds, as headers.
+
+       The shared password wins when both are present, because that is the director
+       working in their own browser and they expect to see everything. A staff
+       member's browser has only the token, so this is the same object either way
+       from their side. */
+    function headers() {
+        var h = {};
+        var a = header();
+        if (a) h['Authorization'] = a;
+        var t = token();
+        if (t) h['X-Staff-Token'] = t;
+        return h;
     }
 
     function remember(pw, persist) {
@@ -89,21 +123,74 @@
         });
     }
 
-    /* Drop-in for the old apiFetch: attaches credentials when we have them and
-       leaves the request alone when we do not, so the browser can still prompt
+    /* Drop-in for the old apiFetch: attaches whatever credentials we have and
+       leaves the request alone when we have none, so the browser can still prompt
        as a last resort rather than the page silently failing. */
     function apiFetch(url, opts) {
         opts = opts || {};
-        var h = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
-        var a = header();
-        if (a) h['Authorization'] = a;
+        var h = Object.assign({ 'Content-Type': 'application/json' }, headers(), opts.headers || {});
         opts.headers = h;
         return fetch(url, opts);
     }
 
+    /* ── Staff sign-in ──
+       Signs one individual in and keeps the token this browser was given. The
+       password is used for the one request and never stored; the token replaces
+       it, so a stolen browser yields a session that expires rather than a
+       password that does not. */
+    function staffLogin(login, password, persist) {
+        return fetch('/api/staff-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ login: login, password: password })
+        }).then(function (r) {
+            return r.json().then(function (body) {
+                if (!r.ok) throw new Error(body && body.error ? body.error : 'Could not sign in');
+                try {
+                    var store = persist ? localStorage : sessionStorage;
+                    store.setItem(TOKEN_KEY, body.token);
+                    store.setItem(TOKEN_NAME_KEY, body.name || '');
+                } catch (e) { /* private browsing — the tab still works */ }
+                return body;
+            });
+        });
+    }
+
+    function staffLogout() {
+        try { localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY); } catch (e) {}
+        try { localStorage.removeItem(TOKEN_NAME_KEY); sessionStorage.removeItem(TOKEN_NAME_KEY); } catch (e) {}
+    }
+
+    /* Changes the signed-in staff member's own password. The server requires the
+       current one as well, so this cannot be used to take over a left-open screen. */
+    function staffChangePassword(current, next) {
+        return apiFetch('/api/staff-password', {
+            method: 'POST',
+            body: JSON.stringify({ current: current, next: next })
+        }).then(function (r) {
+            return r.json().then(function (body) {
+                if (!r.ok) throw new Error(body && body.error ? body.error : 'Could not change it');
+                return body;
+            });
+        });
+    }
+
+    // Who the server thinks we are. The page never decides this for itself.
+    function whoAmI() {
+        return apiFetch('/api/staff-whoami').then(function (r) {
+            if (!r.ok) return null;
+            return r.json();
+        }).catch(function () { return null; });
+    }
+
     window.CofpAuth = {
-        header: header, stored: stored, remember: remember,
+        header: header, headers: headers, stored: stored, remember: remember,
         forget: forget, verify: verify, apiFetch: apiFetch,
-        signedIn: function () { return !!stored(); }
+        token: token, tokenName: tokenName,
+        staffLogin: staffLogin, staffLogout: staffLogout,
+        staffChangePassword: staffChangePassword, whoAmI: whoAmI,
+        // True when this browser holds either kind of credential.
+        signedIn: function () { return !!stored() || !!token(); },
+        isStaffSession: function () { return !stored() && !!token(); }
     };
 })();

@@ -183,9 +183,10 @@ window.addEventListener('beforeprint', function () {
     });
 });
 
+// Whatever this browser is signed in with — the shared password for the director,
+// or a personal session token for one member of staff.
 function auth() {
-    return (window.CofpAuth && CofpAuth.header())
-        ? { 'Authorization': CofpAuth.header() } : {};
+    return (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {};
 }
 
 function esc(s) {

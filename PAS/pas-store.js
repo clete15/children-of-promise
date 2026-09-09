@@ -65,11 +65,14 @@
 
     const cacheKey = (worksheet, scope) => worksheet + '\u0000' + (scope || '');
 
+    /* Credentials come from a sign-in, never from source. Asking for the whole
+       header set rather than the Basic one alone is what lets an individual staff
+       member open their own appraisal: their browser carries a session token, and
+       the server returns and accepts only the worksheets scoped to them. */
     function api(opts) {
         return fetch(ENDPOINT, Object.assign({
             headers: Object.assign({ 'Content-Type': 'application/json' },
-                // Credentials come from the Staff Portal sign-in, never from source.
-                (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {})
+                (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {})
         }, opts));
     }
 

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- form-audit: read-only. This page holds no record; it signs a person in and hands
+     them to their own page. The two inputs are credentials, not stored data, so the
+     persistence audit should not treat it as a form. -->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff Sign In — Children of Promise</title>
+<!-- Absolute, because this page is also served at the short address /me, where a
+     relative stylesheet would resolve to /styles.css and miss. -->
+<link rel="stylesheet" href="/staff/styles.css">
+<style>
+    body {
+        margin: 0; min-height: 100vh;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #2563eb 0%, #1e3a8a 100%);
+        display: flex; align-items: center; justify-content: center;
+        padding: 24px;
+    }
+    .mp-wrap { width: 100%; max-width: 380px; }
+    .mp-head { text-align: center; margin-bottom: 22px; }
+    .mp-head img { height: 84px; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3)); }
+    .mp-head h1 { color: #fff; font-size: 1.35rem; font-weight: 800; margin: 14px 0 4px; }
+    .mp-head p { color: rgba(255,255,255,0.72); font-size: 0.82rem; margin: 0; }
+    .mp-card {
+        background: #fff; border-radius: 12px; padding: 26px 28px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+        display: flex; flex-direction: column; gap: 13px;
+    }
+    .mp-card h2 { margin: 0; font-size: 1rem; font-weight: 800; color: #1e293b; }
+    .mp-card .mp-lead { font-size: 0.78rem; color: #64748b; line-height: 1.55; margin: 0; }
+    .mp-card label {
+        font-size: 0.72rem; font-weight: 700; color: #64748b;
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .mp-card input[type="text"], .mp-card input[type="password"] {
+        width: 100%; box-sizing: border-box; padding: 10px 12px;
+        border: 1.5px solid #cbd5e1; border-radius: 7px;
+        font-size: 0.95rem; font-family: inherit;
+    }
+    .mp-card input:focus { outline: none; border-color: #2563eb; }
+    .mp-card button {
+        padding: 11px 14px; border: none; border-radius: 7px;
+        background: #2563eb; color: #fff; font-size: 0.9rem;
+        font-weight: 700; font-family: inherit; cursor: pointer;
+    }
+    .mp-card button:hover:not(:disabled) { background: #1d4ed8; }
+    .mp-card button:disabled { background: #a3a3a3; cursor: default; }
+    .mp-remember {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 0.8rem; color: #64748b; font-weight: 500;
+        text-transform: none; letter-spacing: normal;
+    }
+    .mp-remember input { width: auto; accent-color: #2563eb; cursor: pointer; }
+    .mp-msg {
+        font-size: 0.8rem; line-height: 1.5; padding: 9px 11px;
+        border-radius: 7px; display: none;
+    }
+    .mp-msg.err { display: block; background: #fef2f2; color: #991b1b; border: 1px solid #fca5a5; }
+    .mp-msg.ok  { display: block; background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+    .mp-msg.note{ display: block; background: #fffbeb; color: #92400e; border: 1px solid #fcd34d; }
+    .mp-foot {
+        margin-top: 16px; text-align: center;
+        font-size: 0.74rem; color: rgba(255,255,255,0.7); line-height: 1.6;
+    }
+    .mp-foot a { color: #fff; }
+    .mp-hint { font-size: 0.73rem; color: #94a3b8; line-height: 1.55; margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="mp-wrap">
+    <div class="mp-head">
+        <img src="/staff/logo-sm.png" alt="Children of Promise">
+        <h1>Staff Sign In</h1>
+        <p>Children of Promise &nbsp;·&nbsp; Millstadt, IL</p>
+    </div>
+
+    <!-- SIGN IN -->
+    <form class="mp-card" id="mpSignIn" autocomplete="on">
+        <h2>Your own page</h2>
+        <p class="mp-lead">Your record, your classroom and your own files. This is your
+            personal sign-in — not the shared centre password.</p>
+
+        <div>
+            <label for="mpLogin">Your sign-in name</label>
+            <input type="text" id="mpLogin" name="username" autocomplete="username"
+                   autocapitalize="none" spellcheck="false" autofocus>
+        </div>
+        <div>
+            <label for="mpPassword">Password</label>
+            <input type="password" id="mpPassword" name="password" autocomplete="current-password">
+        </div>
+
+        <p class="mp-hint">First time? Your sign-in name and password are both your first
+            name followed by the initial of your surname — Molly Ellis would be
+            <strong>MollyE</strong>. You will be asked to choose your own password.</p>
+
+        <label class="mp-remember">
+            <input type="checkbox" id="mpRemember" checked>
+            Keep me signed in on this device
+        </label>
+
+        <div class="mp-msg" id="mpError" role="alert" aria-live="polite"></div>
+        <button type="submit" id="mpSubmit">Sign in</button>
+    </form>
+
+    <!-- FORCED PASSWORD CHANGE -->
+    <form class="mp-card" id="mpChange" style="display:none;" autocomplete="on">
+        <h2>Choose your own password</h2>
+        <p class="mp-lead">The password you just used is your name with a letter after it,
+            so anyone here could work it out. Pick something only you know before going on.</p>
+
+        <div>
+            <label for="mpNew">New password</label>
+            <input type="password" id="mpNew" name="new-password" autocomplete="new-password">
+        </div>
+        <div>
+            <label for="mpConfirm">Type it again</label>
+            <input type="password" id="mpConfirm" name="confirm-password" autocomplete="new-password">
+        </div>
+        <p class="mp-hint">At least 10 characters. A short phrase you will remember beats a
+            complicated word you will have to write down.</p>
+
+        <div class="mp-msg" id="mpChangeMsg" role="alert" aria-live="polite"></div>
+        <button type="submit" id="mpChangeSubmit">Save and continue</button>
+    </form>
+
+    <div class="mp-foot">
+        Forgotten it? Ask Megan to reset you — that puts you back to your name and initial.<br>
+        Centre administration is <a href="/staff/">through the staff portal</a>.
+    </div>
+</div>
+
+<script src="/staff/auth.js"></script>
+<script>
+/* ── Staff sign-in ──────────────────────────────────────────────────────────
+   Its own entry point, deliberately. Staff are not asked for the shared centre
+   password on the way to their own page: that password is the director's, it
+   unlocks every child's record and every colleague's, and handing it out to reach
+   a personal page would defeat the point of having personal pages at all.
+
+   The page decides nothing about who anyone is. It posts credentials, the server
+   answers with a token, and the token is what later requests carry. Everything
+   scoping-related happens there, so nothing here can be edited into more access
+   than it was given. */
+
+const $ = id => document.getElementById(id);
+
+// The password is kept in memory only between signing in and choosing a new one,
+// because the change endpoint requires the current one. It is never stored.
+let pendingCurrent = '';
+let pendingPersist = true;
+
+function show(el, cls, text) {
+    el.className = 'mp-msg ' + cls;
+    el.textContent = text;
+}
+
+function hide(el) {
+    el.className = 'mp-msg';
+    el.textContent = '';
+}
+
+/* Already signed in? Go straight through rather than asking again. A staff member
+   who bookmarked this page should land on their own page, not a form. */
+(function alreadyIn() {
+    if (window.CofpAuth && CofpAuth.token && CofpAuth.token()) {
+        CofpAuth.whoAmI().then(function (who) {
+            // A token the server no longer accepts (expired, or the key changed on a
+            // restart) means the form is the right thing to show, not an error.
+            if (who && !who.director && !who.mustChangePassword) {
+                location.replace('/staff/staff-portal.html');
+            }
+        });
+    }
+})();
+
+$('mpSignIn').addEventListener('submit', async e => {
+    e.preventDefault();
+    const login = $('mpLogin').value.trim();
+    const password = $('mpPassword').value;
+    const err = $('mpError');
+    const btn = $('mpSubmit');
+    hide(err);
+
+    if (!login || !password) {
+        return show(err, 'err', 'Enter your sign-in name and password.');
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    try {
+        pendingPersist = $('mpRemember').checked;
+        const body = await CofpAuth.staffLogin(login, password, pendingPersist);
+        if (body.mustChangePassword) {
+            pendingCurrent = password;
+            $('mpSignIn').style.display = 'none';
+            $('mpChange').style.display = 'flex';
+            $('mpNew').focus();
+            return;
+        }
+        location.replace('/staff/staff-portal.html');
+    } catch (ex) {
+        show(err, 'err', ex.message || 'Could not sign in.');
+        $('mpPassword').value = '';
+        $('mpPassword').focus();
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+    }
+});
+
+$('mpChange').addEventListener('submit', async e => {
+    e.preventDefault();
+    const next = $('mpNew').value;
+    const confirm = $('mpConfirm').value;
+    const msg = $('mpChangeMsg');
+    const btn = $('mpChangeSubmit');
+    hide(msg);
+
+    // Checked here as well as on the server, so the answer is instant and the
+    // reason is specific. The server remains the one that decides.
+    if (next.length < 10) {
+        return show(msg, 'err', 'Use at least 10 characters.');
+    }
+    if (next !== confirm) {
+        return show(msg, 'err', 'Those two do not match.');
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+        await CofpAuth.staffChangePassword(pendingCurrent, next);
+        pendingCurrent = '';
+        show(msg, 'ok', 'Saved. Taking you to your page…');
+        setTimeout(() => location.replace('/staff/staff-portal.html'), 700);
+    } catch (ex) {
+        show(msg, 'err', ex.message || 'Could not change it.');
+        btn.disabled = false;
+        btn.textContent = 'Save and continue';
+    }
+});
+</script>
+</body>
+</html>

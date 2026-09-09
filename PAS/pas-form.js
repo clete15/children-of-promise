@@ -84,10 +84,12 @@
         return (staff.Role || '') + (staff.Classroom ? ' \u2014 ' + staff.Classroom : '');
     }
 
+    /* The whole header set, not just the Basic one, so a staff member signed in as
+       themselves can open and save their own copy of these forms. */
     function api(url, opts) {
         opts = opts || {};
         opts.headers = Object.assign({ 'Content-Type': 'application/json' },
-            (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+            (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
             opts.headers || {});
         return fetch(url, opts);
     }
