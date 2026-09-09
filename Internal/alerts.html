@@ -88,6 +88,53 @@ async function init() {
    by paperwork: staff without infant and toddler coursework need a course.
 
    Ownership and administration are excluded from the count, per Genni. */
+/* Teaching staff with no Gateways Registry number.
+
+   Registry membership is the thing everything else hangs off. Without it there is
+   no Professional Development Record, no route to an ECE or Infant Toddler
+   Credential, and the person cannot appear on a Gateways staff education report —
+   so they count in the ExceleRate denominators while being unable to contribute to
+   the numerators. It is also the cheapest gap on this page to close.
+
+   Calculated rather than written as a fixed reminder, for the same reason as the
+   alert below: it names whoever is actually missing today and disappears once they
+   are entered, instead of ageing into a note about someone who was dealt with
+   months ago. Ownership is excluded to match the credential counts. */
+function gatewaysRegistryAlert(staff) {
+    const missing = staff
+        .filter(p => (p.StaffGroup || '') !== 'Ownership')
+        .filter(p => /teacher|assistant|director/i.test(p.Role || ''))
+        .filter(p => !String(p.Name || '').match(/^new teacher$/i))
+        .filter(p => !String(p.RegistryId || '').trim());
+    if (!missing.length) return '';
+
+    return `<div class="alert-item error">
+        <div class="alert-title">🪪 ${missing.length} staff member${missing.length > 1 ? 's are' : ' is'} not in the Gateways Registry</div>
+        <div class="alert-detail">
+            Registry membership comes before everything else: no PD Record, no ECE or
+            Infant Toddler Credential, and no place on a Gateways staff education report
+            without it. Until then they count toward the ExceleRate staff totals while
+            being unable to count toward the credential percentages.
+        </div>
+        <table>
+            <thead><tr><th>Staff</th><th>Role</th><th>Room</th><th>Needs</th></tr></thead>
+            <tbody>${missing.map(p => `<tr>
+                <td><strong>${p.Name || ''}</strong></td>
+                <td>${p.Role || ''}</td>
+                <td>${p.Classroom || '—'}</td>
+                <td>Register at ilgateways.com, then add the N-number to the staff card</td>
+            </tr>`).join('')}</tbody>
+        </table>
+        <div class="alert-detail" style="margin-top:10px;">
+            Registering is free and done by the person themselves at
+            <a href="https://www.ilgateways.com/registry" target="_blank" rel="noopener">ilgateways.com/registry</a>.
+            Once the number is on the staff card, their ECE Level 1 route opens up —
+            sixteen online modules, no fee and no transcript needed.
+        </div>
+        <a class="alert-action" href="/staff/staff-cards.html">Open Staff Cards →</a>
+    </div>`;
+}
+
 function infantToddlerCredentialAlert(staff) {
     const IT_ROOMS = ['Infant', 'Infants / Toddlers', '2 Year Olds / Toddlers'];
     const norm = s => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
@@ -157,7 +204,14 @@ function renderAlerts(students, waitlist, staff) {
     let html = '';
     let count = 0;
 
-    // 0. ExceleRate 4B infant/toddler credential shortfall
+    /* 0. Not in the Gateways Registry at all. Sits above the credential shortfall
+       because it is the blocker for it: someone without a registry number cannot
+       hold a credential, so acting on this one first is what makes the next one
+       fixable. */
+    const regAlert = gatewaysRegistryAlert(staff || []);
+    if (regAlert) { count++; html += regAlert; }
+
+    // 1. ExceleRate 4B infant/toddler credential shortfall
     const itAlert = infantToddlerCredentialAlert(staff || []);
     if (itAlert) { count++; html += itAlert; }
 
