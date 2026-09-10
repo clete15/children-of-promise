@@ -619,9 +619,14 @@ function render() {
         + '<div class="sp-sub">These open with you already selected. Everything saves on screen \u2014 '
         + 'nothing here needs printing unless you want a signed paper copy.</div>'
         + '<div class="sp-links">'
+        /* Named "Goal Plan" first because that is what it is called here and in the
+           PICC. It is the same document either way — the PI9 individual professional
+           development plan — and there is deliberately no second goal form: two
+           places to record the same goals would split the PI9 evidence between them. */
         + '<a class="sp-link" href="/pas/individual-pd-plan.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" rel="noopener">'
-        + '<div class="n">My Professional Development Plan</div>'
-        + '<div class="s">Your goals for the year, with mid-year and year-end reviews.</div></a>'
+        + '<div class="n">My Goal Plan</div>'
+        + '<div class="s">Your goals for the year, the development that supports each one, and '
+        + 'the mid-year and year-end reviews. This is the individual PD plan PICC PI9 asks for.</div></a>'
         + MY_FORMS.map(f => {
             const done = formState(f, s.Id);
             return '<a class="sp-link" href="' + f.href + '?staffId=' + encodeURIComponent(s.Id)
