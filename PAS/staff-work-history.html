@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work History — Children of Promise LLC</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt; line-height: 1.4; color: #333;
+            padding: 0.5in 0.75in;
+        }
+        .header {
+            text-align: center; border-bottom: 2px solid #2c5282;
+            padding-bottom: 12px; margin-bottom: 20px;
+        }
+        .header h1 { font-size: 14pt; color: #2c5282; margin-bottom: 4px; }
+        .header .org-name { font-size: 11pt; color: #666; margin-bottom: 6px; }
+        .header .subtitle { font-size: 9.5pt; color: #666; }
+        .info-grid {
+            display: grid; grid-template-columns: 1.4fr 1.4fr 1fr;
+            gap: 10px; margin-bottom: 16px;
+        }
+        .info-field { display: flex; align-items: baseline; gap: 8px; }
+        .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
+        .info-field .line {
+            flex: 1; border-bottom: 1px solid #999; min-width: 70px; height: 1.2em;
+        }
+        .instruction {
+            font-size: 9.5pt; color: #555; font-style: italic;
+            margin-bottom: 16px; line-height: 1.5;
+        }
+        .section-title {
+            font-size: 11pt; font-weight: 700; color: #2c5282;
+            margin-top: 18px; margin-bottom: 10px;
+            border-bottom: 1px solid #cbd5e0; padding-bottom: 4px;
+        }
+        .job {
+            border: 1px solid #cbd5e0; border-radius: 4px;
+            padding: 10px 12px; margin-bottom: 12px;
+        }
+        .job-head {
+            font-size: 9pt; font-weight: 700; color: #2c5282;
+            text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;
+        }
+        .job-grid {
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            gap: 8px 12px; margin-bottom: 8px;
+        }
+        .job-grid .wide { grid-column: span 2; }
+        .job-grid .full { grid-column: span 4; }
+        .fld { display: flex; align-items: baseline; gap: 6px; }
+        .fld label { font-weight: 600; font-size: 9pt; white-space: nowrap; color: #555; }
+        .fld .line {
+            flex: 1; border-bottom: 1px solid #999; min-width: 50px; height: 1.2em; font-size: 10pt;
+        }
+        .duties-label { font-weight: 600; font-size: 9pt; color: #555; }
+        .write-area {
+            border-bottom: 1px solid #999; min-height: 2.8em; font-size: 10pt;
+            padding: 3px 2px 2px; white-space: pre-wrap; line-height: 1.55;
+        }
+        .totals {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+            background: #f7fafc; border: 1px solid #cbd5e0; border-radius: 4px;
+            padding: 10px 12px; margin-top: 6px;
+        }
+        .signature-section {
+            margin-top: 26px; display: grid;
+            grid-template-columns: 2fr 1fr; gap: 24px;
+        }
+        .sig-field label {
+            font-weight: 600; font-size: 10pt; display: block; margin-bottom: 20px;
+        }
+        .sig-field .sig-line { border-bottom: 1px solid #333; margin-top: 25px; }
+        .footer {
+            margin-top: 26px; padding-top: 10px;
+            border-top: 1px solid #cbd5e0; display: flex;
+            justify-content: space-between; font-size: 9pt; color: #666;
+        }
+        @media print {
+            body { padding: 0; }
+            @page { margin: 0.45in 0.55in; size: letter; }
+            .no-print { display: none; }
+            .job { break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
+        <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
+        <h1>Work History &amp; Experience Verification</h1>
+        <div class="subtitle">Early childhood employment, for the Gateways Registry and PICC PI9</div>
+    </div>
+
+    <div class="info-grid">
+        <div class="info-field">
+            <label>Name:</label><div class="line" data-k="employeeName"></div>
+        </div>
+        <div class="info-field">
+            <label>Current position:</label><div class="line" data-k="position"></div>
+        </div>
+        <div class="info-field">
+            <label>Registry ID:</label><div class="line" data-k="registryId"></div>
+        </div>
+    </div>
+
+    <p class="instruction">
+        List every position working with children, most recent first. Gateways counts
+        experience in clock hours, so hours per week and dates matter more than job titles —
+        an estimate you are confident of is better than a blank. Your current post here is
+        filled in already; check it before signing.
+    </p>
+
+    <div class="section-title">Employment</div>
+
+    <div class="job">
+        <div class="job-head">Most recent</div>
+        <div class="job-grid">
+            <div class="fld wide"><label>Employer</label><div class="line" data-k="job1Employer"></div></div>
+            <div class="fld wide"><label>City / State</label><div class="line" data-k="job1Place"></div></div>
+            <div class="fld wide"><label>Your position</label><div class="line" data-k="job1Position"></div></div>
+            <div class="fld wide"><label>Ages of children</label><div class="line" data-k="job1Ages"></div></div>
+            <div class="fld"><label>From</label><div class="line" data-k="job1From"></div></div>
+            <div class="fld"><label>To</label><div class="line" data-k="job1To"></div></div>
+            <div class="fld"><label>Hrs/week</label><div class="line" data-k="job1Hours"></div></div>
+            <div class="fld"><label>Total hours</label><div class="line" data-k="job1Total"></div></div>
+            <div class="full">
+                <div class="duties-label">Duties</div>
+                <div class="write-area" data-k="job1Duties"></div>
+            </div>
+            <div class="fld wide"><label>Supervisor</label><div class="line" data-k="job1Supervisor"></div></div>
+            <div class="fld wide"><label>Phone / email</label><div class="line" data-k="job1Contact"></div></div>
+        </div>
+    </div>
+
+    <div class="job">
+        <div class="job-head">Previous</div>
+        <div class="job-grid">
+            <div class="fld wide"><label>Employer</label><div class="line" data-k="job2Employer"></div></div>
+            <div class="fld wide"><label>City / State</label><div class="line" data-k="job2Place"></div></div>
+            <div class="fld wide"><label>Your position</label><div class="line" data-k="job2Position"></div></div>
+            <div class="fld wide"><label>Ages of children</label><div class="line" data-k="job2Ages"></div></div>
+            <div class="fld"><label>From</label><div class="line" data-k="job2From"></div></div>
+            <div class="fld"><label>To</label><div class="line" data-k="job2To"></div></div>
+            <div class="fld"><label>Hrs/week</label><div class="line" data-k="job2Hours"></div></div>
+            <div class="fld"><label>Total hours</label><div class="line" data-k="job2Total"></div></div>
+            <div class="full">
+                <div class="duties-label">Duties</div>
+                <div class="write-area" data-k="job2Duties"></div>
+            </div>
+            <div class="fld wide"><label>Supervisor</label><div class="line" data-k="job2Supervisor"></div></div>
+            <div class="fld wide"><label>Phone / email</label><div class="line" data-k="job2Contact"></div></div>
+        </div>
+    </div>
+
+    <div class="job">
+        <div class="job-head">Previous</div>
+        <div class="job-grid">
+            <div class="fld wide"><label>Employer</label><div class="line" data-k="job3Employer"></div></div>
+            <div class="fld wide"><label>City / State</label><div class="line" data-k="job3Place"></div></div>
+            <div class="fld wide"><label>Your position</label><div class="line" data-k="job3Position"></div></div>
+            <div class="fld wide"><label>Ages of children</label><div class="line" data-k="job3Ages"></div></div>
+            <div class="fld"><label>From</label><div class="line" data-k="job3From"></div></div>
+            <div class="fld"><label>To</label><div class="line" data-k="job3To"></div></div>
+            <div class="fld"><label>Hrs/week</label><div class="line" data-k="job3Hours"></div></div>
+            <div class="fld"><label>Total hours</label><div class="line" data-k="job3Total"></div></div>
+            <div class="full">
+                <div class="duties-label">Duties</div>
+                <div class="write-area" data-k="job3Duties"></div>
+            </div>
+            <div class="fld wide"><label>Supervisor</label><div class="line" data-k="job3Supervisor"></div></div>
+            <div class="fld wide"><label>Phone / email</label><div class="line" data-k="job3Contact"></div></div>
+        </div>
+    </div>
+
+    <div class="job">
+        <div class="job-head">Previous</div>
+        <div class="job-grid">
+            <div class="fld wide"><label>Employer</label><div class="line" data-k="job4Employer"></div></div>
+            <div class="fld wide"><label>City / State</label><div class="line" data-k="job4Place"></div></div>
+            <div class="fld wide"><label>Your position</label><div class="line" data-k="job4Position"></div></div>
+            <div class="fld wide"><label>Ages of children</label><div class="line" data-k="job4Ages"></div></div>
+            <div class="fld"><label>From</label><div class="line" data-k="job4From"></div></div>
+            <div class="fld"><label>To</label><div class="line" data-k="job4To"></div></div>
+            <div class="fld"><label>Hrs/week</label><div class="line" data-k="job4Hours"></div></div>
+            <div class="fld"><label>Total hours</label><div class="line" data-k="job4Total"></div></div>
+            <div class="full">
+                <div class="duties-label">Duties</div>
+                <div class="write-area" data-k="job4Duties"></div>
+            </div>
+            <div class="fld wide"><label>Supervisor</label><div class="line" data-k="job4Supervisor"></div></div>
+            <div class="fld wide"><label>Phone / email</label><div class="line" data-k="job4Contact"></div></div>
+        </div>
+    </div>
+
+    <div class="totals">
+        <div class="fld"><label>Total early childhood clock hours</label><div class="line" data-k="totalHours"></div></div>
+        <div class="fld"><label>Years of experience</label><div class="line" data-k="totalYears"></div></div>
+    </div>
+
+    <div class="section-title">Declaration</div>
+    <p class="instruction" style="margin-bottom:8px;">
+        I confirm this is a true record of my employment with children. I understand it may
+        be used to verify experience for a Gateways credential.
+    </p>
+
+    <div class="signature-section">
+        <div class="sig-field"><label>Employee signature:<div class="sig-line" data-k="employeeSignature"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="signedDate"></div></label></div>
+    </div>
+    <div class="signature-section">
+        <div class="sig-field"><label>Verified by (Director / Administrator):<div class="sig-line" data-k="verifierSignature"></div></label></div>
+        <div class="sig-field"><label>Date:<div class="sig-line" data-k="verifiedDate"></div></label></div>
+    </div>
+
+    <div class="footer">
+        <span>PAS Documentation — Confidential</span>
+        <span>Children of Promise LLC — Work History &amp; Experience Verification</span>
+    </div>
+
+<script src="pas-store.js"></script>
+<script src="/staff/auth.js"></script>
+<script src="pas-form.js"></script>
+<script>
+/* Work history, one record per person rather than one per year: it is a cumulative
+   account of where somebody has worked, not something restarted each September.
+
+   This replaces a paper form in Staff Work History Forms. It matters more than it
+   looks: Gateways verifies experience in clock hours, and experience is half of what
+   compiles into an ECE Credential level. The staff notes already carry totals worked
+   out by hand — "30hrs/wk x 36+ yrs = 56,160+ total hrs" — which is exactly the sum
+   this form exists to record properly.
+
+   Only the current post is prefilled, from the staff record and the hire date the
+   notes carry. Nothing about a previous employer is guessed: the record does not hold
+   it, and inventing an employer on a document used to verify a credential would be
+   worse than leaving it blank. */
+PasForm.init({
+    key: 'pas_work_history',
+    scope: 'staff',
+    prefill: function (staff) {
+        const hire = PasForm.hireDate(staff);
+        const out = {
+            employeeName: staff.Name,
+            position: PasForm.position(staff),
+            registryId: staff.RegistryId || '',
+            job1Employer: 'Children of Promise LLC',
+            job1Place: 'Millstadt, IL',
+            job1Position: staff.Role || '',
+            job1Ages: staff.Classroom || '',
+            job1To: 'Present',
+            job1Supervisor: 'Megan Nooney, Director',
+            totalYears: staff.ExperienceYears || ''
+        };
+        /* A month-only note gives a day that was assumed rather than recorded, so it
+           says so instead of presenting the 1st as fact on a verification document. */
+        if (hire) {
+            out.job1From = hire.precision === 'day'
+                ? PasForm.fmtDate(hire.d)
+                : hire.d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+                  + ' (month only on file — please confirm the day)';
+        }
+        return out;
+    }
+});
+</script>
+</body>
+</html>

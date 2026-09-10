@@ -20,12 +20,15 @@
    file. A contenteditable div prints as the text on the ruled line it replaced.
 
    Storage is the shared PAS worksheet store, so these inherit its behaviour: one
-   row per (form, scope) in the database, visible to everyone, no new table.
+   row per (form, scope) in the database, no new table.
 
-   NOTE ON PRIVACY: performance appraisals are HR records, and the worksheet store
-   is readable by anyone holding the single shared staff password. That is a real
-   difference from compliance evidence and is worth addressing before these are
-   used in anger.
+   PRIVACY, now handled. These are HR records, and the worksheet store used to be
+   readable by anyone holding the single shared staff password — so any member of
+   staff could read a colleague's appraisal. The server now scopes reads and writes
+   by the "__staff<id>" part of the storage key: a signed-in staff member receives
+   only the forms about themselves and can write only to those, while the shared
+   password still sees everything because that is the director. The scope key below
+   is therefore load-bearing, not just a filing convention.
    ══════════════════════════════════════════════════════════════════ */
 
 (function () {

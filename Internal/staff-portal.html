@@ -252,7 +252,12 @@ const MY_FORMS = [
     { key: 'pas_new_hire_checklist', scope: 'staff', href: '/pas/new-hire-checklist.html',
       name: 'Onboarding Checklist', note: 'One-off. Everything that had to be covered when you started.' },
     { key: 'pas_orientation_feedback', scope: 'staff', href: '/pas/orientation-feedback-form.html',
-      name: 'Orientation Feedback', note: 'One-off. What you made of your own orientation.' }
+      name: 'Orientation Feedback', note: 'One-off. What you made of your own orientation.' },
+    /* Cumulative rather than per year, and worth more than it looks: Gateways verifies
+       experience in clock hours, and experience is half of what compiles into an ECE
+       Credential level. */
+    { key: 'pas_work_history', scope: 'staff', href: '/pas/staff-work-history.html',
+      name: 'My Work History', note: 'Everywhere you have worked with children. Used to verify experience for a Gateways credential.' }
 ];
 
 function formState(f, staffId) {
