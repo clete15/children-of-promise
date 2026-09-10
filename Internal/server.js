@@ -781,7 +781,22 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff'
     ALTER TABLE Staff ADD SemesterHoursEce NVARCHAR(20);
 GO
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='TranscriptOnFile')
-    ALTER TABLE Staff ADD TranscriptOnFile NVARCHAR(20);
+    ALTER TABLE Staff ADD TranscriptOnFile NVARCHAR(40);
+GO
+/* Widened from NVARCHAR(20). One of the two values the staff card offers,
+   'On file with Gateways', is 21 characters, so SQL Server rejected the UPDATE that
+   carried it — and because a staff save sends every field at once, the rejection took
+   the whole save with it. The API still answered {"success":true}, so it looked saved
+   and was not. Found while recording Sara Holliday's transcript hours: the hours and
+   notes in the same request vanished too.
+
+   Worth noting the shape of the bug rather than just the width: a silent failure on
+   one field discarding an entire save is the kind of thing that shows up months later
+   as "the site lost my qualifications". */
+IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+           WHERE TABLE_NAME='Staff' AND COLUMN_NAME='TranscriptOnFile'
+             AND CHARACTER_MAXIMUM_LENGTH < 40)
+    ALTER TABLE Staff ALTER COLUMN TranscriptOnFile NVARCHAR(40);
 GO
 /* Professional development clock hours in the current school year.
 
@@ -1923,7 +1938,25 @@ function runSQL(sql) {
         const out = execSync(`"C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\sqlcmd.exe" -S ${DB_SERVER} -d ${DB_NAME} -E -s "|" -W -h -1 ${SQLCMD_ENCODING} -i "${tmp}"`,
             { encoding: 'utf8', shell: 'cmd.exe', maxBuffer: 64 * 1024 * 1024 });
         console.log('[SQL]', out.trim());
-        return { ok: true, data: out };
+        /* sqlcmd exits 0 even when a statement inside the batch failed, unless -b is
+           passed, and its error text goes to stdout rather than stderr. So execSync does
+           not throw and this returned ok for a write that never happened. That is how
+           'On file with Gateways' — 21 characters into an NVARCHAR(20) — produced
+           {"success":true} while discarding the whole UPDATE it travelled in.
+
+           Errors are surfaced rather than made fatal here. The ensure blocks run on every
+           request and failing the request on anything they report would be a much wider
+           change than this bug warrants; instead sqlError is returned alongside the data
+           and the handlers that write user-entered values check it. Level 10 and below are
+           informational, so only 11 and above count. */
+        const msgs = [];
+        const re = /^Msg (\d+), Level (\d+),[^\n]*\n(.*)$/gm;
+        let m;
+        while ((m = re.exec(out))) {
+            if (parseInt(m[2], 10) >= 11) msgs.push(m[3].trim() + ' (Msg ' + m[1] + ')');
+        }
+        if (msgs.length) console.error('[SQL FAILED INSIDE BATCH]', msgs.join(' | '));
+        return { ok: true, data: out, sqlError: msgs.length ? msgs.join('; ') : null };
     } catch (e) {
         console.error('[SQL ERR]', e.stderr || e.message);
         return { ok: false, error: e.stderr || e.message };
@@ -4111,6 +4144,13 @@ ELSE
                 + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            /* A rejected value takes the whole UPDATE with it, so reporting success here
+               would tell someone their qualifications were saved when nothing was. */
+            if (r.sqlError) {
+                return sendJSON(res, 500, {
+                    error: 'The database refused this change, so nothing was saved: ' + r.sqlError
+                });
+            }
             sendJSON(res, 200, { success: true, reviewCleared: !actor.director });
         });
         return;
