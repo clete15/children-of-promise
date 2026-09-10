@@ -2632,10 +2632,29 @@ const PICC_ITEMS = [
 
 // Convention: PICC/<item number>, e.g. PICC/PI5. Items whose evidence already
 // lives in a differently named folder carry an explicit link instead.
-/* ── PFA Compliance Checklist (FY26) ────────────────────────────────────────
-   Transcribed from PFA-Compliance-Checklist.pdf in the library — ISBE Early
-   Childhood Block Grant 3-5 Compliance Checklist, Preschool for All / PFA
-   Expansion, dated August 2025. Wording follows the source; nothing invented.
+/* ── PFA Compliance Checklist (FY25) ────────────────────────────────────────
+   Transcribed from "Preschool for All/PFA Compliance Checklist & CQIP/
+   2025 PFA-Compliance-Checklist.pdf" in the library — ISBE Early Childhood Block
+   Grant 3-5 Compliance Checklist, Preschool for All / PFA Expansion, FY25, dated
+   August 2024. Wording follows the source; nothing invented.
+
+   Extracted text: Internal/documents/FY25-PFA-Compliance-Checklist-EXTRACTED-TEXT.txt
+   so this transcription can be checked without reopening the PDF, the same way
+   FY27-PI-PICC-Checklist-EXTRACTED-TEXT.txt backs the PI list.
+
+   Take care with the file name. The same folder also holds an unprefixed
+   PFA-Compliance-Checklist.pdf, and that one is the older instrument — August
+   2023, FY24. The "2025" prefix is the current one, and it is the one the
+   2024-25 monitoring visit was scored against.
+
+   Items 21-37 are not modelled because they apply only to programs holding a
+   Preschool for All Expansion grant, which we do not. The evidence is our own
+   FY24-25 Site and Classroom Information Form: classroom type is ticked "PFA
+   Classroom", the single classroom is named "Preschool 1 - PFA", and the funding
+   source recorded against all 15 children is PFA. This matters beyond bookkeeping
+   — the instrument says item 21 REPLACES item 7's class-session length for PFAE
+   programs, so holding PFA is what keeps the requirement at 2½ hours a day rather
+   than five.
 
    Twenty items, not nineteen. Items 3, 17 and 18 apply only to programs run by a
    public school district, so they are marked not-applicable here rather than
@@ -2658,6 +2677,10 @@ const PFA_CHECKLIST_ITEMS = [
         code: '23 Ill. Adm. Code 235.30(a)(3) and (c)',
         subs: ['20 children per session maximum', 'Staff to child ratio is met',
                'A waiting list system is established when the maximum number of children are enrolled'],
+        /* The 15-child floor is the part most likely to be misread against us. The
+           instrument names Head Start and DCFS licensing as exceptions to it, and we
+           are DCFS-licensed, so a session under 15 is not a finding here. */
+        guidance: 'The minimum of 15 applies to the inclusive model, with exceptions for Head Start and DCFS licensing. Children of Promise is DCFS-licensed, so the exception applies.',
         evidence: 'Class lists, waiting list or a written process for developing one.',
         excelerate: '3B. Group Size and Staff/Child Ratio',
         waitlistLink: true
@@ -2724,7 +2747,7 @@ const PFA_CHECKLIST_ITEMS = [
     },
     {
         num: 'Item7', n: '7', title: 'Minimum hours and days of instruction',
-        requires: 'At least 165 days of student attendance, sessions of at least 2 hours a day five days a week, and at least 12.5 hours a week overall.',
+        requires: 'At least 165 days of student attendance, sessions of at least 2\u00BD hours a day five days a week, and at least 12.5 hours a week overall.',
         code: '23 Ill. Adm. Code 235.20(c)(13) and the Request for Proposals',
         subs: ['165 days minimum for student attendance',
                'Family conferences, home visits and professional development do not count as attendance days',
@@ -4014,7 +4037,11 @@ function renderPfaChecklistSection(data) {
             status = data[key] ? statusPill('ok', 'evidence recorded') : statusPill('open', 'not recorded');
         }
 
-        var actions = '<a class="picc-btn" href="' + libraryHref(item.num)
+        /* 'PFA' spelled out rather than left to libraryHref's default. The default
+           reads activeProgram, which is the roster's programme, not this panel's —
+           opening the PFA checklist from a PI roster sent every Library button to
+           PI evidence, which reads as the PFA folder having emptied itself. */
+        var actions = '<a class="picc-btn" href="' + libraryHref(item.num, 'PFA')
             + '" target="_blank" rel="noopener">Library</a>';
         if (!item.na) {
             actions += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
@@ -4066,11 +4093,12 @@ function renderPfaChecklistSection(data) {
 
     return '<div class="picc-head">'
         + '<div>'
-        + '<div class="picc-head-title">FY26 Preschool for All Compliance Checklist</div>'
+        + '<div class="picc-head-title">FY25 Preschool for All Compliance Checklist</div>'
         + '<div class="picc-head-sub">' + PFA_CHECKLIST_ITEMS.length + ' items on the ISBE checklist. '
         + (PFA_CHECKLIST_ITEMS.length - applicable.length) + ' apply only to programs run by a school '
         + 'district (3, 17, 18), so ' + applicable.length + ' apply to a DCFS-licensed childcare centre. '
-        + 'Transcribed from the ISBE Early Childhood Block Grant 3-5 Compliance Checklist, August 2025.</div>'
+        + 'Items 21&ndash;37 are Preschool for All Expansion only and do not apply. '
+        + 'Transcribed from the ISBE Early Childhood Block Grant 3-5 Compliance Checklist, August 2024 (FY25).</div>'
         + '</div>'
         + '<div class="picc-readiness">'
         + '<div class="picc-readiness-num">' + ready + ' / ' + applicable.length + '</div>'
@@ -4078,7 +4106,7 @@ function renderPfaChecklistSection(data) {
         + (ready === applicable.length ? 'all evidence recorded' : (applicable.length - ready) + ' still open')
         + '</div>'
         + '</div>'
-        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('') + '" target="_blank" rel="noopener">Open document library</a>'
+        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('', 'PFA') + '" target="_blank" rel="noopener">Open document library</a>'
         + '</div>'
         + '<div class="picc-list">' + rows + '</div>';
 }
@@ -4107,7 +4135,7 @@ function renderPiccSection(data) {
         + '<div class="picc-readiness-num">' + ready + ' / ' + PICC_ITEMS.length + '</div>'
         + '<div class="picc-readiness-lbl">' + (blocked ? blocked + ' still open' : 'all evidence recorded') + '</div>'
         + '</div>'
-        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('') + '" target="_blank" rel="noopener">Open document library</a>'
+        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('', 'PI') + '" target="_blank" rel="noopener">Open document library</a>'
         + '</div>'
         + '<div class="picc-list">' + rows + '</div>';
 }
@@ -4153,7 +4181,7 @@ function renderPiccItem(item, data) {
     (item.docs || []).forEach(function (d) {
         evidence += '<a class="picc-btn" href="' + d.url + '" target="_blank" rel="noopener">' + d.label + '</a>';
     });
-    evidence += '<a class="picc-btn" href="' + libraryHref(item.num)
+    evidence += '<a class="picc-btn" href="' + libraryHref(item.num, 'PI')
         + '" target="_blank" rel="noopener" title="Open this item in the document library">Library</a>';
     // Check-in: a signed or scanned page goes straight back into the item folder.
     evidence += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
