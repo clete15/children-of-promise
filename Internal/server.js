@@ -70,6 +70,28 @@ const MIME = {
     '.doc': 'application/msword'
 };
 
+/* Ask the browser to revalidate the internal pages and scripts.
+
+   These were served with no cache headers at all, which leaves the browser free to guess,
+   and browsers guess generously. The result is a portal running yesterday's JavaScript
+   against today's server, which presents as "the page will not load" with nothing wrong on
+   the server and nothing wrong in the code — the most expensive kind of fault to chase,
+   and entirely avoidable.
+
+   no-cache rather than no-store: the file is still cached, the browser just has to check it
+   is current before reusing it. For a dozen staff on a local connection that check costs
+   nothing, and it means a deploy reaches everyone without anybody being told to hard
+   refresh.
+
+   Images and stylesheets are deliberately left cacheable. They rarely change and they are
+   not what breaks. */
+function noStoreFor(filePath) {
+    const ext = path.extname(filePath).toLowerCase();
+    return (ext === '.html' || ext === '.js')
+        ? { 'Cache-Control': 'no-cache, must-revalidate' }
+        : {};
+}
+
 const COLS = ['Last_Name','First_Name','Birth_date','Start_Date','City_Town','Days_Old',
               'RoomNumber','Monday','Tuesday','Wednesday','Thursday','Friday',
               'Active','Category','PFA_PI_na','F_R_P_Food','IEP','Military'];
@@ -5315,7 +5337,8 @@ ELSE
     if (url === '/me' || url === '/me/') {
         return fs.readFile(path.join(__dirname, 'my-portal.html'), (err, data) => {
             if (err) { res.writeHead(404); return res.end('Not found'); }
-            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.writeHead(200, Object.assign({ 'Content-Type': 'text/html' },
+                noStoreFor('my-portal.html')));
             res.end(data);
         });
     }
@@ -5326,7 +5349,9 @@ ELSE
         const filePath = path.join(__dirname, '..', 'PAS', subPath);
         fs.readFile(filePath, (err, data) => {
             if (err) { res.writeHead(404); return res.end('Not found'); }
-            res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' });
+            res.writeHead(200, Object.assign(
+                { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' },
+                noStoreFor(filePath)));
             res.end(data);
         });
         return;
@@ -5374,7 +5399,9 @@ ELSE
         const filePath = path.join(__dirname, subPath);
         fs.readFile(filePath, (err, data) => {
             if (err) { res.writeHead(404); return res.end('Not found'); }
-            res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' });
+            res.writeHead(200, Object.assign(
+                { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' },
+                noStoreFor(filePath)));
             res.end(data);
         });
         return;
