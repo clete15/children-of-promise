@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAS Storage Check – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background:#f1f5f9; }
+        .wrap { max-width:940px;margin:24px auto;padding:0 18px 60px; }
+        .card { background:white;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,0.08);padding:22px 26px;margin-bottom:18px; }
+        h1 { font-size:1.15rem;color:#1e3a8a;margin:0 0 6px; }
+        h2 { font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;color:#6b7280;margin:22px 0 8px;padding-bottom:6px;border-bottom:1px solid #e5e7eb; }
+        h2:first-of-type { margin-top:0; }
+        p { font-size:0.85rem;color:#475569;line-height:1.6;margin:0 0 10px; }
+        table { width:100%;border-collapse:collapse;font-size:0.8rem;margin-top:6px; }
+        th { text-align:left;background:#f8fafc;color:#64748b;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;padding:7px 10px;border-bottom:2px solid #e5e7eb; }
+        td { padding:7px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top; }
+        code { background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:0.78rem; }
+        .ok { color:#166534;font-weight:700; }
+        .bad { color:#b91c1c;font-weight:700; }
+        .warn { color:#b45309;font-weight:700; }
+        .box { border-radius:8px;padding:12px 14px;font-size:0.82rem;line-height:1.6;margin-bottom:12px; }
+        .box-ok { background:#f0fdf4;border:1.5px solid #86efac;color:#166534; }
+        .box-bad { background:#fef2f2;border:1.5px solid #fca5a5;color:#991b1b; }
+        .box-warn { background:#fffbeb;border:1.5px solid #fcd34d;color:#92400e; }
+        .muted { color:#94a3b8;font-size:0.78rem; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>PAS Storage Check &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="wrap">
+    <div class="card">
+        <h1>PAS Storage Check</h1>
+        <p>
+            Answers whether the PAS worksheets are actually on the server, and what this
+            particular browser is holding. <strong>This page only reads.</strong> It never
+            saves, never uploads and never deletes, so it is safe to open on any machine
+            without risking whatever is stored there.
+        </p>
+        <p class="muted">
+            Deliberately does not load <code>pas-store.js</code>. That script uploads a
+            browser's copy on load, which is the one thing we do not want happening by
+            accident while we work out where a completed assessment went.
+        </p>
+        <div id="result"><p class="muted">Checking…</p></div>
+    </div>
+</div>
+
+<!-- auth.js FIRST. Loading it after a script that fetches is the bug that started
+     all this: the fetch goes out before CofpAuth exists and comes back 401. -->
+<script src="/staff/auth.js"></script>
+<script>
+/* A rough measure of "how much is filled in". Counts leaf values that are not
+   blank, so a form with 90 ticks and notes reads as ~90+ rather than as 1 object. */
+function countAnswers(obj) {
+    var n = 0;
+    (function walk(v) {
+        if (v === null || v === undefined || v === '' || v === false) return;
+        if (Array.isArray(v)) { v.forEach(walk); return; }
+        if (typeof v === 'object') { Object.keys(v).forEach(function (k) { walk(v[k]); }); return; }
+        n++;
+    })(obj);
+    return n;
+}
+
+function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// What this browser is holding, read straight from localStorage.
+function localRows() {
+    var rows = [];
+    for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.indexOf('pas_') !== 0) continue;
+        var raw = localStorage.getItem(k), obj = null;
+        try { obj = JSON.parse(raw); } catch (e) { obj = null; }
+        rows.push({
+            key: k,
+            chars: raw ? raw.length : 0,
+            answers: obj && typeof obj === 'object' ? countAnswers(obj) : null
+        });
+    }
+    return rows.sort(function (a, b) { return a.key < b.key ? -1 : 1; });
+}
+
+function table(headers, rows) {
+    if (!rows.length) return '<p class="muted">Nothing.</p>';
+    return '<table><thead><tr>' + headers.map(function (h) { return '<th>' + h + '</th>'; }).join('')
+        + '</tr></thead><tbody>' + rows.map(function (r) {
+            return '<tr>' + r.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+        }).join('') + '</tbody></table>';
+}
+
+function render(html) { document.getElementById('result').innerHTML = html; }
+
+(function () {
+    var out = '';
+    var signedIn = !!(window.CofpAuth && (CofpAuth.header() || CofpAuth.token()));
+
+    out += '<h2>This browser\u2019s sign-in</h2>';
+    out += signedIn
+        ? '<div class="box box-ok">Credentials are present in this browser.'
+          + (window.CofpAuth.tokenName && CofpAuth.tokenName()
+              ? ' Signed in as <strong>' + esc(CofpAuth.tokenName()) + '</strong>.'
+              : ' Using the shared staff password.')
+          + '</div>'
+        : '<div class="box box-bad">No credentials in this browser. Every PAS page will fall '
+          + 'back to browser-only storage here. Sign in from the staff portal first, then '
+          + 'reload this page.</div>';
+
+    var local = localRows();
+    out += '<h2>Saved in THIS browser only</h2>';
+    out += '<p>These are copies kept by this machine. They are what a PAS page shows when it '
+        + 'cannot reach the server.</p>';
+    out += table(['Key', 'Entries filled in', 'Size'],
+        local.map(function (r) {
+            return ['<code>' + esc(r.key) + '</code>',
+                    r.answers === null ? '<span class="bad">unreadable</span>' : String(r.answers),
+                    r.chars.toLocaleString() + ' chars'];
+        }));
+
+    render(out + '<h2>On the server</h2><p class="muted">Asking…</p>');
+
+    if (!window.CofpAuth) {
+        render(out + '<h2>On the server</h2><div class="box box-bad">auth.js did not load, so '
+            + 'the server cannot be asked. Check the browser console.</div>');
+        return;
+    }
+
+    CofpAuth.apiFetch('/api/pas-worksheets')
+        .then(function (res) {
+            if (!res.ok) {
+                return res.text().then(function (body) {
+                    throw new Error('HTTP ' + res.status + (body ? ' \u2014 ' + body.slice(0, 400) : ''));
+                });
+            }
+            return res.json();
+        })
+        .then(function (rows) {
+            rows = Array.isArray(rows) ? rows : [];
+            var serverHtml = '<h2>On the server</h2>';
+            serverHtml += rows.length
+                ? '<div class="box box-ok">The server answered and holds <strong>' + rows.length
+                  + '</strong> worksheet record(s). Anything listed here is safe and shared.</div>'
+                : '<div class="box box-warn">The server answered, but holds <strong>no</strong> PAS '
+                  + 'worksheet records at all.</div>';
+            serverHtml += table(['Worksheet', 'Scope', 'Entries filled in', 'Last saved by', 'When'],
+                rows.map(function (r) {
+                    var n = r.unreadable ? '<span class="bad">unreadable \u2014 stored but will not parse</span>'
+                                         : String(countAnswers(r.Payload || {}));
+                    return ['<code>' + esc(r.WorksheetKey) + '</code>',
+                            r.ScopeKey ? '<code>' + esc(r.ScopeKey) + '</code>' : '<span class="muted">whole centre</span>',
+                            n, esc(r.UpdatedBy) || '<span class="muted">not recorded</span>',
+                            esc(r.UpdatedAt) || '<span class="muted">\u2014</span>'];
+                }));
+
+            // The specific question that started this.
+            var sa = rows.filter(function (r) { return r.WorksheetKey === 'pas_self_assessment'; })[0];
+            var mine = local.filter(function (r) { return r.key === 'pas_self_assessment'; })[0];
+            serverHtml += '<h2>The 25-item self-assessment</h2>';
+            if (sa && !sa.unreadable && countAnswers(sa.Payload || {}) > 10) {
+                serverHtml += '<div class="box box-ok">Found on the server with '
+                    + countAnswers(sa.Payload) + ' entries, last saved '
+                    + esc(sa.UpdatedAt || 'at an unrecorded time')
+                    + '. <strong>It is not lost.</strong> Open the self-assessment while signed '
+                    + 'in and it will load.</div>';
+            } else if (sa) {
+                serverHtml += '<div class="box box-warn">A record exists on the server but looks '
+                    + 'empty or unreadable. Do not open the self-assessment page and click '
+                    + 'through it yet \u2014 that would save the empty version over it. Send this '
+                    + 'screen to Clete first.</div>';
+            } else if (mine && mine.answers > 10) {
+                serverHtml += '<div class="box box-warn">Not on the server, but <strong>this '
+                    + 'browser has ' + mine.answers + ' entries</strong>. This machine is holding '
+                    + 'the only copy. Sign in, then open the self-assessment on THIS machine to '
+                    + 'push it up \u2014 and do not clear this browser\u2019s history first.</div>';
+            } else {
+                serverHtml += '<div class="box box-bad">Not on the server, and not in this '
+                    + 'browser either. Check the other machines and browsers it might have been '
+                    + 'typed on before entering anything new \u2014 whoever opens the page and '
+                    + 'clicks through it will save an empty assessment.</div>';
+            }
+            render(out + serverHtml);
+        })
+        .catch(function (e) {
+            render(out + '<h2>On the server</h2><div class="box box-bad">Could not read the '
+                + 'server: ' + esc(e.message) + '<br><br>A 401 means this browser is not signed '
+                + 'in. A 500 means the server could not assemble the answer \u2014 send this to '
+                + 'Clete, and do not open the PAS pages until it is sorted, because they will '
+                + 'fall back to browser-only storage and can overwrite good answers.</div>');
+        });
+})();
+</script>
+</body>
+</html>
