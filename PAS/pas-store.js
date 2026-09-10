@@ -96,6 +96,12 @@
         if (!data.success) throw new Error(data.error || 'Save failed');
     }
 
+    /* Worksheets this browser holds that the server has a DIFFERENT version of.
+       Reported rather than resolved: picking a winner by size or date would be a
+       guess about whose work matters, and the wrong guess loses a completed
+       assessment. */
+    const conflicts = [];
+
     // Lift anything still in this browser that the server has not seen.
     async function migrateLocal() {
         const candidates = [];
@@ -105,10 +111,25 @@
         }
         for (const key of candidates) {
             const { worksheet, scope } = splitKey(key);
-            if (cache.has(cacheKey(worksheet, scope))) continue;   // server already has it
             let obj;
             try { obj = JSON.parse(localStorage.getItem(key)); } catch (e) { continue; }
             if (!obj || typeof obj !== 'object') continue;
+
+            /* The server already has this worksheet. Previously this skipped in
+               silence, which is fine when the local copy is a stale echo of the
+               server's and quietly wrong when it is a completed form the server has
+               never seen — the case that arises after the store has been falling
+               back to localStorage. Counting the answers on each side is enough to
+               tell "same thing twice" from "two different pieces of work". */
+            if (cache.has(cacheKey(worksheet, scope))) {
+                const mine = JSON.stringify(obj);
+                const theirs = cache.get(cacheKey(worksheet, scope));
+                if (mine !== theirs) {
+                    conflicts.push({ key: key, localAnswers: countAnswers(obj),
+                                     serverAnswers: countAnswers(safeParse(theirs)) });
+                }
+                continue;
+            }
             try {
                 await push(worksheet, scope, obj);
                 cache.set(cacheKey(worksheet, scope), JSON.stringify(obj));
@@ -117,6 +138,44 @@
                 console.warn('[PasStore] could not migrate "' + key + '": ' + e.message);
             }
         }
+    }
+
+    function safeParse(s) { try { return JSON.parse(s); } catch (e) { return {}; } }
+
+    // A rough measure of "how much is filled in", used only to describe a conflict.
+    function countAnswers(obj) {
+        let n = 0;
+        const walk = v => {
+            if (v === null || v === undefined || v === '' || v === false) return;
+            if (Array.isArray(v)) { v.forEach(walk); return; }
+            if (typeof v === 'object') { Object.keys(v).forEach(k => walk(v[k])); return; }
+            n++;
+        };
+        walk(obj);
+        return n;
+    }
+
+    /* The failure this exists to stop being invisible.
+
+       When the first read fails the store keeps working against localStorage, which
+       is the right call — it beats losing what someone is typing. What was wrong was
+       doing it silently: a director could complete all 25 PAS items, see every answer
+       on screen, and have none of it leave her laptop. Nobody finds that out until
+       somebody else opens the page and sees "not started". */
+    function banner(html, colour) {
+        const show = () => {
+            if (document.getElementById('pasStoreBanner')) return;
+            const el = document.createElement('div');
+            el.id = 'pasStoreBanner';
+            el.setAttribute('role', 'alert');
+            el.style.cssText = 'position:sticky;top:0;z-index:99999;background:' + colour
+                + ';color:#fff;padding:10px 16px;font:600 0.82rem/1.5 system-ui,sans-serif;'
+                + 'box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+            el.innerHTML = html;
+            document.body.insertBefore(el, document.body.firstChild);
+        };
+        if (document.body) show();
+        else document.addEventListener('DOMContentLoaded', show);
     }
 
     // localStorage-shaped facade. Reads hit the cache so existing synchronous
@@ -161,18 +220,34 @@
         }
     };
 
+    let offline = false;
+
     const ready = (async function () {
         try {
             await fetchAll();
             await migrateLocal();
+            if (conflicts.length) {
+                const list = conflicts.map(c => '&ldquo;' + c.key + '&rdquo; (this browser has '
+                    + c.localAnswers + ' entries, the server has ' + c.serverAnswers + ')').join('; ');
+                banner('&#9888; This browser holds a different copy of ' + list
+                    + '. Nothing has been overwritten. Tell Clete before entering more, '
+                    + 'so the right version is the one kept.', '#b45309');
+            }
         } catch (e) {
             lastError = e.message;
+            offline = true;
             console.error('[PasStore] could not reach the server; falling back to this browser only.', e);
             // Fall back to the real localStorage so a page still works offline
             // rather than silently losing the user's typing.
             storage.getItem = k => localStorage.getItem(k);
             storage.setItem = (k, v) => localStorage.setItem(k, v);
             storage.removeItem = k => localStorage.removeItem(k);
+            banner('&#9888; <strong>Not saving to the server.</strong> Anything you enter on this '
+                + 'page is being kept in this browser only &mdash; nobody else will see it, and '
+                + 'clearing your history would erase it. '
+                + 'Sign in again from the staff portal, then reload this page. '
+                + '<span style="font-weight:400;opacity:0.85;">(' + lastError + ')</span>',
+                '#b91c1c');
         }
         return true;
     })();
@@ -190,6 +265,10 @@
             return out;
         },
         refresh: fetchAll,
-        get lastError() { return lastError; }
+        get lastError() { return lastError; },
+        // True when answers are going to this browser only. Exposed so a page can
+        // refuse to look finished when nothing has actually been submitted.
+        get offline() { return offline; },
+        get conflicts() { return conflicts.slice(); }
     };
 })();
