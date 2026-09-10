@@ -292,6 +292,10 @@ function filesCard() {
             + esc(FILES.reason || '') + '</div></div>';
     }
 
+    /* Only this person's own confirmed documents. Nothing undecided, nothing set
+       aside, nothing belonging to anybody else — a page headed with someone's name
+       should hold their paperwork and no one else's. The filing work moved to its
+       own screen, staff-files.html, which is about the library rather than a person. */
     const mine = FILES.mine || [];
     html += '<div class="sp-sub">Your own paperwork, as held by the centre. '
         + 'These open in your browser.</div>';
@@ -308,123 +312,11 @@ function filesCard() {
             + 'matched to your name — ask Megan to check.</div>';
     }
 
-    // ── the director's confirming step ──
-    if (WHO && WHO.director) {
-        const suggested = FILES.suggestedForTarget || [];
-        if (suggested.length) {
-            html += '<div style="margin-top:14px;"><h2 style="font-size:0.86rem;">'
-                + 'Looks like it belongs to this person</h2>'
-                + '<div class="sp-sub">Read the filename before confirming. A firm match means '
-                + 'both names line up; a weak one means only the first name did.</div>';
-            suggested.forEach(f => {
-                html += '<div class="sp-step" style="border-left-color:'
-                    + (f.confidence === 'firm' ? '#16a34a' : '#d97706') + ';">'
-                    + '<div class="t">' + esc(f.name) + '</div>'
-                    + '<div class="d">' + esc(f.category) + ' &nbsp;·&nbsp; '
-                    + (f.confidence === 'firm' ? 'firm match' : 'weak match — first name only')
-                    + ' &nbsp; <a href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
-                    + '" target="_blank" rel="noopener">open it</a>'
-                    + ' &nbsp; <button type="button" class="sp-link-btn" data-rel="' + esc(f.rel)
-                    + '" style="padding:3px 10px;font-size:0.72rem;font-weight:700;border:none;'
-                    + 'border-radius:5px;background:#2563eb;color:#fff;cursor:pointer;">'
-                    + 'This is theirs</button></div></div>';
-            });
-            html += '</div>';
-        }
-
-        const unassigned = FILES.unassigned || [];
-        if (unassigned.length) {
-            html += '<div style="margin-top:14px;"><h2 style="font-size:0.86rem;">'
-                + 'Not filed against anyone (' + unassigned.length + ')</h2>'
-                + '<div class="sp-sub">Until one of these is assigned, nobody sees it on their '
-                + 'own page.</div>';
-            unassigned.forEach(f => {
-                /* Pre-select the strongest guess. The server returns them best
-                   first, so this is that one.
-
-                   Pre-selecting is safe because it does not file anything: the
-                   button is still a deliberate click, so this removes the hunt
-                   through fourteen names rather than removing the check. What it
-                   must not do is make a weak guess look as settled as a firm one,
-                   so the row says which it is and colours itself accordingly. */
-                const best = (f.guesses || [])[0] || null;
-                const weak = best && best.confidence !== 'firm';
-
-                const opts = STAFF.map(s => {
-                    const g = (f.guesses || []).find(x => String(x.staffId) === String(s.Id));
-                    const chosen = best && String(best.staffId) === String(s.Id);
-                    return '<option value="' + s.Id + '"' + (chosen ? ' selected' : '') + '>'
-                        + esc(s.Name)
-                        + (g ? (g.confidence === 'firm' ? '  ✓ likely' : '  ~ maybe') : '')
-                        + '</option>';
-                }).join('');
-
-                html += '<div class="sp-step" style="border-left-color:'
-                    + (best ? (weak ? '#d97706' : '#16a34a') : '#e2e8f0') + ';">'
-                    + '<div class="t">' + esc(f.name) + '</div>'
-                    + '<div class="d">' + esc(f.category)
-                    + ' &nbsp; <a href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
-                    + '" target="_blank" rel="noopener">open it</a>'
-                    + (best
-                        ? '<br><span style="color:' + (weak ? '#92400e' : '#166534') + ';">'
-                          + (weak
-                              ? 'Only the first name matches \u2014 worth opening it before filing.'
-                              : 'Both names match.')
-                          + '</span>'
-                        : '<br><span style="color:#64748b;">The filename matches nobody on the '
-                          + 'roster, so pick a name yourself or leave it.</span>')
-                    + '<br>'
-                    + '<select class="sp-assign-who" data-rel="' + esc(f.rel)
-                    + '" style="margin-top:6px;padding:4px 8px;font-size:0.78rem;">'
-                    + '<option value=""' + (best ? '' : ' selected')
-                    + '>— file it against —</option>' + opts + '</select> '
-                    + '<button type="button" class="sp-assign-btn" data-rel="' + esc(f.rel)
-                    + '" style="padding:4px 10px;font-size:0.72rem;font-weight:700;border:none;'
-                    + 'border-radius:5px;background:' + (weak ? '#b45309' : '#334155')
-                    + ';color:#fff;cursor:pointer;">File it</button> '
-                    /* For anything that is not a personnel file at all, or belongs
-                       to someone long gone. Nothing moves on disk; it just stops
-                       being a pending decision. */
-                    + '<button type="button" class="sp-misc-btn" data-rel="' + esc(f.rel)
-                    + '" title="Not anybody\u2019s personnel file \u2014 set it aside"'
-                    + ' style="padding:4px 10px;font-size:0.72rem;font-weight:700;'
-                    + 'border:1px solid #cbd5e1;border-radius:5px;background:#fff;'
-                    + 'color:#475569;cursor:pointer;">Misc / archive</button>'
-                    + '</div></div>';
-            });
-            html += '</div>';
-        }
-
-        // Set aside as nobody's. Listed so a mistake here is findable and undoable.
-        const misc = FILES.misc || [];
-        if (misc.length) {
-            html += '<div style="margin-top:14px;"><h2 style="font-size:0.86rem;">'
-                + 'Set aside as Misc (' + misc.length + ')</h2>'
-                + '<div class="sp-sub">Not filed against anyone, and not waiting on a '
-                + 'decision. Still in the library \u2014 nothing was moved or deleted.</div>';
-            misc.forEach(f => {
-                html += '<div class="sp-step" style="border-left-color:#cbd5e1;">'
-                    + '<div class="t" style="font-weight:600;color:#475569;">' + esc(f.name) + '</div>'
-                    + '<div class="d">' + esc(f.category)
-                    + ' &nbsp; <a href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
-                    + '" target="_blank" rel="noopener">open it</a>'
-                    + ' &nbsp; <button type="button" class="sp-unmisc-btn" data-rel="' + esc(f.rel)
-                    + '" style="padding:3px 9px;font-size:0.72rem;font-weight:700;'
-                    + 'border:1px solid #cbd5e1;border-radius:5px;background:#fff;'
-                    + 'color:#475569;cursor:pointer;">Put back</button>'
-                    + '</div></div>';
-            });
-            html += '</div>';
-        }
-
-        const nobody = FILES.matchesNobody || [];
-        if (nobody.length) {
-            html += '<div class="sp-sub" style="margin-top:12px;color:#92400e;">'
-                + nobody.length + ' document' + (nobody.length > 1 ? 's match' : ' matches')
-                + ' nobody on the current roster, which usually means a former member of '
-                + 'staff: ' + nobody.map(f => esc(f.name)).join(', ') + '</div>';
-        }
-    }
+    /* The director's filing workbench used to sit here. It moved to
+       staff-files.html, because this page is one person's record and the undecided
+       pile, the set-aside pile and everybody else's documents are no part of it.
+       The server enforces it rather than the page: asked about a specific person it
+       sends only that person's confirmed files, so there is nothing here to hide. */
 
     return html + '</div>';
 }
@@ -465,11 +357,36 @@ function selfEditCard(s) {
         + '</select>'
         + (hint ? '<div class="note">' + hint + '</div>' : '') + '</div>';
 
+    /* Says plainly what is missing and why it matters to the person, rather than
+       leaving them to notice an empty box. Semester hours are the gap that actually
+       exists — most records have none — and they are the thing that moves a
+       credential level, so it is worth asking for directly. */
+    const needsHours = !String(s.SemesterHoursTotal || '').trim();
+    const needsRegistry = !String(s.RegistryId || '').trim();
+    let ask = '';
+    if (needsHours || needsRegistry) {
+        const bits = [];
+        if (needsRegistry) {
+            bits.push('your <strong>Gateways Registry number</strong> — without it no '
+                + 'credential can be awarded at all');
+        }
+        if (needsHours) {
+            bits.push('your <strong>college credit</strong> from your transcript — these are '
+                + 'the hours that move you up the credential levels');
+        }
+        ask = '<div class="sp-step" style="border-left-color:#2563eb;background:#f8fbff;">'
+            + '<div class="t">We need this from you</div>'
+            + '<div class="d">Nothing on your record shows ' + bits.join(', and ') + '. '
+            + 'Filling it in here is quicker than anyone chasing it, and it is your '
+            + 'credential it affects.</div></div>';
+    }
+
     return '<div class="sp-card">'
         + '<h2>Keep my record right</h2>'
         + '<div class="sp-sub">These are the things you know better than the office does. '
         + 'Saving marks the record as needing Megan\u2019s check again, because these figures '
         + 'back the centre\u2019s compliance reporting.</div>'
+        + ask
         + '<div class="sp-grid">'
         + picker('edEducation', 'Highest completed education', s.Education, EDU_OPTIONS,
             'The highest level you actually finished. Coursework without a degree is "Some College".')
@@ -480,9 +397,18 @@ function selfEditCard(s) {
         + field('edGateways', 'Gateways credential', s.Gateways, 'As it appears on your Gateways record.')
         + field('edExperience', 'Years of experience', s.ExperienceYears, 'Decimals are fine, e.g. 9.5.')
         + field('edShTotal', 'Total semester hours', s.SemesterHoursTotal,
-            'All college credit on your transcript.')
+            'Add up the credit hours column on your transcript. If it shows quarter '
+            + 'hours rather than semester hours, say so in the box below and leave this blank.')
+        /* Pointed at the Gateways record rather than left to the person's own
+           reading of their course list. Whether a given course counts toward the
+           ECE Credential is Gateways' determination, not a judgement to be made
+           from a course title, and a wrong figure here moves a credential level and
+           feeds the ExceleRate percentages. Blank is a better answer than a guess. */
         + field('edShEce', 'Of those, early childhood hours', s.SemesterHoursEce,
-            'These are the ones that move you up the credential levels.')
+            'Take this from your Gateways Professional Development Record, which states '
+            + 'it. Please do not work it out from your course titles — whether a course '
+            + 'counts is Gateways\u2019 decision. Leave it blank if you are not sure and '
+            + 'Megan will fill it in.')
         + picker('edTranscript', 'Has Gateways got your transcript?', s.TranscriptOnFile,
             TRANSCRIPT_OPTIONS, 'Hours Gateways never received cannot count toward a credential.')
         + field('edPdHours', 'PD clock hours this year', s.PdHoursYtd, 'Against the 20 ExceleRate asks for.')
@@ -676,73 +602,15 @@ function render() {
     wireCardActions();
 }
 
-/* Buttons inside the rendered cards: saving the editable fields, and the director's
-   file assignment. Attached fresh each render rather than delegated, so a stale
-   handler cannot act on a card that has been redrawn for a different person. */
+/* Buttons inside the rendered cards. Attached fresh each render rather than
+   delegated, so a stale handler cannot act on a card that has been redrawn for a
+   different person.
+
+   The file-assignment handlers that used to live here went with the workbench to
+   staff-files.html. */
 function wireCardActions() {
     const save = $('edSave');
     if (save) save.addEventListener('click', saveMyRecord);
-
-    document.querySelectorAll('.sp-link-btn').forEach(btn => {
-        btn.addEventListener('click', () => assignFile(btn.getAttribute('data-rel'), current.Id, btn));
-    });
-    document.querySelectorAll('.sp-assign-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const rel = btn.getAttribute('data-rel');
-            const sel = document.querySelector('.sp-assign-who[data-rel="' + rel.replace(/"/g, '\\"') + '"]');
-            const who = sel ? sel.value : '';
-            if (!who) { btn.textContent = 'Pick a name first'; setTimeout(() => btn.textContent = 'File it', 1800); return; }
-            assignFile(rel, who, btn);
-        });
-    });
-    // Set aside as nobody's, and the way back from that.
-    document.querySelectorAll('.sp-misc-btn').forEach(btn => {
-        btn.addEventListener('click', () => setFileMisc(btn.getAttribute('data-rel'), true, btn));
-    });
-    document.querySelectorAll('.sp-unmisc-btn').forEach(btn => {
-        btn.addEventListener('click', () => setFileMisc(btn.getAttribute('data-rel'), false, btn));
-    });
-}
-
-/* Marks a file as belonging to nobody, or undoes that. Sending neither a staffId
-   nor the misc flag is what the server reads as "back to undecided". */
-async function setFileMisc(rel, misc, btn) {
-    const original = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = misc ? 'Setting aside…' : 'Putting back…';
-    try {
-        const res = await apiFetch('/api/staff-file-link', {
-            method: 'POST',
-            body: JSON.stringify(misc ? { rel: rel, misc: true } : { rel: rel })
-        });
-        const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error || 'HTTP ' + res.status);
-        await loadFiles(current.Id);
-    } catch (e) {
-        btn.disabled = false;
-        btn.textContent = 'Failed — ' + (e.message || 'try again');
-        setTimeout(() => { btn.textContent = original; }, 2600);
-    }
-}
-
-async function assignFile(rel, staffId, btn) {
-    const original = btn.textContent;
-    btn.disabled = true;
-    btn.textContent = 'Filing…';
-    try {
-        const res = await apiFetch('/api/staff-file-link', {
-            method: 'POST',
-            body: JSON.stringify({ rel: rel, staffId: staffId })
-        });
-        const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error || 'HTTP ' + res.status);
-        // Re-read rather than patching the page, so what is shown is what was stored.
-        await loadFiles(current.Id);
-    } catch (e) {
-        btn.disabled = false;
-        btn.textContent = 'Failed — ' + (e.message || 'try again');
-        setTimeout(() => { btn.textContent = original; }, 2600);
-    }
 }
 
 async function saveMyRecord() {

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<!-- form-audit: read-only. This page files existing documents against people; it holds
+     no record of its own and nothing is typed into it, so the persistence audit should
+     not treat it as a form. -->
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff Document Filing — Children of Promise</title>
+<link rel="stylesheet" href="/staff/styles.css">
+<style>
+    body { background: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    .sf-wrap { max-width: 1000px; margin: 0 auto; padding: 18px 16px 60px; }
+    .sf-bar {
+        display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+        background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+        padding: 12px 16px; margin-bottom: 16px;
+    }
+    .sf-card {
+        background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+        padding: 16px 18px; margin-bottom: 16px;
+    }
+    .sf-card h2 { font-size: 0.95rem; font-weight: 800; color: #1e293b; margin: 0 0 4px; }
+    .sf-sub { font-size: 0.76rem; color: #64748b; line-height: 1.6; margin-bottom: 12px; }
+    .sf-row {
+        border: 1px solid #e2e8f0; border-left: 4px solid #e2e8f0; border-radius: 8px;
+        padding: 11px 14px; margin-bottom: 9px; background: #fff;
+    }
+    .sf-row.firm { border-left-color: #16a34a; }
+    .sf-row.weak { border-left-color: #d97706; }
+    .sf-row.none { border-left-color: #cbd5e1; }
+    .sf-row.set  { border-left-color: #cbd5e1; background: #f8fafc; }
+    .sf-name { font-size: 0.86rem; font-weight: 700; color: #1e293b; word-break: break-word; }
+    .sf-meta { font-size: 0.76rem; color: #475569; line-height: 1.7; margin-top: 4px; }
+    .sf-meta a { color: #2563eb; }
+    .sf-note.firm { color: #166534; }
+    .sf-note.weak { color: #92400e; }
+    .sf-note.none { color: #64748b; }
+    select { padding: 4px 8px; border: 1px solid #cbd5e1; border-radius: 5px; font-size: 0.78rem; font-family: inherit; }
+    button.sf-btn {
+        padding: 4px 10px; font-size: 0.72rem; font-weight: 700;
+        border: none; border-radius: 5px; color: #fff; cursor: pointer;
+    }
+    button.sf-btn.file { background: #334155; }
+    button.sf-btn.fileweak { background: #b45309; }
+    button.sf-btn.ghost { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
+    button.sf-btn:disabled { opacity: 0.6; cursor: default; }
+    .sf-empty { font-size: 0.8rem; color: #16a34a; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="sf-wrap">
+    <div class="sf-bar">
+        <strong style="color:#1e293b;font-size:0.9rem;">Staff Document Filing</strong>
+        <span id="sfMsg" style="font-size:0.76rem;color:#64748b;"></span>
+        <span style="margin-left:auto;font-size:0.76rem;">
+            <a href="/staff/" style="color:#2563eb;font-weight:600;">Back to portal</a>
+        </span>
+        <span style="flex-basis:100%;font-size:0.72rem;color:#94a3b8;">
+            Deciding whose each personnel document is. A file is shown on somebody's own
+            page only once it is filed against them here.
+        </span>
+    </div>
+    <div id="sfBody">
+        <div class="sf-card"><div class="sf-sub">Reading the document library…</div></div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+/* ── Filing personnel documents ─────────────────────────────────────────────
+   Separate from My Page on purpose. That page is one person's own record, and the
+   undecided pile, the set-aside pile and everybody else's paperwork are not part
+   of it — nothing about the library belongs on a page headed with someone's name.
+
+   Nothing here reads a filename and acts on it. The server proposes, a person
+   confirms, and until somebody confirms a file belongs to nobody. The filenames
+   cannot carry the answer: one transcript is filed under a former surname, another
+   has both halves of the name misspelt, and three belong to people who left. A
+   match loose enough to catch those is loose enough to hand somebody a colleague's
+   W4, and a W4 has a social security number on it. */
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+let DATA = null;
+
+async function load() {
+    try {
+        // No staffId: that is what asks for the library view rather than a person's.
+        const res = await apiFetch('/api/staff-files');
+        if (res.status === 401) {
+            $('sfBody').innerHTML = '<div class="sf-card"><div class="sf-sub">'
+                + 'Sign in through the staff portal first.</div></div>';
+            return;
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        DATA = await res.json();
+        render();
+    } catch (e) {
+        $('sfBody').innerHTML = '<div class="sf-card"><div class="sf-sub" style="color:#991b1b;">'
+            + 'Could not read the document library: ' + esc(e.message) + '</div></div>';
+    }
+}
+
+function staffOptions(guesses, best) {
+    return (DATA.staff || []).map(s => {
+        const g = (guesses || []).find(x => String(x.staffId) === String(s.staffId));
+        const chosen = best && String(best.staffId) === String(s.staffId);
+        return '<option value="' + esc(s.staffId) + '"' + (chosen ? ' selected' : '') + '>'
+            + esc(s.name)
+            + (g ? (g.confidence === 'firm' ? '  \u2713 likely' : '  ~ maybe') : '')
+            + '</option>';
+    }).join('');
+}
+
+function render() {
+    if (!DATA) return;
+
+    if (DATA.libraryReachable === false) {
+        $('sfBody').innerHTML = '<div class="sf-card"><h2>The library is not reachable</h2>'
+            + '<div class="sf-sub">' + esc(DATA.reason || '')
+            + ' Nothing can be filed until the server can read it.</div></div>';
+        return;
+    }
+    /* A staff member reaching this page gets no lists at all. The server does not
+       send them, so this is telling them why the page is empty rather than
+       enforcing anything the page could be edited out of. */
+    if (!DATA.staff) {
+        $('sfBody').innerHTML = '<div class="sf-card"><h2>Director only</h2>'
+            + '<div class="sf-sub">Filing documents against people is done by Megan. '
+            + 'Your own documents are on <a href="/staff/staff-portal.html">your page</a>.'
+            + '</div></div>';
+        return;
+    }
+
+    const unassigned = DATA.unassigned || [];
+    const misc = DATA.misc || [];
+    let html = '';
+
+    // ── waiting on a decision ──
+    html += '<div class="sf-card"><h2>Not filed against anyone (' + unassigned.length + ')</h2>';
+    if (!unassigned.length) {
+        html += '<div class="sf-empty">\u2713 Everything in the Staff folders has been dealt with.</div>';
+    } else {
+        html += '<div class="sf-sub">The likely person is already selected, so most of these are '
+            + 'one click. Open anything amber before filing it \u2014 only the first name matched, '
+            + 'which is also what a genuine mix-up looks like.</div>';
+        unassigned.forEach(f => {
+            const best = (f.guesses || [])[0] || null;
+            const cls = best ? (best.confidence === 'firm' ? 'firm' : 'weak') : 'none';
+            html += '<div class="sf-row ' + cls + '">'
+                + '<div class="sf-name">' + esc(f.name) + '</div>'
+                + '<div class="sf-meta">' + esc(f.category)
+                + ' &nbsp;·&nbsp; <a href="/api/staff-file-download?path='
+                + encodeURIComponent(f.rel) + '" target="_blank" rel="noopener">open it</a>'
+                + '<br><span class="sf-note ' + cls + '">'
+                + (best
+                    ? (best.confidence === 'firm'
+                        ? 'Both names match ' + esc(best.name) + '.'
+                        : 'Only the first name matches ' + esc(best.name)
+                          + ' \u2014 worth opening it first.')
+                    : 'Matches nobody on the roster. Usually a former member of staff.')
+                + '</span><br>'
+                + '<select class="sf-who" data-rel="' + esc(f.rel) + '">'
+                + '<option value=""' + (best ? '' : ' selected') + '>\u2014 file it against \u2014</option>'
+                + staffOptions(f.guesses, best) + '</select> '
+                + '<button type="button" class="sf-btn '
+                + (best && best.confidence !== 'firm' ? 'fileweak' : 'file')
+                + ' sf-file" data-rel="' + esc(f.rel) + '">File it</button> '
+                + '<button type="button" class="sf-btn ghost sf-misc" data-rel="' + esc(f.rel)
+                + '" title="Not anybody\u2019s personnel file">Misc / archive</button>'
+                + '</div></div>';
+        });
+    }
+    html += '</div>';
+
+    // ── set aside ──
+    if (misc.length) {
+        html += '<div class="sf-card"><h2>Set aside as Misc (' + misc.length + ')</h2>'
+            + '<div class="sf-sub">Not filed against anyone and not waiting on a decision. '
+            + 'Still in the library \u2014 nothing was moved or deleted.</div>';
+        misc.forEach(f => {
+            html += '<div class="sf-row set">'
+                + '<div class="sf-name" style="font-weight:600;color:#475569;">' + esc(f.name) + '</div>'
+                + '<div class="sf-meta">' + esc(f.category)
+                + ' &nbsp;·&nbsp; <a href="/api/staff-file-download?path='
+                + encodeURIComponent(f.rel) + '" target="_blank" rel="noopener">open it</a>'
+                + ' &nbsp; <button type="button" class="sf-btn ghost sf-unmisc" data-rel="'
+                + esc(f.rel) + '">Put back</button>'
+                + '</div></div>';
+        });
+        html += '</div>';
+    }
+
+    $('sfBody').innerHTML = html;
+    wire();
+}
+
+// Attached after every render, because the markup above replaces these elements.
+function wire() {
+    document.querySelectorAll('.sf-file').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const rel = btn.getAttribute('data-rel');
+            const sel = document.querySelector('.sf-who[data-rel="' + rel.replace(/"/g, '\\"') + '"]');
+            const who = sel ? sel.value : '';
+            if (!who) {
+                const t = btn.textContent;
+                btn.textContent = 'Pick a name first';
+                setTimeout(() => { btn.textContent = t; }, 1800);
+                return;
+            }
+            send({ rel: rel, staffId: who }, btn, 'Filing…');
+        });
+    });
+    document.querySelectorAll('.sf-misc').forEach(btn => {
+        btn.addEventListener('click', () =>
+            send({ rel: btn.getAttribute('data-rel'), misc: true }, btn, 'Setting aside…'));
+    });
+    document.querySelectorAll('.sf-unmisc').forEach(btn => {
+        btn.addEventListener('click', () =>
+            send({ rel: btn.getAttribute('data-rel') }, btn, 'Putting back…'));
+    });
+}
+
+/* One call for all three outcomes. Sending neither a staffId nor the misc flag is
+   what the server reads as "back to undecided". Re-reads afterwards rather than
+   patching the page, so what is on screen is what was actually stored. */
+async function send(payload, btn, busyText) {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = busyText;
+    try {
+        const res = await apiFetch('/api/staff-file-link', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error || 'HTTP ' + res.status);
+        await load();
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Failed — ' + (e.message || 'try again');
+        setTimeout(() => { btn.textContent = original; }, 2600);
+    }
+}
+
+load();
+</script>
+</body>
+</html>

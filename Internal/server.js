@@ -3437,10 +3437,15 @@ ELSE
         const asked = parseInt(new URLSearchParams(req.url.split('?')[1] || '').get('staffId') || 0, 10);
         // The id is only honoured for the director. For a staff member it comes
         // from the token, so a hand-edited URL changes nothing.
+        /* The id is only honoured for the director; for a staff member it comes from
+           the token, so a hand-edited URL changes nothing.
+
+           A director may also ask with no id at all. That is the filing screen,
+           which is about the library rather than about a person: it wants the
+           undecided and set-aside files and no "mine" list. Keeping that off the
+           per-person page is the point — a page headed with somebody's name should
+           hold their documents and nobody else's. */
         const staffId = actor.director ? asked : parseInt(actor.staffId, 10);
-        if (actor.director && !staffId) {
-            return sendJSON(res, 400, { error: 'Which staff member?' });
-        }
 
         const links = staffFileLinkMap();
         if (!links.ok) return sendJSON(res, 500, { error: links.error });
@@ -3456,18 +3461,26 @@ ELSE
             });
         }
 
-        const mine = listed.files.filter(f => links.byPath[f.rel] === String(staffId));
+        /* Confirmed as belonging to this person. Empty when no id was asked for,
+           which is the filing screen rather than somebody's page. */
+        const mine = staffId
+            ? listed.files.filter(f => links.byPath[f.rel] === String(staffId))
+            : [];
         const body = {
-            staffId: String(staffId),
+            staffId: staffId ? String(staffId) : '',
             libraryReachable: true,
             mine: mine.map(f => ({ name: f.name, category: f.category, rel: f.rel }))
         };
 
-        if (actor.director) {
+        /* The filing lists are for the director and only ever reach the filing
+           screen, which asks without a staff id. A request that names a person gets
+           that person's files and nothing else, so the per-person page cannot show
+           somebody a document that has not been confirmed as theirs — or one that
+           has been set aside as nobody's. */
+        if (actor.director && !staffId) {
             const r = runSQLRows(`SELECT Id, ISNULL(Name,'') AS Name FROM Staff WHERE ISNULL(Active,1)=1`,
                 staffEnsureSQL() + 'GO\n');
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
-            const target = r.rows.find(x => String(x.Id) === String(staffId));
 
             /* Set aside as not being anyone's personnel file. Reported back rather
                than simply omitted, so a file put here by mistake can be found and
@@ -3494,14 +3507,8 @@ ELSE
             body.matchesNobody = body.unassigned
                 .filter(f => !f.guesses.length)
                 .map(f => ({ name: f.name, category: f.category }));
-            body.suggestedForTarget = target
-                ? body.unassigned
-                    .filter(f => f.guesses.some(g => String(g.staffId) === String(staffId)))
-                    .map(f => ({
-                        name: f.name, category: f.category, rel: f.rel,
-                        confidence: (f.guesses.find(g => String(g.staffId) === String(staffId)) || {}).confidence
-                    }))
-                : [];
+            // The roster, so the filing screen can offer names without a second call.
+            body.staff = r.rows.map(s => ({ staffId: String(s.Id), name: String(s.Name) }));
         }
 
         return sendJSON(res, 200, body);
