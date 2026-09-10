@@ -5332,6 +5332,30 @@ ELSE
         return;
     }
 
+    /* Canonicalise the directory addresses before serving them.
+
+       /staff and /staff/ both used to return the portal, which looks harmless and is not.
+       A browser at /staff takes the base for relative URLs to be /, so every relative
+       reference on the page resolves one level too high: "auth.js" becomes /auth.js, 404s,
+       and the sign-in form then fails with "CofpAuth is not defined" on a page that
+       otherwise looks completely normal. It cost somebody an evening thinking they had the
+       password wrong.
+
+       Fixing the one relative reference is not enough on its own, because the next
+       relative reference anybody adds brings the bug back. Redirecting is the fix that
+       keeps working.
+
+       302 rather than 301 deliberately. A 301 is cached by the browser more or less
+       forever, and this project has already been bitten once by a redirect it could not
+       easily take back; the extra round trip on a bare /staff costs nothing measurable. */
+    if (url === '/staff' || url === '/pas') {
+        // url has the query stripped, so the query is carried over from req.url by hand.
+        // Dropping it would break /staff?staffId=5 style links silently.
+        const q = req.url.indexOf('?');
+        res.writeHead(302, { Location: url + '/' + (q >= 0 ? req.url.slice(q) : '') });
+        return res.end();
+    }
+
     // Internal static files (protected) - served under /staff/
     // Allow images/css without auth (needed for login page logo)
     if (url.startsWith('/staff') && (url.endsWith('.png') || url.endsWith('.jpg') || url.endsWith('.css'))) {

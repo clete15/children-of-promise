@@ -503,7 +503,18 @@
 
 </div><!-- end mainContent -->
 
-<script src="auth.js"></script>
+<!-- Absolute, and it has to be.
+
+     This page is served at BOTH /staff/ and /staff. At /staff the browser takes the base
+     to be /, so a relative "auth.js" resolves to /auth.js, which does not exist — the
+     script 404s, CofpAuth never defines, and signing in fails with "CofpAuth is not
+     defined" while the page itself looks perfectly normal because the logo and the styles
+     are absolute already. Reported from a laptop bookmarked without the trailing slash,
+     10 Sep 2026.
+
+     my-portal.html carries the same note for the same reason at /me. The server now also
+     redirects /staff to /staff/, so this is belt and braces rather than the only guard. -->
+<script src="/staff/auth.js"></script>
 <script>
 // The password is not held here any more; the server is the only authority.
 
@@ -531,6 +542,15 @@ document.getElementById('pwForm').addEventListener('submit', async e => {
 
     if (btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
     try {
+        /* Checked rather than assumed. When auth.js fails to load this threw a
+           ReferenceError, and the catch below dutifully showed staff the words "CofpAuth
+           is not defined" under the password box — which reads as though they typed
+           something wrong. Say what actually happened and what to do about it. */
+        if (!window.CofpAuth) {
+            throw new Error('This page did not load fully, so the password cannot be '
+                + 'checked. Reload the page. If it keeps happening, open '
+                + 'childrenofpromisedaycare.com/staff/ with the slash on the end.');
+        }
         // The server decides, not this page.
         const ok = await CofpAuth.verify(val);
         if (ok) {
