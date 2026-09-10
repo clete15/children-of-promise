@@ -232,6 +232,40 @@ function readSession(token) {
     return id > 0 ? id : null;
 }
 
+/* ── Who may look at everybody ──────────────────────────────────────────────
+
+   Until now "may see the whole roster" meant "holds the shared password". That made the
+   reach a property of a password rather than of a person, with two consequences: anybody
+   who learned the shared password inherited it, and Clete signing in as HIMSELF lost it —
+   he became just another staff member and could only see his own record.
+
+   So administration is attached to the person. Signing in personally now carries the same
+   reach as the shared password for these two, and nothing changes for anyone else.
+
+   Deliberately an explicit list of login names rather than a rule over Role. "Director"
+   would also match Pamela, who directs the before-and-after-school programme and has no
+   business in a colleague's appraisal, and a rule that quietly widens as job titles change
+   is the wrong shape for a permission. Two names, changed here, visible in one place.
+
+   Compared case-insensitively against LoginName, which is derived as FirstnameL. */
+const STAFF_ADMIN_LOGINS = ['CleteH', 'MeganN'];
+
+function isAdminLogin(loginName) {
+    const l = String(loginName || '').trim().toLowerCase();
+    if (!l) return false;
+    return STAFF_ADMIN_LOGINS.some(a => a.toLowerCase() === l);
+}
+
+/* Is this staff id one of the administrators? Read from the row rather than passed in,
+   because the caller usually has only an id out of a session token. */
+function staffIdIsAdmin(staffId) {
+    const id = parseInt(staffId, 10);
+    if (!id) return false;
+    const r = runSQLRows(`SELECT ISNULL(LoginName,'') AS LoginName FROM Staff WHERE Id=${id}`);
+    if (!r.ok || !r.rows[0]) return false;
+    return isAdminLogin(r.rows[0].LoginName);
+}
+
 /* Who is asking? Either the director by shared password, or one specific staff
    member by signed token, or nobody.
 
@@ -240,10 +274,13 @@ function readSession(token) {
    treating it as one is how "my page" becomes "anyone's page". */
 function resolveActor(req) {
     if (basicPassword(req) === INTERNAL_PASSWORD) {
-        return { director: true, staffId: null };
+        return { director: true, staffId: null, admin: true };
     }
     const id = readSession(req.headers['x-staff-token']);
-    if (id) return { director: false, staffId: id };
+    /* `admin` is what widens the reach; `director` still means "arrived by shared
+       password" and is left alone, because several endpoints use it to mean exactly that.
+       Anything that should apply to Clete and Megan signed in as themselves checks admin. */
+    if (id) return { director: false, staffId: id, admin: staffIdIsAdmin(id) };
     return null;
 }
 
@@ -262,7 +299,7 @@ function requireActor(req, res) {
    The director may reach anyone; a staff member only themselves. */
 function actorMayTouch(actor, staffId) {
     if (!actor) return false;
-    if (actor.director) return true;
+    if (actor.director || actor.admin) return true;
     return String(actor.staffId) === String(staffId);
 }
 
@@ -3574,8 +3611,12 @@ ELSE
            which is about the library rather than about a person: it wants the
            undecided and set-aside files and no "mine" list. Keeping that off the
            per-person page is the point — a page headed with somebody's name should
-           hold their documents and nobody else's. */
-        const staffId = actor.director ? asked : parseInt(actor.staffId, 10);
+           hold their documents and nobody else's.
+
+           admin as well as director, so an administrator signed in as themselves can open
+           a colleague's page and see that colleague's paperwork. Without this the chooser
+           would change the name at the top and leave the documents showing their own. */
+        const staffId = (actor.director || actor.admin) ? asked : parseInt(actor.staffId, 10);
 
         const links = staffFileLinkMap();
         if (!links.ok) return sendJSON(res, 500, { error: links.error });
@@ -3763,7 +3804,7 @@ ELSE
         }
 
         const asked = parseInt(qs.get('staffId') || 0, 10);
-        const staffId = actor.director ? asked : parseInt(actor.staffId, 10);
+        const staffId = (actor.director || actor.admin) ? asked : parseInt(actor.staffId, 10);
         if (!staffId) return sendJSON(res, 400, { error: 'Which staff member?' });
         if (!actorMayTouch(actor, staffId)) {
             return sendJSON(res, 403, { error: 'You can only hand in your own documents' });
@@ -4027,7 +4068,7 @@ ELSE
     if (req.method === 'GET' && url === '/api/staff-whoami') {
         const actor = resolveActor(req);
         if (!actor) return sendJSON(res, 401, { error: 'Sign in first' });
-        if (actor.director) return sendJSON(res, 200, { director: true });
+        if (actor.director) return sendJSON(res, 200, { director: true, admin: true });
         const r = runSQLRows(
             `SELECT Id, ISNULL(Name,'') AS Name, ISNULL(LoginName,'') AS LoginName,
                     ISNULL(CAST(MustChangePassword AS INT),1) AS MustChangePassword
@@ -4037,6 +4078,10 @@ ELSE
         if (!row) return sendJSON(res, 404, { error: 'Staff record not found' });
         return sendJSON(res, 200, {
             director: false,
+            /* What the page keys the staff chooser off. An administrator signed in as
+               themselves is still director:false — they have a name and their own record —
+               but admin:true, so they keep the chooser and everyone else does not. */
+            admin: isAdminLogin(row.LoginName),
             staffId: String(row.Id),
             name: String(row.Name || ''),
             loginName: String(row.LoginName || ''),
@@ -4096,7 +4141,9 @@ ELSE
            avoid ticking a credential that has not actually been awarded. */
         // Parsed to an integer and interpolated, so the scope cannot be widened by
         // anything a caller sends — the id comes from the signed token, not the URL.
-        const scope = actor.director
+        // admin as well as director, so Clete and Megan get the whole roster whether they
+        // arrived by the shared password or signed in as themselves.
+        const scope = (actor.director || actor.admin)
             ? 'ISNULL(Active,1)=1'
             : `Id=${parseInt(actor.staffId, 10)}`;
         const r = runSQLRows(
@@ -4151,7 +4198,7 @@ ELSE
             /* Refuse the whole request rather than quietly dropping the fields a
                staff member may not set. A partial save that silently ignores half
                of what was sent looks like it worked and is worse than an error. */
-            if (!actor.director) {
+            if (!actor.director && !actor.admin) {
                 const refused = supplied
                     .filter(([, key]) => !STAFF_SELF_EDITABLE.has(key))
                     .map(([, key]) => key);
@@ -4171,7 +4218,10 @@ ELSE
                since the seed data was machine-extracted precisely so a human
                confirms before it backs a compliance claim. Self-reported data has
                the same standing, so it re-enters the same queue. */
-            if (!actor.director) {
+            /* An administrator editing a record is the office maintaining it, so it stays
+               reviewed. Anyone else editing their own is self-reported and re-enters the
+               queue, which is the whole point of the field. */
+            if (!actor.director && !actor.admin) {
                 sets.push('ReviewedBy=NULL', 'ReviewedDate=NULL');
             }
 
@@ -5012,7 +5062,7 @@ ELSE
            rather than matched — "staff7" must not also mean "staff71" — and because
            the chunked JSON read above is the one thing on this endpoint that has
            already broken once. Nothing filtered out leaves the server. */
-        const visible = actor.director
+        const visible = (actor.director || actor.admin)
             ? r.rows
             : r.rows.filter(row => pasScopeStaffId(row.ScopeKey) === parseInt(actor.staffId, 10));
 
@@ -5054,7 +5104,7 @@ ELSE
                self-assessment for the whole centre, so without this check a staff
                member saving their own appraisal under a mistyped key could
                overwrite the submission the centre is assessed on. */
-            if (!actor.director
+            if (!actor.director && !actor.admin
                 && pasScopeStaffId(scope) !== parseInt(actor.staffId, 10)) {
                 return sendJSON(res, 403, {
                     error: 'You can only save your own forms. This one belongs to the centre '

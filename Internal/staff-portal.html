@@ -1141,8 +1141,14 @@ async function load() {
         }
         sel.innerHTML = STAFF.map(s =>
             '<option value="' + s.Id + '">' + esc(s.Name) + '</option>').join('');
+        /* Which record to open on: an explicit ?staffId= first, then your own if the
+           server told us who you are, and only then the top of the list. Without the
+           middle step an administrator signed in as themselves lands on whoever comes
+           first alphabetically, which is somebody else's page. */
         const wanted = new URLSearchParams(location.search).get('staffId');
+        const mine = WHO && WHO.staffId;
         if (wanted && STAFF.some(s => String(s.Id) === String(wanted))) sel.value = wanted;
+        else if (mine && STAFF.some(s => String(s.Id) === String(mine))) sel.value = String(mine);
         current = STAFF.find(s => String(s.Id) === String(sel.value)) || STAFF[0];
         sel.addEventListener('change', () => {
             current = STAFF.find(s => String(s.Id) === String(sel.value));
@@ -1150,18 +1156,7 @@ async function load() {
             loadFiles(current.Id);
         });
 
-        /* A staff member gets their name where the chooser was. The server already
-           sent them one record, so hiding the control is honesty about what they
-           have rather than a restriction added on top of it — there is genuinely
-           nothing else for them to look at. */
-        if (WHO && WHO.director === false) {
-            $('spStaff').style.display = 'none';
-            $('spWhoName').style.display = '';
-            $('spWhoName').textContent = WHO.name || (current && current.Name) || '';
-            $('spStaffActions').style.display = 'inline';
-            $('spBarNote').textContent = 'This is your own record. You can correct your '
-                + 'qualifications here; your room and role are set by Megan.';
-        }
+        applyIdentityToBar();
 
         render();
         if (current) loadFiles(current.Id);
@@ -1169,6 +1164,43 @@ async function load() {
         $('spBody').innerHTML = '<div class="sp-card"><div class="sp-sub sp-err">'
             + 'Could not load your record: ' + esc(e.message) + '</div></div>';
     }
+}
+
+/* Who the bar says you are, and whether it offers the staff chooser.
+
+   Two questions, decided separately, because conflating them was the bug. WHO.admin
+   decides whether the chooser is any use; being in a PERSONAL session decides whether the
+   sign-out and change-password links belong here.
+
+   An administrator signed in as themselves needs both: the chooser, because they maintain
+   everyone's records, and the personal links, because it is their own account. Keying the
+   chooser off `director` alone meant Clete signing in as himself became an ordinary member
+   of staff and lost the roster, which is what prompted this.
+
+   For everybody else the chooser is hidden because it holds nothing — the server sent them
+   exactly one record. That is honesty about what they have, not a restriction laid on top:
+   the page could not show a colleague even if it tried.
+
+   A named function rather than a few lines inside the loader, so the three cases can be
+   tested rather than reasoned about. */
+function applyIdentityToBar() {
+    const isPersonal = !!(WHO && WHO.director === false);
+    const mayChoose = !!(WHO && (WHO.director || WHO.admin));
+
+    if (!mayChoose) {
+        $('spStaff').style.display = 'none';
+        $('spWhoName').style.display = '';
+        $('spWhoName').textContent = (WHO && WHO.name) || (current && current.Name) || '';
+        $('spBarNote').textContent = 'This is your own record. You can correct your '
+            + 'qualifications here; your room and role are set by Megan.';
+    } else if (isPersonal) {
+        // Chooser kept, but say whose account it is, which matters on a shared screen.
+        $('spWhoName').style.display = 'none';
+        $('spBarNote').textContent = 'Signed in as ' + ((WHO && WHO.name) || 'an administrator')
+            + '. Choose any member of staff above \u2014 including yourself.';
+    }
+    if (isPersonal) $('spStaffActions').style.display = 'inline';
+    return { mayChoose: mayChoose, isPersonal: isPersonal };
 }
 
 /* ── Theme ──
