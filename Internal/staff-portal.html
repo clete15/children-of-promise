@@ -339,23 +339,49 @@ function filesCard() {
                 + '<div class="sp-sub">Until one of these is assigned, nobody sees it on their '
                 + 'own page.</div>';
             unassigned.forEach(f => {
+                /* Pre-select the strongest guess. The server returns them best
+                   first, so this is that one.
+
+                   Pre-selecting is safe because it does not file anything: the
+                   button is still a deliberate click, so this removes the hunt
+                   through fourteen names rather than removing the check. What it
+                   must not do is make a weak guess look as settled as a firm one,
+                   so the row says which it is and colours itself accordingly. */
+                const best = (f.guesses || [])[0] || null;
+                const weak = best && best.confidence !== 'firm';
+
                 const opts = STAFF.map(s => {
                     const g = (f.guesses || []).find(x => String(x.staffId) === String(s.Id));
-                    return '<option value="' + s.Id + '">' + esc(s.Name)
+                    const chosen = best && String(best.staffId) === String(s.Id);
+                    return '<option value="' + s.Id + '"' + (chosen ? ' selected' : '') + '>'
+                        + esc(s.Name)
                         + (g ? (g.confidence === 'firm' ? '  ✓ likely' : '  ~ maybe') : '')
                         + '</option>';
                 }).join('');
-                html += '<div class="sp-step">'
+
+                html += '<div class="sp-step" style="border-left-color:'
+                    + (best ? (weak ? '#d97706' : '#16a34a') : '#e2e8f0') + ';">'
                     + '<div class="t">' + esc(f.name) + '</div>'
                     + '<div class="d">' + esc(f.category)
                     + ' &nbsp; <a href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
-                    + '" target="_blank" rel="noopener">open it</a><br>'
+                    + '" target="_blank" rel="noopener">open it</a>'
+                    + (best
+                        ? '<br><span style="color:' + (weak ? '#92400e' : '#166534') + ';">'
+                          + (weak
+                              ? 'Only the first name matches \u2014 worth opening it before filing.'
+                              : 'Both names match.')
+                          + '</span>'
+                        : '<br><span style="color:#64748b;">The filename matches nobody on the '
+                          + 'roster, so pick a name yourself or leave it.</span>')
+                    + '<br>'
                     + '<select class="sp-assign-who" data-rel="' + esc(f.rel)
                     + '" style="margin-top:6px;padding:4px 8px;font-size:0.78rem;">'
-                    + '<option value="">— file it against —</option>' + opts + '</select> '
+                    + '<option value=""' + (best ? '' : ' selected')
+                    + '>— file it against —</option>' + opts + '</select> '
                     + '<button type="button" class="sp-assign-btn" data-rel="' + esc(f.rel)
                     + '" style="padding:4px 10px;font-size:0.72rem;font-weight:700;border:none;'
-                    + 'border-radius:5px;background:#334155;color:#fff;cursor:pointer;">File it</button>'
+                    + 'border-radius:5px;background:' + (weak ? '#b45309' : '#334155')
+                    + ';color:#fff;cursor:pointer;">File it</button>'
                     + '</div></div>';
             });
             html += '</div>';
