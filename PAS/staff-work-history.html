@@ -3,266 +3,298 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Work History — Children of Promise LLC</title>
+    <title>Work &amp; Practical Experience Verification — Children of Promise LLC</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 11pt; line-height: 1.4; color: #333;
-            padding: 0.5in 0.75in;
+            font-size: 10.5pt; line-height: 1.35; color: #222;
+            padding: 0.4in 0.6in;
         }
-        .header {
-            text-align: center; border-bottom: 2px solid #2c5282;
-            padding-bottom: 12px; margin-bottom: 20px;
+        .gw-head { margin-bottom: 10px; }
+        .gw-head .big {
+            font-size: 20pt; font-weight: 800; color: #9a9a9a; letter-spacing: -0.5px;
         }
-        .header h1 { font-size: 14pt; color: #2c5282; margin-bottom: 4px; }
-        .header .org-name { font-size: 11pt; color: #666; margin-bottom: 6px; }
-        .header .subtitle { font-size: 9.5pt; color: #666; }
-        .info-grid {
-            display: grid; grid-template-columns: 1.4fr 1.4fr 1fr;
-            gap: 10px; margin-bottom: 16px;
+        .gw-head .bar {
+            background: #e3e3e3; padding: 3px 6px; margin-top: 2px;
+            font-size: 12pt; font-weight: 800;
         }
-        .info-field { display: flex; align-items: baseline; gap: 8px; }
-        .info-field label { font-weight: 600; white-space: nowrap; font-size: 10pt; }
-        .info-field .line {
-            flex: 1; border-bottom: 1px solid #999; min-width: 70px; height: 1.2em;
+        .gw-head .bar span { font-size: 9.5pt; font-weight: 700; }
+        .intro { font-size: 9.5pt; margin: 8px 0 12px; line-height: 1.4; }
+        .sec-title {
+            font-size: 12pt; font-weight: 800; margin: 14px 0 6px;
         }
-        .instruction {
-            font-size: 9.5pt; color: #555; font-style: italic;
-            margin-bottom: 16px; line-height: 1.5;
+        .grp-title { font-weight: 800; font-size: 10.5pt; margin-top: 10px; }
+        .row { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+        .row .lbl { white-space: nowrap; }
+        /* A ruled blank that prints as the line it replaces rather than a grey box. */
+        .fill {
+            border-bottom: 1px solid #333; min-height: 1.25em; flex: 1 1 auto;
+            min-width: 60px; padding: 0 3px;
         }
-        .section-title {
-            font-size: 11pt; font-weight: 700; color: #2c5282;
-            margin-top: 18px; margin-bottom: 10px;
-            border-bottom: 1px solid #cbd5e0; padding-bottom: 4px;
+        .fill.sm { flex: 0 0 62px; min-width: 62px; text-align: center; }
+        .fill.md { flex: 0 0 150px; min-width: 150px; }
+        .fill.tot { flex: 0 0 150px; min-width: 150px; }
+        .legal {
+            font-size: 7.4pt; line-height: 1.3; color: #333; margin-top: 5px; text-align: justify;
         }
-        .job {
-            border: 1px solid #cbd5e0; border-radius: 4px;
-            padding: 10px 12px; margin-bottom: 12px;
-        }
-        .job-head {
-            font-size: 9pt; font-weight: 700; color: #2c5282;
-            text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px;
-        }
-        .job-grid {
-            display: grid; grid-template-columns: repeat(4, 1fr);
-            gap: 8px 12px; margin-bottom: 8px;
-        }
-        .job-grid .wide { grid-column: span 2; }
-        .job-grid .full { grid-column: span 4; }
-        .fld { display: flex; align-items: baseline; gap: 6px; }
-        .fld label { font-weight: 600; font-size: 9pt; white-space: nowrap; color: #555; }
-        .fld .line {
-            flex: 1; border-bottom: 1px solid #999; min-width: 50px; height: 1.2em; font-size: 10pt;
-        }
-        .duties-label { font-weight: 600; font-size: 9pt; color: #555; }
-        .write-area {
-            border-bottom: 1px solid #999; min-height: 2.8em; font-size: 10pt;
-            padding: 3px 2px 2px; white-space: pre-wrap; line-height: 1.55;
-        }
-        .totals {
-            display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
-            background: #f7fafc; border: 1px solid #cbd5e0; border-radius: 4px;
-            padding: 10px 12px; margin-top: 6px;
-        }
-        .signature-section {
-            margin-top: 26px; display: grid;
-            grid-template-columns: 2fr 1fr; gap: 24px;
-        }
-        .sig-field label {
-            font-weight: 600; font-size: 10pt; display: block; margin-bottom: 20px;
-        }
-        .sig-field .sig-line { border-bottom: 1px solid #333; margin-top: 25px; }
+        .sig-label { font-weight: 800; font-size: 10.5pt; margin-top: 12px; }
         .footer {
-            margin-top: 26px; padding-top: 10px;
-            border-top: 1px solid #cbd5e0; display: flex;
-            justify-content: space-between; font-size: 9pt; color: #666;
+            margin-top: 16px; padding-top: 6px; border-top: 1px solid #bbb;
+            display: flex; justify-content: space-between; font-size: 8pt; color: #666;
+        }
+        .note-screen {
+            background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px;
+            padding: 8px 10px; font-size: 9pt; color: #92400e; margin-bottom: 12px;
         }
         @media print {
             body { padding: 0; }
-            @page { margin: 0.45in 0.55in; size: letter; }
-            .no-print { display: none; }
-            .job { break-inside: avoid; }
+            @page { margin: 0.45in 0.5in; size: letter; }
+            .no-print, .note-screen { display: none !important; }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <img src="/pas/logo-sm.png" alt="Children of Promise" style="height:60px;margin-bottom:8px;">
-        <div class="org-name">Children of Promise LLC — Millstadt, IL</div>
-        <h1>Work History &amp; Experience Verification</h1>
-        <div class="subtitle">Early childhood employment, for the Gateways Registry and PICC PI9</div>
-    </div>
 
-    <div class="info-grid">
-        <div class="info-field">
-            <label>Name:</label><div class="line" data-k="employeeName"></div>
-        </div>
-        <div class="info-field">
-            <label>Current position:</label><div class="line" data-k="position"></div>
-        </div>
-        <div class="info-field">
-            <label>Registry ID:</label><div class="line" data-k="registryId"></div>
-        </div>
-    </div>
+<div class="note-screen no-print">
+    <strong>One form per employer.</strong> Children of Promise can only verify time worked
+    here, so this covers this employer only — a previous employer signs their own copy.
+    Use the age-group section that matches the room: a person who has taught in two age
+    groups needs both filled in, with the years split between them rather than counted twice.
+</div>
 
-    <p class="instruction">
-        List every position working with children, most recent first. Gateways counts
-        experience in clock hours, so hours per week and dates matter more than job titles —
-        an estimate you are confident of is better than a blank. Your current post here is
-        filled in already; check it before signing.
-    </p>
+<div class="gw-head">
+    <div class="big">Gateways Credential</div>
+    <div class="bar">Work &amp; Practical Experience<span> — Verification Form</span></div>
+</div>
 
-    <div class="section-title">Employment</div>
+<p class="intro">
+    Please complete and have this form signed by a supervisor, director, or the Human
+    Resources department to validate your work experience providing direct service to
+    children. Use a <strong>separate section</strong> for each role and age group, and a
+    <strong>separate form</strong> for each employer.
+</p>
 
-    <div class="job">
-        <div class="job-head">Most recent</div>
-        <div class="job-grid">
-            <div class="fld wide"><label>Employer</label><div class="line" data-k="job1Employer"></div></div>
-            <div class="fld wide"><label>City / State</label><div class="line" data-k="job1Place"></div></div>
-            <div class="fld wide"><label>Your position</label><div class="line" data-k="job1Position"></div></div>
-            <div class="fld wide"><label>Ages of children</label><div class="line" data-k="job1Ages"></div></div>
-            <div class="fld"><label>From</label><div class="line" data-k="job1From"></div></div>
-            <div class="fld"><label>To</label><div class="line" data-k="job1To"></div></div>
-            <div class="fld"><label>Hrs/week</label><div class="line" data-k="job1Hours"></div></div>
-            <div class="fld"><label>Total hours</label><div class="line" data-k="job1Total"></div></div>
-            <div class="full">
-                <div class="duties-label">Duties</div>
-                <div class="write-area" data-k="job1Duties"></div>
-            </div>
-            <div class="fld wide"><label>Supervisor</label><div class="line" data-k="job1Supervisor"></div></div>
-            <div class="fld wide"><label>Phone / email</label><div class="line" data-k="job1Contact"></div></div>
-        </div>
-    </div>
+<div class="sec-title">Personal Information</div>
 
-    <div class="job">
-        <div class="job-head">Previous</div>
-        <div class="job-grid">
-            <div class="fld wide"><label>Employer</label><div class="line" data-k="job2Employer"></div></div>
-            <div class="fld wide"><label>City / State</label><div class="line" data-k="job2Place"></div></div>
-            <div class="fld wide"><label>Your position</label><div class="line" data-k="job2Position"></div></div>
-            <div class="fld wide"><label>Ages of children</label><div class="line" data-k="job2Ages"></div></div>
-            <div class="fld"><label>From</label><div class="line" data-k="job2From"></div></div>
-            <div class="fld"><label>To</label><div class="line" data-k="job2To"></div></div>
-            <div class="fld"><label>Hrs/week</label><div class="line" data-k="job2Hours"></div></div>
-            <div class="fld"><label>Total hours</label><div class="line" data-k="job2Total"></div></div>
-            <div class="full">
-                <div class="duties-label">Duties</div>
-                <div class="write-area" data-k="job2Duties"></div>
-            </div>
-            <div class="fld wide"><label>Supervisor</label><div class="line" data-k="job2Supervisor"></div></div>
-            <div class="fld wide"><label>Phone / email</label><div class="line" data-k="job2Contact"></div></div>
-        </div>
-    </div>
+<div class="row">
+    <span class="lbl">Name:</span><div class="fill" data-k="name"></div>
+    <span class="lbl">Registry Member ID:</span><div class="fill md" data-k="registryId"></div>
+</div>
 
-    <div class="job">
-        <div class="job-head">Previous</div>
-        <div class="job-grid">
-            <div class="fld wide"><label>Employer</label><div class="line" data-k="job3Employer"></div></div>
-            <div class="fld wide"><label>City / State</label><div class="line" data-k="job3Place"></div></div>
-            <div class="fld wide"><label>Your position</label><div class="line" data-k="job3Position"></div></div>
-            <div class="fld wide"><label>Ages of children</label><div class="line" data-k="job3Ages"></div></div>
-            <div class="fld"><label>From</label><div class="line" data-k="job3From"></div></div>
-            <div class="fld"><label>To</label><div class="line" data-k="job3To"></div></div>
-            <div class="fld"><label>Hrs/week</label><div class="line" data-k="job3Hours"></div></div>
-            <div class="fld"><label>Total hours</label><div class="line" data-k="job3Total"></div></div>
-            <div class="full">
-                <div class="duties-label">Duties</div>
-                <div class="write-area" data-k="job3Duties"></div>
-            </div>
-            <div class="fld wide"><label>Supervisor</label><div class="line" data-k="job3Supervisor"></div></div>
-            <div class="fld wide"><label>Phone / email</label><div class="line" data-k="job3Contact"></div></div>
-        </div>
-    </div>
+<!-- ── Infant/Toddler ── -->
+<div class="grp-title">Infant/Toddler Teaching Position:</div>
+<div class="row"><div class="fill" data-k="itPosition"></div></div>
+<div class="row">
+    <span class="lbl">Start Date (MO/YR):</span><div class="fill" data-k="itStart"></div>
+    <span class="lbl">End Date (MO/YR):</span><div class="fill" data-k="itEnd"></div>
+</div>
+<div class="row">
+    <span class="lbl">Hours per week:</span><div class="fill sm" data-k="itHrs"></div>
+    <span class="lbl">x Weeks per year:</span><div class="fill sm" data-k="itWks"></div>
+    <span class="lbl">x # of years:</span><div class="fill sm" data-k="itYrs"></div>
+    <span class="lbl">= Total Hours:</span><div class="fill tot" data-k="itTotal"></div>
+</div>
 
-    <div class="job">
-        <div class="job-head">Previous</div>
-        <div class="job-grid">
-            <div class="fld wide"><label>Employer</label><div class="line" data-k="job4Employer"></div></div>
-            <div class="fld wide"><label>City / State</label><div class="line" data-k="job4Place"></div></div>
-            <div class="fld wide"><label>Your position</label><div class="line" data-k="job4Position"></div></div>
-            <div class="fld wide"><label>Ages of children</label><div class="line" data-k="job4Ages"></div></div>
-            <div class="fld"><label>From</label><div class="line" data-k="job4From"></div></div>
-            <div class="fld"><label>To</label><div class="line" data-k="job4To"></div></div>
-            <div class="fld"><label>Hrs/week</label><div class="line" data-k="job4Hours"></div></div>
-            <div class="fld"><label>Total hours</label><div class="line" data-k="job4Total"></div></div>
-            <div class="full">
-                <div class="duties-label">Duties</div>
-                <div class="write-area" data-k="job4Duties"></div>
-            </div>
-            <div class="fld wide"><label>Supervisor</label><div class="line" data-k="job4Supervisor"></div></div>
-            <div class="fld wide"><label>Phone / email</label><div class="line" data-k="job4Contact"></div></div>
-        </div>
-    </div>
+<!-- ── Preschool ── -->
+<div class="grp-title">Preschool Teaching Position:</div>
+<div class="row"><div class="fill" data-k="psPosition"></div></div>
+<div class="row">
+    <span class="lbl">Start Date (MO/YR):</span><div class="fill" data-k="psStart"></div>
+    <span class="lbl">End Date (MO/YR):</span><div class="fill" data-k="psEnd"></div>
+</div>
+<div class="row">
+    <span class="lbl">Hours per week:</span><div class="fill sm" data-k="psHrs"></div>
+    <span class="lbl">x Weeks per year:</span><div class="fill sm" data-k="psWks"></div>
+    <span class="lbl">x # of years:</span><div class="fill sm" data-k="psYrs"></div>
+    <span class="lbl">= Total Hours:</span><div class="fill tot" data-k="psTotal"></div>
+</div>
 
-    <div class="totals">
-        <div class="fld"><label>Total early childhood clock hours</label><div class="line" data-k="totalHours"></div></div>
-        <div class="fld"><label>Years of experience</label><div class="line" data-k="totalYears"></div></div>
-    </div>
+<!-- ── School-Age ── -->
+<div class="grp-title">School-Age Teaching Position:</div>
+<div class="row"><div class="fill" data-k="saPosition"></div></div>
+<div class="row">
+    <span class="lbl">Start Date (MO/YR):</span><div class="fill" data-k="saStart"></div>
+    <span class="lbl">End Date (MO/YR):</span><div class="fill" data-k="saEnd"></div>
+</div>
+<div class="row">
+    <span class="lbl">Hours per week:</span><div class="fill sm" data-k="saHrs"></div>
+    <span class="lbl">x Weeks per year:</span><div class="fill sm" data-k="saWks"></div>
+    <span class="lbl">x # of years:</span><div class="fill sm" data-k="saYrs"></div>
+    <span class="lbl">= Total Hours:</span><div class="fill tot" data-k="saTotal"></div>
+</div>
 
-    <div class="section-title">Declaration</div>
-    <p class="instruction" style="margin-bottom:8px;">
-        I confirm this is a true record of my employment with children. I understand it may
-        be used to verify experience for a Gateways credential.
-    </p>
+<div class="sec-title">Contact Information</div>
+<div class="row">
+    <span class="lbl">Contact Name and Title:</span><div class="fill" data-k="contactName"></div>
+</div>
+<div class="row">
+    <span class="lbl">Company Name:</span><div class="fill" data-k="companyName"></div>
+</div>
+<div class="row">
+    <span class="lbl">Company Address:</span><div class="fill" data-k="companyAddress"></div>
+</div>
+<div class="row">
+    <span class="lbl">Company Phone:</span><div class="fill" data-k="companyPhone"></div>
+</div>
 
-    <div class="signature-section">
-        <div class="sig-field"><label>Employee signature:<div class="sig-line" data-k="employeeSignature"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line" data-k="signedDate"></div></label></div>
-    </div>
-    <div class="signature-section">
-        <div class="sig-field"><label>Verified by (Director / Administrator):<div class="sig-line" data-k="verifierSignature"></div></label></div>
-        <div class="sig-field"><label>Date:<div class="sig-line" data-k="verifiedDate"></div></label></div>
-    </div>
+<div class="sig-label">
+    Signature of contact who can verify your work experience (other than yourself):
+</div>
+<div class="row">
+    <div class="fill" data-k="contactSignature"></div>
+    <span class="lbl"><strong>Date:</strong></span><div class="fill md" data-k="contactDate"></div>
+</div>
 
-    <div class="footer">
-        <span>PAS Documentation — Confidential</span>
-        <span>Children of Promise LLC — Work History &amp; Experience Verification</span>
-    </div>
+<p class="legal">
+    I verify that I have read and understood this paragraph and that all the employer and
+    employee information provided herein is true and accurate. By signing below, I understand
+    the Illinois Department of Early Childhood (IDEC) and INCCRRA will use my signature as
+    authorization to review the employer and personnel records and any other applicable files
+    and records. Additionally, I verify that I have not manipulated employee job titles or
+    descriptions in order for the named employee to become eligible for a Gateways Credential.
+</p>
+<p class="legal">
+    I understand that an employer determined to have submitted fraudulent, altered, or false
+    documentation or information will may be banned from INCCRRA administered programs for a
+    time period to be determined by the Illinois Department of Early Childhood (IDEC). Any
+    benefit received by or paid on behalf of the site as a result of fraudulent, altered, or
+    false documentation or information must be reimbursed to INCCRRA by the site as determined
+    by IDEC. Staff employed by a site that has submitted fraudulent, altered, or false
+    documentation or information will be unable to participate in INCCRRA administered
+    programs while employed at that site.
+</p>
+
+<div class="sig-label">Participant Signature:</div>
+<div class="row">
+    <div class="fill" data-k="participantSignature"></div>
+    <span class="lbl"><strong>Date:</strong></span><div class="fill md" data-k="participantDate"></div>
+</div>
+
+<p class="legal">
+    I verify that I have read this paragraph and that all information provided is true and
+    accurate. By signing above, I understand that INCCRRA will use my signature as
+    authorization to verify any information and documents I have submitted, including the
+    request for additional documentation. I understand that an individual determined to have
+    submitted fraudulent, altered, or false documentation or information will be banned from
+    INCCRRA administered programs for a time period to be determined by the Illinois
+    Department of Early Childhood (IDEC). Any benefit received by or paid on behalf of the
+    individual as a result of fraudulent, altered, or false documentation or information must
+    be reimbursed to INCCRRA by the individual as determined by IDEC.
+</p>
+
+<div class="footer">
+    <span>Gateways to Opportunity® — Illinois Professional Development System</span>
+    <span>PD75a © 2017 INCCRRA · Revised 09/2026</span>
+</div>
 
 <script src="pas-store.js"></script>
 <script src="/staff/auth.js"></script>
 <script src="pas-form.js"></script>
 <script>
-/* Work history, one record per person rather than one per year: it is a cumulative
-   account of where somebody has worked, not something restarted each September.
+/* Gateways form PD75a, Work & Practical Experience Verification.
 
-   This replaces a paper form in Staff Work History Forms. It matters more than it
-   looks: Gateways verifies experience in clock hours, and experience is half of what
-   compiles into an ECE Credential level. The staff notes already carry totals worked
-   out by hand — "30hrs/wk x 36+ yrs = 56,160+ total hrs" — which is exactly the sum
-   this form exists to record properly.
+   Rebuilt to match the official form field for field. The earlier version here was
+   organised by employer with four blocks, which was the wrong shape: PD75a is
+   organised by AGE GROUP — infant/toddler, preschool, school-age — and expects a
+   separate form per employer. Since Children of Promise can only verify time worked
+   at Children of Promise, one form per person is the right scope; a previous
+   employer signs their own copy on their own paper.
 
-   Only the current post is prefilled, from the staff record and the hire date the
-   notes carry. Nothing about a previous employer is guessed: the record does not hold
-   it, and inventing an employer on a document used to verify a credential would be
-   worse than leaving it blank. */
+   Why the shape matters rather than being cosmetic: Gateways reads the
+   infant/toddler line to decide an Infant Toddler Credential, and the preschool line
+   for an ECE Credential. Hours recorded against the wrong age group do not count
+   toward the credential the person is applying for. Four undifferentiated employer
+   blocks could not express that at all.
+
+   The arithmetic is computed as it is typed, because the form states it as an
+   equation (hrs/wk x wks/yr x yrs = total) and a total that disagrees with its own
+   multiplication is the sort of thing that sends an application back. Every figure
+   remains editable: the computed value is a convenience, not an assertion, and a
+   person who worked irregular hours should overwrite it. */
+
+const GROUPS = ['it', 'ps', 'sa'];
+
+// Recompute a row's total from its three inputs, unless somebody has typed over it.
+function recalc(prefix) {
+    const num = k => {
+        const el = document.querySelector('[data-k="' + prefix + k + '"]');
+        if (!el) return NaN;
+        return parseFloat(String(el.innerText).replace(/[^0-9.]/g, ''));
+    };
+    const hrs = num('Hrs'), wks = num('Wks'), yrs = num('Yrs');
+    const totalEl = document.querySelector('[data-k="' + prefix + 'Total"]');
+    if (!totalEl) return;
+    if (totalEl.dataset.manual === '1') return;
+    if (!isFinite(hrs) || !isFinite(wks) || !isFinite(yrs)) return;
+    const t = Math.round(hrs * wks * yrs);
+    totalEl.textContent = t ? t.toLocaleString('en-US') : '';
+}
+
+function wireCalc() {
+    GROUPS.forEach(g => {
+        ['Hrs', 'Wks', 'Yrs'].forEach(k => {
+            const el = document.querySelector('[data-k="' + g + k + '"]');
+            if (el) el.addEventListener('input', () => recalc(g));
+        });
+        /* Typing directly into a total means the person is asserting a figure the
+           multiplication does not produce — irregular hours, unpaid leave, a period
+           at a different rate. Respect it and stop overwriting. */
+        const tot = document.querySelector('[data-k="' + g + 'Total"]');
+        if (tot) {
+            tot.addEventListener('input', () => {
+                tot.dataset.manual = String(tot.innerText).trim() ? '1' : '0';
+            });
+        }
+    });
+}
+
+/* Which age-group section a room belongs in. School-Age covers the before and
+   after school programme; everything up to and including twos is infant/toddler for
+   Gateways purposes, which is why the twos rooms are not preschool here. */
+function groupForRoom(room) {
+    const r = String(room || '').toLowerCase();
+    if (/before|after|school.age/.test(r)) return 'sa';
+    if (/infant|toddler|\b2\b|two/.test(r)) return 'it';
+    if (/pre.?school|pre.?k/.test(r)) return 'ps';
+    return '';
+}
+
 PasForm.init({
     key: 'pas_work_history',
     scope: 'staff',
     prefill: function (staff) {
         const hire = PasForm.hireDate(staff);
         const out = {
-            employeeName: staff.Name,
-            position: PasForm.position(staff),
+            name: staff.Name,
             registryId: staff.RegistryId || '',
-            job1Employer: 'Children of Promise LLC',
-            job1Place: 'Millstadt, IL',
-            job1Position: staff.Role || '',
-            job1Ages: staff.Classroom || '',
-            job1To: 'Present',
-            job1Supervisor: 'Megan Nooney, Director',
-            totalYears: staff.ExperienceYears || ''
+            companyName: 'Children of Promise Christian Dayschool',
+            companyAddress: 'Millstadt, IL',
+            contactName: 'Megan Nooney, Director',
+            participantSignature: '',
+            contactSignature: ''
         };
-        /* A month-only note gives a day that was assumed rather than recorded, so it
-           says so instead of presenting the 1st as fact on a verification document. */
-        if (hire) {
-            out.job1From = hire.precision === 'day'
-                ? PasForm.fmtDate(hire.d)
-                : hire.d.toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
-                  + ' (month only on file — please confirm the day)';
+
+        /* Only the section matching their room is filled, and only with what the
+           record actually holds. Weeks per year is left blank on purpose: the centre
+           runs year round but individual contracts and leave are not recorded here,
+           and 52 is an assumption rather than a fact about any one person. */
+        const g = groupForRoom(staff.Classroom || staff.SecondaryClassroom);
+        if (g) {
+            out[g + 'Position'] = (staff.Role || '') + (staff.Classroom ? ' — ' + staff.Classroom : '');
+            if (hire) {
+                const d = hire.d;
+                out[g + 'Start'] = (d.getMonth() + 1) + '/' + d.getFullYear();
+            }
+            out[g + 'End'] = 'Present';
+            const fte = parseFloat(staff.Fte);
+            if (isFinite(fte) && fte > 0) out[g + 'Hrs'] = String(Math.round(fte * 40));
         }
         return out;
+    },
+    onLoad: function () {
+        wireCalc();
+        GROUPS.forEach(recalc);
     }
 });
 </script>
