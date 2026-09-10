@@ -2358,14 +2358,15 @@ function printScreening() {
    trees: without it a PFA button opened PI's library and looked like the evidence had
    vanished.
 
-   The folder mapping is read off the library rather than assumed. PFA evidence lives in
-   folders named Item1, Item3, Item4, Item7, Item8, Item9, Item11, Item13.A, Item13.B,
-   Item14, Item15, Item18 and Item19 — a numbering scheme entirely unlike PI's — and what
-   each holds is:
+   The folder mapping is read off the library rather than assumed. PFA evidence is attached
+   by filename ("Item 6 - ..." -> Item6), not by folder as PI's is, and covers items
+   1, 3, 4, 6, 7, 8, 9, 11, 13.A, 13.B, 14, 15, 18 and 19 — a numbering scheme entirely
+   unlike PI's. What each holds is:
 
-     Item1     classroom information form, waiting list, weighted eligibility form
+     Item1     classroom information form, waiting list
      Item3     homeless policy
      Item4     screening permission slip, exit interview form and explanation
+     Item6     weighted eligibility form
      Item7     PFA calendar
      Item8     DCFS licence
      Item9     mission statement
@@ -2377,9 +2378,17 @@ function printScreening() {
      Item18    screening results for ELL
      Item19    annual assessment and CQIP
 
-   Items 2, 5, 6, 10, 12, 16 and 17 have no folder at all. That is either "not applicable to
+   Items 2, 5, 10, 12, 16 and 17 have nothing attached. That is either "not applicable to
    a centre" or "no evidence yet" and the library cannot tell which, so nothing here claims
-   either — see the note rendered above the list. */
+   either — see the note rendered above the list.
+
+   Item 6 was one of those until Sept 2026, for a reason worth remembering: its evidence was
+   in the folder all along but named "Item 1 PFAE-Weighted-Eligibility-Form.docx", so it
+   attached to item 1 and item 6 read as having no evidence. It was also the Preschool for
+   All EXPANSION form, which does not apply to us. The centre's own "(PFA and PI)"
+   Eligibility and Weighted Priority Enrollment Form is now filed as "Item 6 - ..." and the
+   PFAE form sits in _Archive beside it. A misnamed file does not look like a missing file
+   here — it looks like evidence for the wrong item. */
 const PFA_COMPLIANCE_ITEMS = [
     { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', libraryItem: 'Item19', libraryProgram: 'PFA' },
     /* Same document as the self-assessment: the evidence on file is one file called

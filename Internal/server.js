@@ -1192,7 +1192,13 @@ const STAFF_SEED = [
        with no assigned room. That keeps her off the teaching staff worksheets —
        her qualifications belong on the Administrator Qualifications worksheet. */
     { name: 'Megan Nooney', role: 'Director', program: 'PI', classroom: '', fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1, Gold IT2, Autism 101', gateways: 'ECE Credential - Level 1', experienceYears: '17.5', registryId: 'N179660', notes: "Director only as of 2026-2027, no assigned classroom. Associate's ECE (SWIC, 2012). At CofP since 01/2009. Prior teaching: 40hrs/wk x 15+ yrs = 31,200+ hrs - lead teacher preschool, curriculum, schedules. Admin: Director since 01/2009 - staff, files, admin, filling classrooms. Pending: IT, ECE, Director (Awaiting Work Exp). Gold IT2 (1/2024)." },
-    { name: 'Molly Ellis', role: 'Teacher', program: 'PI', classroom: '2 Year Olds', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'New teacher for 2026-2027, took over the 2 Year Olds room from Janell Poenitske. Qualifications not yet gathered — needs education, Gateways ECE level, credentials and prior experience before the PAS worksheets can be completed.' },
+    /* eceCredentials is the bare token 'CDA' on purpose. The card editor matches
+       /^CDA$/ to tick its checkbox, so "CDA (Infant/Toddler)" would fall through to
+       the free-text "other credentials" box and the checkbox would read as unticked.
+       The setting is recorded in the notes instead, which is where the other
+       credential detail lives. Gateways stays blank: the CDA is not a Gateways
+       credential and hers has not come through yet. */
+    { name: 'Molly Ellis', role: 'Teacher', program: 'PI', classroom: '2 Year Olds', fte: '', education: '', eceCredentials: 'CDA', gateways: '', experienceYears: '', registryId: '', notes: 'New teacher for 2026-2027, took over the 2 Year Olds room from Janell Poenitske. Holds an Infant/Toddler CDA — the setting covers birth to 36 months, which includes the 2 Year Olds room she is in. Gateways submission still pending, so no ECE or IT level yet. Still needed: education level, semester hours, prior experience, Registry ID and start date.' },
     /* Ownership group. Taken from the Gateways Staff Education and Credentials
        report of 9/6/2026, which is the source of truth for names, degrees and
        credential levels. Grouped separately from classroom staff because the
