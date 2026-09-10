@@ -123,6 +123,50 @@
     .sp-step.alert { border-left-color: #dc2626; margin-top: 12px; }
     .sp-step.caution { border-left-color: #d97706; margin-top: 12px; }
     .sp-step.info { border-left-color: var(--sp-accent); background: var(--sp-accent-soft); }
+    /* ── Tabs ────────────────────────────────────────────────────────────────
+       This page was one column of eight stacked cards. The two credential routes
+       alone run to a dozen paragraphs, so "correct my transcript hours" — the thing
+       we actually need people to do — sat below all of it, and most staff would
+       never scroll that far. Tabs put every job one click from the top.
+
+       Built as a real tablist rather than styled links: role attributes, arrow-key
+       movement, and a visible focus ring. This is the one page every member of staff
+       uses, several of them on a phone, and a tab strip that only works with a mouse
+       would exclude anyone using a keyboard or a screen reader.
+
+       The strip scrolls sideways rather than wrapping, so the tab row stays one line
+       and the panel below never shifts down as the window narrows. */
+    .sp-tabs {
+        display: flex; gap: 2px; margin-bottom: 16px;
+        border-bottom: 1.5px solid var(--sp-border);
+        overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .sp-tabs::-webkit-scrollbar { display: none; }
+    .sp-tab {
+        appearance: none; -webkit-appearance: none; background: transparent; border: 0;
+        font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+        color: var(--sp-muted); padding: 10px 15px 11px; margin-bottom: -1.5px;
+        border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0;
+        display: flex; align-items: center; gap: 7px; white-space: nowrap;
+        transition: color 0.12s, background 0.12s;
+    }
+    .sp-tab:hover { color: var(--sp-text); background: var(--sp-surface-2); }
+    .sp-tab[aria-selected="true"] {
+        color: var(--sp-accent); border-bottom-color: var(--sp-accent);
+    }
+    /* Keyboard focus only, so a mouse click does not leave a ring behind. */
+    .sp-tab:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+    /* A count appears only where the person can do something about it, so a badge
+       always means "this needs you" rather than decorating every tab. */
+    .sp-tab .sp-count {
+        font-size: 0.64rem; font-weight: 800; padding: 1px 6px; border-radius: 9px;
+        background: var(--sp-warn-bg); color: var(--sp-warn-fg);
+    }
+    .sp-panel[hidden] { display: none; }
+    /* The name sits above the tabs, so it stays visible whichever tab is open. */
+    .sp-who { margin-bottom: 14px; }
+    .sp-who .sp-sub { margin-bottom: 0; }
+
     .sp-links { display: flex; flex-wrap: wrap; gap: 9px; }
     .sp-link {
         display: block; flex: 1 1 220px; min-width: 200px; text-decoration: none;
@@ -560,13 +604,149 @@ function selfEditCard(s) {
 }
 
 // ── render ────────────────────────────────────────────────────────────────
+/* ── Tabs ──────────────────────────────────────────────────────────────────
+   Five, grouped by the job somebody came here to do rather than by where the data
+   happens to live:
+
+     Overview     where I stand, anything urgent, and my room
+     Credentials  the ECE route, the ITC route, and my training completions
+     My files     what is on file, and handing in what is not
+     Forms        goal plan, self-appraisal, reviews, observations
+     My details   the handful of fields a person knows better than the office
+
+   Training sits under Credentials rather than alone, because a completion is
+   progression towards a level, not a separate subject. "My details" is dropped
+   entirely for a viewer who may not edit, rather than shown empty.
+
+   The active tab is held here, not in the URL, so a save that redraws the page
+   leaves you where you were. A hash still selects a tab on arrival, which keeps
+   the "My Files" link on the dashboard landing where it says it will. */
+const SP_TABS = [
+    { key: 'overview',    label: 'Overview' },
+    { key: 'credentials', label: 'Credentials' },
+    { key: 'files',       label: 'My files' },
+    { key: 'forms',       label: 'Forms' },
+    { key: 'details',     label: 'My details' }
+];
+
+let activeTab = 'overview';
+
+// Anything the person can act on, counted for the tab strip. Nothing else gets a badge.
+function tabCount(key, s) {
+    if (key === 'files') {
+        const absent = (FILES.uploadable || []).filter(u => !u.hasOne).length;
+        return absent || 0;
+    }
+    if (key === 'forms') {
+        return MY_FORMS.filter(f => !formState(f, s.Id)).length;
+    }
+    if (key === 'details') {
+        // The two gaps worth chasing: no registry number, no semester hours.
+        let n = 0;
+        if (!String(s.RegistryId || '').trim()) n++;
+        if (!String(s.SemesterHoursTotal || '').trim()) n++;
+        return n;
+    }
+    return 0;
+}
+
+function visibleTabs(s) {
+    return SP_TABS.filter(t => t.key !== 'details' || selfEditCard(s) !== '');
+}
+
+function tabBar(s, tabs) {
+    return '<div class="sp-tabs" role="tablist" aria-label="My page sections">'
+        + tabs.map(t => {
+            const on = t.key === activeTab;
+            const n = tabCount(t.key, s);
+            return '<button type="button" class="sp-tab" role="tab" id="sptab_' + t.key + '" '
+                + 'aria-controls="sppanel_' + t.key + '" aria-selected="' + (on ? 'true' : 'false') + '" '
+                + 'tabindex="' + (on ? '0' : '-1') + '" data-tab="' + t.key + '">'
+                + esc(t.label)
+                + (n ? '<span class="sp-count" aria-label="' + n + ' needing attention">' + n + '</span>' : '')
+                + '</button>';
+        }).join('')
+        + '</div>';
+}
+
+function tabPanels(s, tabs) {
+    const build = {
+        overview: overviewSection,
+        credentials: credentialsSection,
+        files: () => filesCard(),
+        forms: formsSection,
+        details: selfEditCard
+    };
+    return tabs.map(t =>
+        '<div class="sp-panel" role="tabpanel" id="sppanel_' + t.key + '" '
+        + 'aria-labelledby="sptab_' + t.key + '" tabindex="0"'
+        + (t.key === activeTab ? '' : ' hidden') + '>'
+        + build[t.key](s) + '</div>').join('');
+}
+
+/* Clicking, and arrow keys along the strip. Home and End jump to the ends, which is
+   what the tablist pattern specifies and what anyone using a keyboard will try. */
+function wireTabs(s, tabs) {
+    const btns = Array.prototype.slice.call(document.querySelectorAll('.sp-tab'));
+    const show = key => {
+        activeTab = key;
+        btns.forEach(b => {
+            const on = b.getAttribute('data-tab') === key;
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+            b.setAttribute('tabindex', on ? '0' : '-1');
+        });
+        tabs.forEach(t => {
+            const p = $('sppanel_' + t.key);
+            if (p) p.hidden = t.key !== key;
+        });
+    };
+    btns.forEach((b, i) => {
+        b.addEventListener('click', () => show(b.getAttribute('data-tab')));
+        b.addEventListener('keydown', e => {
+            let j = null;
+            if (e.key === 'ArrowRight') j = (i + 1) % btns.length;
+            else if (e.key === 'ArrowLeft') j = (i - 1 + btns.length) % btns.length;
+            else if (e.key === 'Home') j = 0;
+            else if (e.key === 'End') j = btns.length - 1;
+            if (j === null) return;
+            e.preventDefault();
+            btns[j].focus();
+            show(btns[j].getAttribute('data-tab'));
+        });
+    });
+}
+
 function render() {
     const body = $('spBody');
     if (!current) { body.innerHTML = '<div class="sp-card"><div class="sp-sub">No staff record selected.</div></div>'; return; }
     const s = current;
 
+    const tabs = visibleTabs(s);
+    // A tab can vanish between renders — "My details" does, for a viewer who may not
+    // edit — so an active tab that no longer exists falls back rather than blanking.
+    if (!tabs.some(t => t.key === activeTab)) activeTab = tabs[0].key;
+
+    body.innerHTML = identityHeader(s) + tabBar(s, tabs) + tabPanels(s, tabs);
+    wireTabs(s, tabs);
+    // Handlers are attached after every render, because the markup above replaces
+    // the elements they belong to each time.
+    wireCardActions();
+}
+
+// Above the tabs, so the name and room stay visible whichever tab is open.
+function identityHeader(s) {
     const rooms = [s.Classroom, s.SecondaryClassroom]
         .map(v => String(v || '').trim()).filter(Boolean).join(' and ');
+    return '<div class="sp-card sp-who">'
+        + '<h2>' + esc(s.Name) + '</h2>'
+        + '<div class="sp-sub">' + esc(s.Role || 'Role not recorded')
+        + (rooms ? ' \u00b7 ' + esc(rooms) : ' \u00b7 no classroom assigned')
+        + (s.RegistryId ? ' \u00b7 Registry ' + esc(s.RegistryId) : '')
+        + '</div></div>';
+}
+
+/* ── Overview ── the four figures, anything urgent, and the way into your room. */
+function overviewSection(s) {
     const hours = pdHours(s);
     const pending = pendingText(s);
     const shTotal = parseFloat(s.SemesterHoursTotal);
@@ -574,14 +754,8 @@ function render() {
     const transcriptMissing = String(s.TranscriptOnFile || '') === 'Not submitted';
 
     let html = '';
-
-    // Who you are, from the record.
     html += '<div class="sp-card">'
-        + '<h2>' + esc(s.Name) + '</h2>'
-        + '<div class="sp-sub">' + esc(s.Role || 'Role not recorded')
-        + (rooms ? ' \u00b7 ' + esc(rooms) : ' \u00b7 no classroom assigned')
-        + (s.RegistryId ? ' \u00b7 Registry ' + esc(s.RegistryId) : '')
-        + '</div>'
+        + '<h2>Where you stand</h2>'
         + '<div class="sp-grid">'
         + tile(credLevel(s, 'ece') ? 'good' : 'warn', 'ECE Credential',
             credLevel(s, 'ece') ? 'Level ' + credLevel(s, 'ece') : 'Not yet held')
@@ -618,7 +792,14 @@ function render() {
     }
     html += '</div>';
 
-    // Credential routes.
+    // Their room, on the overview because for a teacher it is the most-used link here.
+    html += classroomSection(s);
+    return html;
+}
+
+/* ── Credentials ── the two routes, then what training is recorded. */
+function credentialsSection(s) {
+    let html = '';
     html += '<div class="sp-card">'
         + '<h2>Next steps \u2014 Preschool (ECE) Credential</h2>'
         + '<div class="sp-sub">The ECE Credential is what the ExceleRate preschool staff '
@@ -647,7 +828,8 @@ function render() {
         + '\u2014 check the source before acting on it.</div>'
         + '</div>';
 
-    // Training recorded against this person.
+    // Training recorded against this person. Kept with the credential routes because a
+    // completion is progress towards a level rather than a subject of its own.
     const mine = TRAINING.filter(t => String(t.StaffId) === String(s.Id) && (t.CompletedDate || '').trim());
     html += '<div class="sp-card">'
         + '<h2>Training on your record</h2>'
@@ -662,15 +844,23 @@ function render() {
               + '\u201cHow ERS Works\u201d is the one ExceleRate requires of half the teaching staff.</div>')
         + '</div>';
 
-    /* ── Their classroom ──
-       The compliance work for a child is done on the roster, and until now there was
-       no route from a staff member to their own room: they had to open the ISBE page
-       and pick a room from a list of all of them. The link carries the room, so they
-       land on their children rather than on whichever room was looked at last.
+    return html;
+}
 
-       Room names on a staff record are the exact dimClassrooms names (the staff card
-       page uses a dropdown for precisely this reason), so an exact match is right
-       here; anything unmatched is named without a link rather than guessed at. */
+/* ── Their classroom ──
+   The compliance work for a child is done on the roster, and until now there was
+   no route from a staff member to their own room: they had to open the ISBE page
+   and pick a room from a list of all of them. The link carries the room, so they
+   land on their children rather than on whichever room was looked at last.
+
+   Room names on a staff record are the exact dimClassrooms names (the staff card
+   page uses a dropdown for precisely this reason), so an exact match is right
+   here; anything unmatched is named without a link rather than guessed at.
+
+   Rendered on the Overview tab rather than one of its own: it is two links, and for a
+   teacher it is the most-used thing on the page. */
+function classroomSection(s) {
+    let html = '';
     const myRooms = [s.Classroom, s.SecondaryClassroom]
         .map(v => String(v || '').trim()).filter(Boolean)
         .map(name => {
@@ -702,12 +892,12 @@ function render() {
               + 'is no room checklist to open. If you are assigned to a room, it needs adding '
               + 'to your record.</div>')
         + '</div>';
+    return html;
+}
 
-    // Their own paperwork, then the parts of the record they can correct.
-    html += filesCard();
-    html += selfEditCard(s);
-
-    // Their plan and their forms.
+/* ── Forms ── their plan and the forms that belong to them. */
+function formsSection(s) {
+    let html = '';
     html += '<div class="sp-card">'
         + '<h2>My learning plan and forms</h2>'
         + '<div class="sp-sub">These open with you already selected. Everything saves on screen \u2014 '
@@ -739,10 +929,7 @@ function render() {
         + 'number, not your name, so this cannot show whether you have done it.</div></a>'
         + '</div></div>';
 
-    body.innerHTML = html;
-    // Handlers are attached after every render, because the markup above replaces
-    // the elements they belong to each time.
-    wireCardActions();
+    return html;
 }
 
 /* Buttons inside the rendered cards. Attached fresh each render rather than
@@ -915,6 +1102,14 @@ async function load() {
 
         // Form completion is read from the shared worksheet store.
         await PasStore.ready;
+
+        /* A tab named in the address opens that tab. The dashboard has linked
+           staff-portal.html#files since My Files was a separate entry, and ?tab= is
+           accepted too so a link can carry both a person and a tab. Anything
+           unrecognised is ignored rather than left on a blank page. */
+        const askedTab = (new URLSearchParams(location.search).get('tab')
+            || location.hash.replace(/^#/, '')).toLowerCase();
+        if (SP_TABS.some(t => t.key === askedTab)) activeTab = askedTab;
 
         const sel = $('spStaff');
         if (!STAFF.length) {
