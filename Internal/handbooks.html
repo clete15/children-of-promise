@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handbooks – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+
+        /* Same soft gate as the PAS, ExceleRate and Meetings screens, and deliberately
+           the same sessionStorage key, so unlocking one unlocks the others. */
+        #pasPasswordOverlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #1e40af 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 24px;
+        }
+        #pasPasswordOverlay h2 { color: white; font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+        #pasPasswordOverlay p { color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-bottom: 24px; }
+        .pas-pw-box { background: white; border-radius: 12px; padding: 28px 32px; width: 100%; max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 12px; }
+        .pas-pw-box label { font-size: 0.78rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+        .pas-pw-box input { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.95rem; }
+        .pas-pw-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+        .pas-pw-box button { width: 100%; padding: 11px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+        .pas-pw-box button:hover { background: #1d4ed8; }
+        .pas-pw-error { color: #dc2626; font-size: 0.8rem; font-weight: 600; text-align: center; display: none; }
+
+        .pas-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
+        .pas-wrapper { display:flex;flex-direction:column;max-height:calc(100vh - 130px);width:100%;max-width:1000px; }
+        .pas-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2); }
+        .pas-header { padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;justify-content:space-between; }
+        .pas-header h2 { font-size:1rem;font-weight:800;color:#1e3a8a;margin:0; }
+        .pas-header a { font-size:0.75rem;font-weight:700;color:#2563eb;text-decoration:none;white-space:nowrap; }
+        .pas-body { overflow-y:auto;flex:1;padding:24px 28px; }
+
+        .doc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .doc-card {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px 18px;
+            text-decoration: none;
+            color: #1e293b;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+        .doc-card:hover { transform: translateY(-3px); border-color: #2563eb; box-shadow: 0 8px 24px rgba(37,99,235,0.12); }
+        .doc-card .card-icon { font-size: 1.8rem; }
+        .doc-card h3 { font-size: 0.88rem; font-weight: 700; color: #2563eb; margin: 0; }
+        .doc-card p { font-size: 0.75rem; color: #64748b; line-height: 1.4; margin: 0; }
+        .doc-card .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .badge-html { background: #dbeafe; color: #1d4ed8; }
+
+        .section-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6b7280;
+            margin-top: 24px;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+
+        .hb-jump { display:flex;flex-wrap:wrap;gap:6px;margin-top:8px; }
+        .hb-jump a { font-size:0.7rem;font-weight:700;color:#475569;background:white;border:1.5px solid #cbd5e1;border-radius:999px;padding:3px 10px;text-decoration:none; }
+        .hb-jump a:hover { border-color:#2563eb;color:#2563eb; }
+    </style>
+</head>
+<body>
+
+<div id="pasPasswordOverlay">
+    <h2>🔒 Handbooks</h2>
+    <p>Enter password to access the handbooks</p>
+    <form class="pas-pw-box" id="pasPwForm">
+        <label for="pasPwInput">Password</label>
+        <input type="password" id="pasPwInput" placeholder="Enter password" autofocus>
+        <div class="pas-pw-error" id="pasPwError">Incorrect password.</div>
+        <button type="submit">Unlock</button>
+    </form>
+</div>
+
+<div id="pasMainContent" style="display:none;">
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Handbooks &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="pas-layout">
+    <div class="pas-wrapper">
+        <div class="pas-card">
+            <div class="pas-header">
+                <h2>📖 Handbooks</h2>
+                <a href="/pas/pas-documentation.html" target="_blank" rel="noopener">PAS Monitoring Guide →</a>
+            </div>
+            <div class="pas-body">
+                <p style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">
+                    The current employee and parent handbooks. Only the version in force is
+                    listed: a monitor asking for the handbook wants the one that applies now,
+                    and having last year's beside it is how the wrong one gets handed over.
+                    Every &ldquo;&rarr; Employee Handbook: Section X&rdquo; reference in the
+                    <a href="/pas/pas-documentation.html" target="_blank" rel="noopener"
+                       style="color:#2563eb;font-weight:600;">PAS Monitoring Guide</a>
+                    points into these two documents.
+                </p>
+
+                <div class="section-title">Current Handbooks</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/pas/employee-handbook-2026.html" target="_blank" rel="noopener">
+                        <div class="card-icon">📖</div>
+                        <h3>Employee Handbook 2026</h3>
+                        <p>Policies, procedures, benefits and expectations for staff. In force for 2026.</p>
+                        <span class="badge badge-html">HTML</span>
+                    </a>
+                    <a class="doc-card" href="/pas/parent-handbook-2026.html" target="_blank" rel="noopener">
+                        <div class="card-icon">👪</div>
+                        <h3>Parent Handbook 2026</h3>
+                        <p>Family-facing handbook covering enrollment, policies, communication and program information.</p>
+                        <span class="badge badge-html">HTML</span>
+                    </a>
+                </div>
+
+                <!-- The sections the monitoring guide cites most often. Deep links rather
+                     than a second copy of the text, so there is one handbook. -->
+                <div class="section-title">Jump To — Employee Handbook</div>
+                <div class="hb-jump">
+                    <a href="/pas/employee-handbook-2026.html#orientation" target="_blank" rel="noopener">Staff Orientation</a>
+                    <a href="/pas/employee-handbook-2026.html#performance" target="_blank" rel="noopener">Performance &amp; Supervision</a>
+                    <a href="/pas/employee-handbook-2026.html#development" target="_blank" rel="noopener">Staff Development</a>
+                    <a href="/pas/employee-handbook-2026.html#compensation" target="_blank" rel="noopener">Compensation</a>
+                    <a href="/pas/employee-handbook-2026.html#benefits" target="_blank" rel="noopener">Benefits</a>
+                    <a href="/pas/employee-handbook-2026.html#leave" target="_blank" rel="noopener">Leave</a>
+                    <a href="/pas/employee-handbook-2026.html#scheduling" target="_blank" rel="noopener">Scheduling</a>
+                    <a href="/pas/employee-handbook-2026.html#health-safety" target="_blank" rel="noopener">Health &amp; Safety</a>
+                </div>
+
+                <div class="section-title">Related</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/pas/salary-scale-2026.html" target="_blank" rel="noopener">
+                        <div class="card-icon">💵</div>
+                        <h3>Salary Scale 2026</h3>
+                        <p>The compensation structure the handbook's salary sections refer to.</p>
+                        <span class="badge badge-html">HTML</span>
+                    </a>
+                </div>
+
+                <p style="font-size:0.74rem;color:#94a3b8;line-height:1.6;margin-top:22px;
+                          border-top:1px solid #e5e7eb;padding-top:12px;">
+                    Superseded versions (Employee Handbook 2025 and Parent Handbook 2024-25)
+                    are no longer listed anywhere in the tool. The Word files are still on the
+                    server under <code>/pas/</code> if a previous year's wording is ever needed
+                    for a grievance or an audit &mdash; they were unlinked, not deleted.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div><!-- end pasMainContent -->
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+const PAS_PASSWORD = 'pasadmin';
+
+function checkPasAuth() {
+    if (sessionStorage.getItem('pasAuth') === '1') {
+        document.getElementById('pasPasswordOverlay').style.display = 'none';
+        document.getElementById('pasMainContent').style.display = 'block';
+    }
+}
+
+document.getElementById('pasPwForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const val = document.getElementById('pasPwInput').value;
+    const err = document.getElementById('pasPwError');
+    if (val === PAS_PASSWORD) {
+        sessionStorage.setItem('pasAuth', '1');
+        err.style.display = 'none';
+        document.getElementById('pasPasswordOverlay').style.display = 'none';
+        document.getElementById('pasMainContent').style.display = 'block';
+    } else {
+        err.style.display = 'block';
+        document.getElementById('pasPwInput').value = '';
+        document.getElementById('pasPwInput').focus();
+    }
+});
+
+checkPasAuth();
+</script>
+
+<!-- Deploy / Restart controls while this area is under active development. -->
+<script src="deploy-widget.js"></script>
+</body>
+</html>
