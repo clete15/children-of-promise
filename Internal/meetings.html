@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meetings Register – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+
+        /* Same soft gate as the PAS and ExceleRate screens, and deliberately the same
+           sessionStorage key, so unlocking one unlocks the others. This is a convenience
+           screen rather than a security boundary -- the log arrives through authenticated
+           API calls, and it is the shared staff password that actually protects it. */
+        #pasPasswordOverlay {
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 60%, #1e40af 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 24px;
+        }
+        #pasPasswordOverlay h2 { color: white; font-size: 1.4rem; font-weight: 800; margin-bottom: 6px; }
+        #pasPasswordOverlay p { color: rgba(255,255,255,0.7); font-size: 0.85rem; margin-bottom: 24px; }
+        .pas-pw-box { background: white; border-radius: 12px; padding: 28px 32px; width: 100%; max-width: 340px; box-shadow: 0 8px 32px rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 12px; }
+        .pas-pw-box label { font-size: 0.78rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+        .pas-pw-box input { width: 100%; padding: 10px 12px; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: 0.95rem; }
+        .pas-pw-box input:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.12); }
+        .pas-pw-box button { width: 100%; padding: 11px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 700; cursor: pointer; }
+        .pas-pw-box button:hover { background: #1d4ed8; }
+        .pas-pw-error { color: #dc2626; font-size: 0.8rem; font-weight: 600; text-align: center; display: none; }
+
+        .pas-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
+        .pas-wrapper { display:flex;flex-direction:column;max-height:calc(100vh - 130px);width:100%;max-width:1100px; }
+        .pas-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2); }
+        .pas-header { padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;justify-content:space-between; }
+        .pas-header h2 { font-size:1rem;font-weight:800;color:#1e3a8a;margin:0; }
+        .pas-header a { font-size:0.75rem;font-weight:700;color:#2563eb;text-decoration:none;white-space:nowrap; }
+        .pas-body { overflow-y:auto;flex:1;padding:24px 28px; }
+
+        .section-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6b7280;
+            margin-top: 24px;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+
+        .mtg-panel { background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:20px; }
+        .mtg-toolbar { display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;flex-wrap:wrap; }
+        .mtg-btn { padding:6px 14px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;white-space:nowrap; }
+        .mtg-btn:hover { background:#1d4ed8; }
+        .mtg-btn-save { background:#16a34a; }
+        .mtg-btn-save:hover { background:#15803d; }
+        .mtg-btn-plain { background:#e2e8f0;color:#334155; }
+        .mtg-btn-plain:hover { background:#cbd5e1; }
+
+        /* Filter chips. One per meeting type actually present, so the row reflects the
+           log rather than a list of categories nobody has used. */
+        .mtg-filters { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px; }
+        .mtg-chip { padding:4px 11px;border-radius:999px;border:1.5px solid #cbd5e1;background:white;color:#475569;font-size:0.72rem;font-weight:700;cursor:pointer; }
+        .mtg-chip:hover { border-color:#2563eb;color:#2563eb; }
+        .mtg-chip.active { background:#2563eb;border-color:#2563eb;color:white; }
+
+        .mtg-form { background:white;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px; }
+        .mtg-form-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px; }
+        .mtg-form label { font-size:0.72rem;font-weight:600;color:#64748b;display:block; }
+        .mtg-form input, .mtg-form select, .mtg-form textarea {
+            width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;font-family:inherit;
+        }
+        .mtg-form textarea { resize:vertical; }
+        .mtg-form-title { font-size:0.8rem;font-weight:800;color:#1e3a8a;margin-bottom:10px; }
+
+        .mtg-table { width:100%;border-collapse:collapse;font-size:0.82rem; }
+        .mtg-table thead tr { background:#2563eb;color:white; }
+        .mtg-table th { padding:8px 12px;text-align:left;border:1px solid #1d4ed8;font-weight:700; }
+        .mtg-table td { padding:8px 12px;vertical-align:top; }
+        .mtg-table tbody tr { border-bottom:1px solid #e2e8f0; }
+        .mtg-table tbody tr:hover { background:#f1f5f9; }
+        .mtg-date { font-weight:600;white-space:nowrap; }
+        .mtg-type { display:inline-block;padding:2px 8px;border-radius:4px;background:#dbeafe;color:#1d4ed8;font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;white-space:nowrap; }
+        .mtg-empty { padding:12px;color:#94a3b8;font-size:0.8rem; }
+        .mtg-row-btn { padding:4px 10px;background:white;border:1.5px solid #cbd5e1;border-radius:5px;font-size:0.7rem;font-weight:700;color:#475569;cursor:pointer;white-space:nowrap; }
+        .mtg-row-btn:hover { border-color:#2563eb;color:#2563eb; }
+        .mtg-editing { background:#fffbeb !important;box-shadow:inset 3px 0 0 #f59e0b; }
+    </style>
+</head>
+<body>
+
+<div id="pasPasswordOverlay">
+    <h2>🔒 Meetings Register</h2>
+    <p>Enter password to access the meeting log</p>
+    <form class="pas-pw-box" id="pasPwForm">
+        <label for="pasPwInput">Password</label>
+        <input type="password" id="pasPwInput" placeholder="Enter password" autofocus>
+        <div class="pas-pw-error" id="pasPwError">Incorrect password.</div>
+        <button type="submit">Unlock</button>
+    </form>
+</div>
+
+<div id="pasMainContent" style="display:none;">
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Meetings Register &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="pas-layout">
+    <div class="pas-wrapper">
+        <div class="pas-card">
+            <div class="pas-header">
+                <h2>🗓️ Meetings Register</h2>
+                <a href="/staff/pas.html">PAS Compliance →</a>
+            </div>
+            <div class="pas-body">
+                <p style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">
+                    Every meeting we have to be able to evidence, in one place. Each entry
+                    carries a type, so administrative meetings, staff meetings and family
+                    meetings live in the same register without being mixed up when a monitor
+                    asks for one of them. Records that pre-date the type field are shown as
+                    Administrative, which is what they were.
+                </p>
+
+                <div class="section-title">Meeting Log</div>
+                <div class="mtg-panel">
+                    <div class="mtg-toolbar">
+                        <p style="font-size:0.8rem;color:#64748b;margin:0;max-width:640px;">
+                            Held meetings, what was covered, and who was there. Saved on the
+                            server rather than in one browser, so everyone sees the same log.
+                        </p>
+                        <button class="mtg-btn" id="btnNewMeeting" onclick="openNewMeeting()">+ New Meeting</button>
+                    </div>
+
+                    <div class="mtg-filters" id="mtgFilters"></div>
+
+                    <div id="meetingForm" class="mtg-form" style="display:none;">
+                        <div class="mtg-form-title" id="mtgFormTitle">New meeting</div>
+                        <div class="mtg-form-grid">
+                            <div>
+                                <label for="mtgDate">Date</label>
+                                <input type="date" id="mtgDate">
+                                <div id="mtgDateWas" style="font-size:0.68rem;color:#b45309;margin-top:3px;display:none;"></div>
+                            </div>
+                            <div>
+                                <label for="mtgTime">Time</label>
+                                <input type="text" id="mtgTime" placeholder="e.g. 11:00 AM – 1:00 PM">
+                            </div>
+                            <div>
+                                <label for="mtgType">Type</label>
+                                <select id="mtgType"></select>
+                            </div>
+                            <div>
+                                <label for="mtgAttendees">Attendees</label>
+                                <input type="text" id="mtgAttendees" placeholder="e.g. Clete Holliday, Megan Nooney">
+                            </div>
+                        </div>
+                        <div style="margin-bottom:10px;">
+                            <label for="mtgTopic">Topic</label>
+                            <input type="text" id="mtgTopic" placeholder="Meeting topic">
+                        </div>
+                        <div style="margin-bottom:10px;">
+                            <label for="mtgNotes">Notes</label>
+                            <textarea id="mtgNotes" rows="3" placeholder="What was covered, decisions, action steps..."></textarea>
+                        </div>
+                        <button class="mtg-btn mtg-btn-save" onclick="saveMeetingForm()" id="mtgSaveBtn">Save Meeting</button>
+                        <button class="mtg-btn mtg-btn-plain" onclick="closeMeetingForm()">Cancel</button>
+                        <span id="mtgStatus" style="margin-left:10px;font-size:0.76rem;font-weight:700;"></span>
+                    </div>
+
+                    <table class="mtg-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Type</th>
+                                <th>Attendees</th>
+                                <th>Topic</th>
+                                <th>Notes</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminMeetingsBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- The blank minutes form that already existed under the PAS documents.
+                     Linked rather than rebuilt: the handbook asks for minutes with action
+                     plans, and that form is what produces them. -->
+                <div class="section-title">Minutes Form</div>
+                <p style="font-size:0.8rem;color:#64748b;margin:0 0 10px;">
+                    The staff handbook (12.3) asks for minutes of staff meetings, including
+                    action plans, distributed to staff, with action steps revisited at the
+                    next meeting. Fill, save and print the blank form, then log the meeting
+                    above.
+                </p>
+                <a class="mtg-btn" style="display:inline-block;text-decoration:none;padding:8px 16px;"
+                   href="/pas/staff-meeting-minutes.html" target="_blank" rel="noopener">
+                    Open Staff Meeting Minutes form ↗
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div><!-- end pasMainContent -->
+
+<!-- Shared auth + apiFetch. -->
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+const PAS_PASSWORD = 'pasadmin';
+
+function checkPasAuth() {
+    if (sessionStorage.getItem('pasAuth') === '1') {
+        document.getElementById('pasPasswordOverlay').style.display = 'none';
+        document.getElementById('pasMainContent').style.display = 'block';
+    }
+}
+
+document.getElementById('pasPwForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const val = document.getElementById('pasPwInput').value;
+    const err = document.getElementById('pasPwError');
+    if (val === PAS_PASSWORD) {
+        sessionStorage.setItem('pasAuth', '1');
+        err.style.display = 'none';
+        document.getElementById('pasPasswordOverlay').style.display = 'none';
+        document.getElementById('pasMainContent').style.display = 'block';
+    } else {
+        err.style.display = 'block';
+        document.getElementById('pasPwInput').value = '';
+        document.getElementById('pasPwInput').focus();
+    }
+});
+
+checkPasAuth();
+</script>
+
+<script src="meetings.js"></script>
+
+<!-- Deploy / Restart controls while this area is under active development. -->
+<script src="deploy-widget.js"></script>
+</body>
+</html>

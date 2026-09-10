@@ -279,53 +279,20 @@
                     </a>
                 </div>
 
-                <div class="section-title">Admin Meetings Log</div>
-                <div style="background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:10px;padding:20px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                        <p style="font-size:0.8rem;color:#64748b;margin:0;">Tracking administrative meetings related to PAS compliance, documentation review, and program planning.</p>
-                        <button onclick="document.getElementById('newMeetingForm').style.display=document.getElementById('newMeetingForm').style.display==='none'?'block':'none'" style="padding:6px 14px;background:#2563eb;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:700;cursor:pointer;white-space:nowrap;">+ New Meeting</button>
-                    </div>
-                    <div id="newMeetingForm" style="display:none;background:white;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px;">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
-                            <div>
-                                <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Date</label>
-                                <input type="date" id="mtgDate" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;">
-                            </div>
-                            <div>
-                                <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Time</label>
-                                <input type="text" id="mtgTime" placeholder="e.g. 11:00 AM – 1:00 PM" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;">
-                            </div>
-                            <div>
-                                <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Attendees</label>
-                                <input type="text" id="mtgAttendees" placeholder="e.g. Clete Holliday, Megan Nooney" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;">
-                            </div>
-                            <div>
-                                <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Topic</label>
-                                <input type="text" id="mtgTopic" placeholder="Meeting topic" style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;">
-                            </div>
-                        </div>
-                        <div style="margin-bottom:10px;">
-                            <label style="font-size:0.72rem;font-weight:600;color:#64748b;">Notes</label>
-                            <textarea id="mtgNotes" rows="2" placeholder="Meeting notes..." style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:5px;font-size:0.82rem;resize:vertical;"></textarea>
-                        </div>
-                        <button onclick="addMeetingRow()" style="padding:7px 16px;background:#16a34a;color:white;border:none;border-radius:5px;font-size:0.78rem;font-weight:700;cursor:pointer;">Save Meeting</button>
-                        <span id="mtgStatus" style="margin-left:10px;font-size:0.76rem;font-weight:700;"></span>
-                    </div>
-                    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
-                        <thead>
-                            <tr style="background:#2563eb;color:white;">
-                                <th style="padding:8px 12px;text-align:left;border:1px solid #1d4ed8;">Date</th>
-                                <th style="padding:8px 12px;text-align:left;border:1px solid #1d4ed8;">Time</th>
-                                <th style="padding:8px 12px;text-align:left;border:1px solid #1d4ed8;">Attendees</th>
-                                <th style="padding:8px 12px;text-align:left;border:1px solid #1d4ed8;">Topic</th>
-                                <th style="padding:8px 12px;text-align:left;border:1px solid #1d4ed8;">Notes</th>
-                            </tr>
-                        </thead>
-                        <!-- Filled from the shared store. The August 2026 meeting that
-                             used to be hardcoded here is now seeded into that store
-                             instead, so it is an ordinary record like any other. -->
-                        <tbody id="adminMeetingsBody"></tbody>
-                    </table>
+                <!-- Split out of PAS Compliance on 10 Sep 2026. PAS wants evidence that
+                     administration meets, but so does the staff handbook for staff
+                     meetings and the PFA and PI checklists for family and community
+                     ones, so the log is not a PAS thing and does not belong at the
+                     bottom of the PAS page. Linked rather than duplicated, so there is
+                     one register and one place a meeting gets recorded. -->
+                <div class="section-title">Meetings</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/staff/meetings.html">
+                        <div class="card-icon">🗓️</div>
+                        <h3>Meetings Register</h3>
+                        <p>Administrative, staff, family and community meetings in one log, with the blank minutes form. Entries can be edited after the fact.</p>
+                        <span class="badge badge-html">Own screen</span>
+                    </a>
                 </div>
             </div>
         </div>
@@ -951,161 +918,18 @@ async function renderOfficeDocs() {
 
 renderOfficeDocs();
 
-/* ── Admin meetings log ────────────────────────────────────────────────────
-   PAS wants evidence that administration meets and a record of what was covered,
-   so this is compliance evidence rather than a scratchpad.
+/* The meetings log moved to meetings.html / meetings.js on 10 Sep 2026, along with
+   MEETINGS_KEY, MEETING_SEED and the render, load and save functions. escHtml stays
+   here because renderOfficeDocs above still needs it. */
 
-   It used to be written only to localStorage. That meant the log existed in
-   exactly one browser: no one else could see it, a second person would start an
-   empty log of their own, and clearing the cache erased the lot. It now goes
-   through the same shared PAS worksheet store as every other PAS answer, which
-   also means it inherits proper handling of long notes.
-
-   No new table: PasWorksheets is already a (key, scope, JSON) store, so this is
-   one more key in it. */
-const MEETINGS_KEY = 'pas_admin_meetings';
-
-/* The meeting that used to be hardcoded into the table markup. Kept so the move
-   to shared storage loses no history, and seeded only when the server has never
-   held a log - after which it is an ordinary record. */
-const MEETING_SEED = [{
-    date: 'Tuesday, August 11, 2026',
-    time: '11:00 AM \u2013 1:00 PM',
-    attendees: 'Clete Holliday, Megan Nooney',
-    topic: 'PAS Section Review',
-    notes: 'Reviewed new PAS section on internal staff site \u2014 documentation guide, '
-        + 'forms, compliance checklists, and annual timeline.'
-}];
-
-let adminMeetings = [];
-
-// Document titles and meeting text are typed by staff, so they are escaped before
-// going into markup. A note containing "<" is an accident, not an attack, but it
-// would still break the page.
+// Document titles are typed by staff, so they are escaped before going into markup.
+// A title containing "<" is an accident, not an attack, but it would still break
+// the page.
 function escHtml(s) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-
-function meetingStatus(text, colour) {
-    const el = document.getElementById('mtgStatus');
-    if (!el) return;
-    el.textContent = text || '';
-    el.style.color = colour || '#166534';
-}
-
-function renderMeetings() {
-    const tbody = document.getElementById('adminMeetingsBody');
-    if (!tbody) return;
-    if (!adminMeetings.length) {
-        tbody.innerHTML = '<tr><td colspan="5" style="padding:12px;color:#94a3b8;font-size:0.8rem;">'
-            + 'No meetings logged yet.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = adminMeetings.map(m =>
-        '<tr style="border-bottom:1px solid #e2e8f0;">'
-        + '<td style="padding:8px 12px;font-weight:600;">' + escHtml(m.date) + '</td>'
-        + '<td style="padding:8px 12px;">' + escHtml(m.time || '\u2014') + '</td>'
-        + '<td style="padding:8px 12px;">' + escHtml(m.attendees || '\u2014') + '</td>'
-        + '<td style="padding:8px 12px;">' + escHtml(m.topic) + '</td>'
-        + '<td style="padding:8px 12px;">' + escHtml(m.notes || '') + '</td>'
-        + '</tr>').join('');
-}
-
-// Publishes the current list. Throws on failure so the caller can roll back and
-// say so, rather than leaving a row on screen that nobody else will ever see.
-async function saveMeetings() {
-    const res = await apiFetch('/api/pas-worksheets', {
-        method: 'POST',
-        body: JSON.stringify({
-            worksheet: MEETINGS_KEY, scope: '',
-            payload: { meetings: adminMeetings }
-        })
-    });
-    if (!res.ok) {
-        throw new Error(res.status === 401 ? 'your staff sign-in has lapsed'
-                                          : 'the server returned ' + res.status);
-    }
-    const d = await res.json();
-    if (!d || !d.success) throw new Error((d && d.error) || 'the server rejected it');
-    // A local copy is kept only as a fallback for a failed read; the server is the record.
-    try { localStorage.setItem(MEETINGS_KEY, JSON.stringify(adminMeetings)); } catch (_) {}
-}
-
-async function loadMeetings() {
-    try {
-        const res = await apiFetch('/api/pas-worksheets');
-        if (!res.ok) throw new Error('the server returned ' + res.status);
-        const rows = await res.json();
-        const row = (Array.isArray(rows) ? rows : [])
-            .find(r => r.WorksheetKey === MEETINGS_KEY && !r.ScopeKey);
-
-        if (row && row.Payload && Array.isArray(row.Payload.meetings)) {
-            adminMeetings = row.Payload.meetings;
-            renderMeetings();
-            return;
-        }
-
-        /* The server has never held this log. Lift whatever this browser has, so the
-           move loses nothing, and fall back to the seed. Then publish it, which is
-           what makes it visible to everyone else. Only reached when the read
-           SUCCEEDED and genuinely found no record - a failed read is caught below
-           and must never overwrite what is on the server. */
-        let local = [];
-        try { local = JSON.parse(localStorage.getItem(MEETINGS_KEY) || '[]'); } catch (_) {}
-        adminMeetings = Array.isArray(local) && local.length ? local : MEETING_SEED.slice();
-        renderMeetings();
-        try {
-            await saveMeetings();
-            meetingStatus('\u2713 Meeting log moved to the server \u2014 everyone can see it now');
-        } catch (e) {
-            meetingStatus('\u26a0 Could not publish the meeting log: ' + e.message, '#b91c1c');
-        }
-    } catch (e) {
-        // Show the local copy if there is one, but never let it pass for the shared log.
-        let local = [];
-        try { local = JSON.parse(localStorage.getItem(MEETINGS_KEY) || '[]'); } catch (_) {}
-        adminMeetings = Array.isArray(local) ? local : [];
-        renderMeetings();
-        meetingStatus('\u26a0 Could not load the shared meeting log (' + e.message
-            + '). Showing this browser\u2019s copy only.', '#b91c1c');
-    }
-}
-
-async function addMeetingRow() {
-    const date = document.getElementById('mtgDate').value;
-    const time = document.getElementById('mtgTime').value;
-    const attendees = document.getElementById('mtgAttendees').value;
-    const topic = document.getElementById('mtgTopic').value;
-    const notes = document.getElementById('mtgNotes').value;
-    if (!date || !topic) { alert('Please fill in at least a date and topic.'); return; }
-
-    const dateStr = new Date(date + 'T12:00:00').toLocaleDateString('en-US',
-        { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-
-    const previous = adminMeetings.slice();
-    adminMeetings.unshift({ date: dateStr, time, attendees, topic, notes });
-    renderMeetings();
-    meetingStatus('Saving\u2026', '#64748b');
-
-    try {
-        await saveMeetings();
-        meetingStatus('\u2713 Saved');
-        ['mtgDate', 'mtgTime', 'mtgAttendees', 'mtgTopic', 'mtgNotes']
-            .forEach(id => { document.getElementById(id).value = ''; });
-        document.getElementById('newMeetingForm').style.display = 'none';
-        setTimeout(() => meetingStatus(''), 2500);
-    } catch (e) {
-        // Put the list back, so what is on screen matches what is actually stored.
-        adminMeetings = previous;
-        renderMeetings();
-        meetingStatus('\u26a0 NOT saved \u2014 ' + e.message + '. Your entry is still in the form.',
-            '#b91c1c');
-    }
-}
-
-loadMeetings();
 
 /* ── Cross-check data ─────────────────────────────────────────────────────
    The Standard 4 panels, the staff training matrix and the classroom
