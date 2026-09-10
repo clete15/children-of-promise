@@ -102,42 +102,58 @@
        assessment. */
     const conflicts = [];
 
-    // Lift anything still in this browser that the server has not seen.
+    /* Reconcile whatever this browser still has in localStorage with the server,
+       then LEAVE THE BROWSER EMPTY. The record is the server; a copy in the browser
+       is only ever a liability — it is what let one laptop's answers pass for the
+       centre's, and what produced the "6 here / 10 on the server" conflicts.
+
+       Rules, in order:
+         · server has never seen this key   -> push it up (nothing is lost), then
+                                               remove the local copy.
+         · server already has an identical  -> just remove the local copy; it is a
+           copy                                stale mirror from the old version.
+         · server has a DIFFERENT copy      -> do NOT overwrite either side. Report
+                                               it and keep the local copy for now, so
+                                               a real divergence is a decision a person
+                                               makes, not one this code makes silently.
+       After this runs, the only keys left in localStorage are genuine conflicts. */
     async function migrateLocal() {
         const candidates = [];
         for (let i = 0; i < localStorage.length; i++) {
             const k = localStorage.key(i);
             if (k && k.indexOf('pas_') === 0) candidates.push(k);
         }
+        const removeLocal = [];
         for (const key of candidates) {
             const { worksheet, scope } = splitKey(key);
             let obj;
-            try { obj = JSON.parse(localStorage.getItem(key)); } catch (e) { continue; }
-            if (!obj || typeof obj !== 'object') continue;
+            try { obj = JSON.parse(localStorage.getItem(key)); } catch (e) { removeLocal.push(key); continue; }
+            if (!obj || typeof obj !== 'object') { removeLocal.push(key); continue; }
 
-            /* The server already has this worksheet. Previously this skipped in
-               silence, which is fine when the local copy is a stale echo of the
-               server's and quietly wrong when it is a completed form the server has
-               never seen — the case that arises after the store has been falling
-               back to localStorage. Counting the answers on each side is enough to
-               tell "same thing twice" from "two different pieces of work". */
             if (cache.has(cacheKey(worksheet, scope))) {
                 const mine = JSON.stringify(obj);
                 const theirs = cache.get(cacheKey(worksheet, scope));
-                if (mine !== theirs) {
+                if (mine === theirs) {
+                    removeLocal.push(key);              // identical mirror, safe to drop
+                } else {
                     conflicts.push({ key: key, localAnswers: countAnswers(obj),
                                      serverAnswers: countAnswers(safeParse(theirs)) });
+                    // left in place on purpose: a person decides which wins
                 }
                 continue;
             }
+            // Server has never seen it. Push, then drop the local copy.
             try {
                 await push(worksheet, scope, obj);
                 cache.set(cacheKey(worksheet, scope), JSON.stringify(obj));
-                console.info('[PasStore] migrated "' + key + '" from this browser to the server.');
+                removeLocal.push(key);
+                console.info('[PasStore] migrated "' + key + '" to the server and cleared it locally.');
             } catch (e) {
                 console.warn('[PasStore] could not migrate "' + key + '": ' + e.message);
+                // keep the local copy; nothing was saved, so losing it would lose work
             }
         }
+        removeLocal.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
     }
 
     function safeParse(s) { try { return JSON.parse(s); } catch (e) { return {}; } }
@@ -236,16 +252,33 @@
         } catch (e) {
             lastError = e.message;
             offline = true;
-            console.error('[PasStore] could not reach the server; falling back to this browser only.', e);
-            // Fall back to the real localStorage so a page still works offline
-            // rather than silently losing the user's typing.
-            storage.getItem = k => localStorage.getItem(k);
-            storage.setItem = (k, v) => localStorage.setItem(k, v);
-            storage.removeItem = k => localStorage.removeItem(k);
-            banner('&#9888; <strong>Not saving to the server.</strong> Anything you enter on this '
-                + 'page is being kept in this browser only &mdash; nobody else will see it, and '
-                + 'clearing your history would erase it. '
-                + 'Sign in again from the staff portal, then reload this page. '
+            console.error('[PasStore] could not reach the server. The page is now read-only.', e);
+            /* Deliberately does NOT repoint storage at localStorage. That fallback is
+               what caused the PAS self-assessment to be lost: the page kept working,
+               wrote every answer to one laptop, and nobody could tell it had never
+               reached the server. The menu planner already learned this — a failed
+               read there shows a warning and refuses to let a browser copy pass for
+               the shared record. This now does the same.
+
+               getItem still serves the in-memory cache (empty here, since the read
+               failed), so the page renders blank rather than resurrecting a stale
+               local draft. setItem is made to fail loudly: nothing is persisted as
+               though it were saved, and the person is told plainly. */
+            storage.setItem = function () {
+                if (!document.getElementById('pasStoreBlockedMsg')) {
+                    banner('&#9888; <strong>Nothing you enter here is being saved.</strong> '
+                        + 'This page could not reach the server, so it is read-only to protect '
+                        + 'the shared records. <strong>Do not fill it in.</strong> Sign in again '
+                        + 'from the Staff Portal, then reload before entering anything. '
+                        + '<span id="pasStoreBlockedMsg" style="font-weight:400;opacity:0.85;">('
+                        + lastError + ')</span>', '#b91c1c');
+                }
+            };
+            storage.removeItem = function () {};
+            banner('&#9888; <strong>Not connected to the server.</strong> This page is '
+                + 'read-only right now, so anything you type will not be saved and will not be '
+                + 'seen by anyone else. Nothing already on the server has been touched. '
+                + 'Sign in again from the Staff Portal and reload this page before working. '
                 + '<span style="font-weight:400;opacity:0.85;">(' + lastError + ')</span>',
                 '#b91c1c');
         }
