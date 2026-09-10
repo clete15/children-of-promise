@@ -135,6 +135,86 @@ function gatewaysRegistryAlert(staff) {
     </div>`;
 }
 
+/* Everybody below ECE Credential Level 2, because that is the gate on the Infant Toddler
+   Credential. ITC Level 2 requires ECE Level 2, so no amount of infant/toddler hours moves
+   anyone until the ECE side is at 2 — which makes this the prerequisite for the 4B
+   shortfall alert below, not a separate ambition.
+
+   Split into two groups on purpose. ECE Level 2 asks for twelve competencies with at most
+   six from credential-approved training, so at least six must be college coursework.
+   Someone with credit already earned needs an errand; someone with none needs a couple of
+   courses. Presenting those as the same task would misplan the term. */
+function eceLevelTwoAlert(staff) {
+    const eceLv = p => {
+        const m = [p.EceCredentials, p.Gateways].filter(Boolean).join(', ')
+            .match(/ECE(?:\s*Credential)?\s*-?\s*Level\s*(\d)/i);
+        return m ? +m[1] : 0;
+    };
+    const hours = p => {
+        const n = parseFloat(p.SemesterHoursTotal);
+        return isFinite(n) ? n : 0;
+    };
+    const transcriptOut = p => /not submitted/i.test(String(p.TranscriptOnFile || ''));
+
+    const below = staff
+        .filter(p => !String(p.Name || '').match(/^new teacher$/i))
+        .filter(p => /teacher|assistant/i.test(p.Role || ''))
+        .filter(p => String(p.RegistryId || '').trim())
+        .filter(p => eceLv(p) < 2);
+    if (!below.length) return '';
+
+    // The errand group: credit already earned, just not with the Registry.
+    const errand = below.filter(p => hours(p) > 0 && transcriptOut(p));
+    const coursework = below.filter(p => errand.indexOf(p) === -1);
+
+    const route = p => {
+        if (errand.indexOf(p) !== -1) {
+            return 'Send the ' + hours(p) + '-hour transcript to the Registry';
+        }
+        return hours(p) > 0
+            ? 'Has ' + hours(p) + ' hours on file; needs the remaining competencies'
+            : 'No college credit recorded \u2014 needs coursework, roughly two courses';
+    };
+
+    return `<div class="alert-item danger">
+        <div class="alert-title">🎯 ${below.length} staff below ECE Credential Level 2 — the gate on every Infant Toddler Credential</div>
+        <div class="alert-detail">
+            Infant Toddler Level 2 requires ECE Credential Level 2, Level 3 requires ECE 3,
+            and so on up. Nobody here moves on the infant/toddler side until their ECE level
+            reaches 2, however many hours they have with under-threes. That makes this the
+            prerequisite for the 4B shortfall, not a parallel goal.
+            <br><br>
+            <strong>What Level 2 actually needs:</strong> a high school diploma or GED, which
+            everyone listed has; 10 hours of ECE observation or 200 hours of documented ECE
+            work, which long service already covers; and twelve competencies. At most six of those
+            twelve may come from credential-approved training, so <strong>at least six have to
+            be college coursework</strong>. Training alone will not get anyone to Level 2.
+        </div>
+        <table>
+            <thead><tr><th>Staff</th><th>Room</th><th>ECE now</th><th>Next move</th></tr></thead>
+            <tbody>${below.map(p => `<tr>
+                <td><strong>${p.Name || ''}</strong></td>
+                <td>${p.Classroom || p.SecondaryClassroom || '—'}</td>
+                <td style="color:#b45309;">${eceLv(p) ? 'Level ' + eceLv(p) : 'none'}</td>
+                <td>${route(p)}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+        ${errand.length ? `<div class="alert-detail" style="margin-top:10px;">
+            <strong>${errand.length} of these need an errand rather than a course.</strong>
+            ${errand.map(p => p.Name).join(', ')} ${errand.length > 1 ? 'have' : 'has'} credit
+            already earned that Gateways has never received. It must go to the Registry direct
+            from the college, not to the centre. Until it does, none of it counts.
+        </div>` : ''}
+        ${coursework.length ? `<div class="alert-detail" style="margin-top:10px;">
+            <strong>${coursework.length} need actual coursework.</strong>
+            ${coursework.map(p => p.Name).join(', ')} — worth asking the CCR&amp;R which
+            credential-approved training covers the most competencies, then planning college
+            credit around whatever the six-competency training cap leaves outstanding.
+        </div>` : ''}
+        <a class="alert-action" href="/staff/staff-portal.html">Open a staff page for the full breakdown →</a>
+    </div>`;
+}
+
 function infantToddlerCredentialAlert(staff) {
     const IT_ROOMS = ['Infant', 'Infants / Toddlers', '2 Year Olds / Toddlers'];
     const norm = s => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
@@ -210,6 +290,12 @@ function renderAlerts(students, waitlist, staff) {
        fixable. */
     const regAlert = gatewaysRegistryAlert(staff || []);
     if (regAlert) { count++; html += regAlert; }
+
+    /* 0b. Below ECE Level 2. Above the 4B shortfall for the same reason the registry
+       alert is above this one: ECE Level 2 is the gate on the Infant Toddler Credential,
+       so this is the work that makes the shortfall closable. */
+    const eceAlert = eceLevelTwoAlert(staff || []);
+    if (eceAlert) { count++; html += eceAlert; }
 
     // 1. ExceleRate 4B infant/toddler credential shortfall
     const itAlert = infantToddlerCredentialAlert(staff || []);

@@ -44,7 +44,12 @@ var ECE_LEVELS = [
         level: 2,
         education: 'High school diploma or GED',
         rank: 2,
-        experience: { supervised: 10, supervisedLabel: 'hours of ECE observation', documented: 200 }
+        experience: { supervised: 10, supervisedLabel: 'hours of ECE observation', documented: 200 },
+        /* Note IRE stops at 2 here, where the ITC list runs to IRE3. The two credentials
+           use the same competency family names for different requirements, so they cannot
+           be read across. */
+        adds: ['HGD1', 'HGD2', 'HGD3', 'HSW1', 'HSW2', 'IRE1', 'IRE2',
+               'FCR1', 'FCR2', 'FCR3', 'PPD1', 'PPD2']
     },
     {
         level: 3,
@@ -52,20 +57,27 @@ var ECE_LEVELS = [
                  + 'elective such as Psychology, Sociology or Science. All nine must be credit '
                  + 'bearing, non-developmental, and 100 level or above.',
         rank: 3,
-        experience: { supervised: 10, documented: 400 }
+        experience: { supervised: 10, documented: 400 },
+        adds: ['HSW3', 'HSW4', 'HSW5', 'OA1', 'OA2', 'OA3', 'CPD1', 'CPD2', 'CPD3',
+               'IRE3', 'IRE4', 'FCR4', 'FCR5', 'FCR6', 'PPD3', 'PPD4']
     },
     {
         level: 4,
         education: 'An Associate\u2019s degree, or 60+ semester hours including the nine listed at '
                  + 'Level 3',
         rank: 4,
-        experience: { supervised: 100, documented: 600 }
+        experience: { supervised: 100, documented: 600 },
+        adds: ['HGD4', 'HSW6', 'OA4', 'OA5', 'OA6', 'CPD4', 'CPD5', 'CPD6', 'CPD7', 'CPD8',
+               'CPD9', 'IRE5', 'PPD5', 'PPD6']
     },
     {
         level: 5,
         education: 'A Bachelor\u2019s degree',
         rank: 5,
-        experience: { supervised: 200, documented: 1200 }
+        experience: { supervised: 200, documented: 1200 },
+        // The source prints "HDG6" here; it is HGD6.
+        adds: ['HGD5', 'HGD6', 'HSW7', 'HSW8', 'OA7', 'OA8', 'CPD10', 'IRE6', 'IRE7',
+               'FCR7', 'PPD7', 'PPD8', 'PPD9', 'PPD10']
     },
     {
         level: 6,
@@ -81,33 +93,90 @@ var ECE_LEVELS = [
    The ECE level in each row is the gate that catches most people: ITC Level 4
    cannot be awarded without ECE Credential Level 4, whatever the infant/toddler
    hours look like. */
+/* Competencies are held as codes rather than prose because two things need doing with
+   them: adding up across levels, and subtracting what a credential already covers.
+
+   Each row lists only what that level ADDS. The framework wording is "Must meet all
+   previous level competencies plus", so the real requirement for a level is its own list
+   plus every list below it — see competenciesFor. */
 var ITC_LEVELS = [
     {
         level: 2, ece: 2,
         experience: { supervised: 5, documented: 200 },
-        competencies: 'ITC HGD1\u20133, HSW1\u20132, IRE1\u20133, FCR1\u20133, PPD1\u20132'
+        adds: ['HGD1', 'HGD2', 'HGD3', 'HSW1', 'HSW2', 'IRE1', 'IRE2', 'IRE3',
+               'FCR1', 'FCR2', 'FCR3', 'PPD1', 'PPD2']
     },
     {
         level: 3, ece: 3,
         experience: { supervised: 10, documented: 450 },
-        competencies: 'ITC HGD4\u20135, HSW3\u20134, OA1\u20132, CPD1\u20133, IRE4\u20136, FCR4, PPD3'
+        adds: ['HGD4', 'HGD5', 'HSW3', 'HSW4', 'OA1', 'OA2', 'CPD1', 'CPD2', 'CPD3',
+               'IRE4', 'IRE5', 'IRE6', 'FCR4', 'PPD3']
     },
     {
         level: 4, ece: 4,
         experience: { supervised: 50, documented: 900 },
-        competencies: 'ITC HGD6, HSW5, OA3, CPD4, IRE7, FCR5\u20136, PPD4'
+        adds: ['HGD6', 'HSW5', 'OA3', 'CPD4', 'IRE7', 'FCR5', 'FCR6', 'PPD4']
     },
     {
         level: 5, ece: 5,
         experience: { supervised: 100, documented: 1800 },
-        competencies: 'ITC HGD7, CPD5, FCR7, PPD5'
+        adds: ['HGD7', 'CPD5', 'FCR7', 'PPD5']
     },
     {
         level: 6, ece: 5, gradDegree: true,
         experience: { documented: 3600 },
-        competencies: 'ITC HGD8, HSW6\u20137, OA4\u20136, CPD6\u20138, IRE8, FCR8, PPD6\u20139'
+        adds: ['HGD8', 'HSW6', 'HSW7', 'OA4', 'OA5', 'OA6', 'CPD6', 'CPD7', 'CPD8',
+               'IRE8', 'FCR8', 'PPD6', 'PPD7', 'PPD8', 'PPD9']
     }
 ];
+
+// Everything a level needs, its own additions plus every level below it.
+function competenciesFor(level) {
+    var all = [];
+    for (var i = 0; i < ITC_LEVELS.length; i++) {
+        if (ITC_LEVELS[i].level <= level) all = all.concat(ITC_LEVELS[i].adds);
+    }
+    return all;
+}
+
+/* The Infant Toddler CDA is worth detecting rather than merely mentioning: it covers
+   seven of the thirteen competencies Level 2 asks for. The Preschool CDA covers none of
+   the ITC ones, so the two must not be conflated — "CDA" alone is not enough to act on. */
+var IT_CDA_COMPETENCIES = ['HSW1', 'HSW2', 'IRE1', 'IRE2', 'IRE3', 'FCR3', 'PPD2'];
+
+function hasInfantToddlerCda(s) {
+    var src = [s.EceCredentials, s.Gateways, s.Notes].filter(Boolean).join(' ');
+    // Must say infant/toddler near the CDA; a bare "CDA" is ambiguous by design.
+    return /(infant[\s/-]*toddler|\bIT\b)[^.;]{0,40}\bCDA\b/i.test(src)
+        || /\bCDA\b[^.;]{0,40}(infant[\s/-]*toddler)/i.test(src);
+}
+
+// Group consecutive numbers in a family so a long list reads as HGD1-3 rather than all three.
+function formatCompetencies(codes) {
+    var fams = {}, order = [];
+    codes.forEach(function (c) {
+        var m = c.match(/^([A-Z]+)(\d+)$/);
+        if (!m) return;
+        if (!fams[m[1]]) { fams[m[1]] = []; order.push(m[1]); }
+        fams[m[1]].push(parseInt(m[2], 10));
+    });
+    return order.map(function (fam) {
+        var ns = fams[fam].sort(function (a, b) { return a - b; });
+        /* Runs of three or more collapse to a range; a pair stays as two codes, because
+           "HSW1-2" saves nothing over "HSW1, HSW2" and reads as a range that isn't one. */
+        var parts = [], start = ns[0], prev = ns[0];
+        for (var i = 1; i <= ns.length; i++) {
+            if (ns[i] === prev + 1) { prev = ns[i]; continue; }
+            if (start === prev) parts.push(String(start));
+            else if (prev === start + 1) parts.push(String(start), String(prev));
+            else parts.push(start + '\u2013' + prev);
+            start = prev = ns[i];
+        }
+        // Gateways writes these without a space: HGD1, HSW6-7. Match that exactly so a
+        // staff member can find the code on their PD Record by eye.
+        return fam + parts.join(', ' + fam);
+    }).join(', ');
+}
 
 /* How many competencies may come from credential-approved training rather than
    college coursework. Worth stating because it is the route for people with long
@@ -117,8 +186,29 @@ var TRAINING_ALLOWANCE = {
     itc: { low: 13, high: 20 }
 };
 
-// The Infant Toddler CDA is worth naming: it covers seven ITC competencies outright.
-var IT_CDA_COVERS = 'ITC HSW1, HSW2, IRE1, IRE2, IRE3, FCR3, PPD2, plus ECE FCR1 and ECE PPD1';
+/* What each CDA is worth on the ECE Credential. The difference is large and runs the
+   opposite way to the ITC: the Preschool CDA covers six of the twelve ECE Level 2
+   competencies, the Infant Toddler CDA only two. Somebody holding the infant/toddler one
+   has more of the ITC done and less of the ECE. */
+var PRESCHOOL_CDA_ECE = ['HSW1', 'HSW2', 'IRE1', 'IRE2', 'FCR1', 'PPD1'];
+var IT_CDA_ECE = ['FCR1', 'PPD1'];
+
+// Everything an ECE level needs: its own additions plus every level below it.
+function eceCompetenciesFor(level) {
+    var all = [];
+    for (var i = 0; i < ECE_LEVELS.length; i++) {
+        if (ECE_LEVELS[i].level <= level && ECE_LEVELS[i].adds) {
+            all = all.concat(ECE_LEVELS[i].adds);
+        }
+    }
+    return all;
+}
+
+function hasPreschoolCda(s) {
+    var src = [s.EceCredentials, s.Gateways, s.Notes].filter(Boolean).join(' ');
+    if (/(pre.?school|pre.?k)[^.;]{0,40}\bCDA\b/i.test(src)) return true;
+    return /\bCDA\b[^.;]{0,40}(pre.?school|pre.?k)/i.test(src);
+}
 
 function num(v) {
     var n = parseFloat(String(v === null || v === undefined ? '' : v).replace(/[^0-9.]/g, ''));
@@ -214,6 +304,44 @@ function weeksToReach(hours, perWeek) {
 
 function levelWord(n) { return 'Level ' + n; }
 
+/* The competency sentence for an ECE level, including the part that decides whether the
+   level is reachable without going back to college.
+
+   The training allowance is a cap on the TOTAL, not a per-level allowance, so where the
+   outstanding count exceeds it the difference has to come from coursework. For Level 2
+   that is the whole question: twelve competencies against a cap of six means at least six
+   must be college credit, and no amount of in-service training substitutes. */
+function eceCompetencyText(s, row) {
+    if (!row.adds) {
+        return 'Level 6 is assessed on mastery in three of the seven Level 6 skill areas and six '
+             + 'professional contributions rather than on a competency list.';
+    }
+    var required = eceCompetenciesFor(row.level);
+    var psCda = hasPreschoolCda(s);
+    var itCda = hasInfantToddlerCda(s);
+    var coveredSet = psCda ? PRESCHOOL_CDA_ECE : (itCda ? IT_CDA_ECE : []);
+    var covered = required.filter(function (c) { return coveredSet.indexOf(c) !== -1; });
+    var outstanding = required.filter(function (c) { return covered.indexOf(c) === -1; });
+    var cap = row.level <= 4 ? TRAINING_ALLOWANCE.ece.low : TRAINING_ALLOWANCE.ece.high;
+    var mustBeCollege = outstanding.length - cap;
+
+    return levelWord(row.level) + ' needs ' + required.length + ' competencies'
+        + (row.level > 2 ? ', counting every level below it' : '') + ': '
+        + formatCompetencies(required) + '. '
+        + (covered.length
+           ? 'Your ' + (psCda ? 'Preschool' : 'Infant Toddler') + ' CDA covers '
+             + formatCompetencies(covered) + ', leaving ' + outstanding.length + '. '
+           : '')
+        + 'Up to ' + cap + ' may come from credential-approved training rather than college. '
+        + (mustBeCollege > 0
+           ? '<b>That means at least ' + mustBeCollege + ' of them have to be college coursework '
+             + '\u2014 training alone will not reach this level.</b>'
+           : 'The outstanding ' + outstanding.length + ' fall within that allowance, so this level '
+             + 'is reachable through training without further college credit.')
+        + ' We do not track competencies per person, so check them against your Professional '
+        + 'Development Record.';
+}
+
 /* ── ECE next steps ─────────────────────────────────────────────────────── */
 function eceSteps(s, held) {
     var steps = [];
@@ -293,11 +421,7 @@ function eceSteps(s, held) {
                  : row.experience.documented.toLocaleString('en-US')
                    + ' hours of documented ECE work experience.')
             : '')
-         + '<br><b>Competencies:</b> each level adds a named list, assessed by Gateways from your '
-         + 'transcript and training. Up to ' + TRAINING_ALLOWANCE.ece.low + ' competencies may come '
-         + 'from credential-approved training at Levels 2 to 4, and up to '
-         + TRAINING_ALLOWANCE.ece.high + ' at Levels 5 and 6. We do not track these per person, so '
-         + 'check them against your Professional Development Record.'
+         + '<br><b>Competencies:</b> ' + eceCompetencyText(s, row)
     });
 
     return steps;
@@ -411,16 +535,38 @@ function itcSteps(s, heldItc, heldEce) {
          + ' Documented hours only count once a work history form from the employer is on file.'
     });
 
-    // Competencies, named but never scored.
+    /* Competencies. The only ones ever treated as met are those a held credential
+       covers outright, because that is a documented fact rather than an inference from a
+       course title. Everything else is listed to be checked, never scored. */
+    var required = competenciesFor(row.level);
+    var cda = hasInfantToddlerCda(s);
+    var covered = cda ? required.filter(function (c) {
+        return IT_CDA_COMPETENCIES.indexOf(c) !== -1;
+    }) : [];
+    var outstanding = required.filter(function (c) { return covered.indexOf(c) === -1; });
+    var allowance = row.level <= 4 ? TRAINING_ALLOWANCE.itc.low : TRAINING_ALLOWANCE.itc.high;
+
     steps.push({
         done: false,
-        t: 'Competencies for ' + levelWord(row.level),
-        d: 'Gateways assesses ' + row.competencies + '. These come from college coursework, and up '
-         + 'to ' + (row.level <= 4 ? TRAINING_ALLOWANCE.itc.low : TRAINING_ALLOWANCE.itc.high)
-         + ' in total may come from credential-approved training instead. We do not track '
-         + 'competencies per person, so this list needs checking against your Professional '
-         + 'Development Record rather than assumed. The Infant Toddler CDA covers '
-         + IT_CDA_COVERS + '.'
+        t: 'Competencies for ' + levelWord(row.level) + ' \u2014 ' + outstanding.length
+            + ' to evidence' + (covered.length ? ', ' + covered.length + ' already covered' : ''),
+        d: (row.level > 2
+            ? levelWord(row.level) + ' requires every competency from the levels below it as well, '
+              + 'so the full list is ' + required.length + ' of them: '
+            : 'Gateways assesses ')
+         + 'ITC ' + formatCompetencies(required) + '. '
+         + (cda
+            ? '<br>Your Infant Toddler CDA covers ITC ' + formatCompetencies(covered)
+              + ' outright, which leaves <b>ITC ' + formatCompetencies(outstanding) + '</b>.'
+            : '')
+         + '<br>These come from college coursework, and up to ' + allowance + ' in total may come '
+         + 'from credential-approved training instead'
+         + (outstanding.length <= allowance
+            ? ' \u2014 so the ' + outstanding.length + ' outstanding could all be met by training, '
+              + 'without further college credit.'
+            : '.')
+         + ' We do not track competencies per person, so this needs checking against your '
+         + 'Professional Development Record rather than assumed.'
     });
 
     if (!edu.transcriptOnFile && edu.hours) {
@@ -437,7 +583,14 @@ function itcSteps(s, heldItc, heldEce) {
 root.CredentialFramework = {
     ECE_LEVELS: ECE_LEVELS,
     ITC_LEVELS: ITC_LEVELS,
-    IT_CDA_COVERS: IT_CDA_COVERS,
+    IT_CDA_COMPETENCIES: IT_CDA_COMPETENCIES,
+    PRESCHOOL_CDA_ECE: PRESCHOOL_CDA_ECE,
+    IT_CDA_ECE: IT_CDA_ECE,
+    competenciesFor: competenciesFor,
+    eceCompetenciesFor: eceCompetenciesFor,
+    hasInfantToddlerCda: hasInfantToddlerCda,
+    hasPreschoolCda: hasPreschoolCda,
+    formatCompetencies: formatCompetencies,
     degreeRank: degreeRank,
     semesterRank: semesterRank,
     isVague: isVague,
