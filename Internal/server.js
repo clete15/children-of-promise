@@ -1462,7 +1462,11 @@ function childFilesFolder(program, year) {
     const DOC_ROOT = findDocRoot();
     if (!DOC_ROOT) return { error: 'The document library is not reachable from the server.' };
     const programFolder = program === 'PFA' ? 'Preschool for All' : 'Birth to Three';
-    const y = String(year || '').replace(/[^0-9]/g, '').slice(0, 4) || String(new Date().getFullYear());
+    /* Last four digits, not the first. A school year passed in as "2025-2026" names the 2026
+       visit — the visit happens in the second half of the year — and slicing from the front
+       picked 2025, which is a different visit folder or none at all. */
+    const yDigits = String(year || '').replace(/[^0-9]/g, '');
+    const y = (yDigits.length > 4 ? yDigits.slice(-4) : yDigits) || String(new Date().getFullYear());
     const yearFolder = program === 'PFA' ? 'PFA Monitoring Visit ' + y : y + ' PI Monitoring Visit';
     const base = path.join(DOC_ROOT, programFolder, yearFolder);
     if (!fs.existsSync(base)) {
@@ -4339,7 +4343,13 @@ ELSE
         if (!checkAuth(req, res)) return;
         const qs = new URLSearchParams(req.url.split('?')[1] || '');
         const program = qs.get('program') === 'PFA' ? 'Preschool for All' : 'Birth to Three';
-        const year = (qs.get('year') || '').replace(/[^0-9]/g, '') || '2026';
+        /* A visit folder is named for ONE calendar year. Callers sometimes hold a school
+           year instead, and "2025-2026" with the punctuation stripped becomes "20252026",
+           which builds a folder name that cannot exist and reports the whole library as
+           missing. The visit falls in the second half of a school year, so the LAST four
+           digits are the right ones: 2025-2026 is the 2026 visit. */
+        const digits = (qs.get('year') || '').replace(/[^0-9]/g, '');
+        const year = (digits.length > 4 ? digits.slice(-4) : digits) || '2026';
         const folder = qs.get('folder') || (program === 'Birth to Three'
             ? year + ' PI Monitoring Visit' : 'PFA Monitoring Visit ' + year);
         const idx = indexYearFolder(program, folder);

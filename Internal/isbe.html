@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1360,11 +1360,38 @@ const VERIFIED_LINKS = {
 };
 
 // Grant Periodic Performance Report lives in SharePoint, one per program.
+/* ── Monitoring visit years ────────────────────────────────────────────────────
+   Visit folders are named by the CALENDAR year of the visit and hold the PRECEDING school
+   year's evidence. The two programmes are not on the same cycle:
+
+     PI   2026 visit  \u2192  2025-26 evidence   (FY27 window, Sep 2026 \u2013 May 2027)
+     PFA  2025 visit  \u2192  2024-25 evidence
+
+   THERE WAS NO PFA MONITORING VISIT IN 2026. A "PFA Monitoring Visit 2026" folder does
+   exist in the library, but it is a copy: byte for byte the same twenty files as the 2025
+   folder, every one naming 2024-25. Anything that pointed PFA at the current calendar year
+   was therefore showing the previous cycle's paperwork as though it were current, which is
+   the sort of thing a monitor notices before we do.
+
+   Confirmed against the library on 10 Sep 2026 by listing both folders and comparing them. */
+const LATEST_VISIT_YEAR = { PI: '2026', PFA: '2025' };
+
+/* One place that builds a link into the library, so no caller can forget the programme.
+   A link without one opens whichever the library defaults to, which is PI, and a PFA row
+   then shows PI evidence — indistinguishable from the PFA files having gone missing.
+   `item` is optional: with no item the library simply opens on the right programme. */
+function libraryHref(item, program) {
+    var prog = program || (activeProgram === 'PFA' ? 'PFA' : 'PI');
+    return 'documents.html?program=' + encodeURIComponent(prog)
+        + '&year=' + encodeURIComponent(LATEST_VISIT_YEAR[prog] || '')
+        + (item ? '#' + encodeURIComponent(item) : '');
+}
+
 /* Which library item holds the Grant Periodic Performance Report, per programme. The
    report is filed against the monitoring item it evidences, so the library link lands on
    the folder rather than on one file that gets superseded every year. */
 const GRANT_REPORT_ITEMS = {
-    PFA: 'PFA',
+    PFA: 'Item19',
     PI: 'PI10'
 };
 
@@ -1602,7 +1629,7 @@ function renderRoster() {
             if (f === 'GrantPerfReport') {
                 const item = GRANT_REPORT_ITEMS[activeProgram];
                 if (!item) return td + box + '</td>';
-                return td + box + '<a href="documents.html#' + encodeURIComponent(item)
+                return td + box + '<a href="' + libraryHref(item)
                     + '" target="_blank" rel="noopener" style="' + LINK_STYLE
                     + '" title="Open the Grant Periodic Performance Report in the document library">'
                     + '[doc]</a></td>';
@@ -2325,18 +2352,44 @@ function printScreening() {
 }
 
 // ── Program Compliance Checklist ──
-/* `libraryItem` is the folder in OUR library to open, replacing the SharePoint URLs these
-   three used to carry. The documents are on the server now, so a link out to SharePoint
-   asked for a Microsoft sign-in to reach a second copy that no longer gets updated — the
-   exact thing moving the library was meant to end. Where no library item is named the
-   button opens the library itself rather than pointing somewhere else. */
+/* ── PFA evidence, as it actually sits in our library ──────────────────────────
+   `libraryItem` is the folder in OUR library, replacing the SharePoint URLs three of these
+   rows used to carry. `libraryProgram` matters because PFA and PI keep separate folder
+   trees: without it a PFA button opened PI's library and looked like the evidence had
+   vanished.
+
+   The folder mapping is read off the library rather than assumed. PFA evidence lives in
+   folders named Item1, Item3, Item4, Item7, Item8, Item9, Item11, Item13.A, Item13.B,
+   Item14, Item15, Item18 and Item19 — a numbering scheme entirely unlike PI's — and what
+   each holds is:
+
+     Item1     classroom information form, waiting list, weighted eligibility form
+     Item3     homeless policy
+     Item4     screening permission slip, exit interview form and explanation
+     Item7     PFA calendar
+     Item8     DCFS licence
+     Item9     mission statement
+     Item11    weekly menus, CACFP food monitoring visit
+     Item13.A  transition letter to kindergarten
+     Item13.B  behaviour plan
+     Item14    community resource guide and referral list
+     Item15    staff individual goal plans, Gateways education reports
+     Item18    screening results for ELL
+     Item19    annual assessment and CQIP
+
+   Items 2, 5, 6, 10, 12, 16 and 17 have no folder at all. That is either "not applicable to
+   a centre" or "no evidence yet" and the library cannot tell which, so nothing here claims
+   either — see the note rendered above the list. */
 const PFA_COMPLIANCE_ITEMS = [
-    { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file' },
-    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted' },
-    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 classroom assessment and quality improvement plan' },
-    { key: 'PEL_ECE5', label: 'PEL / ECE Level 5', description: 'Lead teacher holds Professional Educator License with ECE endorsement or Gateways ECE Credential Level 5' },
-    { key: 'Paraprofessional', label: 'Paraprofessional Credentials', description: 'Paraprofessional holds ELS-Para license (60 credit hours, associate degree, or passing ACT WorkKeys exam)' },
-    { key: 'PFACalendar', label: 'PFA Calendar', description: 'PFA program calendar submitted and approved for the school year' },
+    { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', libraryItem: 'Item19', libraryProgram: 'PFA' },
+    /* Same document as the self-assessment: the evidence on file is one file called
+       "Item 19 - Annual Assessment and CQIP", so both rows open the same folder rather
+       than one of them pointing nowhere. */
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', libraryItem: 'Item19', libraryProgram: 'PFA' },
+    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 classroom assessment and quality improvement plan', libraryProgram: 'PFA' },
+    { key: 'PEL_ECE5', label: 'PEL / ECE Level 5', description: 'Lead teacher holds Professional Educator License with ECE endorsement or Gateways ECE Credential Level 5', libraryItem: 'Item15', libraryProgram: 'PFA' },
+    { key: 'Paraprofessional', label: 'Paraprofessional Credentials', description: 'Paraprofessional holds ELS-Para license (60 credit hours, associate degree, or passing ACT WorkKeys exam)', libraryItem: 'Item15', libraryProgram: 'PFA' },
+    { key: 'PFACalendar', label: 'PFA Calendar', description: 'PFA program calendar submitted and approved for the school year', libraryItem: 'Item7', libraryProgram: 'PFA' },
 ];
 
 // FY27 PI monitoring context, per the IDEC notification letter dated 8/31/2026.
@@ -2375,8 +2428,8 @@ const PI_COMPLIANCE_ITEMS = [
     { key: 'PIQET3', label: 'PIQET-3 Quality Evaluation', description: 'Prevention Initiative Quality Evaluation Tool-3 completed' },
     /* These two ARE PICC items as well as instruments, so they open the item folder in our
        library rather than duplicating the evidence somewhere else. */
-    { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', libraryItem: 'PI8.A' },
-    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', libraryItem: 'PI8.B' },
+    { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', libraryItem: 'PI8.A', libraryProgram: 'PI' },
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', libraryItem: 'PI8.B', libraryProgram: 'PI' },
     { key: 'ITERS3CQIP', label: 'ITERS-3 CQIP', description: 'ITERS-3 infant/toddler environment assessment and quality improvement plan' },
     { key: 'PICalendar', label: 'PI Calendar', description: 'PI program calendar submitted and approved for the school year' },
 ];
@@ -2479,8 +2532,8 @@ const PICC_ITEMS = [
            documents a monitor asks for first sat behind a Microsoft sign-in in a copy
            nothing writes to any more. */
         docs: [
-            { label: 'PI8.A Self-Assessment', url: 'documents.html#PI8.A' },
-            { label: 'PI8.B CQIP', url: 'documents.html#PI8.B' },
+            { label: 'PI8.A Self-Assessment', url: 'documents.html?program=PI&year=2026#PI8.A' },
+            { label: 'PI8.B CQIP', url: 'documents.html?program=PI&year=2026#PI8.B' },
             { label: 'FY27 CQIP form (blank)', url: 'documents/DEC PI - FY27 CQIP.pdf' }
         ]
     },
@@ -3607,7 +3660,14 @@ function loadDocIndex(program) {
     if (docIndexState === 'loading' || docIndexState === 'ready') return;
     docIndexProgram = program;
     docIndexState = 'loading';
-    fetch('/api/doc-index?program=' + program + '&year=' + new Date().getFullYear())
+    /* The programme's real latest visit, not the current calendar year. Both used to ask for
+       2026, which for PFA is the duplicate folder rather than the 2025 visit that actually
+       happened. Two consequences, both live until now: a document checked in against a PFA
+       item landed in the copy nobody reads, and the same file was judged current in one
+       folder and out of date in the other, because staleness is measured against the
+       folder's year. */
+    var visitYear = LATEST_VISIT_YEAR[program] || String(new Date().getFullYear());
+    fetch('/api/doc-index?program=' + program + '&year=' + encodeURIComponent(visitYear))
         .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
         .then(function (d) {
             docIndex = d;
@@ -3792,7 +3852,7 @@ function openChildFiles(studentId) {
         + 'folder. '
         + (docIndex && docIndex.childFolder
             ? 'The whole folder (' + docIndex.childFolder.count + ' files) is in the '
-              + '<a href="documents.html" target="_blank" rel="noopener">document library</a>.'
+              + '<a href="' + libraryHref('') + '" target="_blank" rel="noopener">document library</a>.'
             : '')
         + '</p>'
         + '<p id="cfilesStatus" style="font-size:0.76rem;margin-top:8px;"></p>';
@@ -3954,7 +4014,7 @@ function renderPfaChecklistSection(data) {
             status = data[key] ? statusPill('ok', 'evidence recorded') : statusPill('open', 'not recorded');
         }
 
-        var actions = '<a class="picc-btn" href="documents.html#' + encodeURIComponent(item.num)
+        var actions = '<a class="picc-btn" href="' + libraryHref(item.num)
             + '" target="_blank" rel="noopener">Library</a>';
         if (!item.na) {
             actions += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
@@ -4018,7 +4078,7 @@ function renderPfaChecklistSection(data) {
         + (ready === applicable.length ? 'all evidence recorded' : (applicable.length - ready) + ' still open')
         + '</div>'
         + '</div>'
-        + '<a class="picc-btn picc-btn-primary" href="documents.html" target="_blank" rel="noopener">Open document library</a>'
+        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('') + '" target="_blank" rel="noopener">Open document library</a>'
         + '</div>'
         + '<div class="picc-list">' + rows + '</div>';
 }
@@ -4047,7 +4107,7 @@ function renderPiccSection(data) {
         + '<div class="picc-readiness-num">' + ready + ' / ' + PICC_ITEMS.length + '</div>'
         + '<div class="picc-readiness-lbl">' + (blocked ? blocked + ' still open' : 'all evidence recorded') + '</div>'
         + '</div>'
-        + '<a class="picc-btn picc-btn-primary" href="documents.html" target="_blank" rel="noopener">Open document library</a>'
+        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('') + '" target="_blank" rel="noopener">Open document library</a>'
         + '</div>'
         + '<div class="picc-list">' + rows + '</div>';
 }
@@ -4093,7 +4153,7 @@ function renderPiccItem(item, data) {
     (item.docs || []).forEach(function (d) {
         evidence += '<a class="picc-btn" href="' + d.url + '" target="_blank" rel="noopener">' + d.label + '</a>';
     });
-    evidence += '<a class="picc-btn" href="documents.html#' + encodeURIComponent(item.num)
+    evidence += '<a class="picc-btn" href="' + libraryHref(item.num)
         + '" target="_blank" rel="noopener" title="Open this item in the document library">Library</a>';
     // Check-in: a signed or scanned page goes straight back into the item folder.
     evidence += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
@@ -4159,8 +4219,11 @@ function renderInstrumentSection(items, prefix, data) {
            offered alongside rather than instead — it is for the occasional thing that
            genuinely sits outside, and it used to be the ONLY route, which is why it won.
            Labelled so the two are not mistaken for each other. */
-        var libHref = 'documents.html'
-            + (item.libraryItem ? '#' + encodeURIComponent(item.libraryItem) : '');
+        /* Programme and year travel with the link. PFA and PI keep separate folder trees on
+           separate cycles, so a bare link opens whichever the library defaults to — PI —
+           and a PFA button then appeared to show the wrong evidence. */
+        var libProg = item.libraryProgram || (activeProgram === 'PFA' ? 'PFA' : 'PI');
+        var libHref = libraryHref(item.libraryItem, libProg);
         var linkBtn = '<a class="picc-btn" href="' + libHref + '" target="_blank" rel="noopener"'
             + ' title="' + (item.libraryItem
                 ? 'Open ' + item.libraryItem + ' in the document library'
@@ -4199,11 +4262,27 @@ function renderInstrumentSection(items, prefix, data) {
             + '</div>';
     }).join('');
 
+    /* Which visit the Library buttons below actually open, said out loud. PFA and PI are on
+       different cycles, and the PFA case is the one worth stating: there was no 2026 visit,
+       so the newest PFA evidence is 2024-25 and reads as out of date unless the reason is
+       on screen next to it. */
+    var prog = prefix.indexOf('pfa') === 0 || activeProgram === 'PFA' ? 'PFA' : 'PI';
+    var yearNote = prog === 'PFA'
+        ? '<div class="picc-head-sub" style="margin-top:6px;">'
+          + '<strong>Library opens the 2025 PFA visit, which holds 2024-25 evidence.</strong> '
+          + 'There was no PFA monitoring visit in 2026. A 2026 PFA folder exists in the '
+          + 'library but it is a copy of the 2025 one \u2014 the same twenty files, all naming '
+          + '2024-25 \u2014 so nothing in it is newer. Documents checked in here go to the 2025 '
+          + 'visit folder.</div>'
+        : '<div class="picc-head-sub" style="margin-top:6px;">'
+          + 'Library opens the 2026 PI visit, which holds 2025-26 evidence.</div>';
+
     return '<div class="picc-head" style="margin-top:22px;">'
         + '<div>'
         + '<div class="picc-head-title">Monitoring instruments &amp; program documents</div>'
         + '<div class="picc-head-sub">Observation tools and program-wide documents the monitor will ask for, '
         + 'alongside the checklist itself.</div>'
+        + yearNote
         + '</div></div>'
         + '<div class="picc-list">' + rows + '</div>';
 }
@@ -4314,3 +4393,4 @@ init();
 <script src="deploy-widget.js"></script>
 </body>
 </html>
+

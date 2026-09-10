@@ -129,12 +129,29 @@ async function probeOffice() {
 
 
 
-function fillYears() {
-    const now = new Date();
-    // Visit folders are named by calendar year; offer the current one and back.
-    const y = now.getFullYear();
-    document.getElementById('yearPick').innerHTML = [y, y - 1, y - 2]
-        .map(v => '<option value="' + v + '">' + v + '</option>').join('');
+/* Which visit folder each programme's evidence is actually in.
+
+   Folders are named by the CALENDAR year of the monitoring visit and hold the preceding
+   school year's evidence: "2026 PI Monitoring Visit" holds 2025-26 files, and "PFA
+   Monitoring Visit 2025" holds 2024-25 files.
+
+   PFA and PI are on different cycles, which the single year picker used to hide. There was
+   no PFA monitoring visit in 2026 — the 2026 PFA folder is a copy of the 2025 one and
+   contains the same twenty 2024-25 files — so defaulting PFA to the current calendar year
+   presented the last cycle's paperwork as though it were current. Each programme now opens
+   on its own latest real visit. */
+const PROGRAM_YEARS = {
+    PI:  { years: [2026, 2025], covers: { 2026: '2025-26', 2025: '2024-25' } },
+    PFA: { years: [2025], covers: { 2025: '2024-25' } }
+};
+
+function fillYears(program, wantYear) {
+    const conf = PROGRAM_YEARS[program] || PROGRAM_YEARS.PI;
+    const sel = document.getElementById('yearPick');
+    sel.innerHTML = conf.years.map(v =>
+        '<option value="' + v + '">' + v + ' visit'
+        + (conf.covers[v] ? ' \u00b7 ' + conf.covers[v] + ' evidence' : '') + '</option>').join('');
+    if (wantYear && conf.years.indexOf(parseInt(wantYear, 10)) !== -1) sel.value = String(wantYear);
 }
 
 function fileRow(f, item) {
@@ -444,8 +461,20 @@ async function load() {
     }
 }
 
-fillYears();
-document.getElementById('progPick').addEventListener('change', load);
+/* A link can name the programme and the year as well as the item, so a PFA row on the
+   compliance checklist opens PFA evidence. Before this, every link landed on the default
+   programme, which is PI — a PFA button opened the wrong library and looked like the PFA
+   evidence had gone missing. */
+const params = new URLSearchParams(location.search);
+const askedProgram = (params.get('program') || '').toUpperCase() === 'PFA' ? 'PFA' : '';
+if (askedProgram) document.getElementById('progPick').value = askedProgram;
+fillYears(document.getElementById('progPick').value, params.get('year'));
+
+// Changing programme changes which visit years exist, so the year list is rebuilt first.
+document.getElementById('progPick').addEventListener('change', () => {
+    fillYears(document.getElementById('progPick').value);
+    load();
+});
 document.getElementById('yearPick').addEventListener('change', load);
 
 /* Ask about the editor first, then list. Doing it the other way round drew the list
