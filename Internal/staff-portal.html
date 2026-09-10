@@ -301,15 +301,55 @@ function filesCard() {
         + 'These open in your browser.</div>';
 
     if (mine.length) {
-        html += '<div class="sp-links">' + mine.map(f =>
-            '<a class="sp-link" href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
-            + '" target="_blank" rel="noopener">'
-            + '<div class="n">' + esc(f.category) + '</div>'
-            + '<div class="s">' + esc(f.name) + '</div></a>').join('') + '</div>';
+        html += '<div class="sp-links">' + mine.map(f => {
+            const waiting = f.status === 'Pending';
+            return '<a class="sp-link" href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
+                + '" target="_blank" rel="noopener"'
+                + (waiting ? ' style="border-color:#fcd34d;background:#fffbeb;"' : '') + '>'
+                + '<div class="n">' + esc(f.category)
+                /* Says plainly that it has arrived but not been checked. Without this
+                   a handed-in document looks identical to a verified one, and the
+                   person would reasonably assume the matter was closed. */
+                + (waiting ? ' <span class="sp-pill" style="background:#fef3c7;color:#92400e;">'
+                    + 'waiting to be checked</span>' : '')
+                + '</div>'
+                + '<div class="s">' + esc(f.name) + '</div></a>';
+        }).join('') + '</div>';
     } else {
         html += '<div class="sp-sub" style="color:#92400e;">Nothing is filed against you yet. '
             + 'If you have handed documents in, they may be in the library but not yet '
             + 'matched to your name — ask Megan to check.</div>';
+    }
+
+    /* ── handing in what is missing ──
+       Only offered to the person themselves, and only for documents they obtain from
+       somewhere else: a transcript or a Gateways report. W4s and background check
+       authorisations are not here on purpose — those are collected at onboarding and
+       an upload box for them invites a social security number somewhere unexpected. */
+    const missing = FILES.missing || [];
+    const isMe = WHO && !WHO.director && String(WHO.staffId) === String(s.Id);
+    if (isMe && missing.length) {
+        const label = k => k === 'transcript' ? 'college transcript' : 'Gateways education report';
+        html += '<div class="sp-step" style="border-left-color:#2563eb;margin-top:12px;">'
+            + '<div class="t">Hand in what is missing</div>'
+            + '<div class="d">We do not have your '
+            + missing.map(m => label(m.key)).join(' or your ') + '. '
+            + 'A PDF or a clear photo is fine. It goes to Megan to check rather than '
+            + 'straight onto your record.</div>';
+        missing.forEach(m => {
+            html += '<div style="margin-top:8px;">'
+                + '<label for="up_' + esc(m.key) + '" style="font-size:0.76rem;font-weight:600;'
+                + 'color:#475569;">' + esc(label(m.key)) + '</label><br>'
+                + '<input type="file" id="up_' + esc(m.key) + '" class="sp-upfile" '
+                + 'accept=".pdf,.jpg,.jpeg,.png" style="font-size:0.78rem;margin-top:4px;"> '
+                + '<button type="button" class="sp-upbtn" data-key="' + esc(m.key) + '" '
+                + 'style="padding:4px 10px;font-size:0.72rem;font-weight:700;border:none;'
+                + 'border-radius:5px;background:#2563eb;color:#fff;cursor:pointer;">Send it</button>'
+                + ' <span class="sp-upmsg" id="upmsg_' + esc(m.key) + '" '
+                + 'style="font-size:0.75rem;"></span>'
+                + '</div>';
+        });
+        html += '</div>';
     }
 
     /* The director's filing workbench used to sit here. It moved to
@@ -611,6 +651,56 @@ function render() {
 function wireCardActions() {
     const save = $('edSave');
     if (save) save.addEventListener('click', saveMyRecord);
+
+    document.querySelectorAll('.sp-upbtn').forEach(btn => {
+        btn.addEventListener('click', () => handIn(btn.getAttribute('data-key'), btn));
+    });
+}
+
+/* Sends a missing document. Multipart, so this cannot go through apiFetch — that
+   sets a JSON content type, and the browser has to set its own boundary here. The
+   credentials are attached by hand for the same reason. */
+async function handIn(key, btn) {
+    const input = $('up_' + key);
+    const msg = $('upmsg_' + key);
+    if (!input || !input.files || !input.files.length) {
+        msg.style.color = '#92400e';
+        msg.textContent = 'Choose a file first.';
+        return;
+    }
+
+    const file = input.files[0];
+    // Checked here so the answer is instant; the server checks again and decides.
+    if (file.size > 15 * 1024 * 1024) {
+        msg.style.color = '#991b1b';
+        msg.textContent = 'That is over 15 MB. A PDF scan is usually much smaller.';
+        return;
+    }
+
+    const form = new FormData();
+    form.append('file', file, file.name);
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    msg.textContent = '';
+    try {
+        const headers = (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {};
+        delete headers['Content-Type'];
+        const res = await fetch('/api/staff-file-upload?category=' + encodeURIComponent(key), {
+            method: 'POST', headers: headers, body: form
+        });
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error || 'HTTP ' + res.status);
+        msg.style.color = '#166534';
+        msg.textContent = 'Sent. Megan will check it.';
+        // Re-read so it appears in the list above, marked as waiting.
+        await loadFiles(current.Id);
+    } catch (e) {
+        msg.style.color = '#991b1b';
+        msg.textContent = e.message || 'Could not send it.';
+        btn.disabled = false;
+        btn.textContent = 'Send it';
+    }
 }
 
 async function saveMyRecord() {

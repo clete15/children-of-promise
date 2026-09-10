@@ -924,8 +924,53 @@ function staffFileLinksEnsureSQL() {
         CreatedAt DATETIME DEFAULT GETDATE(),
         CONSTRAINT UQ_StaffFileLink UNIQUE(RelPath)
     );
+GO
+/* Confirmed or Pending.
+
+   A document the director filed is confirmed by the act of filing it. One a member
+   of staff hands in themselves is pending until somebody looks at it, which is the
+   same rule the self-reported qualifications follow: staff supply, the office
+   confirms. It matters because these files back compliance claims — a transcript
+   nobody has opened should not read as verified evidence.
+
+   Read as ISNULL(Status,'Confirmed') rather than backfilled with an UPDATE, so no
+   write happens on a read path. Every row that predates this column was filed by
+   the director, so confirmed is the correct reading of a null. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffFileLinks' AND COLUMN_NAME='Status')
+    ALTER TABLE StaffFileLinks ADD Status NVARCHAR(20);
+GO
+/* Who handed it in, when. Kept because "Molly uploaded this on the 9th" is the
+   answer to "where did this come from", and an unattributed file in a personnel
+   folder is worth less than one with a name on it. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffFileLinks' AND COLUMN_NAME='UploadedBy')
+    ALTER TABLE StaffFileLinks ADD UploadedBy NVARCHAR(200);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffFileLinks' AND COLUMN_NAME='UploadedDate')
+    ALTER TABLE StaffFileLinks ADD UploadedDate NVARCHAR(30);
 `;
 }
+
+/* Which categories a member of staff may hand in themselves.
+
+   Transcripts and Gateways reports only. Both are documents the person obtains
+   from a third party and the office is chasing them for, so self-service removes a
+   real bottleneck — seven of ten teaching records have no semester hours because
+   nobody has the transcript.
+
+   W4s and background check authorisations are deliberately absent. Those are
+   onboarding paperwork the centre collects and holds, and an upload box for them
+   invites somebody to put a social security number somewhere nobody expected it to
+   be. Goal plans and work history are absent too, because they are forms filled in
+   on screen rather than documents brought from elsewhere. */
+const STAFF_UPLOADABLE = {
+    transcript: 'Staff Transcripts',
+    gateways: 'Staff Gateways Education Reports'
+};
+
+// What a staff member is allowed to hand in, by extension. A transcript arrives as
+// a PDF or a photograph of one; nothing here needs to be executable.
+const STAFF_UPLOAD_EXTS = ['.pdf', '.jpg', '.jpeg', '.png'];
+const STAFF_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
 
 /* The Staff folder inside the library, and the categories within it.
 
@@ -1025,15 +1070,32 @@ function proposeStaffMatch(fileName, staffName) {
     return { confidence: 'weak', why: 'first name matches, surname does not' };
 }
 
-// Files already assigned, as { rel: staffId }.
+/* Files that have been decided on, as { rel: { staffId, status, uploadedBy } }.
+
+   Staff id '0' is the sentinel for "not anybody's personnel file" — real ids start
+   at 1, so it cannot collide with a person. */
 function staffFileLinkMap() {
     const r = runSQLRows(
-        `SELECT StaffId, RelPath FROM StaffFileLinks`,
+        `SELECT StaffId, RelPath, ISNULL(Status,'Confirmed') AS Status,
+                ISNULL(UploadedBy,'') AS UploadedBy, ISNULL(UploadedDate,'') AS UploadedDate
+         FROM StaffFileLinks`,
         staffFileLinksEnsureSQL() + 'GO\n');
     if (!r.ok) return { ok: false, error: r.error };
     const byPath = {};
-    r.rows.forEach(row => { byPath[String(row.RelPath)] = String(row.StaffId); });
+    r.rows.forEach(row => {
+        byPath[String(row.RelPath)] = {
+            staffId: String(row.StaffId),
+            status: String(row.Status || 'Confirmed'),
+            uploadedBy: String(row.UploadedBy || ''),
+            uploadedDate: String(row.UploadedDate || '')
+        };
+    });
     return { ok: true, byPath: byPath };
+}
+
+// The link for one path, or null. Keeps the shape checks in one place.
+function staffFileLinkFor(links, rel) {
+    return Object.prototype.hasOwnProperty.call(links.byPath, rel) ? links.byPath[rel] : null;
 }
 
 /* One-time migration payload: the staff list that used to be hardcoded in
@@ -3461,15 +3523,29 @@ ELSE
             });
         }
 
-        /* Confirmed as belonging to this person. Empty when no id was asked for,
-           which is the filing screen rather than somebody's page. */
+        /* This person's documents, confirmed and pending alike. Their own upload is
+           theirs to see while it waits, and marked so they know it has not been
+           checked yet — hiding it would look like the upload had failed. Empty when
+           no id was asked for, which is the filing screen rather than a person. */
         const mine = staffId
-            ? listed.files.filter(f => links.byPath[f.rel] === String(staffId))
+            ? listed.files
+                .map(f => ({ file: f, link: staffFileLinkFor(links, f.rel) }))
+                .filter(x => x.link && x.link.staffId === String(staffId))
             : [];
         const body = {
             staffId: staffId ? String(staffId) : '',
             libraryReachable: true,
-            mine: mine.map(f => ({ name: f.name, category: f.category, rel: f.rel }))
+            mine: mine.map(x => ({
+                name: x.file.name, category: x.file.category, rel: x.file.rel,
+                status: x.link.status,
+                uploadedDate: x.link.uploadedDate || ''
+            })),
+            // Which of the self-service categories they have nothing for yet.
+            missing: staffId
+                ? Object.keys(STAFF_UPLOADABLE)
+                    .filter(key => !mine.some(x => x.file.folder === STAFF_UPLOADABLE[key]))
+                    .map(key => ({ key: key, folder: STAFF_UPLOADABLE[key] }))
+                : []
         };
 
         /* The filing lists are for the director and only ever reach the filing
@@ -3482,14 +3558,28 @@ ELSE
                 staffEnsureSQL() + 'GO\n');
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
 
+            /* Handed in by staff and not yet looked at. First list on the filing
+               screen, because somebody is waiting on it — unlike the rest of the
+               pile, which has been sitting there for years. */
+            body.pending = listed.files
+                .map(f => ({ file: f, link: staffFileLinkFor(links, f.rel) }))
+                .filter(x => x.link && x.link.status === 'Pending' && x.link.staffId !== '0')
+                .map(x => ({
+                    name: x.file.name, category: x.file.category, rel: x.file.rel,
+                    staffId: x.link.staffId,
+                    uploadedBy: x.link.uploadedBy,
+                    uploadedDate: x.link.uploadedDate
+                }));
+
             /* Set aside as not being anyone's personnel file. Reported back rather
                than simply omitted, so a file put here by mistake can be found and
                undone instead of quietly disappearing from every list there is. */
             body.misc = listed.files
-                .filter(f => links.byPath[f.rel] === '0')
-                .map(f => ({ name: f.name, category: f.category, rel: f.rel }));
+                .map(f => ({ file: f, link: staffFileLinkFor(links, f.rel) }))
+                .filter(x => x.link && x.link.staffId === '0')
+                .map(x => ({ name: x.file.name, category: x.file.category, rel: x.file.rel }));
 
-            const unassigned = listed.files.filter(f => !links.byPath[f.rel]);
+            const unassigned = listed.files.filter(f => !staffFileLinkFor(links, f.rel));
             body.unassigned = unassigned.map(f => {
                 // What this filename looks like across the whole roster, best first,
                 // so a file can be filed against the right person in one pass.
@@ -3558,14 +3648,139 @@ ELSE
 
             /* One owner per file, so re-filing replaces rather than adds. A file
                with two owners would show up on two people's pages, and the second
-               person seeing it is the failure this whole table exists to prevent. */
+               person seeing it is the failure this whole table exists to prevent.
+
+               Anything the director files here is confirmed by the act of filing it,
+               which is also how a pending upload gets approved: the same button,
+               against the person it was handed in for. */
             const w = runSQL(staffFileLinksEnsureSQL() + 'GO\n'
                 + `DELETE FROM StaffFileLinks WHERE RelPath=${esc(rel)};\n`
-                + `INSERT INTO StaffFileLinks (StaffId, RelPath, LinkedBy, LinkedDate) VALUES (`
-                + `${staffId}, ${esc(rel)}, ${esc('director')}, ${esc(new Date().toISOString())})`);
+                + `INSERT INTO StaffFileLinks (StaffId, RelPath, Status, LinkedBy, LinkedDate)`
+                + ` VALUES (${staffId}, ${esc(rel)}, ${esc('Confirmed')}, ${esc('director')},`
+                + ` ${esc(new Date().toISOString())})`);
             if (!w.ok) return sendJSON(res, 500, { error: w.error });
             return sendJSON(res, 200, { success: true, linked: true });
         });
+    }
+
+    /* POST hand in a missing document.
+
+       The point is to remove a chase. Most teaching records have no semester hours
+       because the office does not have the transcript, and asking the person who
+       already owns a copy is quicker than asking their college for another.
+
+       It lands as Pending, so it is visible to them and waiting for the office
+       rather than silently becoming verified evidence. A staff member uploads only
+       against themselves — the id comes from the token, never the request. */
+    if (req.method === 'POST' && url.startsWith('/api/staff-file-upload')) {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+
+        const qs = new URLSearchParams(req.url.split('?')[1] || '');
+        const categoryKey = String(qs.get('category') || '').trim().toLowerCase();
+        const folder = STAFF_UPLOADABLE[categoryKey];
+        if (!folder) {
+            return sendJSON(res, 400, {
+                error: 'That is not something you can hand in here. Transcripts and Gateways '
+                     + 'reports only.'
+            });
+        }
+
+        const asked = parseInt(qs.get('staffId') || 0, 10);
+        const staffId = actor.director ? asked : parseInt(actor.staffId, 10);
+        if (!staffId) return sendJSON(res, 400, { error: 'Which staff member?' });
+        if (!actorMayTouch(actor, staffId)) {
+            return sendJSON(res, 403, { error: 'You can only hand in your own documents' });
+        }
+
+        const DOC_ROOT = findDocRoot();
+        if (!DOC_ROOT) {
+            return sendJSON(res, 500, { error: 'The document library is not reachable from the server.' });
+        }
+        const destDir = path.join(DOC_ROOT, STAFF_DOC_ROOT_FOLDER, folder);
+        if (!fs.existsSync(destDir)) {
+            return sendJSON(res, 500, { error: 'No "' + folder + '" folder in the library.' });
+        }
+
+        // Name it after the person, so the file is identifiable in the folder even
+        // to somebody browsing the library rather than using this application.
+        const who = runSQLRows(`SELECT ISNULL(Name,'') AS Name FROM Staff WHERE Id=${staffId}`);
+        if (!who.ok) return sendJSON(res, 500, { error: who.error });
+        const personName = who.rows[0] ? String(who.rows[0].Name || '') : '';
+        if (!personName) return sendJSON(res, 404, { error: 'Staff record not found' });
+
+        let chunks = [];
+        let total = 0;
+        let tooBig = false;
+        req.on('data', chunk => {
+            total += chunk.length;
+            // Stop accumulating once over the limit rather than buffering a huge body.
+            if (total > STAFF_UPLOAD_MAX_BYTES) { tooBig = true; return; }
+            chunks.push(chunk);
+        });
+        req.on('end', () => {
+            if (tooBig) {
+                return sendJSON(res, 413, {
+                    error: 'That file is over 15 MB. A scan saved as a PDF is usually well under.'
+                });
+            }
+            const buf = Buffer.concat(chunks);
+            const boundary = (req.headers['content-type'] || '').split('boundary=')[1];
+            if (!boundary) return sendJSON(res, 400, { error: 'No boundary' });
+
+            /* Same multipart handling as the proof-of-income upload. Crude, and kept
+               deliberately consistent with it rather than introducing a second way
+               of doing the same thing in one codebase. */
+            const parts = buf.toString('binary').split('--' + boundary);
+            for (const part of parts) {
+                if (!part.includes('filename=')) continue;
+                const nameMatch = part.match(/filename="([^"]+)"/);
+                if (!nameMatch || !nameMatch[1]) continue;
+
+                const ext = path.extname(nameMatch[1]).toLowerCase();
+                if (!STAFF_UPLOAD_EXTS.includes(ext)) {
+                    return sendJSON(res, 400, {
+                        error: 'Please send a PDF or a photo (' + STAFF_UPLOAD_EXTS.join(', ') + ').'
+                    });
+                }
+                const headerEnd = part.indexOf('\r\n\r\n');
+                if (headerEnd < 0) continue;
+                const fileData = Buffer.from(part.slice(headerEnd + 4, part.lastIndexOf('\r\n')), 'binary');
+                if (!fileData.length) return sendJSON(res, 400, { error: 'That file was empty.' });
+
+                const stamp = new Date().toISOString().slice(0, 10);
+                const label = categoryKey === 'transcript' ? 'Transcript' : 'Gateways Education Report';
+                const safePerson = personName.replace(/[^A-Za-z0-9 ]/g, '').trim();
+                let base = safePerson + ' - ' + label + ' handed in ' + stamp;
+                // Never overwrite. A second copy on the same day is a new file, not a
+                // replacement, because the first one may already be someone's evidence.
+                let fileName = base + ext;
+                let n = 2;
+                while (fs.existsSync(path.join(destDir, fileName))) {
+                    fileName = base + ' (' + n + ')' + ext;
+                    n++;
+                }
+
+                try {
+                    fs.writeFileSync(path.join(destDir, fileName), fileData);
+                } catch (e) {
+                    return sendJSON(res, 500, { error: 'Could not save it: ' + e.message });
+                }
+
+                const rel = STAFF_DOC_ROOT_FOLDER + '/' + folder + '/' + fileName;
+                const w = runSQL(staffFileLinksEnsureSQL() + 'GO\n'
+                    + `DELETE FROM StaffFileLinks WHERE RelPath=${esc(rel)};\n`
+                    + `INSERT INTO StaffFileLinks (StaffId, RelPath, Status, UploadedBy, UploadedDate)`
+                    + ` VALUES (${staffId}, ${esc(rel)}, ${esc('Pending')}, ${esc(personName)},`
+                    + ` ${esc(new Date().toISOString())})`);
+                if (!w.ok) return sendJSON(res, 500, { error: w.error });
+
+                console.log('[STAFF FILE] ' + personName + ' handed in ' + rel);
+                return sendJSON(res, 200, { success: true, name: fileName, status: 'Pending' });
+            }
+            return sendJSON(res, 400, { error: 'No file found in that upload.' });
+        });
+        return;
     }
 
     /* GET one personnel file.
@@ -3585,7 +3800,9 @@ ELSE
         if (!actor.director) {
             const links = staffFileLinkMap();
             if (!links.ok) return sendJSON(res, 500, { error: links.error });
-            if (links.byPath[rel] !== String(actor.staffId)) {
+            const link = staffFileLinkFor(links, rel);
+            // Pending counts as theirs: they handed it in, so they may read it back.
+            if (!link || link.staffId !== String(actor.staffId)) {
                 // Deliberately 404 and not 403: whether a file exists at all is
                 // not something to confirm to someone it does not belong to.
                 res.writeHead(404); return res.end('Not found');

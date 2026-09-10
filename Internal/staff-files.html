@@ -139,7 +139,39 @@ function render() {
 
     const unassigned = DATA.unassigned || [];
     const misc = DATA.misc || [];
+    const pending = DATA.pending || [];
     let html = '';
+
+    /* ── handed in by staff, waiting on you ──
+       First, because somebody is actually waiting on it. The rest of the pile has
+       been sitting in the library for years and nobody is watching for an answer.
+
+       Approving is the same "file it" action against the person it was handed in
+       for: confirming who it belongs to is exactly what approval means here. */
+    if (pending.length) {
+        html += '<div class="sf-card"><h2>Handed in and waiting on you (' + pending.length + ')</h2>'
+            + '<div class="sf-sub">Staff sent these themselves. They are visible to the person '
+            + 'who sent them but do not count as checked evidence until you confirm. Open it, '
+            + 'then approve or set it aside.</div>';
+        pending.forEach(f => {
+            const who = (DATA.staff || []).find(s => String(s.staffId) === String(f.staffId));
+            html += '<div class="sf-row firm">'
+                + '<div class="sf-name">' + esc(f.name) + '</div>'
+                + '<div class="sf-meta">' + esc(f.category)
+                + ' &nbsp;·&nbsp; handed in by <strong>' + esc(f.uploadedBy || (who ? who.name : '')) + '</strong>'
+                + (f.uploadedDate ? ' on ' + esc(String(f.uploadedDate).slice(0, 10)) : '')
+                + ' &nbsp;·&nbsp; <a href="/api/staff-file-download?path='
+                + encodeURIComponent(f.rel) + '" target="_blank" rel="noopener">open it</a>'
+                + '<br>'
+                + '<button type="button" class="sf-btn file sf-approve" data-rel="' + esc(f.rel)
+                + '" data-staff="' + esc(f.staffId) + '">Approve for '
+                + esc(who ? who.name.split(' ')[0] : 'them') + '</button> '
+                + '<button type="button" class="sf-btn ghost sf-misc" data-rel="' + esc(f.rel)
+                + '" title="Not what it should be \u2014 set it aside">Not right / set aside</button>'
+                + '</div></div>';
+        });
+        html += '</div>';
+    }
 
     // ── waiting on a decision ──
     html += '<div class="sf-card"><h2>Not filed against anyone (' + unassigned.length + ')</h2>';
@@ -223,6 +255,12 @@ function wire() {
     document.querySelectorAll('.sf-unmisc').forEach(btn => {
         btn.addEventListener('click', () =>
             send({ rel: btn.getAttribute('data-rel') }, btn, 'Putting back…'));
+    });
+    // Approving is filing it against the person who handed it in.
+    document.querySelectorAll('.sf-approve').forEach(btn => {
+        btn.addEventListener('click', () => send(
+            { rel: btn.getAttribute('data-rel'), staffId: btn.getAttribute('data-staff') },
+            btn, 'Approving…'));
     });
 }
 
