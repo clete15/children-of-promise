@@ -411,7 +411,15 @@ function formState(f, staffId) {
    confirms, and until then a file belongs to nobody.
 
    For the director this card is also where that confirming happens. */
-function filesCard() {
+/* Takes the staff record, and has to.
+
+   It read a free `s` further down, which resolved to nothing: it is a top-level function,
+   so it never saw render()'s local `s`. That went unnoticed because the only line using it
+   sits behind `WHO && !WHO.director`, which short-circuits for anyone holding the shared
+   password — so the director view worked perfectly and a member of staff signed in as
+   themselves got "Could not load your record: s is not defined" instead of their page.
+   Found 10 Sep 2026, the day people first signed in personally. */
+function filesCard(s) {
     // The id is the target of the "My Files" entry on the portal landing page.
     let html = '<div class="sp-card" id="files"><h2>My files</h2>';
 
@@ -631,21 +639,35 @@ const SP_TABS = [
 
 let activeTab = 'overview';
 
-// Anything the person can act on, counted for the tab strip. Nothing else gets a badge.
+/* Anything the person can act on, counted for the tab strip. Nothing else gets a badge.
+
+   Wrapped, and every read guarded, because of what happened on 10 Sep 2026: this reached
+   into FILES.uploadable while FILES was still null, threw, and took the ENTIRE page down
+   with "Could not load your record: Cannot read properties of null". A decorative number
+   on a tab must never be able to do that — the page is worth more than the badge, so a
+   count that cannot be worked out is simply not shown. */
 function tabCount(key, s) {
-    if (key === 'files') {
-        const absent = (FILES.uploadable || []).filter(u => !u.hasOne).length;
-        return absent || 0;
-    }
-    if (key === 'forms') {
-        return MY_FORMS.filter(f => !formState(f, s.Id)).length;
-    }
-    if (key === 'details') {
-        // The two gaps worth chasing: no registry number, no semester hours.
-        let n = 0;
-        if (!String(s.RegistryId || '').trim()) n++;
-        if (!String(s.SemesterHoursTotal || '').trim()) n++;
-        return n;
+    try {
+        if (key === 'files') {
+            /* FILES is null until the fetch returns, and the first render deliberately
+               happens before then so the page appears immediately rather than blank.
+               filesCard() has always guarded for this; this did not. */
+            const up = (FILES && FILES.uploadable) || [];
+            return up.filter(u => u && !u.hasOne).length;
+        }
+        if (key === 'forms') {
+            if (!s || !Array.isArray(MY_FORMS)) return 0;
+            return MY_FORMS.filter(f => !formState(f, s.Id)).length;
+        }
+        if (key === 'details') {
+            // The two gaps worth chasing: no registry number, no semester hours.
+            let n = 0;
+            if (!String(s.RegistryId || '').trim()) n++;
+            if (!String(s.SemesterHoursTotal || '').trim()) n++;
+            return n;
+        }
+    } catch (e) {
+        console.error('[MY PAGE] could not count the ' + key + ' tab', e);
     }
     return 0;
 }
@@ -673,7 +695,7 @@ function tabPanels(s, tabs) {
     const build = {
         overview: overviewSection,
         credentials: credentialsSection,
-        files: () => filesCard(),
+        files: filesCard,
         forms: formsSection,
         details: selfEditCard
     };
