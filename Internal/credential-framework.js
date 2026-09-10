@@ -250,8 +250,20 @@ function semesterRank(total) {
     return 0;
 }
 
-function transcriptWithGateways(s) {
-    return !/not submitted/i.test(String(s.TranscriptOnFile || ''));
+/* Three states, not two. A blank field means nobody has established whether Gateways
+   holds the transcript, and treating that as "on file" is an optimistic default that
+   produces confident wrong advice: it credits someone with an education level the
+   Registry may not be able to see, and sends them off to chase competencies when the
+   actual blocker is an unsent transcript.
+
+   Unknown is therefore costed like "not submitted" when working out what counts today,
+   because the asymmetry is stark. If we assume it is missing and it is not, somebody
+   re-orders a transcript for nothing. If we assume it is there and it is not, we plan
+   coursework nobody needed while the application sits. */
+function transcriptState(s) {
+    var v = String(s.TranscriptOnFile || '').trim();
+    if (!v) return 'unknown';
+    return /not submitted/i.test(v) ? 'not' : 'onfile';
 }
 
 /* The education ceiling, twice over: what the Registry can act on now, and what it
@@ -260,7 +272,8 @@ function transcriptWithGateways(s) {
 function educationCeiling(s, heldEce) {
     var deg = degreeRank(s.Education);
     var sem = semesterRank(s.SemesterHoursTotal);
-    var onFile = transcriptWithGateways(s);
+    var tState = transcriptState(s);
+    var onFile = tState === 'onfile';
 
     /* A level Gateways has already awarded is proof its education gate was met, whatever
        the Education field says. Janell holds ECE Level 2 against an Education of "Some
@@ -276,6 +289,7 @@ function educationCeiling(s, heldEce) {
         potential: Math.max(deg, floor, sem),
         semesterRank: sem,
         transcriptOnFile: onFile,
+        transcriptState: tState,
         hours: hours,
         eceHours: num(s.SemesterHoursEce),
         // Nothing in the record establishes an education level beyond what is already held.
@@ -359,18 +373,30 @@ function eceSteps(s, held) {
 
     // Transcript gap first: it is usually the largest single move available.
     if (!edu.transcriptOnFile && edu.hours) {
+        var unknown = edu.transcriptState === 'unknown';
         steps.push({
             done: false,
-            t: 'Send your transcript to the Registry \u2014 worth up to '
-                + levelWord(edu.potential) + ' on its own',
+            t: (unknown
+                ? 'Check whether Gateways has your transcript \u2014 it is worth up to '
+                : 'Send your transcript to the Registry \u2014 worth up to ')
+                + levelWord(edu.potential) + (unknown ? '' : ' on its own'),
             d: 'Your record shows ' + edu.hours + ' semester hours'
              + (edu.eceHours ? ', ' + edu.eceHours + ' of them in early childhood' : '')
-             + ', but the transcript has not reached Gateways. Credit the Registry has not '
-             + 'received cannot raise a level. On paper you are at '
+             + (unknown
+                ? ', but nothing on your record establishes whether the Registry has ever '
+                  + 'received the transcript. That question is worth settling before anything '
+                  + 'else, because the answer changes what you should do next: if they have it, '
+                  + 'the gap is which competencies your courses map to; if they do not, none of '
+                  + 'the credit counts yet and sending it is the only thing that matters. '
+                  + 'Your Gateways Professional Development Record shows what they hold.'
+                : ', but the transcript has not reached Gateways. Credit the Registry has not '
+                  + 'received cannot raise a level.')
+             + ' Counted conservatively you are at '
              + (edu.today ? levelWord(edu.today) : 'no education level')
              + '; with the transcript on file the education requirement supports '
              + levelWord(edu.potential) + '. It must go to the Registry direct from the college, '
-             + 'not to the centre.'
+             + 'not to the centre \u2014 a copy issued to you, or a black and white print of one, '
+             + 'is not an official transcript however complete it looks.'
              /* The distance to the next threshold is the actionable part. 53 hours is not
                 "nearly Level 4", it is seven credits short of it, and that is a semester. */
              + (edu.hours < 60 && edu.hours >= 9
@@ -571,9 +597,16 @@ function itcSteps(s, heldItc, heldEce) {
 
     if (!edu.transcriptOnFile && edu.hours) {
         steps.push({
-            done: false, t: 'Your transcript is holding up the ECE side too',
-            d: 'The same missing transcript caps your ECE level, which in turn caps the ITC. One '
-             + 'errand clears both.'
+            done: false,
+            t: edu.transcriptState === 'unknown'
+                ? 'The same transcript question caps the ECE side'
+                : 'Your transcript is holding up the ECE side too',
+            d: edu.transcriptState === 'unknown'
+                ? 'Until it is known whether Gateways holds your transcript, your ECE level '
+                  + 'cannot be relied on, and the ECE level caps the ITC. One phone call settles '
+                  + 'both.'
+                : 'The same missing transcript caps your ECE level, which in turn caps the ITC. '
+                  + 'One errand clears both.'
         });
     }
 

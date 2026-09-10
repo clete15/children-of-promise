@@ -1988,7 +1988,20 @@ function runSQL(sql) {
    backslashes, a 3000-character blob, accented characters and NULL. Values arrive
    correctly typed, so txCol()/txDecode() are unnecessary on this path — their
    whole purpose was surviving the pipe-delimited format. */
-const LONG_TEXT_CHUNK = 200;
+/* 60 rather than 200, and the reason is bytes against characters.
+
+   SUBSTRING slices NVARCHAR by CHARACTER, but sqlcmd caps a variable-length column at 256
+   and emits UTF-8 under -f 65001. An em-dash or a curly quote is one character and three
+   bytes, so a 200-character chunk carrying enough of them exceeded the cap and was
+   truncated — losing bytes from the middle of the JSON and breaking the parse for the
+   entire endpoint, not merely the row that contained them. A staff note with a few dashes
+   in it took down GET /api/staff on 9/10/2026.
+
+   60 characters cannot exceed 256 bytes even if every one of them is a 4-byte character,
+   which makes the read safe for any text rather than safe for the text we happen to have
+   written so far. The cost is more rows out of sqlcmd, which is cheap; the alternative was
+   sanitising what people are allowed to type, which is not. */
+const LONG_TEXT_CHUNK = 60;
 const LONG_TEXT_SENTINEL = '~';
 
 function jsonChunkSQL(innerSelect) {
