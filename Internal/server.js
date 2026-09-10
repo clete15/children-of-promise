@@ -3469,6 +3469,13 @@ ELSE
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             const target = r.rows.find(x => String(x.Id) === String(staffId));
 
+            /* Set aside as not being anyone's personnel file. Reported back rather
+               than simply omitted, so a file put here by mistake can be found and
+               undone instead of quietly disappearing from every list there is. */
+            body.misc = listed.files
+                .filter(f => links.byPath[f.rel] === '0')
+                .map(f => ({ name: f.name, category: f.category, rel: f.rel }));
+
             const unassigned = listed.files.filter(f => !links.byPath[f.rel]);
             body.unassigned = unassigned.map(f => {
                 // What this filename looks like across the whole roster, best first,
@@ -3520,8 +3527,22 @@ ELSE
                 return sendJSON(res, 404, { error: 'No such file in the library' });
             }
 
-            const staffId = parseInt((d && d.staffId) || 0, 10);
-            if (!staffId) {
+            /* Three outcomes, not two: filed against a person, set aside as not
+               being anybody's personnel file, or put back to undecided.
+
+               "Misc" is recorded as a link to staff 0 rather than as a deletion,
+               because a deleted row means "nobody has looked at this yet" and that
+               is the opposite of what happened. Staff ids start at 1, so 0 can
+               never collide with a real person, and the row keeps the file out of
+               the pending list while leaving it visible and reversible.
+
+               Nothing is moved or deleted on disk. Three of these files belong to
+               former staff and are still the centre's records; the only thing being
+               decided here is whether they appear on somebody's own page. */
+            const misc = !!(d && d.misc);
+            const staffId = misc ? 0 : parseInt((d && d.staffId) || 0, 10);
+
+            if (!misc && !staffId) {
                 const w = runSQL(staffFileLinksEnsureSQL() + 'GO\n'
                     + `DELETE FROM StaffFileLinks WHERE RelPath=${esc(rel)}`);
                 if (!w.ok) return sendJSON(res, 500, { error: w.error });

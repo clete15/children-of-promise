@@ -381,7 +381,37 @@ function filesCard() {
                     + '<button type="button" class="sp-assign-btn" data-rel="' + esc(f.rel)
                     + '" style="padding:4px 10px;font-size:0.72rem;font-weight:700;border:none;'
                     + 'border-radius:5px;background:' + (weak ? '#b45309' : '#334155')
-                    + ';color:#fff;cursor:pointer;">File it</button>'
+                    + ';color:#fff;cursor:pointer;">File it</button> '
+                    /* For anything that is not a personnel file at all, or belongs
+                       to someone long gone. Nothing moves on disk; it just stops
+                       being a pending decision. */
+                    + '<button type="button" class="sp-misc-btn" data-rel="' + esc(f.rel)
+                    + '" title="Not anybody\u2019s personnel file \u2014 set it aside"'
+                    + ' style="padding:4px 10px;font-size:0.72rem;font-weight:700;'
+                    + 'border:1px solid #cbd5e1;border-radius:5px;background:#fff;'
+                    + 'color:#475569;cursor:pointer;">Misc / archive</button>'
+                    + '</div></div>';
+            });
+            html += '</div>';
+        }
+
+        // Set aside as nobody's. Listed so a mistake here is findable and undoable.
+        const misc = FILES.misc || [];
+        if (misc.length) {
+            html += '<div style="margin-top:14px;"><h2 style="font-size:0.86rem;">'
+                + 'Set aside as Misc (' + misc.length + ')</h2>'
+                + '<div class="sp-sub">Not filed against anyone, and not waiting on a '
+                + 'decision. Still in the library \u2014 nothing was moved or deleted.</div>';
+            misc.forEach(f => {
+                html += '<div class="sp-step" style="border-left-color:#cbd5e1;">'
+                    + '<div class="t" style="font-weight:600;color:#475569;">' + esc(f.name) + '</div>'
+                    + '<div class="d">' + esc(f.category)
+                    + ' &nbsp; <a href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
+                    + '" target="_blank" rel="noopener">open it</a>'
+                    + ' &nbsp; <button type="button" class="sp-unmisc-btn" data-rel="' + esc(f.rel)
+                    + '" style="padding:3px 9px;font-size:0.72rem;font-weight:700;'
+                    + 'border:1px solid #cbd5e1;border-radius:5px;background:#fff;'
+                    + 'color:#475569;cursor:pointer;">Put back</button>'
                     + '</div></div>';
             });
             html += '</div>';
@@ -665,6 +695,34 @@ function wireCardActions() {
             assignFile(rel, who, btn);
         });
     });
+    // Set aside as nobody's, and the way back from that.
+    document.querySelectorAll('.sp-misc-btn').forEach(btn => {
+        btn.addEventListener('click', () => setFileMisc(btn.getAttribute('data-rel'), true, btn));
+    });
+    document.querySelectorAll('.sp-unmisc-btn').forEach(btn => {
+        btn.addEventListener('click', () => setFileMisc(btn.getAttribute('data-rel'), false, btn));
+    });
+}
+
+/* Marks a file as belonging to nobody, or undoes that. Sending neither a staffId
+   nor the misc flag is what the server reads as "back to undecided". */
+async function setFileMisc(rel, misc, btn) {
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = misc ? 'Setting aside…' : 'Putting back…';
+    try {
+        const res = await apiFetch('/api/staff-file-link', {
+            method: 'POST',
+            body: JSON.stringify(misc ? { rel: rel, misc: true } : { rel: rel })
+        });
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error || 'HTTP ' + res.status);
+        await loadFiles(current.Id);
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = 'Failed — ' + (e.message || 'try again');
+        setTimeout(() => { btn.textContent = original; }, 2600);
+    }
 }
 
 async function assignFile(rel, staffId, btn) {
