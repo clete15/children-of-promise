@@ -9,78 +9,195 @@
 <title>My Page — Children of Promise</title>
 <link rel="stylesheet" href="styles.css">
 <style>
-    body { background: #f1f5f9; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+    /* ── Colours as variables, so dark mode is a change of values rather than a
+       second copy of every rule.
+
+       This page previously hardcoded its colours, including inside the markup the
+       script builds. Half of a dark page still glowing white is worse than no dark
+       mode at all, so the generated markup now uses classes and everything that
+       carries a colour resolves through here. The accent hues stay recognisable
+       between the two themes — green still means held, amber still means missing —
+       because the meaning is carried by the colour and should not shift with the
+       background. */
+    :root {
+        --sp-bg: #f1f5f9;
+        --sp-surface: #ffffff;
+        --sp-surface-2: #f8fafc;
+        --sp-border: #e2e8f0;
+        --sp-border-in: #cbd5e1;
+        --sp-text: #1e293b;
+        --sp-text-2: #475569;
+        --sp-muted: #64748b;
+        --sp-quiet: #94a3b8;
+        --sp-accent: #2563eb;
+        --sp-accent-soft: #f8fbff;
+
+        --sp-good-bg: #f0fdf4;  --sp-good-br: #86efac;  --sp-good-fg: #166534;
+        --sp-warn-bg: #fffbeb;  --sp-warn-br: #fcd34d;  --sp-warn-fg: #92400e;
+        --sp-bad-bg:  #fef2f2;  --sp-bad-br:  #fca5a5;  --sp-bad-fg:  #991b1b;
+        --sp-pill-bg: #f8fafc;
+    }
+    body.sp-dark {
+        --sp-bg: #0f172a;
+        --sp-surface: #1a2235;
+        --sp-surface-2: #212b41;
+        --sp-border: #2f3b52;
+        --sp-border-in: #45526b;
+        --sp-text: #e8edf6;
+        --sp-text-2: #bcc7da;
+        --sp-muted: #9aa7bd;
+        --sp-quiet: #7d8a9f;
+        --sp-accent: #7ea6ff;
+        --sp-accent-soft: #1e2a44;
+
+        --sp-good-bg: #14301f;  --sp-good-br: #2f6b45;  --sp-good-fg: #86efac;
+        --sp-warn-bg: #35290f;  --sp-warn-br: #8a6a1f;  --sp-warn-fg: #fcd34d;
+        --sp-bad-bg:  #3a1a1c;  --sp-bad-br:  #8a3a3f;  --sp-bad-fg:  #fca5a5;
+        --sp-pill-bg: #212b41;
+    }
+
+    body {
+        background: var(--sp-bg); color: var(--sp-text);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
     .sp-wrap { max-width: 1000px; margin: 0 auto; padding: 18px 16px 60px; }
     .sp-bar {
         display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-        background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+        background: var(--sp-surface); border: 1.5px solid var(--sp-border); border-radius: 10px;
         padding: 12px 16px; margin-bottom: 16px;
     }
-    .sp-bar select { padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 0.85rem; }
+    .sp-bar select {
+        padding: 6px 10px; border: 1px solid var(--sp-border-in); border-radius: 6px;
+        font-size: 0.85rem; background: var(--sp-surface); color: var(--sp-text);
+    }
+    .sp-bar strong { color: var(--sp-text); }
+    .sp-bar a { color: var(--sp-accent); }
     .sp-card {
-        background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
+        background: var(--sp-surface); border: 1.5px solid var(--sp-border); border-radius: 10px;
         padding: 16px 18px; margin-bottom: 16px;
     }
     .sp-card h2 {
-        font-size: 0.95rem; font-weight: 800; color: #1e293b; margin: 0 0 4px;
+        font-size: 0.95rem; font-weight: 800; color: var(--sp-text); margin: 0 0 4px;
     }
     .sp-card .sp-sub {
-        font-size: 0.76rem; color: #64748b; line-height: 1.6; margin-bottom: 12px;
+        font-size: 0.76rem; color: var(--sp-muted); line-height: 1.6; margin-bottom: 12px;
     }
     .sp-grid { display: flex; flex-wrap: wrap; gap: 12px; }
     .sp-tile {
-        flex: 1 1 210px; min-width: 190px; border: 1.5px solid #e2e8f0;
-        border-radius: 9px; padding: 12px 14px; background: #f8fafc;
+        flex: 1 1 210px; min-width: 190px; border: 1.5px solid var(--sp-border);
+        border-radius: 9px; padding: 12px 14px; background: var(--sp-surface-2);
     }
     .sp-tile .lbl {
         font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.04em; color: #64748b; margin-bottom: 4px;
+        letter-spacing: 0.04em; color: var(--sp-muted); margin-bottom: 4px;
     }
-    .sp-tile .val { font-size: 1.15rem; font-weight: 800; color: #1e293b; line-height: 1.2; }
-    .sp-tile .note { font-size: 0.7rem; color: #64748b; margin-top: 5px; line-height: 1.5; }
-    .sp-tile.good { background: #f0fdf4; border-color: #86efac; }
-    .sp-tile.warn { background: #fffbeb; border-color: #fcd34d; }
-    .sp-tile.bad  { background: #fef2f2; border-color: #fca5a5; }
+    .sp-tile .val { font-size: 1.15rem; font-weight: 800; color: var(--sp-text); line-height: 1.2; }
+    .sp-tile .note { font-size: 0.7rem; color: var(--sp-muted); margin-top: 5px; line-height: 1.5; }
+    .sp-tile.good { background: var(--sp-good-bg); border-color: var(--sp-good-br); }
+    .sp-tile.warn { background: var(--sp-warn-bg); border-color: var(--sp-warn-br); }
+    .sp-tile.bad  { background: var(--sp-bad-bg);  border-color: var(--sp-bad-br); }
+    /* The editable fields on the "keep my record right" card. */
+    .sp-tile.sp-field { background: var(--sp-surface); }
+    .sp-tile.sp-field input, .sp-tile.sp-field select {
+        width: 100%; box-sizing: border-box; padding: 6px 8px;
+        border: 1px solid var(--sp-border-in); border-radius: 5px;
+        font-size: 0.88rem; font-family: inherit;
+        background: var(--sp-surface); color: var(--sp-text);
+    }
     .sp-pill {
         display: inline-block; font-size: 0.68rem; font-weight: 700;
         padding: 2px 9px; border-radius: 11px; white-space: nowrap;
+        background: var(--sp-pill-bg); color: var(--sp-muted);
     }
+    .sp-pill.done { background: var(--sp-good-bg); color: var(--sp-good-fg); }
+    .sp-pill.waiting { background: var(--sp-warn-bg); color: var(--sp-warn-fg); }
     .sp-step {
-        border: 1px solid #e2e8f0; border-left: 4px solid #2563eb; border-radius: 8px;
-        padding: 11px 14px; margin-bottom: 9px; background: #fff;
+        border: 1px solid var(--sp-border); border-left: 4px solid var(--sp-accent);
+        border-radius: 8px; padding: 11px 14px; margin-bottom: 9px;
+        background: var(--sp-surface);
     }
-    .sp-step .t { font-size: 0.84rem; font-weight: 700; color: #1e293b; }
-    .sp-step .d { font-size: 0.76rem; color: #475569; line-height: 1.6; margin-top: 4px; }
-    .sp-step.done { border-left-color: #16a34a; background: #f0fdf4; }
+    .sp-step .t { font-size: 0.84rem; font-weight: 700; color: var(--sp-text); }
+    .sp-step .d { font-size: 0.76rem; color: var(--sp-text-2); line-height: 1.6; margin-top: 4px; }
+    .sp-step.done { border-left-color: #16a34a; background: var(--sp-good-bg); }
+    /* Severity variants, replacing the inline border colours the script used to set. */
+    .sp-step.alert { border-left-color: #dc2626; margin-top: 12px; }
+    .sp-step.caution { border-left-color: #d97706; margin-top: 12px; }
+    .sp-step.info { border-left-color: var(--sp-accent); background: var(--sp-accent-soft); }
     .sp-links { display: flex; flex-wrap: wrap; gap: 9px; }
     .sp-link {
         display: block; flex: 1 1 220px; min-width: 200px; text-decoration: none;
-        border: 1.5px solid #e2e8f0; border-radius: 9px; padding: 11px 13px; background: #fff;
+        border: 1.5px solid var(--sp-border); border-radius: 9px; padding: 11px 13px;
+        background: var(--sp-surface);
     }
-    .sp-link:hover { border-color: #2563eb; background: #f8fbff; }
-    .sp-link .n { font-size: 0.82rem; font-weight: 700; color: #1e293b; }
-    .sp-link .s { font-size: 0.71rem; color: #64748b; margin-top: 3px; }
-    .sp-src { font-size: 0.7rem; color: #64748b; margin-top: 10px; line-height: 1.6; }
-    .sp-src a { color: #2563eb; }
+    .sp-link:hover { border-color: var(--sp-accent); background: var(--sp-accent-soft); }
+    .sp-link.waiting { border-color: var(--sp-warn-br); background: var(--sp-warn-bg); }
+    .sp-link .n { font-size: 0.82rem; font-weight: 700; color: var(--sp-text); }
+    .sp-link .s { font-size: 0.71rem; color: var(--sp-muted); margin-top: 3px; }
+    .sp-src { font-size: 0.7rem; color: var(--sp-muted); margin-top: 10px; line-height: 1.6; }
+    .sp-src a { color: var(--sp-accent); }
+
+    /* Handing in a document. */
+    .sp-handin { border-left-color: var(--sp-accent); margin-top: 12px; }
+    .sp-handin-row { margin-top: 8px; }
+    .sp-handin-row label { font-size: 0.76rem; font-weight: 600; color: var(--sp-text-2); }
+    .sp-handin-row input[type="file"] {
+        font-size: 0.78rem; margin-top: 4px; color: var(--sp-text-2); max-width: 100%;
+    }
+    .sp-handin-row button {
+        padding: 4px 10px; font-size: 0.72rem; font-weight: 700; border: none;
+        border-radius: 5px; background: var(--sp-accent); color: #fff; cursor: pointer;
+    }
+    .sp-handin-row button:disabled { opacity: 0.6; cursor: default; }
+    .sp-quiet { color: var(--sp-quiet); font-weight: 500; }
+    .sp-need { color: var(--sp-warn-fg); font-weight: 600; }
+    .sp-upmsg { font-size: 0.75rem; }
+    .sp-upmsg.good { color: var(--sp-good-fg); }
+    .sp-upmsg.warn { color: var(--sp-warn-fg); }
+    .sp-upmsg.bad  { color: var(--sp-bad-fg); }
+
+    /* Saving the record. */
+    .sp-save {
+        padding: 9px 16px; border: none; border-radius: 7px;
+        background: var(--sp-accent); color: #fff; font-size: 0.85rem;
+        font-weight: 700; cursor: pointer;
+    }
+    .sp-save:disabled { opacity: 0.6; cursor: default; }
+    .sp-savemsg { font-size: 0.78rem; }
+    .sp-savemsg.good { color: var(--sp-good-fg); }
+    .sp-savemsg.bad  { color: var(--sp-bad-fg); }
+    .sp-saverow { margin-top: 12px; display: flex; align-items: center; gap: 12px; }
+    .sp-err { color: var(--sp-bad-fg); }
+    .sp-warntext { color: var(--sp-warn-fg); }
+
+    /* Theme toggle. Looks like the other bar links rather than a control, because it
+       is a preference and not part of the task. */
+    .sp-theme {
+        background: none; border: none; padding: 0; cursor: pointer;
+        font: inherit; font-size: 0.76rem; font-weight: 600; color: var(--sp-muted);
+    }
+    .sp-theme:hover { color: var(--sp-accent); }
 </style>
 </head>
 <body>
 
 <div class="sp-wrap">
     <div class="sp-bar">
-        <strong style="color:#1e293b;font-size:0.9rem;">My Page</strong>
+        <strong style="font-size:0.9rem;">My Page</strong>
         <!-- The chooser is the director's control. A staff member sees their own name
              instead, because there is nothing for them to choose: the server sends
              them one record, their own. -->
         <select id="spStaff"><option value="">Loading…</option></select>
-        <strong id="spWhoName" style="display:none;color:#1e293b;font-size:0.9rem;"></strong>
-        <span id="spMsg" style="font-size:0.76rem;color:#64748b;"></span>
-        <span id="spStaffActions" style="display:none;margin-left:auto;font-size:0.76rem;">
-            <a href="#" id="spChangePw" style="color:#2563eb;font-weight:600;">Change my password</a>
+        <strong id="spWhoName" style="display:none;font-size:0.9rem;"></strong>
+        <span id="spMsg" class="sp-quiet" style="font-size:0.76rem;"></span>
+        <!-- Outside the staff-only block, so the director gets the theme choice too. -->
+        <button type="button" id="spTheme" class="sp-theme" style="margin-left:auto;"
+                aria-pressed="false" title="Switch between light and dark"></button>
+        <span id="spStaffActions" style="display:none;font-size:0.76rem;">
+            <a href="#" id="spChangePw" style="font-weight:600;">Change my password</a>
             &nbsp;·&nbsp;
-            <a href="#" id="spSignOut" style="color:#64748b;font-weight:600;">Sign out</a>
+            <a href="#" id="spSignOut" class="sp-quiet" style="font-weight:600;">Sign out</a>
         </span>
-        <span id="spBarNote" style="flex-basis:100%;font-size:0.72rem;color:#94a3b8;">
+        <span id="spBarNote" class="sp-quiet" style="flex-basis:100%;font-size:0.72rem;">
             Everything here comes from your staff record. If something is wrong, it is wrong
             in the record — tell Megan rather than working around it.
         </span>
@@ -122,6 +239,19 @@ let FILES = null;
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/* Every request on this page goes through the PERSONAL credentials, not the shared
+   ones. This page is about one individual, so a session token has to outrank the
+   centre password when a browser holds both — otherwise a staff member signing in
+   on the office computer gets the director's view of it, which is exactly what
+   happened: Paige saw the whole staff list and Clete's record.
+
+   The rest of the site keeps using apiFetch, where the shared password rightly
+   wins. Routing those through here instead would mean a forgotten staff token
+   quietly narrowing the roster on the director's own admin pages. */
+const myFetch = (url, opts) => (window.CofpAuth && CofpAuth.personalFetch)
+    ? CofpAuth.personalFetch(url, opts)
+    : apiFetch(url, opts);
 
 /* Credential level out of the free-text credential fields. Same regex the PAS pages
    use, so this page and the ExceleRate maths cannot disagree. */
@@ -286,13 +416,13 @@ function filesCard() {
         return html + '<div class="sp-sub">Looking for your documents…</div></div>';
     }
     if (FILES.error) {
-        return html + '<div class="sp-sub" style="color:#991b1b;">Could not read the document '
+        return html + '<div class="sp-sub sp-err">Could not read the document '
             + 'library: ' + esc(FILES.error) + '</div></div>';
     }
     /* "The library is not reachable" is not "you have no transcript". Someone told
        the second thing would go and order a replacement from their college. */
     if (FILES.libraryReachable === false) {
-        return html + '<div class="sp-sub" style="color:#92400e;">The document library is not '
+        return html + '<div class="sp-sub sp-warntext">The document library is not '
             + 'reachable from the server right now, so this cannot say what is on file. '
             + esc(FILES.reason || '') + '</div></div>';
     }
@@ -308,20 +438,19 @@ function filesCard() {
     if (mine.length) {
         html += '<div class="sp-links">' + mine.map(f => {
             const waiting = f.status === 'Pending';
-            return '<a class="sp-link" href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
-                + '" target="_blank" rel="noopener"'
-                + (waiting ? ' style="border-color:#fcd34d;background:#fffbeb;"' : '') + '>'
+            return '<a class="sp-link' + (waiting ? ' waiting' : '') + '"'
+                + ' href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
+                + '" target="_blank" rel="noopener">'
                 + '<div class="n">' + esc(f.category)
                 /* Says plainly that it has arrived but not been checked. Without this
                    a handed-in document looks identical to a verified one, and the
                    person would reasonably assume the matter was closed. */
-                + (waiting ? ' <span class="sp-pill" style="background:#fef3c7;color:#92400e;">'
-                    + 'waiting to be checked</span>' : '')
+                + (waiting ? ' <span class="sp-pill waiting">waiting to be checked</span>' : '')
                 + '</div>'
                 + '<div class="s">' + esc(f.name) + '</div></a>';
         }).join('') + '</div>';
     } else {
-        html += '<div class="sp-sub" style="color:#92400e;">Nothing is filed against you yet. '
+        html += '<div class="sp-sub sp-warntext">Nothing is filed against you yet. '
             + 'If you have handed documents in, they may be in the library but not yet '
             + 'matched to your name — ask Megan to check.</div>';
     }
@@ -331,27 +460,35 @@ function filesCard() {
        somewhere else: a transcript or a Gateways report. W4s and background check
        authorisations are not here on purpose — those are collected at onboarding and
        an upload box for them invites a social security number somewhere unexpected. */
-    const missing = FILES.missing || [];
+    const uploadable = FILES.uploadable || [];
     const isMe = WHO && !WHO.director && String(WHO.staffId) === String(s.Id);
-    if (isMe && missing.length) {
+    if (isMe && uploadable.length) {
         const label = k => k === 'transcript' ? 'college transcript' : 'Gateways education report';
-        html += '<div class="sp-step" style="border-left-color:#2563eb;margin-top:12px;">'
-            + '<div class="t">Hand in what is missing</div>'
-            + '<div class="d">We do not have your '
-            + missing.map(m => label(m.key)).join(' or your ') + '. '
+        const absent = uploadable.filter(u => !u.hasOne);
+
+        html += '<div class="sp-step sp-handin">'
+            + '<div class="t">' + (absent.length ? 'Hand in what is missing' : 'Send a newer copy') + '</div>'
+            + '<div class="d">'
+            + (absent.length
+                ? 'We do not have your ' + absent.map(m => label(m.key)).join(' or your ') + '. '
+                : 'Finished a course since you last sent these? Send the newer one. ')
             + 'A PDF or a clear photo is fine. It goes to Megan to check rather than '
-            + 'straight onto your record.</div>';
-        missing.forEach(m => {
-            html += '<div style="margin-top:8px;">'
-                + '<label for="up_' + esc(m.key) + '" style="font-size:0.76rem;font-weight:600;'
-                + 'color:#475569;">' + esc(label(m.key)) + '</label><br>'
+            + 'straight onto your record, and a new copy never replaces the old one.</div>';
+
+        uploadable.forEach(m => {
+            html += '<div class="sp-handin-row">'
+                + '<label for="up_' + esc(m.key) + '">' + esc(label(m.key))
+                /* Says which of the two this is, so "send it" is never ambiguous about
+                   whether it is filling a gap or adding a version. */
+                + (m.hasOne
+                    ? ' <span class="sp-quiet">— one already on file, this adds a newer one</span>'
+                    : ' <span class="sp-need">— nothing on file</span>')
+                + '</label><br>'
                 + '<input type="file" id="up_' + esc(m.key) + '" class="sp-upfile" '
-                + 'accept=".pdf,.jpg,.jpeg,.png" style="font-size:0.78rem;margin-top:4px;"> '
-                + '<button type="button" class="sp-upbtn" data-key="' + esc(m.key) + '" '
-                + 'style="padding:4px 10px;font-size:0.72rem;font-weight:700;border:none;'
-                + 'border-radius:5px;background:#2563eb;color:#fff;cursor:pointer;">Send it</button>'
-                + ' <span class="sp-upmsg" id="upmsg_' + esc(m.key) + '" '
-                + 'style="font-size:0.75rem;"></span>'
+                + 'accept=".pdf,.jpg,.jpeg,.png"> '
+                + '<button type="button" class="sp-upbtn" data-key="' + esc(m.key) + '">'
+                + (m.hasOne ? 'Send newer' : 'Send it') + '</button>'
+                + ' <span class="sp-upmsg" id="upmsg_' + esc(m.key) + '"></span>'
                 + '</div>';
         });
         html += '</div>';
@@ -384,18 +521,15 @@ function selfEditCard(s) {
     if (!mayEdit) return '';
 
     const field = (id, label, value, hint) =>
-        '<div class="sp-tile" style="background:#fff;">'
+        '<div class="sp-tile sp-field">'
         + '<div class="lbl"><label for="' + id + '">' + esc(label) + '</label></div>'
-        + '<input id="' + id + '" value="' + esc(value || '') + '" '
-        + 'style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #cbd5e1;'
-        + 'border-radius:5px;font-size:0.88rem;font-family:inherit;">'
+        + '<input id="' + id + '" value="' + esc(value || '') + '">'
         + (hint ? '<div class="note">' + hint + '</div>' : '') + '</div>';
 
     const picker = (id, label, value, options, hint) =>
-        '<div class="sp-tile" style="background:#fff;">'
+        '<div class="sp-tile sp-field">'
         + '<div class="lbl"><label for="' + id + '">' + esc(label) + '</label></div>'
-        + '<select id="' + id + '" style="width:100%;box-sizing:border-box;padding:6px 8px;'
-        + 'border:1px solid #cbd5e1;border-radius:5px;font-size:0.88rem;font-family:inherit;">'
+        + '<select id="' + id + '">'
         + options.map(o => '<option value="' + esc(o) + '"'
             + (String(value || '') === o ? ' selected' : '') + '>'
             + (o === '' ? '— not recorded —' : esc(o)) + '</option>').join('')
@@ -419,7 +553,7 @@ function selfEditCard(s) {
             bits.push('your <strong>college credit</strong> from your transcript — these are '
                 + 'the hours that move you up the credential levels');
         }
-        ask = '<div class="sp-step" style="border-left-color:#2563eb;background:#f8fbff;">'
+        ask = '<div class="sp-step info">'
             + '<div class="t">We need this from you</div>'
             + '<div class="d">Nothing on your record shows ' + bits.join(', and ') + '. '
             + 'Filling it in here is quicker than anyone chasing it, and it is your '
@@ -460,11 +594,9 @@ function selfEditCard(s) {
         + field('edPdYear', 'Which calendar year those hours are for', s.PdHoursYear,
             'So last year\u2019s total is not read as this year\u2019s.')
         + '</div>'
-        + '<div style="margin-top:12px;display:flex;align-items:center;gap:12px;">'
-        + '<button type="button" id="edSave" style="padding:9px 16px;border:none;border-radius:7px;'
-        + 'background:#2563eb;color:#fff;font-size:0.85rem;font-weight:700;cursor:pointer;">'
-        + 'Save my changes</button>'
-        + '<span id="edMsg" style="font-size:0.78rem;"></span>'
+        + '<div class="sp-saverow">'
+        + '<button type="button" id="edSave" class="sp-save">Save my changes</button>'
+        + '<span id="edMsg" class="sp-savemsg"></span>'
         + '</div></div>';
 }
 
@@ -513,14 +645,14 @@ function render() {
         + '</div>';
 
     if (transcriptMissing) {
-        html += '<div class="sp-step" style="border-left-color:#dc2626;margin-top:12px;">'
+        html += '<div class="sp-step alert">'
             + '<div class="t">Your transcript has not reached Gateways</div>'
             + '<div class="d">College credit that Gateways has not received cannot count toward a '
             + 'credential level, however many hours you have earned. Sending the transcript is '
             + 'usually the single biggest step available.</div></div>';
     }
     if (pending) {
-        html += '<div class="sp-step" style="border-left-color:#d97706;margin-top:12px;">'
+        html += '<div class="sp-step caution">'
             + '<div class="t">Something is in progress on your record</div>'
             + '<div class="d">Recorded as: \u201c' + esc(pending) + '\u201d. A credential that is '
             + 'pending does not count until it is awarded.</div></div>';
@@ -563,7 +695,7 @@ function render() {
                     : t.TrainingKey === 'ecers3' ? 'ECERS-3'
                     : t.TrainingKey === 'iters3' ? 'ITERS-3' : t.TrainingKey,
                     esc(t.CompletedDate))).join('') + '</div>'
-            : '<div class="sp-sub" style="color:#92400e;">Nothing recorded yet. '
+            : '<div class="sp-sub sp-warntext">Nothing recorded yet. '
               + '\u201cHow ERS Works\u201d is the one ExceleRate requires of half the teaching staff.</div>')
         + '</div>';
 
@@ -596,8 +728,7 @@ function render() {
                       + encodeURIComponent(r.roomNumber) + '" target="_blank" rel="noopener">'
                     : '<div class="sp-link">')
                   + '<div class="n">' + esc(r.name)
-                  + (r.secondary ? ' <span class="sp-pill" style="background:#f8fafc;color:#64748b;">'
-                      + 'part time</span>' : '') + '</div>'
+                  + (r.secondary ? ' <span class="sp-pill">part time</span>' : '') + '</div>'
                   + '<div class="s">' + (r.roomNumber
                       ? 'Opens your room\u2019s checklist, one card per child.'
                       : 'This room name is not in the classroom list, so it cannot be opened '
@@ -632,16 +763,15 @@ function render() {
             return '<a class="sp-link" href="' + f.href + '?staffId=' + encodeURIComponent(s.Id)
                 + '" target="_blank" rel="noopener">'
                 + '<div class="n">' + esc(f.name) + ' '
-                + '<span class="sp-pill" style="background:' + (done ? '#f0fdf4' : '#f8fafc')
-                + ';color:' + (done ? '#166534' : '#64748b') + ';">'
+                + '<span class="sp-pill' + (done ? ' done' : '') + '">'
                 + (done ? '\u2713 done' : 'not started') + '</span></div>'
                 + '<div class="s">' + esc(f.note) + '</div></a>';
         }).join('')
         /* The staff survey is anonymous, so it cannot show done or not done against a
            name - saying so is better than leaving people wondering why it has no tick. */
         + '<a class="sp-link" href="/pas/staff-program-evaluation.html" target="_blank" rel="noopener">'
-        + '<div class="n">Staff Program Evaluation <span class="sp-pill" '
-        + 'style="background:#f8fafc;color:#64748b;">anonymous</span></div>'
+        + '<div class="n">Staff Program Evaluation <span class="sp-pill"'
+        + '>anonymous</span></div>'
         + '<div class="s">Your view of how the programme is run. Responses are saved under a '
         + 'number, not your name, so this cannot show whether you have done it.</div></a>'
         + '</div></div>';
@@ -673,8 +803,10 @@ function wireCardActions() {
 async function handIn(key, btn) {
     const input = $('up_' + key);
     const msg = $('upmsg_' + key);
+    // Captured, because the label differs between filling a gap and adding a version.
+    const originalLabel = btn.textContent;
     if (!input || !input.files || !input.files.length) {
-        msg.style.color = '#92400e';
+        msg.className = 'sp-upmsg warn';
         msg.textContent = 'Choose a file first.';
         return;
     }
@@ -682,7 +814,7 @@ async function handIn(key, btn) {
     const file = input.files[0];
     // Checked here so the answer is instant; the server checks again and decides.
     if (file.size > 15 * 1024 * 1024) {
-        msg.style.color = '#991b1b';
+        msg.className = 'sp-upmsg bad';
         msg.textContent = 'That is over 15 MB. A PDF scan is usually much smaller.';
         return;
     }
@@ -694,22 +826,26 @@ async function handIn(key, btn) {
     btn.textContent = 'Sending…';
     msg.textContent = '';
     try {
-        const headers = (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {};
+        /* Personal credentials, so the upload is filed against the person whose page
+           this is rather than resolving to the director on a shared browser. No
+           Content-Type: the browser must set its own multipart boundary. */
+        const headers = (window.CofpAuth && CofpAuth.personalHeaders)
+            ? CofpAuth.personalHeaders() : {};
         delete headers['Content-Type'];
         const res = await fetch('/api/staff-file-upload?category=' + encodeURIComponent(key), {
             method: 'POST', headers: headers, body: form
         });
         const body = await res.json();
         if (!res.ok || !body.success) throw new Error(body.error || 'HTTP ' + res.status);
-        msg.style.color = '#166534';
+        msg.className = 'sp-upmsg good';
         msg.textContent = 'Sent. Megan will check it.';
         // Re-read so it appears in the list above, marked as waiting.
         await loadFiles(current.Id);
     } catch (e) {
-        msg.style.color = '#991b1b';
+        msg.className = 'sp-upmsg bad';
         msg.textContent = e.message || 'Could not send it.';
         btn.disabled = false;
-        btn.textContent = 'Send it';
+        btn.textContent = originalLabel;
     }
 }
 
@@ -746,7 +882,7 @@ async function saveMyRecord() {
     btn.textContent = 'Saving…';
     msg.textContent = '';
     try {
-        const res = await apiFetch('/api/staff/' + encodeURIComponent(current.Id), {
+        const res = await myFetch('/api/staff/' + encodeURIComponent(current.Id), {
             method: 'PUT',
             body: JSON.stringify(payload)
         });
@@ -784,7 +920,7 @@ async function saveMyRecord() {
 async function loadFiles(staffId) {
     FILES = null;
     try {
-        const res = await apiFetch('/api/staff-files?staffId=' + encodeURIComponent(staffId));
+        const res = await myFetch('/api/staff-files?staffId=' + encodeURIComponent(staffId));
         FILES = res.ok ? await res.json() : { error: 'HTTP ' + res.status };
     } catch (e) {
         FILES = { error: e.message || 'could not reach the server' };
@@ -798,12 +934,12 @@ async function load() {
         WHO = (window.CofpAuth && CofpAuth.whoAmI) ? await CofpAuth.whoAmI() : null;
 
         const [sRes, tRes, rRes] = await Promise.all([
-            apiFetch('/api/staff'),
-            apiFetch('/api/staff-training').catch(() => null),
+            myFetch('/api/staff'),
+            myFetch('/api/staff-training').catch(() => null),
             // Rooms, so an assigned classroom name can be turned into the room number
             // the roster is keyed on. Optional: without it the classroom card simply
             // names the room instead of linking to it.
-            apiFetch('/api/classrooms').catch(() => null)
+            myFetch('/api/classrooms').catch(() => null)
         ]);
         if (!sRes.ok) throw new Error('staff records: HTTP ' + sRes.status);
         STAFF = await sRes.json();
@@ -842,7 +978,7 @@ async function load() {
             $('spStaff').style.display = 'none';
             $('spWhoName').style.display = '';
             $('spWhoName').textContent = WHO.name || (current && current.Name) || '';
-            $('spStaffActions').style.display = '';
+            $('spStaffActions').style.display = 'inline';
             $('spBarNote').textContent = 'This is your own record. You can correct your '
                 + 'qualifications here; your room and role are set by Megan.';
         }
@@ -850,10 +986,48 @@ async function load() {
         render();
         if (current) loadFiles(current.Id);
     } catch (e) {
-        $('spBody').innerHTML = '<div class="sp-card"><div class="sp-sub" style="color:#991b1b;">'
+        $('spBody').innerHTML = '<div class="sp-card"><div class="sp-sub sp-err">'
             + 'Could not load your record: ' + esc(e.message) + '</div></div>';
     }
 }
+
+/* ── Theme ──
+   Remembered per browser rather than per person, because it is a property of the
+   screen someone is looking at, not of their record. Applied before the record
+   loads so the page never flashes light and then switches.
+
+   Honours the operating system's setting on a first visit and then stops, because
+   once somebody has chosen, that choice should stick even if they later change the
+   system default. */
+const THEME_KEY = 'copStaffTheme';
+
+function prefersDark() {
+    try {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch (e) { return false; }
+}
+
+function applyTheme(dark) {
+    document.body.classList.toggle('sp-dark', !!dark);
+    const btn = $('spTheme');
+    if (btn) {
+        // Names what clicking does, not what is currently on.
+        btn.textContent = dark ? '\u2600 Light mode' : '\u263e Dark mode';
+        btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    }
+}
+
+(function initTheme() {
+    let saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* private browsing */ }
+    applyTheme(saved === null ? prefersDark() : saved === 'dark');
+})();
+
+$('spTheme').addEventListener('click', () => {
+    const dark = !document.body.classList.contains('sp-dark');
+    applyTheme(dark);
+    try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) {}
+});
 
 /* Bar actions, for a staff member signed in as themselves. Attached once: these
    elements live in the page shell rather than the rendered body. */

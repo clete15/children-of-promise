@@ -84,10 +84,11 @@
 
     /* Every credential this browser holds, as headers.
 
-       The shared password wins when both are present, because that is the director
-       working in their own browser and they expect to see everything. A staff
-       member's browser has only the token, so this is the same object either way
-       from their side. */
+       For the centre-wide pages — roster, ISBE, enrolment — the shared password is
+       what matters, and the server prefers it when both are present. That is the
+       director at their own desk expecting to see everything.
+
+       Deliberately NOT used by the personal pages; see personalHeaders below. */
     function headers() {
         var h = {};
         var a = header();
@@ -95,6 +96,35 @@
         var t = token();
         if (t) h['X-Staff-Token'] = t;
         return h;
+    }
+
+    /* Credentials for a page that is about ONE person.
+
+       Here a session token WINS over the shared password, which is the opposite of
+       the rule above, and the reason is that holding a token is an explicit
+       statement of who you are acting as. Sending both let the server prefer the
+       shared password, so when Paige signed in on the office computer — which still
+       has the centre password saved — her own page came back as the director's: the
+       full staff list, a chooser, and Clete's record showing first because he sorts
+       first alphabetically.
+
+       The shared password is still the fallback, so a director who has never signed
+       in personally keeps the chooser and can look at anyone. Signing out of a
+       personal session on that browser returns it to the director view. */
+    function personalHeaders() {
+        var t = token();
+        if (t) return { 'X-Staff-Token': t };
+        var a = header();
+        return a ? { 'Authorization': a } : {};
+    }
+
+    // apiFetch's counterpart for the personal pages.
+    function personalFetch(url, opts) {
+        opts = opts || {};
+        var h = Object.assign({ 'Content-Type': 'application/json' },
+            personalHeaders(), opts.headers || {});
+        opts.headers = h;
+        return fetch(url, opts);
     }
 
     function remember(pw, persist) {
@@ -186,9 +216,13 @@
         });
     }
 
-    // Who the server thinks we are. The page never decides this for itself.
+    /* Who the server thinks we are. The page never decides this for itself.
+
+       Asks with the personal credentials, so on a browser holding both this answers
+       "you are Paige" rather than "you are the director". Getting that wrong is what
+       put the staff chooser on a staff member's own page. */
     function whoAmI() {
-        return apiFetch('/api/staff-whoami').then(function (r) {
+        return personalFetch('/api/staff-whoami').then(function (r) {
             if (!r.ok) return null;
             return r.json();
         }).catch(function () { return null; });
@@ -197,6 +231,7 @@
     window.CofpAuth = {
         header: header, headers: headers, stored: stored, remember: remember,
         forget: forget, verify: verify, apiFetch: apiFetch,
+        personalHeaders: personalHeaders, personalFetch: personalFetch,
         token: token, tokenName: tokenName,
         staffLogin: staffLogin, staffLogout: staffLogout,
         staffChangePassword: staffChangePassword, whoAmI: whoAmI,

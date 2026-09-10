@@ -3540,11 +3540,19 @@ ELSE
                 status: x.link.status,
                 uploadedDate: x.link.uploadedDate || ''
             })),
-            // Which of the self-service categories they have nothing for yet.
-            missing: staffId
-                ? Object.keys(STAFF_UPLOADABLE)
-                    .filter(key => !mine.some(x => x.file.folder === STAFF_UPLOADABLE[key]))
-                    .map(key => ({ key: key, folder: STAFF_UPLOADABLE[key] }))
+            /* The self-service categories, and whether they already hold one.
+
+               Both are reported rather than only the gaps, because a transcript is
+               not a one-time thing: somebody finishing a course has a newer one, and
+               with only the missing ones offered there was no way to send it. A
+               replacement never overwrites — the upload names itself by date and the
+               old copy stays — so this adds a version rather than losing evidence. */
+            uploadable: staffId
+                ? Object.keys(STAFF_UPLOADABLE).map(key => ({
+                    key: key,
+                    folder: STAFF_UPLOADABLE[key],
+                    hasOne: mine.some(x => x.file.folder === STAFF_UPLOADABLE[key])
+                }))
                 : []
         };
 
