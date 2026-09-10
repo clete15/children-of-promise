@@ -1326,43 +1326,28 @@ function formLink(call, tip) {
         + '" title="' + tip + '">[form]</a>';
 }
 
-/* ── SharePoint document locations (LEGACY) ──
-   SharePoint is NO LONGER the document of record. The library now lives on the
-   server at C:\app\documents\Operations, is indexed by item number, and is read
-   and written through /api/doc-file and /api/doc-upload. The PICC panel opens
-   documents in place and takes signed copies back in without leaving this site.
+/* ── SharePoint document locations (ARCHIVE ONLY — NOTHING LINKS HERE) ──
+   SharePoint is NOT the document of record. The library lives on the server at
+   C:\app\documents\Operations, is indexed by item number, and is read and written through
+   /api/doc-file and /api/doc-upload. The PICC panel opens documents in place and takes
+   signed copies back in without leaving this site.
 
-   These URLs are kept only as external references for the handful of documents
-   that genuinely still sit in SharePoint, and because the OneDrive copy remains
-   as an archive of everything up to Sep 2026. They are not the primary route to
-   anything, and new evidence should not be linked this way.
+   As of 10 Sep 2026 NOTHING IN ANY PAGE LINKS TO THESE. They were still wired to four
+   buttons — the PFA Compliance and ECERS-3 CQIPs, the PI self-assessment and CQIP — plus
+   the Grant Periodic Performance Report and the INCCRA folder card. Every one of those now
+   opens our own library. That mattered because the SharePoint copies are frozen: the
+   documents a monitor asks for first were the ones still being served from a second copy
+   nothing writes to, behind a Microsoft sign-in.
 
-   Kept centralised for the original reasons, which still hold: the visit folders
-   carry a year in their name, so an annual rollover is one edit here rather than
-   a hunt through the file, and a folder rename is not a change in many places.
+   They stay in the file as a record of where the pre-September-2026 originals sit, for the
+   one case of needing to retrieve something the migration missed. If you find yourself
+   adding a link to one of these, the file belongs in the library instead.
 
-   spUrl() builds a document-library browse URL from a path relative to the
-   library root. encodeURIComponent produces exactly the %2F and %20 escaping
-   SharePoint expects. It leaves '-' and '.' unescaped where the older pasted
-   URLs used %2D and %2E; those are equivalent under RFC 3986 and SharePoint
-   accepts both, but it is the first thing to check if a built link misbehaves.
-
-   VERIFIED_LINKS holds deep links that were confirmed working and use URL forms
-   spUrl does not reproduce (Doc.aspx for Office documents, FolderCTID). They
-   stay literal on purpose; they are centralised here, not rebuilt. */
-const SP_SITE = 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise';
-const SP_LIBRARY = '/sites/ChildrenOfPromise/Shared Documents';
-const SP_PI_VISIT = 'Operations/Birth to Three/2026 PI Monitoring Visit';
-const SP_PFA_VISIT = 'Operations/Preschool for All/PFA Monitoring Visit 2026';
-const SP_PICC_FOLDER = SP_PI_VISIT + '/PICC';
-
-function spUrl(relPath) {
-    const full = SP_LIBRARY + '/' + relPath;
-    const parent = full.slice(0, full.lastIndexOf('/'));
-    return SP_SITE + '/Shared%20Documents/Forms/AllItems.aspx?id=' + encodeURIComponent(full)
-        + '&parent=' + encodeURIComponent(parent);
-}
-
+   spUrl() and the SP_SITE / SP_LIBRARY / SP_PI_VISIT / SP_PFA_VISIT / SP_PICC_FOLDER
+   constants were removed with the last live link. They existed only to BUILD SharePoint
+   URLs, and we no longer build any — leaving the machinery in place is an invitation to
+   use it. The literal URLs below stay because they record where the originals sit; git
+   history holds the builder if it is ever genuinely needed. */
 const VERIFIED_LINKS = {
     grantReportPFA: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FPreschool%20for%20All%2FPFA%20Monitoring%20Visit%202026',
     grantReportPI: 'https://childrenofpromisemillstadt.sharepoint.com/sites/ChildrenOfPromise/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit%2F2025%2D26%20Grant%20Periodic%20Performance%20Report%20PI%2Epdf&parent=%2Fsites%2FChildrenOfPromise%2FShared%20Documents%2FOperations%2FBirth%20to%20Three%2F2026%20PI%20Monitoring%20Visit',
@@ -1375,9 +1360,12 @@ const VERIFIED_LINKS = {
 };
 
 // Grant Periodic Performance Report lives in SharePoint, one per program.
-const GRANT_REPORT_LINKS = {
-    PFA: VERIFIED_LINKS.grantReportPFA,
-    PI: VERIFIED_LINKS.grantReportPI
+/* Which library item holds the Grant Periodic Performance Report, per programme. The
+   report is filed against the monitoring item it evidences, so the library link lands on
+   the folder rather than on one file that gets superseded every year. */
+const GRANT_REPORT_ITEMS = {
+    PFA: 'PFA',
+    PI: 'PI10'
 };
 
 function renderRosterHead() {
@@ -1608,11 +1596,16 @@ function renderRoster() {
                     + formLink('openDocForm(\'' + c.docForm + '\',' + s.Id + ')',
                         'Open ' + (spec ? spec.title : 'form')) + '</td>';
             }
+            /* The Grant Periodic Performance Report, in our own library. It used to open
+               the SharePoint copy, which is one of the two documents a monitor asks for
+               first and therefore the last one that should live outside the tool. */
             if (f === 'GrantPerfReport') {
-                const href = GRANT_REPORT_LINKS[activeProgram];
-                if (!href) return td + box + '</td>';
-                return td + box + '<a href="' + href + '" target="_blank" style="' + LINK_STYLE
-                    + '" title="Open the Grant Periodic Performance Report in SharePoint">[doc]</a></td>';
+                const item = GRANT_REPORT_ITEMS[activeProgram];
+                if (!item) return td + box + '</td>';
+                return td + box + '<a href="documents.html#' + encodeURIComponent(item)
+                    + '" target="_blank" rel="noopener" style="' + LINK_STYLE
+                    + '" title="Open the Grant Periodic Performance Report in the document library">'
+                    + '[doc]</a></td>';
             }
             return td + box + '</td>';
         }).join('');
@@ -2332,10 +2325,15 @@ function printScreening() {
 }
 
 // ── Program Compliance Checklist ──
+/* `libraryItem` is the folder in OUR library to open, replacing the SharePoint URLs these
+   three used to carry. The documents are on the server now, so a link out to SharePoint
+   asked for a Microsoft sign-in to reach a second copy that no longer gets updated — the
+   exact thing moving the library was meant to end. Where no library item is named the
+   button opens the library itself rather than pointing somewhere else. */
 const PFA_COMPLIANCE_ITEMS = [
     { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file' },
-    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', link: VERIFIED_LINKS.pfaComplianceCqip },
-    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 classroom assessment and quality improvement plan', link: VERIFIED_LINKS.pfaEcers3Cqip },
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted' },
+    { key: 'ECERS3CQIP', label: 'ECERS-3 CQIP', description: 'ECERS-3 classroom assessment and quality improvement plan' },
     { key: 'PEL_ECE5', label: 'PEL / ECE Level 5', description: 'Lead teacher holds Professional Educator License with ECE endorsement or Gateways ECE Credential Level 5' },
     { key: 'Paraprofessional', label: 'Paraprofessional Credentials', description: 'Paraprofessional holds ELS-Para license (60 credit hours, associate degree, or passing ACT WorkKeys exam)' },
     { key: 'PFACalendar', label: 'PFA Calendar', description: 'PFA program calendar submitted and approved for the school year' },
@@ -2375,8 +2373,10 @@ const PI_FY27_MONITORING = {
 const PI_COMPLIANCE_ITEMS = [
     { key: 'ITERS3Observation', label: 'ITERS-3 Classroom Observation', description: 'ITERS-3 observation completed for each infant/toddler classroom. Unannounced, up to 3 hours, at least one PI classroom. Personal Care Routines is not scored.' },
     { key: 'PIQET3', label: 'PIQET-3 Quality Evaluation', description: 'Prevention Initiative Quality Evaluation Tool-3 completed' },
-    { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', link: VERIFIED_LINKS.piSelfAssessment },
-    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', link: VERIFIED_LINKS.piCqip },
+    /* These two ARE PICC items as well as instruments, so they open the item folder in our
+       library rather than duplicating the evidence somewhere else. */
+    { key: 'AnnualSelfAssessment', label: 'Written Annual Self-Assessment', description: 'Written annual self-assessment completed and on file', libraryItem: 'PI8.A' },
+    { key: 'ComplianceCQIP', label: 'Compliance CQIP', description: 'Continuous Quality Improvement Plan completed and submitted', libraryItem: 'PI8.B' },
     { key: 'ITERS3CQIP', label: 'ITERS-3 CQIP', description: 'ITERS-3 infant/toddler environment assessment and quality improvement plan' },
     { key: 'PICalendar', label: 'PI Calendar', description: 'PI program calendar submitted and approved for the school year' },
 ];
@@ -2475,13 +2475,14 @@ const PICC_ITEMS = [
             'B. Written Continuous Quality Improvement Plan, updated annually'
         ],
         guidance: 'Both documents are required to be in compliance, and both must be valid for the current program year. The Compliance Checklist CQIP is due 30 days from receipt of the monitoring results and must address all non-compliance items by the following fiscal year. CQIP questions go to dec.picqip@illinois.gov.',
+        /* Both point into our own library. They were SharePoint URLs, which meant the two
+           documents a monitor asks for first sat behind a Microsoft sign-in in a copy
+           nothing writes to any more. */
         docs: [
-            { label: 'PI8.A Self-Assessment', url: VERIFIED_LINKS.piSelfAssessment },
-            { label: 'PI8.B CQIP', url: VERIFIED_LINKS.piCqip },
+            { label: 'PI8.A Self-Assessment', url: 'documents.html#PI8.A' },
+            { label: 'PI8.B CQIP', url: 'documents.html#PI8.B' },
             { label: 'FY27 CQIP form (blank)', url: 'documents/DEC PI - FY27 CQIP.pdf' }
-        ],
-        // Evidence already lives in these named folders rather than PICC/PI8.
-        folderUrl: VERIFIED_LINKS.piSelfAssessment
+        ]
     },
     {
         num: 'PI9', title: 'Staff development and professional development plans',
@@ -2572,9 +2573,9 @@ const PICC_ITEMS = [
 ];
 
 // Root of the PICC evidence folder. Individual items resolve their own link in
-// this order: a URL pasted for that item and school year, then a folder named
-// after the item number under PICC/, then this root.
-const PICC_SHAREPOINT_FOLDER = spUrl(SP_PICC_FOLDER);
+/* PICC_SHAREPOINT_FOLDER and piccItemFolderUrl() were removed on 10 Sep 2026. Both were
+   already unreferenced — the checklist reads the server library — but they read like a live
+   route into SharePoint, which is exactly the confusion worth deleting. */
 
 // Convention: PICC/<item number>, e.g. PICC/PI5. Items whose evidence already
 // lives in a differently named folder carry an explicit link instead.
@@ -2804,9 +2805,7 @@ const PFA_CHECKLIST_ITEMS = [
     }
 ];
 
-function piccItemFolderUrl(num) {
-    return spUrl(SP_PICC_FOLDER + '/' + num);
-}
+
 
 let activeComplianceProgram = 'pfaCompliance';
 
@@ -4156,10 +4155,32 @@ function renderInstrumentSection(items, prefix, data) {
         var checked = data[fullKey] ? 'checked' : '';
         var dateVal = data[fullKey + 'Date'] || '';
         var savedLink = data[fullKey + 'Link'] || '';
-        var href = savedLink || item.link;
-        var linkBtn = href
-            ? '<a class="picc-btn" href="' + href + '" target="_blank" rel="noopener">Open</a>'
-            : '';
+        /* The library first, because that is where the document lives. A pasted URL is
+           offered alongside rather than instead — it is for the occasional thing that
+           genuinely sits outside, and it used to be the ONLY route, which is why it won.
+           Labelled so the two are not mistaken for each other. */
+        var libHref = 'documents.html'
+            + (item.libraryItem ? '#' + encodeURIComponent(item.libraryItem) : '');
+        var linkBtn = '<a class="picc-btn" href="' + libHref + '" target="_blank" rel="noopener"'
+            + ' title="' + (item.libraryItem
+                ? 'Open ' + item.libraryItem + ' in the document library'
+                : 'Open the document library') + '">Library</a>';
+        if (savedLink) {
+            linkBtn += '<a class="picc-btn" href="' + savedLink.replace(/"/g, '&quot;') + '"'
+                + ' target="_blank" rel="noopener" title="Open the link saved against this item">'
+                + 'External link</a>';
+        }
+        /* Check-in, so a signed or scanned copy goes into the library from here instead of
+           being mailed to somebody. The instrument rows never had this and the PICC rows
+           did, which is why these documents kept ending up outside the tool. */
+        if (item.libraryItem) {
+            linkBtn += '<label class="picc-btn" style="cursor:pointer;"'
+                + ' title="Add a signed or scanned document to ' + item.libraryItem + '">'
+                + 'Check in a file'
+                + '<input type="file" style="display:none;"'
+                + ' accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt"'
+                + ' onchange="uploadEvidence(\'' + item.libraryItem + '\',this)"></label>';
+        }
         return '<div class="picc-item">'
             + '<div class="picc-item-top">'
             + '<label class="picc-check" style="margin:0;"><input type="checkbox" ' + checked

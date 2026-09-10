@@ -307,7 +307,10 @@ function render() {
         const current = it.files.filter(f => !f.stale);
         const earlier = it.files.filter(f => f.stale);
         const stale = earlier.length;
-        html += '<details class="dl-item">'
+        /* Addressable, so a link can land on one item. The compliance checklist has
+           always linked here with the item number in the hash, and nothing was listening
+           for it: you arrived at the top of a list of forty folders and hunted. */
+        html += '<details class="dl-item" id="' + esc('item-' + (it.item || k)) + '">'
             + '<summary>'
             + '<span class="dl-num">' + esc(it.item || '—') + '</span>'
             + '<span>' + esc(it.folders[0].replace(/\s*-\s*[MC]\s*$/, '')) + '</span>'
@@ -363,7 +366,45 @@ function render() {
             + 'so a file is always viewed in the context of the child it belongs to.</div></div></details>';
     }
     body.innerHTML = html;
+    revealRequestedItem();
 }
+
+/* Opens and scrolls to the item named in the address, if there is one.
+
+   Accepts documents.html#PI8 and documents.html?item=PI8. A <details> has to be opened
+   in script — the browser will jump to an anchor but leaves it collapsed, which looks
+   like the link went nowhere. An unrecognised item is ignored rather than reported: the
+   library is still the right page to be on. */
+function revealRequestedItem() {
+    let want = new URLSearchParams(location.search).get('item') || '';
+    if (!want && location.hash) {
+        try { want = decodeURIComponent(location.hash.slice(1)); }
+        catch (e) { want = location.hash.slice(1); }
+    }
+    want = String(want || '').trim();
+    if (!want) return;
+
+    let el = document.getElementById('item-' + want);
+    /* Item numbers are written inconsistently across years — "CB2" against "CB2.D" — so
+       an exact miss falls back to the nearest match on the number rather than giving up.
+       Same forgiveness the server's own folder matching applies. */
+    if (!el) {
+        const all = Array.prototype.slice.call(document.querySelectorAll('.dl-item[id]'));
+        const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9.]/g, '');
+        const target = norm(want);
+        el = all.find(d => norm(d.id.replace(/^item-/, '')) === target)
+            || all.find(d => norm(d.id.replace(/^item-/, '')).indexOf(target) === 0);
+    }
+    if (!el) return;
+    el.open = true;
+    el.scrollIntoView({ block: 'start' });
+    // A brief outline, so it is obvious which of forty folders was meant.
+    el.style.outline = '2px solid #2563eb';
+    setTimeout(() => { el.style.outline = ''; }, 2600);
+}
+
+// Following a link to a different item on a page already open needs the same treatment.
+window.addEventListener('hashchange', revealRequestedItem);
 
 async function toggleOut(rel, item) {
     const cur = (INDEX.meta || {})[rel];
