@@ -162,10 +162,21 @@
     }
 
     /* Changes the signed-in staff member's own password. The server requires the
-       current one as well, so this cannot be used to take over a left-open screen. */
+       current one as well, so this cannot be used to take over a left-open screen.
+
+       Sends the token and nothing else, rather than going through apiFetch. On a
+       computer that has been used for the staff portal the shared password is also
+       in local storage, and apiFetch attaches both — which made the server read the
+       request as the director and refuse, because a director has no personal
+       password. Being explicit about which credential this acts on removes the
+       ambiguity instead of relying on the server to pick correctly. */
     function staffChangePassword(current, next) {
-        return apiFetch('/api/staff-password', {
+        var h = { 'Content-Type': 'application/json' };
+        var t = token();
+        if (t) h['X-Staff-Token'] = t;
+        return fetch('/api/staff-password', {
             method: 'POST',
+            headers: h,
             body: JSON.stringify({ current: current, next: next })
         }).then(function (r) {
             return r.json().then(function (body) {

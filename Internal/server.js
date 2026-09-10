@@ -3644,11 +3644,21 @@ ELSE
        account. The director route is separate: a reset goes back to the enrolment
        code rather than to a password the director chooses and knows. */
     if (req.method === 'POST' && url === '/api/staff-password') {
-        const actor = resolveActor(req);
-        if (!actor || actor.director) {
-            // The director has no personal password here; there is nothing to change.
+        /* Resolved from the session token ALONE, deliberately ignoring any shared
+           password on the same request.
+
+           resolveActor() lets the shared password win when a browser carries both,
+           which is right for reading — that is the director at their own desk and
+           they expect to see everything. It is wrong here. This endpoint is about
+           one person's own password, and a browser that has ever been signed in to
+           the portal keeps cofpadmin in local storage, so a member of staff setting
+           their first password on the office computer was told to "sign in as a
+           staff member first" while being signed in as exactly that. */
+        const tokenStaffId = readSession(req.headers['x-staff-token']);
+        if (!tokenStaffId) {
             return sendJSON(res, 401, { error: 'Sign in as a staff member first' });
         }
+        const actor = { director: false, staffId: tokenStaffId };
         return readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const current = String((d && d.current) || '');
