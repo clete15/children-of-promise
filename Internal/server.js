@@ -2705,7 +2705,24 @@ function handleRequest(req, res) {
     if (req.method === 'POST' && url === '/api/preenrollment') {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
-            const sql = `
+            /* The table-ensure (CREATE + ADD COLUMN guards) MUST run as its own batch,
+               separately from and before the INSERT.
+
+               The bug this fixes (found 11 Sep 2026, after 3 test submissions and every
+               real one since Aug 2 silently vanished): the ensure block and the INSERT
+               used to be one string, so runSQL sent them as ONE sqlcmd batch. SQL Server
+               compiles a whole batch before running any of it, and the INSERT named
+               columns (HouseholdSize, ChildStartDate, DaysRequested, ScreeningDelayNoEi,
+               ParentEll, IncomeBelow50Fpl) that a fresh table did not yet have. That is a
+               compile-time "Invalid column name", which fails the ENTIRE batch — so the
+               ALTERs that would have added those columns never ran either, and nothing was
+               inserted. sqlcmd still exits 0 on such a failure, so the endpoint reported
+               {success:true} over a write that never happened.
+
+               Splitting them means the columns exist before the INSERT is compiled. And
+               below we now check sqlError, so a silent mid-batch failure can never again
+               masquerade as success. */
+            const ensureSql = `
                 IF NOT EXISTS (
                     SELECT 1 FROM INFORMATION_SCHEMA.TABLES
                     WHERE TABLE_NAME = 'PreEnrollment'
@@ -2755,7 +2772,8 @@ function handleRequest(req, res) {
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='DaysRequested') ALTER TABLE PreEnrollment ADD DaysRequested NVARCHAR(50);
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ScreeningDelayNoEi') ALTER TABLE PreEnrollment ADD ScreeningDelayNoEi NVARCHAR(10);
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ParentEll') ALTER TABLE PreEnrollment ADD ParentEll NVARCHAR(10);
-                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='IncomeBelow50Fpl') ALTER TABLE PreEnrollment ADD IncomeBelow50Fpl NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='IncomeBelow50Fpl') ALTER TABLE PreEnrollment ADD IncomeBelow50Fpl NVARCHAR(10);`;
+            const insertSql = `
                 INSERT INTO PreEnrollment (
                     FirstName,LastName,Email,Address,City,Zip,Country,Phone,
                     ChildrenInfo,ChildName,ChildBirthDate,ChildStartDate,AgeGroup,DaysRequested,HouseholdIncome,HouseholdSize,PublicBenefits,Homeless,IEP,
@@ -2781,8 +2799,23 @@ function handleRequest(req, res) {
                     ${esc(d.screeningDelayNoEi)},${esc(d.parentEll)},${esc(d.incomeBelow50Fpl)},
                     ${parseInt(d.score)||0}
                 );`;
-            const r = runSQL(sql);
+            // 1. Make sure the table and every column exist. Its own batch, so the
+            //    columns are committed before the INSERT below is compiled.
+            const ensured = runSQL(ensureSql);
+            if (!ensured.ok) return sendJSON(res, 500, { error: ensured.error });
+            if (ensured.sqlError) {
+                console.error('[PREENROLL] table-ensure failed:', ensured.sqlError);
+                return sendJSON(res, 500, { error: 'Could not prepare the pre-enrollment table: ' + ensured.sqlError });
+            }
+            // 2. Insert the record. Check sqlError as well as ok, so a mid-batch SQL
+            //    failure (which sqlcmd reports with exit 0) can never be reported as
+            //    a successful save — the thing that hid every lost submission before.
+            const r = runSQL(insertSql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            if (r.sqlError) {
+                console.error('[PREENROLL] insert failed:', r.sqlError);
+                return sendJSON(res, 500, { error: 'The submission was not saved: ' + r.sqlError });
+            }
             sendJSON(res, 200, { success: true });
         });
         return;
