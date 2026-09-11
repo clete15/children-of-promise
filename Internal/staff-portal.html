@@ -268,6 +268,12 @@
         font-weight: 700; cursor: pointer;
     }
     .sp-save:disabled { opacity: 0.6; cursor: default; }
+    .sp-cancel {
+        padding: 9px 16px; border: 1.5px solid var(--sp-border); border-radius: 7px;
+        background: transparent; color: var(--sp-text-2); font-size: 0.85rem;
+        font-weight: 700; cursor: pointer; font-family: inherit;
+    }
+    .sp-cancel:hover { border-color: var(--sp-accent); color: var(--sp-accent); }
     .sp-savemsg { font-size: 0.78rem; }
     .sp-savemsg.good { color: var(--sp-good-fg); }
     .sp-savemsg.bad  { color: var(--sp-bad-fg); }
@@ -672,6 +678,7 @@ function selfEditCard(s) {
         + '</div>'
         + '<div class="sp-saverow">'
         + '<button type="button" id="edSave" class="sp-save">Save my changes</button>'
+        + '<button type="button" id="edCancel" class="sp-cancel">Cancel</button>'
         + '<span id="edMsg" class="sp-savemsg"></span>'
         + '</div></div>';
 }
@@ -857,20 +864,50 @@ function identityHeader(s) {
         + '</div>';
 }
 
-/* Show/hide the self-edit form under the name card. The button remembers its state
-   across a re-render (a save redraws the page) by reading a module flag, so saving
-   does not snap the panel shut under the person mid-edit. */
+/* Show/hide the self-edit form under the name card.
+
+   When it is open the tabs and their panels are hidden, so editing your details is a
+   focused view — just your name and the form — rather than the form stacked under
+   everything else. The button state survives a re-render (a save redraws the page)
+   via the module flag, so a save does not snap the panel shut mid-edit. */
 let detailsOpen = false;
-function wireDetailsToggle() {
+function setDetailsOpen(open) {
+    detailsOpen = open;
     const btn = document.getElementById('edToggle');
     const panel = document.getElementById('edPanel');
-    if (!btn || !panel) return;
-    const apply = () => {
-        panel.hidden = !detailsOpen;
-        btn.setAttribute('aria-expanded', detailsOpen ? 'true' : 'false');
-    };
-    apply();
-    btn.addEventListener('click', () => { detailsOpen = !detailsOpen; apply(); });
+    if (!panel) return;
+    panel.hidden = !open;
+    if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    // Hide the tab strip and every tab panel while editing; restore them after.
+    const tabs = document.querySelector('.sp-tabs');
+    if (tabs) tabs.hidden = open;
+    document.querySelectorAll('.sp-panel').forEach(p => {
+        // While editing, hide all. When closing, restore only the active tab.
+        p.hidden = open ? true : (p.id !== 'sppanel_' + activeTab);
+    });
+}
+function wireDetailsToggle() {
+    const btn = document.getElementById('edToggle');
+    if (!btn) return;
+    setDetailsOpen(detailsOpen);   // reapply after a re-render
+    btn.addEventListener('click', () => setDetailsOpen(!detailsOpen));
+}
+
+/* Leave the edit view: close the panel and land on Overview. Used by both Save and
+   Cancel so finishing an edit always returns somewhere sensible rather than to a
+   hidden tab. */
+function closeDetailsToOverview() {
+    activeTab = 'overview';
+    setDetailsOpen(false);
+    // Reflect the tab change in the strip and panels.
+    document.querySelectorAll('.sp-tab').forEach(b => {
+        const on = b.getAttribute('data-tab') === 'overview';
+        b.setAttribute('aria-selected', on ? 'true' : 'false');
+        b.setAttribute('tabindex', on ? '0' : '-1');
+    });
+    document.querySelectorAll('.sp-panel').forEach(p => {
+        p.hidden = p.id !== 'sppanel_overview';
+    });
 }
 
 /* ── Overview ── the four figures, anything urgent, and the way into your room. */
@@ -947,19 +984,19 @@ function credentialsSection(s) {
     const heldEce = credLevel(s, 'ece');
     const heldItc = credLevel(s, 'it');
 
-    let html = '<div class="sp-card" style="margin-bottom:12px;">'
-        + '<h2>Credential routes</h2>'
-        + '<div class="sp-sub">Two ladders, shown side by side. The <strong>ECE</strong> '
-        + 'Credential is what the ExceleRate preschool staff requirement counts; the '
-        + '<strong>Infant Toddler</strong> Credential is counted for staff working with children '
-        + 'from birth to age three. The ECE level caps how far the Infant Toddler one can go.</div>'
-        + '</div>';
+    let html = '';
 
-    /* Gateways-waiting note. Shown at the top of this tab whenever the record itself
-       says something is pending or awaited (e.g. "Pending: ECE & IT (Missing
-       Documents)"). Quoted straight from the record rather than paraphrased, so it
-       cannot claim a hold-up the record does not. This is the same source the Overview
-       tab uses; repeated here because credentials is where a person acts on it. */
+    /* Gateways training report is down. A dated, self-expiring note: it names the day
+       it was flagged and the day to look again, so it reads as stale on its own once
+       the date has passed rather than sitting there forever. Trainings are not tracked
+       here yet — this is a reminder to re-check the source, not a status. */
+    html += gatewaysReportAlert();
+
+    /* Gateways-waiting note. Shown whenever the record itself says something is pending
+       or awaited (e.g. "Pending: ECE & IT (Missing Documents)"). Quoted straight from
+       the record rather than paraphrased, so it cannot claim a hold-up the record does
+       not. Same source the Overview tab uses; repeated here because credentials is
+       where a person acts on it. */
     const waiting = pendingText(s);
     if (waiting) {
         html += '<div class="sp-step caution" style="margin-top:0;margin-bottom:12px;">'
@@ -983,26 +1020,35 @@ function credentialsSection(s) {
         + '<a href="https://www.ilgateways.com/credentials/ece-credential" target="_blank" rel="noopener">'
         + 'ECE Credential</a> and '
         + '<a href="https://www.ilgateways.com/credentials/infant-toddler-credential" target="_blank" rel="noopener">'
-        + 'Infant Toddler Credential</a>. Competencies are listed but not scored: Gateways assesses '
-        + 'those from your transcript and training record.</div></div>';
-
-    // Training recorded against this person. Kept with the credential routes because a
-    // completion is progress towards a level rather than a subject of its own.
-    const mine = TRAINING.filter(t => String(t.StaffId) === String(s.Id) && (t.CompletedDate || '').trim());
-    html += '<div class="sp-card">'
-        + '<h2>Training on your record</h2>'
-        + '<div class="sp-sub">Completions recorded for ExceleRate and PICC PI9.</div>'
-        + (mine.length
-            ? '<div class="sp-grid">' + mine.map(t =>
-                tile('good', t.TrainingKey === 'howERSWorks' ? 'How ERS Works'
-                    : t.TrainingKey === 'ecers3' ? 'ECERS-3'
-                    : t.TrainingKey === 'iters3' ? 'ITERS-3' : t.TrainingKey,
-                    esc(t.CompletedDate))).join('') + '</div>'
-            : '<div class="sp-sub sp-warntext">Nothing recorded yet. '
-              + '\u201cHow ERS Works\u201d is the one ExceleRate requires of half the teaching staff.</div>')
-        + '</div>';
+        + 'Infant Toddler Credential</a>.</div></div>';
 
     return html;
+}
+
+/* The "Gateways training report is broken" reminder.
+
+   FLAGGED is the day it was raised; the follow-up is three days on. Both dates are
+   printed so the note ages honestly: once the follow-up date is in the past it says
+   so, rather than a stale "check back soon" that never changes. Update FLAGGED (or
+   delete this function's call) once Gateways fixes the report. */
+function gatewaysReportAlert() {
+    const FLAGGED = '2026-09-10';               // the day the report was found broken
+    const flagged = new Date(FLAGGED + 'T12:00:00');
+    const followUp = new Date(flagged.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const fmt = d => d.toLocaleDateString('en-US',
+        { weekday: 'short', month: 'short', day: 'numeric' });
+    const overdue = Date.now() > followUp.getTime() + 24 * 60 * 60 * 1000;
+
+    return '<div class="sp-step caution" style="margin-top:0;margin-bottom:12px;">'
+        + '<div class="t">\u26a0 Gateways training report is down</div>'
+        + '<div class="d">The training report on the Gateways site was not working as of '
+        + fmt(flagged) + '. '
+        + (overdue
+            ? 'It was worth another look around ' + fmt(followUp) + ' \u2014 if it is back, '
+              + 'training records can be reconciled and this note removed.'
+            : 'Check back around ' + fmt(followUp) + '. Until then, training completions cannot '
+              + 'be pulled from Gateways.')
+        + '</div></div>';
 }
 
 /* ── Their classroom ──
@@ -1099,6 +1145,15 @@ function formsSection(s) {
 function wireCardActions() {
     const save = $('edSave');
     if (save) save.addEventListener('click', saveMyRecord);
+
+    // Cancel: discard nothing (the record is unchanged until Save), just leave the
+    // edit view and return to Overview.
+    const cancel = $('edCancel');
+    if (cancel) cancel.addEventListener('click', () => {
+        current = STAFF.find(x => String(x.Id) === String(current.Id)) || current;
+        render();
+        closeDetailsToOverview();
+    });
 
     document.querySelectorAll('.sp-upbtn').forEach(btn => {
         btn.addEventListener('click', () => handIn(btn.getAttribute('data-key'), btn));
@@ -1220,8 +1275,14 @@ async function saveMyRecord() {
         msg.textContent = body.reviewCleared
             ? 'Saved. Megan will see it as needing a check.'
             : 'Saved.';
-        // Redraw so the credential tiles and next steps reflect the new figures.
-        setTimeout(render, 900);
+        /* Leave the edit view and land on Overview after a beat, long enough to read
+           the confirmation. Closing detailsOpen BEFORE the redraw is what stops
+           wireDetailsToggle reopening the panel on the fresh markup. */
+        setTimeout(() => {
+            detailsOpen = false;
+            activeTab = 'overview';
+            render();
+        }, 900);
     } catch (e) {
         msg.style.color = '#991b1b';
         msg.textContent = e.message || 'Could not save.';
