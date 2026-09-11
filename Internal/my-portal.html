@@ -166,14 +166,32 @@ function hide(el) {
 /* Already signed in? Go straight through rather than asking again. A staff member
    who bookmarked this page should land on their own page, not a form. */
 (function alreadyIn() {
-    if (window.CofpAuth && CofpAuth.token && CofpAuth.token()) {
-        CofpAuth.whoAmI().then(function (who) {
-            // A token the server no longer accepts (expired, or the key changed on a
-            // restart) means the form is the right thing to show, not an error.
-            if (who && !who.director && !who.mustChangePassword) {
-                location.replace('/staff/staff-portal.html');
-            }
-        });
+    /* Two ways to already be in, because this is now the ONLY door to My Page.
+
+       A personal token: send them through, unless the server no longer accepts the
+       token (expired, or the signing key changed on a restart) or a password change
+       is still owed — in both of those the form is the right thing to show.
+
+       Or the shared centre password, which is Clete or Megan at their own desk. They
+       have no personal token, so without this they would hit the sign-in form on the
+       way to a page they already have full access to. whoAmI() answers director:true
+       for them, and the staff chooser on the page is what they actually want. */
+    if (window.CofpAuth && CofpAuth.whoAmI) {
+        var hasToken = CofpAuth.token && CofpAuth.token();
+        var hasShared = CofpAuth.stored && CofpAuth.stored();
+        if (hasToken || hasShared) {
+            CofpAuth.whoAmI().then(function (who) {
+                if (!who) return;                                   // no valid credential — show the form
+                if (who.director) {                                 // shared-password director
+                    return location.replace('/staff/staff-portal.html');
+                }
+                if (!who.mustChangePassword) {                      // signed-in staff, nothing owed
+                    location.replace('/staff/staff-portal.html');
+                }
+                // A staff token that still owes a password change falls through to the
+                // change form below rather than being bounced to the page.
+            });
+        }
     }
 })();
 

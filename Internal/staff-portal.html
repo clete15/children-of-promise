@@ -1105,6 +1105,17 @@ async function load() {
         // Identity first, and on its own: everything below is shaped by the answer.
         WHO = (window.CofpAuth && CofpAuth.whoAmI) ? await CofpAuth.whoAmI() : null;
 
+        /* Nobody signed in — no personal token and no shared password. Send them to
+           the one door rather than showing "could not load your record", which is
+           what a visitor with no credentials used to get here. /me shows the sign-in
+           form and, once they are in, sends them right back. This is the same gate
+           the dashboard card leans on; having it here too means a saved link straight
+           to this page still lands a stranger on the login rather than an error. */
+        if (!WHO && !(window.CofpAuth && CofpAuth.signedIn && CofpAuth.signedIn())) {
+            location.replace('/me');
+            return;
+        }
+
         const [sRes, tRes, rRes] = await Promise.all([
             myFetch('/api/staff'),
             myFetch('/api/staff-training').catch(() => null),

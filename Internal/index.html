@@ -387,21 +387,19 @@
                      at the very top of it — so the list implied three destinations and
                      delivered one. The page now has a tab per section, which is where that
                      distinction belongs. -->
-                <a class="dash-item" href="/staff/staff-portal.html">
+                <!-- One card, and it goes through /me on purpose. /me is the single
+                     door: it sends a signed-in person (staff token, or Clete/Megan on
+                     the shared password) straight to their page, and shows the sign-in
+                     form only to someone with no credentials at all. That is the "force
+                     the password on the way in" the director asked for, without a
+                     second card telling people which door to use. Clete and Megan get
+                     the staff chooser on the page; everyone else lands on their own
+                     record and cannot see anyone else's. -->
+                <a class="dash-item" href="/me">
                     <div class="di-icon">🎓</div>
                     <div class="di-content">
                         <div class="di-title">My Page</div>
-                        <div class="di-desc">Credentials and what to do next, your files, your forms, and the details only you can correct</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
-                <!-- Where staff go when they are NOT using this shared password. Listed
-                     here so the address is easy to pass on. -->
-                <a class="dash-item" href="/me" style="background:#f8fafc;">
-                    <div class="di-icon">🔑</div>
-                    <div class="di-content">
-                        <div class="di-title" style="color:#64748b;">Staff Sign-In Page</div>
-                        <div class="di-desc">childrenofpromisedaycare.com/me — each person signs in as themselves</div>
+                        <div class="di-desc">Sign in as yourself to see your credentials, files and forms. Megan and Clete can view any staff member.</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
