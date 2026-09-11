@@ -367,35 +367,16 @@
 
     <div class="form-row">
         <div class="form-group">
-            <label>Has there been any DCFS involvement with the family?</label>
-            <select id="dcfsInvolvement">
+            <label>Has there been any DCFS involvement with the family? <span class="required">*</span></label>
+            <select id="dcfsInvolvement" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
             </select>
         </div>
         <div class="form-group">
-            <label>Is there a history of alcohol or drug abuse in the household?</label>
-            <select id="substanceAbuse">
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-            </select>
-        </div>
-    </div>
-
-    <div class="form-row">
-        <div class="form-group">
-            <label>Is the child being raised by a caregiver other than a parent (grandparent, relative, guardian)?</label>
-            <select id="caregiverOther">
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Has there been a recent death of a parent, sibling, or child in the immediate family?</label>
-            <select id="familyDeath">
+            <label>Is there a history of alcohol or drug abuse in the household? <span class="required">*</span></label>
+            <select id="substanceAbuse" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
@@ -405,16 +386,35 @@
 
     <div class="form-row">
         <div class="form-group">
-            <label>Was the child low birth weight or diagnosed with failure to thrive?</label>
-            <select id="lowBirthWeight">
+            <label>Is the child being raised by a caregiver other than a parent (grandparent, relative, guardian)? <span class="required">*</span></label>
+            <select id="caregiverOther" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
             </select>
         </div>
         <div class="form-group">
-            <label>Is a parent or primary caregiver currently incarcerated?</label>
-            <select id="parentIncarcerated">
+            <label>Has there been a recent death of a parent, sibling, or child in the immediate family? <span class="required">*</span></label>
+            <select id="familyDeath" required>
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Was the child low birth weight or diagnosed with failure to thrive? <span class="required">*</span></label>
+            <select id="lowBirthWeight" required>
+                <option value="">Select</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Is a parent or primary caregiver currently incarcerated? <span class="required">*</span></label>
+            <select id="parentIncarcerated" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
@@ -427,16 +427,16 @@
          here means the waiting list order reflects them, not just the child's file. -->
     <div class="form-row">
         <div class="form-group">
-            <label>Has a developmental screening suggested a delay without a current Early Intervention referral?</label>
-            <select id="screeningDelayNoEi">
+            <label>Has a developmental screening suggested a delay without a current Early Intervention referral? <span class="required">*</span></label>
+            <select id="screeningDelayNoEi" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
             </select>
         </div>
         <div class="form-group">
-            <label>Is the parent or primary caregiver still learning English?</label>
-            <select id="parentEll">
+            <label>Is the parent or primary caregiver still learning English? <span class="required">*</span></label>
+            <select id="parentEll" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
@@ -446,8 +446,8 @@
 
     <div class="form-row">
         <div class="form-group">
-            <label>Is your total household income less than half of the federal poverty level for your household size?</label>
-            <select id="incomeBelow50Fpl">
+            <label>Is your total household income less than half of the federal poverty level for your household size? <span class="required">*</span></label>
+            <select id="incomeBelow50Fpl" required>
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
