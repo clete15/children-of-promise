@@ -33,7 +33,10 @@
         --sp-accent-soft: #f8fbff;
 
         --sp-good-bg: #f0fdf4;  --sp-good-br: #86efac;  --sp-good-fg: #166534;
-        --sp-warn-bg: #fffbeb;  --sp-warn-br: #fcd34d;  --sp-warn-fg: #92400e;
+        /* "Attention", not alarm. Deliberately blue-slate rather than amber: the
+           director does not like the brown/amber look, and on this palette a soft
+           indigo reads as "worth noting" without turning the page yellow. */
+        --sp-warn-bg: #eef2ff;  --sp-warn-br: #a5b4fc;  --sp-warn-fg: #3730a3;
         --sp-bad-bg:  #fef2f2;  --sp-bad-br:  #fca5a5;  --sp-bad-fg:  #991b1b;
         --sp-pill-bg: #f8fafc;
     }
@@ -51,7 +54,8 @@
         --sp-accent-soft: #1e2a44;
 
         --sp-good-bg: #14301f;  --sp-good-br: #2f6b45;  --sp-good-fg: #86efac;
-        --sp-warn-bg: #35290f;  --sp-warn-br: #8a6a1f;  --sp-warn-fg: #fcd34d;
+        /* Dark-mode attention: indigo, matching the light theme's shift off amber. */
+        --sp-warn-bg: #1e2450;  --sp-warn-br: #4f5bb0;  --sp-warn-fg: #c7d2fe;
         --sp-bad-bg:  #3a1a1c;  --sp-bad-br:  #8a3a3f;  --sp-bad-fg:  #fca5a5;
         --sp-pill-bg: #212b41;
     }
@@ -121,7 +125,7 @@
     .sp-step.done { border-left-color: #16a34a; background: var(--sp-good-bg); }
     /* Severity variants, replacing the inline border colours the script used to set. */
     .sp-step.alert { border-left-color: #dc2626; margin-top: 12px; }
-    .sp-step.caution { border-left-color: #d97706; margin-top: 12px; }
+    .sp-step.caution { border-left-color: var(--sp-warn-br); background: var(--sp-warn-bg); margin-top: 12px; }
     .sp-step.info { border-left-color: var(--sp-accent); background: var(--sp-accent-soft); }
     /* ── Tabs ────────────────────────────────────────────────────────────────
        This page was one column of eight stacked cards. The two credential routes
@@ -666,7 +670,7 @@ function selfEditCard(s) {
    the "My Files" link on the dashboard landing where it says it will. */
 const SP_TABS = [
     { key: 'overview',    label: 'Overview' },
-    { key: 'credentials', label: 'Credentials' },
+    { key: 'credentials', label: 'Gateways Credentials' },
     { key: 'files',       label: 'My files' },
     { key: 'forms',       label: 'Forms' },
     { key: 'details',     label: 'My details' }
@@ -883,6 +887,21 @@ function credentialsSection(s) {
         + '<strong>Infant Toddler</strong> Credential is counted for staff working with children '
         + 'from birth to age three. The ECE level caps how far the Infant Toddler one can go.</div>'
         + '</div>';
+
+    /* Gateways-waiting note. Shown at the top of this tab whenever the record itself
+       says something is pending or awaited (e.g. "Pending: ECE & IT (Missing
+       Documents)"). Quoted straight from the record rather than paraphrased, so it
+       cannot claim a hold-up the record does not. This is the same source the Overview
+       tab uses; repeated here because credentials is where a person acts on it. */
+    const waiting = pendingText(s);
+    if (waiting) {
+        html += '<div class="sp-step caution" style="margin-top:0;margin-bottom:12px;">'
+            + '<div class="t">\u23f3 Gateways is waiting on something</div>'
+            + '<div class="d">Your record shows: \u201c' + esc(waiting) + '\u201d. Until that '
+            + 'clears, Gateways cannot move the credential forward \u2014 a pending or awaited item '
+            + 'does not count until it is awarded. If you think it is already sorted, tell Megan so '
+            + 'the record can be updated.</div></div>';
+    }
 
     html += '<div class="sp-cred-cols">'
         + credentialColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceSteps(s))
