@@ -16,6 +16,15 @@
         .isbe-sidebar button div { font-size:0.82rem;font-weight:700;color:white; }
         .isbe-sidebar button span { font-size:0.68rem;color:rgba(255,255,255,0.6); }
         .isbe-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
+
+        /* Focused classroom mode: a teacher arriving from My Page's My Classroom tab
+           sees only their room's checklist, not the whole PFA/PI compliance page. The
+           sidebar of admin views is hidden and the card takes the full width; the site
+           header stays (it carries the "← Staff Portal" way back). Triggered by a body
+           class set in init() only when a room is named in the URL. */
+        body.isbe-classroom-only .isbe-sidebar { display:none; }
+        body.isbe-classroom-only .isbe-card { border-radius:12px; }
+        body.isbe-classroom-only .isbe-layout { height:calc(100vh - 90px); }
         .isbe-header { padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px; }
         .isbe-header h2 { font-size:1rem;font-weight:800;color:var(--text);margin:0; }
         .isbe-header span { font-size:0.72rem;color:var(--text-muted); }
@@ -1138,6 +1147,19 @@ async function init() {
         const roomWanted = params.get('room');
         if (roomWanted && classroomOptions().some(o => o.roomNumber === String(roomWanted))) {
             activeClassroomRoom = String(roomWanted);
+        }
+        /* Focused classroom mode: when My Page links a teacher straight to their room
+           (view=classroom&room=...), hide the ISBE sidebar and site header so they see
+           only their room's checklist, not the whole PFA/PI compliance page. The view
+           itself is unchanged — this only strips the surrounding chrome. Any other
+           entry to view=classroom (an admin clicking the sidebar) is untouched, because
+           it does not carry a room in the URL. */
+        if (wanted === 'classroom' && roomWanted) {
+            document.body.classList.add('isbe-classroom-only');
+            // Point the header's way-back at My Page's classroom tab, since that is
+            // where the teacher came from, rather than the general staff dashboard.
+            var back = document.querySelector('.header-back');
+            if (back) { back.setAttribute('href', 'staff-portal.html#classroom'); back.textContent = '\u2190 My Page'; }
         }
         if (wanted && VIEWS.indexOf(wanted) !== -1) setProgram(wanted);
         else renderRoster();

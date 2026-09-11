@@ -1082,9 +1082,12 @@ function classroomSection(s) {
               + 'interviews. Everything opens and saves here, and a signed paper copy can be '
               + 'checked in against the child.</div>'
               + '<div class="sp-links">'
+              /* Same tab, not a new window: the focused classroom view (isbe.html with
+                 view=classroom&room= hides the compliance sidebar) reads as part of My
+                 Page, and its header links back to the My Classroom tab. */
               + myRooms.map(r => (r.roomNumber
                     ? '<a class="sp-link" href="isbe.html?view=classroom&room='
-                      + encodeURIComponent(r.roomNumber) + '" target="_blank" rel="noopener">'
+                      + encodeURIComponent(r.roomNumber) + '">'
                     : '<div class="sp-link">')
                   + '<div class="n">' + esc(r.name)
                   + (r.secondary ? ' <span class="sp-pill">part time</span>' : '') + '</div>'
@@ -1487,5 +1490,10 @@ $('spChangePw').addEventListener('click', e => {
 
 load();
 </script>
+
+<!-- Deploy / Restart controls, so a change can be shipped from here without going
+     back to the portal. Only Clete and Megan can act on it (the endpoints check the
+     shared password); harmless for others to see. -->
+<script src="deploy-widget.js"></script>
 </body>
 </html>
