@@ -498,57 +498,20 @@ function eceCompetencyText(s, row) {
         + 'Development Record.';
 }
 
-/* ── ECE next steps ─────────────────────────────────────────────────────── */
+/* ── ECE next steps ───────────────────────────────────────────────────────
+   Deliberately brief: what the NEXT level needs, in the three terms the director
+   asked for — college, training, and classroom/work hours — and nothing else. The
+   competency lists and transcript essays that used to live here were removed on
+   request; detail can come back later if wanted. */
 function eceSteps(s, held) {
     var steps = [];
-    var edu = educationCeiling(s, held);
 
     if (held) {
         steps.push({ done: true, t: 'ECE Credential ' + levelWord(held) + ' held',
             d: 'Recorded on your staff record from the Gateways report.' });
-    } else {
-        steps.push({ done: false, t: 'Start with ECE Credential Level 1',
-            d: ECE_LEVELS[0].education + ' No fee and no transcript needed, and it is awarded '
-             + 'automatically once the modules are complete. You need to be a Gateways Registry '
-             + 'member first.' });
     }
 
-    // Transcript gap first: it is usually the largest single move available.
-    if (!edu.transcriptOnFile && edu.hours) {
-        var unknown = edu.transcriptState === 'unknown';
-        steps.push({
-            done: false,
-            t: (unknown
-                ? 'Check whether Gateways has your transcript \u2014 it is worth up to '
-                : 'Send your transcript to the Registry \u2014 worth up to ')
-                + levelWord(edu.potential) + (unknown ? '' : ' on its own'),
-            d: 'Your record shows ' + edu.hours + ' semester hours'
-             + (edu.eceHours ? ', ' + edu.eceHours + ' of them in early childhood' : '')
-             + (unknown
-                ? ', but nothing on your record establishes whether the Registry has ever '
-                  + 'received the transcript. That question is worth settling before anything '
-                  + 'else, because the answer changes what you should do next: if they have it, '
-                  + 'the gap is which competencies your courses map to; if they do not, none of '
-                  + 'the credit counts yet and sending it is the only thing that matters. '
-                  + 'Your Gateways Professional Development Record shows what they hold.'
-                : ', but the transcript has not reached Gateways. Credit the Registry has not '
-                  + 'received cannot raise a level.')
-             + ' Counted conservatively you are at '
-             + (edu.today ? levelWord(edu.today) : 'no education level')
-             + '; with the transcript on file the education requirement supports '
-             + levelWord(edu.potential) + '. It must go to the Registry direct from the college, '
-             + 'not to the centre \u2014 a copy issued to you, or a black and white print of one, '
-             + 'is not an official transcript however complete it looks.'
-             /* The distance to the next threshold is the actionable part. 53 hours is not
-                "nearly Level 4", it is seven credits short of it, and that is a semester. */
-             + (edu.hours < 60 && edu.hours >= 9
-                ? ' A further ' + Math.ceil(60 - edu.hours) + ' semester hours would reach the 60 '
-                  + 'that Level 4 asks for.'
-                : '')
-        });
-    }
-
-    var next = held ? held + 1 : 2;
+    var next = held ? held + 1 : 1;
     var row = null;
     for (var i = 0; i < ECE_LEVELS.length; i++) if (ECE_LEVELS[i].level === next) row = ECE_LEVELS[i];
 
@@ -558,41 +521,69 @@ function eceSteps(s, held) {
         return steps;
     }
 
-    var eduMet = edu.potential >= row.rank;
-    // row.education already ends in a full stop in some rows; do not add a second.
-    var eduSentence = row.education.replace(/\.\s*$/, '') + '. ';
-    steps.push({
-        done: false,
-        t: 'Next: ECE Credential ' + levelWord(row.level),
-        d: '<b>Education:</b> ' + eduSentence
-         /* The transcript caveat belongs only on levels the semester hours are carrying.
-            Level 2 needs a diploma, which no transcript affects, and saying otherwise
-            invents a blocker. edu.today excludes credit the Registry has not received, so
-            today >= rank means the level stands without it. */
-         + (eduMet
-            ? 'Your record already supports this'
-              + (edu.today >= row.rank ? '.' : ', once the transcript is with Gateways.')
-            : (edu.assessable
-               ? 'Your record does not reach this yet'
-                 + (edu.hours ? ' \u2014 ' + edu.hours + ' semester hours recorded.' : '.')
-               : 'Your record does not say either way \u2014 it shows \u201c'
-                 + String(s.Education || 'nothing').trim() + '\u201d and no semester hours, which '
-                 + 'is not enough to judge this against. Worth getting your transcript on file so '
-                 + 'the question can be answered.'))
-         + (row.experience
-            ? '<br><b>Experience:</b> '
-              + (row.experience.supervised
-                 ? row.experience.supervised + ' '
-                   + (row.experience.supervisedLabel || 'hours of supervised ECE experience')
-                   + ', or ' + row.experience.documented.toLocaleString('en-US')
-                   + ' hours of documented ECE work experience.'
-                 : row.experience.documented.toLocaleString('en-US')
-                   + ' hours of documented ECE work experience.')
-            : '')
-         + '<br><b>Competencies:</b> ' + eceCompetencyText(s, row)
-    });
-
+    steps.push(levelRequirementStep('ECE Credential', row, 'ECE'));
     return steps;
+}
+
+/* One "what the next level needs" card, three plain lines: college, training,
+   classroom/work. Shared by both ladders so they read identically.
+
+   `kind` is 'ECE' or 'ITC' and only changes the wording of the work-experience line
+   (ECE work vs infant/toddler work). No competency text, by design. */
+function levelRequirementStep(credName, row, kind) {
+    var college = row.education
+        ? row.education.replace(/\.\s*$/, '')
+        : null;
+
+    // Level 1 is a training course, not an education gate — that is its "college" line.
+    var isLevel1 = row.level === 1;
+
+    var lines = '';
+    if (isLevel1) {
+        lines += '<div class="req"><span class="k">Training</span><span class="v">'
+              + college + '.</span></div>';
+    } else {
+        /* ITC levels carry no education line of their own — the ECE Credential is their
+           education gate, and that is shown on the ECE side. So only print College when
+           the level actually has an education requirement (the ECE ladder does). */
+        if (college) {
+            lines += '<div class="req"><span class="k">College</span><span class="v">'
+                  + college + '.</span></div>';
+        } else if (kind === 'ITC') {
+            lines += '<div class="req"><span class="k">College</span><span class="v">'
+                  + 'Set by the ECE Credential level shown above \u2014 no separate college '
+                  + 'requirement.</span></div>';
+        }
+        // Training line: the honest statement is that approved training can substitute
+        // for some of the required competencies, not that there is a fixed hour count.
+        var cap = kind === 'ECE'
+            ? (row.level <= 4 ? TRAINING_ALLOWANCE.ece.low : TRAINING_ALLOWANCE.ece.high)
+            : (row.level <= 4 ? TRAINING_ALLOWANCE.itc.low : TRAINING_ALLOWANCE.itc.high);
+        lines += '<div class="req"><span class="k">Training</span><span class="v">'
+              + 'Up to ' + cap + ' of the required competencies may come from Gateways '
+              + 'credential-approved training instead of college coursework.</span></div>';
+
+        // Classroom / work-experience line.
+        var workWord = kind === 'ITC'
+            ? 'with infants, toddlers and their families'
+            : 'of ECE work';
+        if (row.experience && (row.experience.supervised || row.experience.documented)) {
+            var v = '';
+            if (row.experience.supervised) {
+                v += '<b>' + row.experience.supervised + ' hours</b> supervised, or ';
+            }
+            v += '<b>' + row.experience.documented.toLocaleString('en-US') + ' hours</b> '
+               + 'documented ' + workWord + '.';
+            lines += '<div class="req"><span class="k">Classroom</span><span class="v">'
+                  + v + '</span></div>';
+        }
+    }
+
+    return {
+        done: false,
+        t: 'Next: ' + credName + ' ' + levelWord(row.level),
+        d: '<div class="req-list">' + lines + '</div>'
+    };
 }
 
 /* The ITC level to aim at, given what is held. Extracted so the competency checklist
@@ -612,60 +603,50 @@ function itcTargetLevel(s, heldItc, heldEce) {
     return next;
 }
 
-/* ── ITC next steps ─────────────────────────────────────────────────────── */
+/* ── ITC next steps ───────────────────────────────────────────────────────
+   Brief, on request. What the next Infant Toddler level needs in three terms, plus
+   one line if a higher ECE Credential is the gate — and in that case it says only
+   "obtain ECE X", not the ECE coursework, because the ECE column already covers that.
+
+   The ECE credential caps the ITC: you cannot hold ITC Level 4 without ECE Level 4.
+   So the "next" ITC level offered is capped at the ECE level held — chasing a higher
+   ITC level than the ECE allows is effort in the wrong place. */
 function itcSteps(s, heldItc, heldEce) {
     var steps = [];
-    var edu = educationCeiling(s, heldEce);
-    var inItRoom = worksWithInfantsToddlers(s);
-    var perWeek = hoursPerWeek(s);
 
     if (heldItc) {
         steps.push({ done: true, t: 'Infant Toddler Credential ' + levelWord(heldItc) + ' held',
             d: 'This is what the ExceleRate infant and toddler room requirement counts.' });
     }
 
-    /* Said before the gates rather than after them. Somebody working school-age can meet
-       every education requirement for a high ITC level and still have no route to it,
-       because the experience has to be with children under three. Leading with the level
-       would send them after the wrong credential. */
-    if (!inItRoom && !heldItc) {
+    // The ITC level the CURRENT ECE allows. Never past what ECE supports, so the card
+    // shows a level that is actually reachable rather than one gated behind ECE work.
+    var nextByEce = itcTargetLevel(s, heldItc, heldEce);
+    // The plain next rung up, regardless of ECE — used to explain an ECE gate.
+    var nextRung = (heldItc || 1) + 1;
+    if (nextRung > 6) nextRung = 6;
+
+    /* If a higher ECE Credential is the gate for the next rung, show ONLY that — the
+       instruction was to say "obtain ECE X" and stop, not to list the requirements for
+       a level the person cannot reach yet. The ECE column shows how to get the ECE
+       level; repeating ITC hours for an unreachable level would be noise. */
+    var rungRow = null;
+    for (var r = 0; r < ITC_LEVELS.length; r++) if (ITC_LEVELS[r].level === nextRung) rungRow = ITC_LEVELS[r];
+    if (rungRow && heldEce < rungRow.ece) {
         steps.push({
             done: false,
-            t: 'The ITC may not be the credential to chase from your current room',
-            d: 'Every level needs experience with children from birth to age three, and your '
-             + 'recorded room is ' + (String(s.Classroom || s.SecondaryClassroom || '').trim()
-                 || 'not set') + '. The education requirements below may well be met, but without '
-             + 'infant/toddler hours there is no route to an award. The ECE Credential is usually '
-             + 'the better target unless a move to an infant or toddler room is on the cards.'
+            t: 'Next: reach ECE Credential ' + levelWord(rungRow.ece) + ' first',
+            d: 'Infant Toddler ' + levelWord(nextRung) + ' requires ECE Credential '
+             + levelWord(rungRow.ece) + (nextRung < 5 ? ' or higher' : '')
+             + (heldEce ? ', and you hold ECE ' + levelWord(heldEce) + '.' : '.')
+             + ' See the Preschool (ECE) column for what that takes.'
+             + (rungRow.gradDegree ? ' Level 6 also requires a graduate degree.' : '')
         });
+        return steps;
     }
-
-    /* The ITC is not a ladder that has to be climbed a rung at a time. You apply for the
-       level you qualify for, and the ECE credential is what caps it. Lindsey holds ECE
-       Level 4 and no ITC, so her target is ITC Level 4 — pointing her at Level 2 would
-       send her after a credential well below what she is entitled to, and Level 4 is the
-       application she already has pending.
-
-       Level 6 additionally needs a graduate degree, so it is only offered to someone who
-       has one. */
-    var next = itcTargetLevel(s, heldItc, heldEce);
 
     var row = null;
-    for (var i = 0; i < ITC_LEVELS.length; i++) if (ITC_LEVELS[i].level === next) row = ITC_LEVELS[i];
-
-    /* Say so when the target genuinely skips levels, otherwise it looks like a mistake.
-       Only when the ECE gate for that level is actually met — offering to skip ahead on
-       the strength of a credential the person does not hold would be worse than silence —
-       and never for Level 2, which is the bottom rung and cannot be skipped to. */
-    if (row && next > 2 && next > heldItc + 1 && heldEce >= row.ece && inItRoom) {
-        steps.push({
-            done: false,
-            t: 'You can apply straight at ' + levelWord(next),
-            d: 'Your ECE Credential ' + levelWord(heldEce) + ' entitles you to Infant Toddler '
-             + levelWord(next) + ', so there is no need to work up through the levels below it. '
-             + 'Apply for the level you qualify for.'
-        });
-    }
+    for (var i = 0; i < ITC_LEVELS.length; i++) if (ITC_LEVELS[i].level === nextByEce) row = ITC_LEVELS[i];
 
     if (!row) {
         steps.push({ done: true, t: 'Level 6 is the top of the Infant Toddler Credential',
@@ -673,98 +654,9 @@ function itcSteps(s, heldItc, heldEce) {
         return steps;
     }
 
-    /* The ECE gate, stated before anything else. Somebody chasing infant/toddler hours
-       while their ECE level is the real blocker is spending effort in the wrong place. */
-    var eceGateMet = heldEce >= row.ece;
-    steps.push({
-        done: eceGateMet,
-        t: (eceGateMet ? 'ECE Credential ' + levelWord(row.ece) + ' requirement met'
-                       : 'First you need ECE Credential ' + levelWord(row.ece)),
-        d: 'Infant Toddler ' + levelWord(row.level) + ' requires ECE Credential '
-         + levelWord(row.ece) + (row.level < 5 ? ' or higher' : '') + '. '
-         + (eceGateMet
-            ? 'You hold ECE ' + levelWord(heldEce) + ', so this is not what is holding you up.'
-            : (heldEce ? 'You hold ECE ' + levelWord(heldEce) + ', so the ECE side is the binding '
-                         + 'constraint here, not your infant and toddler hours.'
-                       : 'You do not hold an ECE Credential yet, so there is no route to the ITC '
-                         + 'that skips it.'))
-         + (row.gradDegree ? ' Level 6 also requires a graduate degree.' : '')
-    });
-
-    // The experience gate, with the supervised route costed in weeks where possible.
-    var sup = row.experience.supervised;
-    var doc = row.experience.documented;
-    var weeks = sup && inItRoom ? weeksToReach(sup, perWeek) : null;
-    steps.push({
-        done: false,
-        t: 'Experience with infants, toddlers and their families',
-        d: (sup
-            ? '<b>' + sup + ' hours supervised</b>, or <b>' + doc.toLocaleString('en-US')
-              + ' hours documented</b>. '
-            : '<b>' + doc.toLocaleString('en-US') + ' hours documented.</b> ')
-         + (inItRoom
-            ? (weeks
-               ? 'You work in an infant/toddler room at about ' + perWeek + ' hours a week, so the '
-                 + 'supervised route is roughly ' + weeks + ' week' + (weeks === 1 ? '' : 's')
-                 + ' of documented supervision \u2014 usually far quicker than assembling '
-                 + doc.toLocaleString('en-US') + ' verified hours from former employers.'
-               : 'You work in an infant/toddler room, so the supervised route is likely the '
-                 + 'quicker one. Hours per week are not on your record, so it cannot be costed.')
-            : 'Your recorded room is not an infant/toddler room, so neither route accrues from '
-              + 'your current assignment. Documented hours from earlier infant/toddler work need a '
-              + 'PD75a signed by that employer.')
-         + ' Documented hours only count once a work history form from the employer is on file.'
-    });
-
-    /* Competencies. The only ones ever treated as met are those a held credential
-       covers outright, because that is a documented fact rather than an inference from a
-       course title. Everything else is listed to be checked, never scored. */
-    var required = competenciesFor(row.level);
-    var cda = hasInfantToddlerCda(s);
-    var covered = cda ? required.filter(function (c) {
-        return IT_CDA_COMPETENCIES.indexOf(c) !== -1;
-    }) : [];
-    var outstanding = required.filter(function (c) { return covered.indexOf(c) === -1; });
-    var allowance = row.level <= 4 ? TRAINING_ALLOWANCE.itc.low : TRAINING_ALLOWANCE.itc.high;
-
-    steps.push({
-        done: false,
-        t: 'Competencies for ' + levelWord(row.level) + ' \u2014 ' + outstanding.length
-            + ' to evidence' + (covered.length ? ', ' + covered.length + ' already covered' : ''),
-        d: (row.level > 2
-            ? levelWord(row.level) + ' requires every competency from the levels below it as well, '
-              + 'so the full list is ' + required.length + ' of them: '
-            : 'Gateways assesses ')
-         + 'ITC ' + formatCompetencies(required) + '. '
-         + (cda
-            ? '<br>Your Infant Toddler CDA covers ITC ' + formatCompetencies(covered)
-              + ' outright, which leaves <b>ITC ' + formatCompetencies(outstanding) + '</b>.'
-            : '')
-         + '<br>These come from college coursework, and up to ' + allowance + ' in total may come '
-         + 'from credential-approved training instead'
-         + (outstanding.length <= allowance
-            ? ' \u2014 so the ' + outstanding.length + ' outstanding could all be met by training, '
-              + 'without further college credit.'
-            : '.')
-         + ' We do not track competencies per person, so this needs checking against your '
-         + 'Professional Development Record rather than assumed.'
-    });
-
-    if (!edu.transcriptOnFile && edu.hours) {
-        steps.push({
-            done: false,
-            t: edu.transcriptState === 'unknown'
-                ? 'The same transcript question caps the ECE side'
-                : 'Your transcript is holding up the ECE side too',
-            d: edu.transcriptState === 'unknown'
-                ? 'Until it is known whether Gateways holds your transcript, your ECE level '
-                  + 'cannot be relied on, and the ECE level caps the ITC. One phone call settles '
-                  + 'both.'
-                : 'The same missing transcript caps your ECE level, which in turn caps the ITC. '
-                  + 'One errand clears both.'
-        });
-    }
-
+    // The requirement for the level the ECE currently allows. On the ITC side the ECE
+    // credential IS the education gate, so the college line is suppressed (see kind).
+    steps.push(levelRequirementStep('Infant Toddler Credential', row, 'ITC'));
     return steps;
 }
 
