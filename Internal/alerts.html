@@ -306,10 +306,28 @@ function gatewaysTrainingReportAlert() {
         + '</div></div>';
 }
 
+/* Manual reminder: print and sign Lindsey's Work History form once the new tablet
+   with stylus is here (so the parent/staff signature can be captured on screen).
+   Unlike the dated notes above, this one has no auto-expiry — it is a to-do that is
+   done when it is done. DELETE this function and its call once the form is signed. */
+function workHistorySignReminder() {
+    return '<div class="alert-item info">'
+        + '<div class="alert-title">\uD83D\uDD8A\uFE0F Print &amp; sign Lindsey\u2019s Work History form</div>'
+        + '<div class="alert-detail">Her Gateways Work &amp; Practical Experience form is filled in and ready. '
+        + 'Once the new tablet with stylus arrives, print and sign it (or capture the signature on the tablet), '
+        + 'then remove this reminder.</div>'
+        + '<a class="alert-action" href="/pas/staff-work-history.html">Open Work History form \u2192</a>'
+        + '</div>';
+}
+
 function renderAlerts(students, waitlist, staff) {
     const body = document.getElementById('alertsBody');
     let html = '';
     let count = 0;
+
+    /* Manual reminder to sign Lindsey's work history once the tablet arrives. */
+    const whSign = workHistorySignReminder();
+    if (whSign) { count++; html += whSign; }
 
     /* Gateways training report is down. A dated, self-expiring system note (not tied
        to any one person's record), so it lives here on the shared alerts page rather

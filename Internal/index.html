@@ -685,6 +685,10 @@ async function loadAlertCount() {
         if (GW_REPORT_FLAGGED) alertCount++;
         void gwFollowUp;
 
+        // Manual reminder: sign Lindsey's work history once the tablet arrives. Shows
+        // on the alerts page too; counted here so the badge matches. Remove both when done.
+        alertCount++;
+
         // CCAP eligible
         const CCAP_T = [35910,48690,61470,74250,87030,99810,112590,125370];
         const ccapEligible = students.filter(s => {
