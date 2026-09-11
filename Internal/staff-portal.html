@@ -622,11 +622,16 @@ function filesCard(s) {
         + 'These open in your browser.</div>';
 
     if (mine.length) {
+        /* Opened through fetchStaffFile() rather than a plain href. A raw <a> is a
+           browser navigation that carries no headers, so the personal staff token
+           never travelled with it and the server answered "Sign in first" — which is
+           the error a signed-in teacher was getting on their own files. Fetching via
+           myFetch attaches the token, and the file is then shown from a blob URL, so
+           the token never rides in the address bar either. */
         html += '<div class="sp-links">' + mine.map(f => {
             const waiting = f.status === 'Pending';
             return '<a class="sp-link' + (waiting ? ' waiting' : '') + '"'
-                + ' href="/api/staff-file-download?path=' + encodeURIComponent(f.rel)
-                + '" target="_blank" rel="noopener">'
+                + ' href="#" data-file="' + esc(f.rel) + '">'
                 + '<div class="n">' + esc(f.category)
                 /* Says plainly that it has arrived but not been checked. Without this
                    a handed-in document looks identical to a verified one, and the
@@ -1395,6 +1400,41 @@ function wireCardActions() {
     document.querySelectorAll('.sp-upbtn').forEach(btn => {
         btn.addEventListener('click', () => handIn(btn.getAttribute('data-key'), btn));
     });
+
+    // Personal file cards: open through fetchStaffFile so the staff token travels.
+    document.querySelectorAll('[data-file]').forEach(a => {
+        a.addEventListener('click', e => {
+            e.preventDefault();
+            fetchStaffFile(a.getAttribute('data-file'), a);
+        });
+    });
+}
+
+/* Open one of "my files" in a new tab, authenticated.
+
+   The download endpoint checks the personal staff token, which only travels on a
+   header myFetch adds — a plain link sends no headers, so it failed with "Sign in
+   first". We fetch the bytes through myFetch, wrap them in a blob URL and open that,
+   so the token authorises the request without ever appearing in the address bar. */
+async function fetchStaffFile(rel, el) {
+    const label = el ? el.querySelector('.n') : null;
+    const original = label ? label.getAttribute('data-label') || null : null;
+    try {
+        const res = await myFetch('/api/staff-file-download?path=' + encodeURIComponent(rel));
+        if (!res.ok) {
+            let msg = 'HTTP ' + res.status;
+            try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (e) {}
+            alert('Could not open that file: ' + msg);
+            return;
+        }
+        const blob = await res.blob();
+        const objUrl = URL.createObjectURL(blob);
+        // Open in a new tab; revoke shortly after so the browser has grabbed it.
+        window.open(objUrl, '_blank', 'noopener');
+        setTimeout(() => URL.revokeObjectURL(objUrl), 60000);
+    } catch (e) {
+        alert('Could not open that file: ' + (e.message || e));
+    }
 }
 
 /* Sends a missing document. Multipart, so this cannot go through apiFetch — that
