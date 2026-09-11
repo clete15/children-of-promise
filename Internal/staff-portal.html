@@ -749,18 +749,19 @@ function selfEditCard(s) {
 
 // ── render ────────────────────────────────────────────────────────────────
 /* ── Tabs ──────────────────────────────────────────────────────────────────
-   Five, grouped by the job somebody came here to do rather than by where the data
+   Grouped by the job somebody came here to do rather than by where the data
    happens to live:
 
-     Overview     where I stand, anything urgent, and my room
      Credentials  the ECE route, the ITC route, and my training completions
+     My Classroom my room's checklist, one card per child
      My files     what is on file, and handing in what is not
      Forms        goal plan, self-appraisal, reviews, observations
-     My details   the handful of fields a person knows better than the office
 
-   Training sits under Credentials rather than alone, because a completion is
-   progression towards a level, not a separate subject. "My details" is dropped
-   entirely for a viewer who may not edit, rather than shown empty.
+   Credentials leads because it is what most people open this page to check.
+   "Where you stand" (the old Overview) is no longer a tab — it is a summary of
+   the person, so it sits under the name card, always visible, rather than being
+   somewhere to navigate to. Training sits under Credentials rather than alone,
+   because a completion is progression towards a level, not a separate subject.
 
    The active tab is held here, not in the URL, so a save that redraws the page
    leaves you where you were. A hash still selects a tab on arrival, which keeps
@@ -771,14 +772,15 @@ function selfEditCard(s) {
    card they are already looking at. The self-edit card still exists; it is just
    shown under the header rather than behind a tab. */
 const SP_TABS = [
-    { key: 'overview',    label: 'Overview' },
-    { key: 'classroom',   label: 'My Classroom' },
     { key: 'credentials', label: 'Gateways Credentials' },
+    { key: 'classroom',   label: 'My Classroom' },
     { key: 'files',       label: 'My files' },
     { key: 'forms',       label: 'Forms' }
 ];
 
-let activeTab = 'overview';
+/* "Where you stand" (the old Overview) is no longer a tab — it sits under the name
+   card, always visible. So the default tab is the first remaining one. */
+let activeTab = 'credentials';
 
 /* Anything the person can act on, counted for the tab strip. Nothing else gets a badge.
 
@@ -827,7 +829,6 @@ function tabBar(s, tabs) {
 
 function tabPanels(s, tabs) {
     const build = {
-        overview: overviewSection,
         classroom: classroomSection,
         credentials: credentialsSection,
         files: filesCard,
@@ -882,7 +883,12 @@ function render() {
     // edit — so an active tab that no longer exists falls back rather than blanking.
     if (!tabs.some(t => t.key === activeTab)) activeTab = tabs[0].key;
 
-    body.innerHTML = identityHeader(s) + tabBar(s, tabs) + tabPanels(s, tabs);
+    // "Where you stand" sits between the name card and the tabs, always visible —
+    // it used to be the Overview tab, but it is a summary of the person, not a
+    // separate place to navigate to, so it belongs under their name.
+    body.innerHTML = identityHeader(s)
+        + '<div id="spStanding">' + overviewSection(s) + '</div>'
+        + tabBar(s, tabs) + tabPanels(s, tabs);
     wireTabs(s, tabs);
     // Handlers are attached after every render, because the markup above replaces
     // the elements they belong to each time.
@@ -948,9 +954,12 @@ function setDetailsOpen(open) {
     if (!panel) return;
     panel.hidden = !open;
     if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    // Hide the tab strip and every tab panel while editing; restore them after.
+    // Hide the tab strip, every tab panel, and the "Where you stand" summary while
+    // editing; restore them after, so editing your details is a focused view.
     const tabs = document.querySelector('.sp-tabs');
     if (tabs) tabs.hidden = open;
+    const standing = document.getElementById('spStanding');
+    if (standing) standing.hidden = open;
     document.querySelectorAll('.sp-panel').forEach(p => {
         // While editing, hide all. When closing, restore only the active tab.
         p.hidden = open ? true : (p.id !== 'sppanel_' + activeTab);
@@ -963,21 +972,11 @@ function wireDetailsToggle() {
     btn.addEventListener('click', () => setDetailsOpen(!detailsOpen));
 }
 
-/* Leave the edit view: close the panel and land on Overview. Used by both Save and
-   Cancel so finishing an edit always returns somewhere sensible rather than to a
-   hidden tab. */
+/* Leave the edit view: close the panel and restore the page. "Where you stand"
+   lives under the name card now, so finishing an edit simply reveals it again
+   along with the tab that was open. Used by both Save and Cancel. */
 function closeDetailsToOverview() {
-    activeTab = 'overview';
     setDetailsOpen(false);
-    // Reflect the tab change in the strip and panels.
-    document.querySelectorAll('.sp-tab').forEach(b => {
-        const on = b.getAttribute('data-tab') === 'overview';
-        b.setAttribute('aria-selected', on ? 'true' : 'false');
-        b.setAttribute('tabindex', on ? '0' : '-1');
-    });
-    document.querySelectorAll('.sp-panel').forEach(p => {
-        p.hidden = p.id !== 'sppanel_overview';
-    });
 }
 
 /* ── Overview ── the four figures, and the transcript flag if it applies. The
@@ -1495,12 +1494,12 @@ async function saveMyRecord() {
         msg.textContent = body.reviewCleared
             ? 'Saved. Megan will see it as needing a check.'
             : 'Saved.';
-        /* Leave the edit view and land on Overview after a beat, long enough to read
-           the confirmation. Closing detailsOpen BEFORE the redraw is what stops
-           wireDetailsToggle reopening the panel on the fresh markup. */
+        /* Leave the edit view after a beat, long enough to read the confirmation.
+           "Where you stand" reappears under the name card on the redraw. Closing
+           detailsOpen BEFORE the redraw is what stops wireDetailsToggle reopening
+           the panel on the fresh markup. */
         setTimeout(() => {
             detailsOpen = false;
-            activeTab = 'overview';
             render();
         }, 900);
     } catch (e) {
