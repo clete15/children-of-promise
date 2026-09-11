@@ -675,6 +675,16 @@ async function loadAlertCount() {
         const wlData = await wRes.json();
         let alertCount = 0;
 
+        // Gateways training report down — a dated, self-expiring note that also shows
+        // on the alerts page. Counted here so the badge matches while it is active.
+        // Update GW_REPORT_FLAGGED (or remove) when Gateways fixes the report.
+        const GW_REPORT_FLAGGED = '2026-09-10';
+        const gwFollowUp = new Date(GW_REPORT_FLAGGED + 'T12:00:00').getTime() + 3*24*60*60*1000;
+        // Show while the report is flagged; the alerts page shows it indefinitely
+        // until the flag is cleared, so mirror that here rather than auto-hiding.
+        if (GW_REPORT_FLAGGED) alertCount++;
+        void gwFollowUp;
+
         // CCAP eligible
         const CCAP_T = [35910,48690,61470,74250,87030,99810,112590,125370];
         const ccapEligible = students.filter(s => {

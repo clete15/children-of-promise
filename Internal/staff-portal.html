@@ -1053,11 +1053,9 @@ function credentialsSection(s) {
 
     let html = '';
 
-    /* Gateways training report is down. A dated, self-expiring note: it names the day
-       it was flagged and the day to look again, so it reads as stale on its own once
-       the date has passed rather than sitting there forever. Trainings are not tracked
-       here yet — this is a reminder to re-check the source, not a status. */
-    html += gatewaysReportAlert();
+    /* The "Gateways training report is down" note used to sit here. It is a
+       system-wide status, not a fact about this person, so it moved to the shared
+       alerts page (alerts.html) on 10 Sep 2026. */
 
     /* Gateways-waiting note. Shown whenever the record itself says something is pending
        or awaited (e.g. "Pending: ECE & IT (Missing Documents)"). Quoted straight from
@@ -1090,32 +1088,6 @@ function credentialsSection(s) {
         + 'Infant Toddler Credential</a>.</div></div>';
 
     return html;
-}
-
-/* The "Gateways training report is broken" reminder.
-
-   FLAGGED is the day it was raised; the follow-up is three days on. Both dates are
-   printed so the note ages honestly: once the follow-up date is in the past it says
-   so, rather than a stale "check back soon" that never changes. Update FLAGGED (or
-   delete this function's call) once Gateways fixes the report. */
-function gatewaysReportAlert() {
-    const FLAGGED = '2026-09-10';               // the day the report was found broken
-    const flagged = new Date(FLAGGED + 'T12:00:00');
-    const followUp = new Date(flagged.getTime() + 3 * 24 * 60 * 60 * 1000);
-    const fmt = d => d.toLocaleDateString('en-US',
-        { weekday: 'short', month: 'short', day: 'numeric' });
-    const overdue = Date.now() > followUp.getTime() + 24 * 60 * 60 * 1000;
-
-    return '<div class="sp-step caution" style="margin-top:0;margin-bottom:12px;">'
-        + '<div class="t">\u26a0 Gateways training report is down</div>'
-        + '<div class="d">The training report on the Gateways site was not working as of '
-        + fmt(flagged) + '. '
-        + (overdue
-            ? 'It was worth another look around ' + fmt(followUp) + ' \u2014 if it is back, '
-              + 'training records can be reconciled and this note removed.'
-            : 'Check back around ' + fmt(followUp) + '. Until then, training completions cannot '
-              + 'be pulled from Gateways.')
-        + '</div></div>';
 }
 
 /* ── Their classroom ──

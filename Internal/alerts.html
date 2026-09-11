@@ -279,10 +279,44 @@ function infantToddlerCredentialAlert(staff) {
     </div>`;
 }
 
+/* The "Gateways training report is broken" reminder.
+
+   FLAGGED is the day it was raised; the follow-up is three days on. Both dates are
+   printed so the note ages honestly rather than sitting as a stale "check back soon"
+   that never changes. Moved here from the staff card on 10 Sep 2026 — it is a
+   system-wide status, not a fact about any one person, so it belongs on the shared
+   alerts page. Update FLAGGED (or delete this call) once Gateways fixes the report. */
+function gatewaysTrainingReportAlert() {
+    const FLAGGED = '2026-09-10';               // the day the report was found broken
+    const flagged = new Date(FLAGGED + 'T12:00:00');
+    const followUp = new Date(flagged.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const fmt = d => d.toLocaleDateString('en-US',
+        { weekday: 'short', month: 'short', day: 'numeric' });
+    const overdue = Date.now() > followUp.getTime() + 24 * 60 * 60 * 1000;
+
+    return '<div class="alert-item warning">'
+        + '<div class="alert-title">\u26a0\ufe0f Gateways training report is down</div>'
+        + '<div class="alert-detail">The training report on the Gateways site was not working as of '
+        + fmt(flagged) + '. '
+        + (overdue
+            ? 'It was worth another look around ' + fmt(followUp) + ' \u2014 if it is back, '
+              + 'training records can be reconciled and this note removed.'
+            : 'Check back around ' + fmt(followUp) + '. Until then, training completions cannot '
+              + 'be pulled from Gateways.')
+        + '</div></div>';
+}
+
 function renderAlerts(students, waitlist, staff) {
     const body = document.getElementById('alertsBody');
     let html = '';
     let count = 0;
+
+    /* Gateways training report is down. A dated, self-expiring system note (not tied
+       to any one person's record), so it lives here on the shared alerts page rather
+       than on each staff card. It ages honestly against the follow-up date and simply
+       stops showing once cleared. */
+    const trainingReport = gatewaysTrainingReportAlert();
+    if (trainingReport) { count++; html += trainingReport; }
 
     /* 0. Not in the Gateways Registry at all. Sits above the credential shortfall
        because it is the blocker for it: someone without a registry number cannot
