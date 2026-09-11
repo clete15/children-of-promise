@@ -149,7 +149,13 @@ function checkAuth(req, res) {
     // A missing header and a wrong password are the same answer to the caller, so
     // they share one branch rather than two identical ones.
     if (basicPassword(req) !== INTERNAL_PASSWORD) {
-        res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Children Of Promise Staff"' });
+        /* Deliberately NO 'WWW-Authenticate: Basic' header. That header is what makes
+           the browser throw up its own native "Sign in to access this site" popup on
+           top of our own password page — which is confusing and looks like a second,
+           broken login. The 401 still rejects the request; the page's own sign-in
+           form reads the 401 and shows its styled message. Security is unchanged;
+           only the browser's built-in credential dialog is suppressed. */
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
         res.end('Unauthorized');
         return false;
     }
