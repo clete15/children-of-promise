@@ -88,20 +88,21 @@
     }
     .sp-grid { display: flex; flex-wrap: wrap; gap: 12px; }
     .sp-tile {
-        flex: 1 1 210px; min-width: 190px; border: 1.5px solid var(--sp-border);
-        border-radius: 9px; padding: 12px 14px; background: var(--sp-surface-2);
+        flex: 1 1 170px; min-width: 150px; border: 1.5px solid var(--sp-border);
+        border-radius: 9px; padding: 9px 12px; background: var(--sp-surface-2);
     }
     .sp-tile .lbl {
-        font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.04em; color: var(--sp-muted); margin-bottom: 4px;
+        font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.04em; color: var(--sp-muted); margin-bottom: 3px;
     }
-    .sp-tile .val { font-size: 1.32rem; font-weight: 800; color: var(--sp-text); line-height: 1.2; }
-    .sp-tile .note { font-size: 0.8rem; color: var(--sp-muted); margin-top: 5px; line-height: 1.5; }
+    .sp-tile .val { font-size: 1.05rem; font-weight: 800; color: var(--sp-text); line-height: 1.2; }
+    .sp-tile .note { font-size: 0.76rem; color: var(--sp-muted); margin-top: 5px; line-height: 1.5; }
     .sp-tile.good { background: var(--sp-good-bg); border-color: var(--sp-good-br); }
     .sp-tile.warn { background: var(--sp-warn-bg); border-color: var(--sp-warn-br); }
     .sp-tile.bad  { background: var(--sp-bad-bg);  border-color: var(--sp-bad-br); }
-    /* The editable fields on the "keep my record right" card. */
-    .sp-tile.sp-field { background: var(--sp-surface); }
+    /* The editable fields on the "keep my record right" card. Kept wider than the
+       compact summary tiles so the inputs have room. */
+    .sp-tile.sp-field { background: var(--sp-surface); flex-basis: 210px; min-width: 190px; padding: 12px 14px; }
     .sp-tile.sp-field input, .sp-tile.sp-field select {
         width: 100%; box-sizing: border-box; padding: 6px 8px;
         border: 1px solid var(--sp-border-in); border-radius: 5px;
@@ -996,6 +997,8 @@ function standingTiles(s) {
     const shEce = parseFloat(s.SemesterHoursEce);
     const transcriptMissing = String(s.TranscriptOnFile || '') === 'Not submitted';
 
+    // Compact tiles: just the label and the value, no explanatory note under each —
+    // the notes made the cards tall and mostly repeated what the value already says.
     let html = '<div class="sp-grid">'
         + tile(credLevel(s, 'ece') ? 'good' : 'warn', 'ECE Credential',
             credLevel(s, 'ece') ? 'Level ' + credLevel(s, 'ece') : 'Not yet held')
@@ -1003,18 +1006,9 @@ function standingTiles(s) {
             credLevel(s, 'it') ? 'Level ' + credLevel(s, 'it') : 'Not yet held')
         + tile(hours === null ? 'warn' : (hours >= PD_REQUIRED ? 'good' : 'warn'),
             'PD hours in ' + new Date().getFullYear(),
-            hours === null ? 'Not recorded' : hours + ' of ' + PD_REQUIRED,
-            hours === null
-                ? 'Nothing recorded for this calendar year yet. That is not the same as none \u2014 '
-                  + 'if you have done training, it needs adding to your record.'
-                : (hours >= PD_REQUIRED
-                    ? 'You have met the 20 clock hours ExceleRate asks for this year.'
-                    : (PD_REQUIRED - hours) + ' more clock hours needed this calendar year.'))
+            hours === null ? 'Not recorded' : hours + ' of ' + PD_REQUIRED)
         + tile(isFinite(shEce) ? '' : 'warn', 'College credit on file',
-            isFinite(shTotal) ? shTotal + ' hrs' : 'Not recorded',
-            isFinite(shEce) ? shEce + ' of them in early childhood'
-                : 'Semester hours are what move you up the credential levels, so it is worth '
-                  + 'getting your transcript on file.')
+            isFinite(shTotal) ? shTotal + ' hrs' : 'Not recorded')
         + '</div>';
 
     if (transcriptMissing) {
