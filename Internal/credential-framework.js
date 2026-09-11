@@ -145,34 +145,91 @@ var ITC_LEVELS = [
    two codes in the same area read the same. That is honest about what the source
    actually says; inventing a unique sentence per number is exactly the kind of guess
    the rest of this file refuses to make. */
+/* `descriptor` is the content area's purpose statement, transcribed verbatim from the
+   Infant Toddler Credential Level 2-4 Benchmarks (INCCRRA 2013), which is in the
+   document library. The individual numbered indicators (A1, A5, B3...) are NOT held
+   here: that document numbers them by area LETTER (A, B, C...) rather than by the
+   HGD/HSW/IRE codes the framework and this checklist use, so there is no reliable
+   code-to-code map and inventing one would put the wrong text on a line. The page
+   therefore shows the descriptor plus a link to the full benchmark PDF, and leaves the
+   per-indicator wording to the source. */
 var COMPETENCY_AREAS = {
     HGD: {
         area: 'Human Growth and Development',
-        gloss: 'Infant and toddler physical, cognitive, language and social-emotional development.'
+        gloss: 'Infant and toddler physical, cognitive, language and social-emotional development.',
+        descriptor: 'Infant/toddler practitioners use current and emerging principles, theories and '
+            + 'knowledge of developmental milestones as a foundation for all aspects of their work with '
+            + 'young children, prenatal to age 3, and their families. They view child development '
+            + 'knowledge as the core of their practitioner practice, and engage in ongoing learning and '
+            + 'reflection about developmental knowledge and theory. They use their understanding as they '
+            + 'plan and implement observations, assessments, and teaching/learning interactions, and as a '
+            + 'context for collaborating with families and other practitioners on behalf of children.'
     },
     HSW: {
         area: 'Health, Safety & Well-Being',
-        gloss: 'Safe environments, sanitation, safe-sleep practice, nutrition and health protocols for very young children.'
+        gloss: 'Safe environments, sanitation, safe-sleep practice, nutrition and health protocols for very young children.',
+        descriptor: 'Infant/toddler practitioners understand that children\u2019s mental health, physical '
+            + 'health, and safety are the foundations for development and learning in children, prenatal to '
+            + 'age 3. They acknowledge the value of creating and fostering healthy social and physical '
+            + 'environments that promote children\u2019s adaptive behavior and emotional, social, physical, '
+            + 'cognitive, and language development. They collaborate with families and other practitioners '
+            + 'to understand their perspectives on health, nutrition, and safety, and provide practices and '
+            + 'routines that recognize individual children\u2019s needs and are congruent with individual '
+            + 'families\u2019 cultures, values and preferences.'
     },
     IRE: {
         area: 'Interactions, Relationships, & Environments',
-        gloss: 'Nurturing, responsive interactions and learning environments designed for infants and toddlers.'
+        gloss: 'Nurturing, responsive interactions and learning environments designed for infants and toddlers.',
+        descriptor: 'Infant/toddler practitioners use their understanding of early development to support and '
+            + 'provide healthy early relationships, both in their own work with children and as they '
+            + 'collaborate with families on behalf of children. They provide and promote developmentally, '
+            + 'culturally, and individually appropriate environments and seek to engage young children, ages '
+            + 'birth to 3, in social, play and caregiving interactions that support their development and '
+            + 'learning. Relationships recognize and promote the primacy of the parent-child relationship as '
+            + 'well as foster emerging relationships with other adults and with peers.'
     },
     FCR: {
         area: 'Family & Community Relationships',
-        gloss: 'Partnering with families, understanding cultural backgrounds and supporting family systems.'
+        gloss: 'Partnering with families, understanding cultural backgrounds and supporting family systems.',
+        descriptor: 'Infant/toddler practitioners understand the roles that culture, community, and family '
+            + 'play in the growth and development of infants and toddlers, knowing that parenting styles, '
+            + 'ethnicity, cultural expectations, household make up, and community influence all domains of '
+            + 'development. They understand and value the critical role of positive, collaborative '
+            + 'partnerships with families, colleagues, and community service agencies, and use their '
+            + 'knowledge of family and social systems to create reciprocal, productive relationships that '
+            + 'enhance the contributions of family, program, and community to the development, learning, and '
+            + 'well being of young children, prenatal to age 3, and their families.'
     },
     PPD: {
         area: 'Personal & Professional Development',
-        gloss: 'Reflective practice, professional ethics and continuing to learn.'
+        gloss: 'Reflective practice, professional ethics and continuing to learn.',
+        descriptor: 'Infant/toddler practitioners demonstrate respect for children, families, and colleagues. '
+            + 'They identify themselves as practitioners and conduct themselves as members of a significant, '
+            + 'expanding, changing profession. They honor diversity in cultures, beliefs, and practices, and '
+            + 'are committed to ongoing practitioner development. They continually reflect on and take '
+            + 'responsibility for their own values, choices and actions, and they advocate for young children, '
+            + 'prenatal to age 3, and their families, exemplifying the ethical standards of their profession.'
     },
     OA: {
         area: 'Observation & Assessment',
-        gloss: 'Documenting developmental milestones and using observation to guide care.'
+        gloss: 'Documenting developmental milestones and using observation to guide care.',
+        descriptor: 'Infant/toddler practitioners recognize that knowledge of each infant\u2019s or toddler\u2019s '
+            + 'development and learning provides the framework for what they do with each child, birth to age 3, '
+            + 'and family. They value the roles of informal and formal observation and assessment in '
+            + 'understanding what and how each child is developing, and they view observation and assessment as '
+            + 'ways to understand children and their interactions and relationships with their families, other '
+            + 'caregivers, peers, and physical environments, within the context of culture and community.'
     },
     CPD: {
         area: 'Curriculum or Program Design',
-        gloss: 'Curriculum, schedules and responsive routines built around infant and toddler needs.'
+        gloss: 'Curriculum, schedules and responsive routines built around infant and toddler needs.',
+        descriptor: 'Infant/toddler practitioners take their cues for curriculum from the child and family. '
+            + 'They use child development knowledge, knowledge of developmentally appropriate practices, and '
+            + 'content knowledge to design, provide, promote, and evaluate opportunities and experiences that '
+            + 'support optimal development and learning in children, birth to age 3. Practitioners encourage '
+            + 'young children\u2019s social emotional competence, problem solving, critical thinking, and '
+            + 'academic competence within a nurturing, supportive, challenging learning environment that '
+            + 'emphasizes relationships, interactions, routines, and play.'
     }
 };
 
@@ -208,6 +265,7 @@ function itcCompetencyChecklist(level, coveredCodes) {
                 key: a,
                 area: COMPETENCY_AREAS[a] ? COMPETENCY_AREAS[a].area : a,
                 gloss: COMPETENCY_AREAS[a] ? COMPETENCY_AREAS[a].gloss : '',
+                descriptor: COMPETENCY_AREAS[a] ? (COMPETENCY_AREAS[a].descriptor || '') : '',
                 items: byArea[a].sort(function (x, y) { return numOf(x) - numOf(y); })
                     .map(function (code) { return { code: code, covered: !!covered[code] }; })
             };

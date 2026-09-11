@@ -219,7 +219,19 @@
         border-bottom: 1px solid var(--sp-border);
     }
     .sp-comp-area .hdr .a { font-size: 0.78rem; font-weight: 800; color: var(--sp-text); }
+    .sp-comp-area .hdr .a .ct { font-size: 0.66rem; font-weight: 700; color: var(--sp-muted); }
     .sp-comp-area .hdr .g { font-size: 0.72rem; color: var(--sp-muted); line-height: 1.5; margin-top: 2px; }
+    .sp-comp-desc { margin-top: 6px; }
+    .sp-comp-desc summary {
+        cursor: pointer; font-size: 0.7rem; font-weight: 700; color: var(--sp-accent);
+        list-style: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .sp-comp-desc summary::before { content: '\25b8'; font-size: 0.6rem; transition: transform 0.1s; }
+    .sp-comp-desc[open] summary::before { transform: rotate(90deg); }
+    .sp-comp-desc summary::-webkit-details-marker { display: none; }
+    .sp-comp-desc p {
+        font-size: 0.72rem; color: var(--sp-text-2); line-height: 1.6; margin: 6px 0 2px;
+    }
     .sp-comp-list { padding: 6px 12px 10px; }
     .sp-comp-item {
         display: flex; align-items: flex-start; gap: 9px; padding: 5px 0;
@@ -926,9 +938,21 @@ function itcCompetencyCard(s) {
         + '</div>';
 
     html += areas.map(a => {
+        const areaDone = a.items.filter(it => it.covered).length;
         return '<div class="sp-comp-area">'
-            + '<div class="hdr"><div class="a">' + esc(a.area) + '</div>'
-            + (a.gloss ? '<div class="g">' + esc(a.gloss) + '</div>' : '') + '</div>'
+            + '<div class="hdr">'
+            + '<div class="a">' + esc(a.area)
+            + ' <span class="ct">' + a.items.length + ' competenc'
+            + (a.items.length === 1 ? 'y' : 'ies')
+            + (areaDone ? ', ' + areaDone + ' covered' : '') + '</span></div>'
+            + (a.gloss ? '<div class="g">' + esc(a.gloss) + '</div>' : '')
+            // The area's purpose statement, verbatim from the benchmarks PDF, tucked in a
+            // details so the panel stays scannable but the real Gateways wording is one click away.
+            + (a.descriptor
+                ? '<details class="sp-comp-desc"><summary>What this area covers</summary>'
+                  + '<p>' + esc(a.descriptor) + '</p></details>'
+                : '')
+            + '</div>'
             + '<div class="sp-comp-list">'
             + a.items.map(it =>
                 '<label class="sp-comp-item' + (it.covered ? ' covered' : '') + '">'
@@ -942,13 +966,15 @@ function itcCompetencyCard(s) {
             + '</div></div>';
     }).join('');
 
-    html += '<div class="sp-src">Areas and their per-level competency codes are transcribed '
-        + 'from the <a href="documents.html" target="_blank" rel="noopener">Infant Toddler '
-        + 'Credential Framework</a> (PD229, 12/19/2022). The framework lists competencies by '
-        + 'area rather than giving each numbered code its own sentence, so two codes in one area '
-        + 'read the same here; the exact per-code benchmark wording is in the Gateways Content '
-        + 'Area Benchmarks. Level ' + target + ' includes every competency from the levels below '
-        + 'it.</div>'
+    html += '<div class="sp-src">Competency codes and level requirements are from the '
+        + '<a href="documents.html" target="_blank" rel="noopener">Infant Toddler Credential '
+        + 'Framework</a> (PD229, 12/19/2022). The area descriptions above are transcribed from the '
+        + '<a href="documents.html" target="_blank" rel="noopener">Infant Toddler Level 2-4 '
+        + 'Benchmarks</a> (INCCRRA 2013). That benchmarks document lists the specific indicator for '
+        + 'each competency \u2014 open it for the exact wording; it is numbered by area rather than by '
+        + 'these codes, so it is linked rather than mapped line-by-line here. Level ' + target
+        + ' includes every competency from the levels below it, and Gateways assesses which are met '
+        + 'from your transcript and training record.</div>'
         + '</div>';
     return html;
 }
