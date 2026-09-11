@@ -130,7 +130,7 @@
             + 'font-family:inherit;transition:background 0.15s,opacity 0.15s;white-space:nowrap;}'
             + '.dw-btn:disabled{opacity:0.65;cursor:default;}'
             + '.dw-deploy{background:#16a34a;} .dw-deploy:hover:not(:disabled){background:#15803d;}'
-            + '.dw-restart{background:#b45309;} .dw-restart:hover:not(:disabled){background:#92400e;}'
+            + '.dw-restart{background:#475569;} .dw-restart:hover:not(:disabled){background:#334155;}'
             + '.dw-btn[data-state=ok]{background:#16a34a;} .dw-btn[data-state=fail]{background:#dc2626;}'
             + '@media print{#deployWidget{display:none !important;}}';
         document.head.appendChild(s);

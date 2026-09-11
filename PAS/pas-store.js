@@ -247,7 +247,7 @@
                     + c.localAnswers + ' entries, the server has ' + c.serverAnswers + ')').join('; ');
                 banner('&#9888; This browser holds a different copy of ' + list
                     + '. Nothing has been overwritten. Tell Clete before entering more, '
-                    + 'so the right version is the one kept.', '#b45309');
+                    + 'so the right version is the one kept.', '#3730a3');
             }
         } catch (e) {
             lastError = e.message;
