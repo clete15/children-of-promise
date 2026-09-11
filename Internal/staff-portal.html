@@ -200,15 +200,30 @@
        part of the name card rather than a box inside a box. */
     .sp-edit-panel > .sp-card { border: 0; padding: 0; margin: 0; background: transparent; }
 
-    /* Forms grouped by the authority that asks for them (ISBE / Gateways / PAS). A
-       light heading strip and a one-line note above each group's cards. */
-    .sp-formgroup { margin-top: 16px; }
+    /* Forms grouped by the authority that asks for them (ISBE / Gateways / PAS).
+       Each group gets its own accent colour so the three stand apart at a glance:
+       the heading takes the colour, and every card in the group carries a matching
+       left border. The colours are the group's own hue, not the theme accent, so
+       the meaning ("this is an ISBE form") is carried by colour consistently.
+         --grp: the accent for the group, set per-group below. */
+    .sp-formgroup { margin-top: 18px; --grp: var(--sp-accent); }
     .sp-formgroup:first-of-type { margin-top: 4px; }
     .sp-formgroup-head {
-        font-size: 0.82rem; font-weight: 800; color: var(--sp-text);
+        font-size: 0.82rem; font-weight: 800; color: var(--grp);
         text-transform: uppercase; letter-spacing: 0.03em;
+        display: inline-block; padding-bottom: 3px; border-bottom: 2px solid var(--grp);
     }
-    .sp-formgroup-note { font-size: 0.8rem; color: var(--sp-muted); margin: 2px 0 9px; line-height: 1.5; }
+    .sp-formgroup-note { font-size: 0.8rem; color: var(--sp-muted); margin: 4px 0 9px; line-height: 1.5; }
+    /* Cards in a group take that group's accent on their left edge. */
+    .sp-formgroup .sp-link { border-left: 4px solid var(--grp); }
+    .sp-formgroup .sp-link:hover { border-color: var(--grp); }
+    /* The three group hues. Chosen to read distinctly in both themes. */
+    .sp-formgroup-isbe     { --grp: #2563eb; }   /* ISBE — blue (the grant/regulatory one) */
+    .sp-formgroup-gateways { --grp: #7c3aed; }   /* Gateways — violet (your credential) */
+    .sp-formgroup-pas      { --grp: #0d9488; }   /* ExceleRate/PAS — teal (quality rating) */
+    body.sp-dark .sp-formgroup-isbe     { --grp: #7ea6ff; }
+    body.sp-dark .sp-formgroup-gateways { --grp: #b794f6; }
+    body.sp-dark .sp-formgroup-pas      { --grp: #4fd1c5; }
     .sp-links { display: flex; flex-wrap: wrap; gap: 9px; }
     .sp-link {
         display: block; flex: 1 1 220px; min-width: 200px; text-decoration: none;
@@ -1348,7 +1363,7 @@ function formsSection(s) {
             .concat(MY_FORMS.filter(f => f.group === g.key).map(formCard))
             .concat(specialTrail[g.key] || []);
         if (!cards.length) return;
-        html += '<div class="sp-formgroup">'
+        html += '<div class="sp-formgroup sp-formgroup-' + g.key + '">'
             + '<div class="sp-formgroup-head">' + esc(g.label) + '</div>'
             + '<div class="sp-formgroup-note">' + esc(g.note) + '</div>'
             + '<div class="sp-links">' + cards.join('') + '</div></div>';
