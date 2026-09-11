@@ -170,8 +170,19 @@
     /* The name sits above the tabs, so it stays visible whichever tab is open. */
     .sp-who { margin-bottom: 14px; }
     .sp-who .sp-sub { margin-bottom: 0; }
-    /* Name on the left, the Edit-my-details button on the right. */
+    /* Name on the left, the actions (classroom link + Edit) on the right. */
     .sp-who-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .sp-who-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex: 0 0 auto; }
+    /* Classroom link, styled to match the Edit button so the action row reads as one set. */
+    .sp-room-btn {
+        appearance: none; -webkit-appearance: none; cursor: pointer; text-decoration: none;
+        font-family: inherit; font-size: 0.78rem; font-weight: 700; white-space: nowrap;
+        color: var(--sp-text); background: var(--sp-surface-2);
+        border: 1.5px solid var(--sp-border); border-radius: 8px; padding: 7px 13px;
+        display: inline-flex; align-items: center; gap: 6px;
+        transition: border-color 0.12s, color 0.12s;
+    }
+    .sp-room-btn:hover { border-color: var(--sp-accent); color: var(--sp-accent); }
     .sp-edit-btn {
         flex: 0 0 auto; appearance: none; -webkit-appearance: none; cursor: pointer;
         font-family: inherit; font-size: 0.78rem; font-weight: 700;
@@ -839,6 +850,22 @@ function identityHeader(s) {
     if (!String(s.RegistryId || '').trim()) gaps++;
     if (!String(s.SemesterHoursTotal || '').trim()) gaps++;
 
+    /* Classroom links, in the name card as buttons rather than a card on Overview.
+       One per assigned room, opening that room's checklist. A room whose name is not
+       in the classroom list gets no link (there is nothing to open) and is skipped
+       rather than shown broken. */
+    const roomLinks = [s.Classroom, s.SecondaryClassroom]
+        .map(v => String(v || '').trim()).filter(Boolean)
+        .map(name => {
+            const room = ROOMS.find(r => String(r.Room || '').trim() === name);
+            return { name: name, roomNumber: room ? String(room.RoomNumber) : null };
+        })
+        .filter(r => r.roomNumber)
+        .map(r => '<a class="sp-room-btn" href="isbe.html?view=classroom&room='
+            + encodeURIComponent(r.roomNumber) + '" target="_blank" rel="noopener" '
+            + 'title="Open your room\u2019s checklist, one card per child">'
+            + '\uD83D\uDEAA ' + esc(r.name) + '</a>').join('');
+
     return '<div class="sp-card sp-who">'
         + '<div class="sp-who-row">'
         + '<div>'
@@ -848,6 +875,8 @@ function identityHeader(s) {
         + (s.RegistryId ? ' \u00b7 Registry ' + esc(s.RegistryId) : '')
         + '</div>'
         + '</div>'
+        + '<div class="sp-who-actions">'
+        + roomLinks
         + (editable
             ? '<button type="button" id="edToggle" class="sp-edit-btn" aria-expanded="false" '
               + 'aria-controls="edPanel">\u270e Edit my details'
@@ -855,6 +884,7 @@ function identityHeader(s) {
                   + ' needing attention">' + gaps + '</span>' : '')
               + '</button>'
             : '')
+        + '</div>'
         + '</div>'
         // Hidden until the button is pressed. Kept inside the name card's flow so it
         // opens directly underneath, which is what was asked for.
@@ -910,10 +940,11 @@ function closeDetailsToOverview() {
     });
 }
 
-/* ── Overview ── the four figures, anything urgent, and the way into your room. */
+/* ── Overview ── the four figures, and the transcript flag if it applies. The
+   pending/credential note and the classroom card moved off here: pending lives on
+   the Gateways Credentials tab, the classroom is a link in the name card. */
 function overviewSection(s) {
     const hours = pdHours(s);
-    const pending = pendingText(s);
     const shTotal = parseFloat(s.SemesterHoursTotal);
     const shEce = parseFloat(s.SemesterHoursEce);
     const transcriptMissing = String(s.TranscriptOnFile || '') === 'Not submitted';
@@ -949,16 +980,13 @@ function overviewSection(s) {
             + 'credential level, however many hours you have earned. Sending the transcript is '
             + 'usually the single biggest step available.</div></div>';
     }
-    if (pending) {
-        html += '<div class="sp-step caution">'
-            + '<div class="t">Something is in progress on your record</div>'
-            + '<div class="d">Recorded as: \u201c' + esc(pending) + '\u201d. A credential that is '
-            + 'pending does not count until it is awarded.</div></div>';
-    }
+    /* The "something is in progress / pending" note used to sit here too. It is a
+       Gateways status about a credential, so it now lives only on the Gateways
+       Credentials tab, where a person is looking at exactly that. Overview stays
+       about where you stand, not what Gateways is chewing on. */
     html += '</div>';
 
-    // Their room, on the overview because for a teacher it is the most-used link here.
-    html += classroomSection(s);
+    // The classroom is a link in the name card now, not a card on Overview.
     return html;
 }
 
@@ -1058,46 +1086,10 @@ function gatewaysReportAlert() {
    land on their children rather than on whichever room was looked at last.
 
    Room names on a staff record are the exact dimClassrooms names (the staff card
-   page uses a dropdown for precisely this reason), so an exact match is right
-   here; anything unmatched is named without a link rather than guessed at.
+   page uses a dropdown for precisely this reason), so an exact match is right here.
 
-   Rendered on the Overview tab rather than one of its own: it is two links, and for a
-   teacher it is the most-used thing on the page. */
-function classroomSection(s) {
-    let html = '';
-    const myRooms = [s.Classroom, s.SecondaryClassroom]
-        .map(v => String(v || '').trim()).filter(Boolean)
-        .map(name => {
-            const room = ROOMS.find(r => String(r.Room || '').trim() === name);
-            return { name: name, roomNumber: room ? String(room.RoomNumber) : null,
-                     secondary: name === String(s.SecondaryClassroom || '').trim() };
-        });
-
-    html += '<div class="sp-card">'
-        + '<h2>My classroom</h2>'
-        + (myRooms.length
-            ? '<div class="sp-sub">Your children\u2019s screenings, permission slips and parent '
-              + 'interviews. Everything opens and saves here, and a signed paper copy can be '
-              + 'checked in against the child.</div>'
-              + '<div class="sp-links">'
-              + myRooms.map(r => (r.roomNumber
-                    ? '<a class="sp-link" href="isbe.html?view=classroom&room='
-                      + encodeURIComponent(r.roomNumber) + '" target="_blank" rel="noopener">'
-                    : '<div class="sp-link">')
-                  + '<div class="n">' + esc(r.name)
-                  + (r.secondary ? ' <span class="sp-pill">part time</span>' : '') + '</div>'
-                  + '<div class="s">' + (r.roomNumber
-                      ? 'Opens your room\u2019s checklist, one card per child.'
-                      : 'This room name is not in the classroom list, so it cannot be opened '
-                        + 'directly \u2014 worth correcting on the staff record.') + '</div>'
-                  + (r.roomNumber ? '</a>' : '</div>')).join('')
-              + '</div>'
-            : '<div class="sp-sub">No classroom is recorded against your staff record, so there '
-              + 'is no room checklist to open. If you are assigned to a room, it needs adding '
-              + 'to your record.</div>')
-        + '</div>';
-    return html;
-}
+   The classroom is now a link (or links) in the name card via identityHeader, rather
+   than a card on Overview. classroomSection was removed with that change. */
 
 /* ── Forms ── their plan and the forms that belong to them. */
 function formsSection(s) {
