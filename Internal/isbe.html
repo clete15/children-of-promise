@@ -17,14 +17,6 @@
         .isbe-sidebar button span { font-size:0.68rem;color:rgba(255,255,255,0.6); }
         .isbe-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
 
-        /* Focused classroom mode: a teacher arriving from My Page's My Classroom tab
-           sees only their room's checklist, not the whole PFA/PI compliance page. The
-           sidebar of admin views is hidden and the card takes the full width; the site
-           header stays (it carries the "← Staff Portal" way back). Triggered by a body
-           class set in init() only when a room is named in the URL. */
-        body.isbe-classroom-only .isbe-sidebar { display:none; }
-        body.isbe-classroom-only .isbe-card { border-radius:12px; }
-        body.isbe-classroom-only .isbe-layout { height:calc(100vh - 90px); }
         .isbe-header { padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px; }
         .isbe-header h2 { font-size:1rem;font-weight:800;color:var(--text);margin:0; }
         .isbe-header span { font-size:0.72rem;color:var(--text-muted); }
@@ -222,41 +214,11 @@
         /* Flash a roster column when jumping to it from a checklist item */
         .col-flash { background:#fef9c3 !important;transition:background 0.3s; }
 
-        /* "My Classroom" (teacher view) */
-        .cls-roompick { display:flex;align-items:center;gap:9px;padding:12px 16px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px;flex-wrap:wrap; }
-        .cls-roompick label { font-size:0.72rem;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em; }
-        .cls-roompick select { padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:0.85rem;font-weight:600;font-family:inherit;background:white; }
-        .cls-roompick select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
-        .cls-roompick #classroomTeacher { font-size:0.76rem;color:#64748b; }
-        .cls-batch { border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;margin-bottom:18px; }
-        .cls-batch-head { padding:10px 15px;background:#f8fafc;border-bottom:1px solid #e5e7eb;font-size:0.78rem;font-weight:800;color:#1e293b; }
-        .cls-batch-row { display:flex;align-items:center;gap:10px;padding:9px 15px;border-bottom:1px solid #f8fafc;font-size:0.78rem; }
-        .cls-batch-row:last-child { border-bottom:none; }
-        .cls-batch-label { font-weight:700;color:#334155;flex:1; }
-        .cls-batch-count { font-size:0.72rem;color:#92400e;background:#fffbeb;padding:3px 9px;border-radius:11px;font-weight:700;white-space:nowrap; }
-        .cls-batch-row a { color:#2563eb;text-decoration:none;font-weight:700;font-size:0.72rem;white-space:nowrap; }
-        .cls-batch-row a:hover { text-decoration:underline; }
-        .cls-alldone, .cls-empty { padding:16px;border-radius:10px;font-size:0.8rem;margin-bottom:18px; }
-        .cls-alldone { background:#f0fdf4;color:#166534;border:1px solid #bbf7d0; }
-        .cls-empty { background:#f8fafc;color:#64748b;border:1px solid #e5e7eb; }
-        .cls-cards { display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px; }
-        .cls-card { border:1px solid #e5e7eb;border-radius:10px;padding:13px 15px;background:white; }
-        .cls-card-head { display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px; }
-        .cls-name { font-size:0.88rem;font-weight:700;color:#1e293b; }
-        .cls-meta { font-size:0.69rem;color:#94a3b8;margin-top:2px; }
-        .cls-out { font-size:0.66rem;font-weight:700;color:#92400e;background:#fffbeb;padding:3px 9px;border-radius:11px;white-space:nowrap;flex-shrink:0; }
-        .cls-ok { font-size:0.66rem;font-weight:700;color:#166534;background:#f0fdf4;padding:3px 9px;border-radius:11px;white-space:nowrap;flex-shrink:0; }
-        .cls-chips { display:flex;flex-wrap:wrap;gap:5px; }
-        .cls-chip { display:inline-flex;align-items:center;gap:5px;font-size:0.69rem;font-weight:600;padding:4px 9px;border-radius:6px;border:1px solid #e2e8f0;background:white;color:#475569;text-decoration:none;white-space:nowrap; }
-        a.cls-chip:hover { border-color:#2563eb;color:#1d4ed8;background:#eff6ff; }
-        .cls-chip-done { background:#f0fdf4;border-color:#bbf7d0;color:#166534; }
-        a.cls-chip-done:hover { background:#dcfce7;border-color:#86efac;color:#166534; }
-        .cls-dl { font-size:0.62rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px; }
-        /* Ticked with nothing saved behind it. Amber, not red: done on paper is allowed. */
-        .cls-paper { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;
-                     background:#fffbeb;color:#b45309;cursor:help; }
-        .cls-dl-overdue { background:#fef2f2;color:#b91c1c; }
-        .cls-dl-due { background:#fffbeb;color:#92400e; }
+        /* The "My Classroom" (teacher) view moved to My Page (staff-portal.html)
+           on 10 Sep 2026, along with its .cls-* styles. My Page opens the same
+           three child-record forms through the shared classroom-forms.js module;
+           this page still uses its own inline copies of those modals below, for the
+           roster and compliance [form] links. */
 
         /* "What Needs Doing" panel */
         .sy-header { padding:14px 18px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px; }
@@ -365,12 +327,9 @@
                 <div>🚦 What Needs<br>Doing</div>
                 <span id="startYearCount"></span>
             </button>
-            <!-- Teacher-facing. One classroom, both programs, only the tasks a
-                 teacher owns. Teachers do not think in PFA versus PI. -->
-            <button id="btnClassroom" onclick="setProgram('classroom')">
-                <div>🏫 My Classroom</div>
-                <span id="classroomCount"></span>
-            </button>
+            <!-- "My Classroom" used to sit here. It is now a teacher's own tab on
+                 My Page (staff-portal.html), which is where teachers work, so it was
+                 removed from this director-facing compliance page. -->
             <button class="active" id="btnPFA" onclick="setProgram('PFA')">
                 <div>📋 PFA Roster</div>
                 <span id="pfaCount"></span>
@@ -425,15 +384,7 @@
             <div id="startYearPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
                 <div id="startYearBody"></div>
             </div>
-            <!-- My Classroom (teacher view) -->
-            <div id="classroomPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
-                <div class="cls-roompick">
-                    <label for="classroomRoom">Classroom</label>
-                    <select id="classroomRoom" onchange="setClassroomRoom(this.value)"></select>
-                    <span id="classroomTeacher"></span>
-                </div>
-                <div id="classroomBody"></div>
-            </div>
+            <!-- The My Classroom panel moved to My Page (staff-portal.html). -->
             <!-- Screening Follow-Up: children whose screening flagged a concern -->
             <div id="followUpPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
                 <p style="font-size:0.78rem;color:#6b7280;margin-bottom:16px;">
@@ -1135,32 +1086,12 @@ async function init() {
         document.getElementById('piCount').textContent = piCount + ' students';
         updateFollowUpCount();
         updateStartYearCount();
-        // Deep link, e.g. the portal's My Classroom card. Falls through to the
-        // default PFA roster for anything unrecognised.
+        // Deep link into one of the director-facing views. Falls through to the
+        // default PFA roster for anything unrecognised. (The old view=classroom
+        // deep link is gone — My Classroom now lives on My Page.)
         const params = new URLSearchParams(location.search);
         const wanted = params.get('view');
-        const VIEWS = ['classroom', 'startYear', 'followUp', 'PFA', 'PI', 'pfaCompliance', 'piCompliance'];
-        /* A room can be named in the link, so the staff portal can send someone
-           straight to their own classroom rather than to whichever room they last
-           looked at. Set before setProgram so the first render is already correct,
-           and only when the room actually has children in one of the programs. */
-        const roomWanted = params.get('room');
-        if (roomWanted && classroomOptions().some(o => o.roomNumber === String(roomWanted))) {
-            activeClassroomRoom = String(roomWanted);
-        }
-        /* Focused classroom mode: when My Page links a teacher straight to their room
-           (view=classroom&room=...), hide the ISBE sidebar and site header so they see
-           only their room's checklist, not the whole PFA/PI compliance page. The view
-           itself is unchanged — this only strips the surrounding chrome. Any other
-           entry to view=classroom (an admin clicking the sidebar) is untouched, because
-           it does not carry a room in the URL. */
-        if (wanted === 'classroom' && roomWanted) {
-            document.body.classList.add('isbe-classroom-only');
-            // Point the header's way-back at My Page's classroom tab, since that is
-            // where the teacher came from, rather than the general staff dashboard.
-            var back = document.querySelector('.header-back');
-            if (back) { back.setAttribute('href', 'staff-portal.html#classroom'); back.textContent = '\u2190 My Page'; }
-        }
+        const VIEWS = ['startYear', 'followUp', 'PFA', 'PI', 'pfaCompliance', 'piCompliance'];
         if (wanted && VIEWS.indexOf(wanted) !== -1) setProgram(wanted);
         else renderRoster();
     } catch(e) {
@@ -1179,8 +1110,7 @@ function getRoom(roomNum) {
 // looking at My Classroom or What Needs Doing, so a just-saved form appeared to
 // do nothing.
 function refreshActiveView() {
-    if (activeProgram === 'classroom') renderClassroom();
-    else if (activeProgram === 'startYear') renderStartYear();
+    if (activeProgram === 'startYear') renderStartYear();
     else if (activeProgram === 'followUp') renderFollowUp();
     else if (activeProgram === 'PFA' || activeProgram === 'PI') renderRoster();
     updateFollowUpCount();
@@ -1195,14 +1125,12 @@ function setProgram(prog) {
     document.getElementById('btnPICompliance').classList.toggle('active', prog === 'piCompliance');
     document.getElementById('btnFollowUp').classList.toggle('active', prog === 'followUp');
     document.getElementById('btnStartYear').classList.toggle('active', prog === 'startYear');
-    document.getElementById('btnClassroom').classList.toggle('active', prog === 'classroom');
 
     const grid = document.getElementById('isbeRosterGrid');
     const compliance = document.getElementById('compliancePanel');
     const followUp = document.getElementById('followUpPanel');
     const startYear = document.getElementById('startYearPanel');
-    const classroom = document.getElementById('classroomPanel');
-    [grid, compliance, followUp, startYear, classroom].forEach(el => { el.style.display = 'none'; });
+    [grid, compliance, followUp, startYear].forEach(el => { el.style.display = 'none'; });
 
     if (prog === 'pfaCompliance' || prog === 'piCompliance') {
         document.getElementById('isbeTitle').textContent = prog === 'pfaCompliance' ? 'PFA Compliance' : 'PI Compliance';
@@ -1219,10 +1147,6 @@ function setProgram(prog) {
         document.getElementById('isbeCount').textContent = '';
         startYear.style.display = 'block';
         renderStartYear();
-    } else if (prog === 'classroom') {
-        document.getElementById('isbeTitle').textContent = 'My Classroom';
-        classroom.style.display = 'block';
-        renderClassroom();
     } else {
         document.getElementById('isbeTitle').textContent = prog + ' Roster';
         grid.style.display = 'block';
@@ -1741,13 +1665,10 @@ function serializeModalForPrint(modalEl) {
 }
 
 async function printAllForColumn(field) {
-    // Scope follows the view you triggered this from. Without this, printing from
-    // My Classroom matched no one (activeProgram is 'classroom', not a program
-    // value) and printing from a roster would have spanned every room.
-    const roster = activeProgram === 'classroom'
-        ? classroomRoster(activeClassroomRoom)
-        : students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'))
-            .sort(sortByRoomThenName);
+    // Scoped to the program roster in view. (The classroom scope moved to My Page,
+    // which prints through its own copy of this in classroom-forms.js.)
+    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'))
+        .sort(sortByRoomThenName);
     const unchecked = roster.filter(s => !(trackingData[s.Id] || {})[field]);
     if (!unchecked.length) { alert('All forms in this column are already completed!'); return; }
 
@@ -3003,192 +2924,13 @@ async function loadCompliance(prog) {
     list.innerHTML = html;
 }
 
-/* ── My Classroom (teacher view) ──
-   The compliance roster answers the director's question: is every file complete
-   across a program. A teacher has a different question: what do I owe on my own
-   children this week. So this view scopes to one room, ignores the PFA/PI split
-   (a classroom usually holds both, and it is not a distinction a teacher acts
-   on), and shows only the columns that are classroom work.
-
-   It reuses the existing screening and permission-slip modals rather than
-   duplicating them, so there is one place where a screening gets entered. */
-
-const CLASSROOM_ROOM_KEY = 'cofp.classroom.room';
-
-// Columns a teacher is responsible for. Income verification, SIS entry, grant
-// reports and the PI6/PI7 family documents are office work and stay out.
-function teacherColumns() {
-    return COLUMNS.filter(c => c.teacher);
-}
-
-function classroomRoster(roomNumber) {
-    return students
-        .filter(s => (s.Active === 'Yes' || s.Active === 'YES')
-            && String(s.RoomNumber) === String(roomNumber)
-            // Only children in a tracked program have a checklist to complete.
-            && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI'))
-        .sort(sortByName);
-}
-
-// Rooms that actually hold tracked children, so the picker is not a list of
-// empty classrooms.
-function classroomOptions() {
-    const counts = {};
-    students.forEach(s => {
-        if (!(s.Active === 'Yes' || s.Active === 'YES')) return;
-        if (s.PFA_PI_na !== 'PFA' && s.PFA_PI_na !== 'PI') return;
-        const rn = String(s.RoomNumber || '');
-        if (!rn) return;
-        counts[rn] = (counts[rn] || 0) + 1;
-    });
-    return Object.keys(counts)
-        .sort((a, b) => (parseInt(a) || 9999) - (parseInt(b) || 9999))
-        .map(rn => ({ roomNumber: rn, label: getRoom(rn), count: counts[rn] }));
-}
-
-let activeClassroomRoom = null;
-
-function setClassroomRoom(roomNumber) {
-    activeClassroomRoom = roomNumber;
-    try { localStorage.setItem(CLASSROOM_ROOM_KEY, roomNumber); } catch (e) { /* private mode */ }
-    renderClassroom();
-}
-
-// The soonest deadline affecting a child, used to sort the most urgent first.
-function childUrgency(s) {
-    let worst = null;
-    ['BegASQ', 'BegASE'].forEach(field => {
-        if ((trackingData[s.Id] || {})[field]) return;
-        // Only late enrollees have an individual clock that should raise urgency.
-        if (!isLateEnrollee(s, activeSchoolYear)) return;
-        const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
-        const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
-        const dl = screeningDeadline(s, rec && rec.ScreeningDate, activeSchoolYear);
-        if (!dl) return;
-        const rank = dl.state === 'overdue' ? 0 : dl.state === 'due' ? 1 : 2;
-        if (worst === null || rank < worst) worst = rank;
-    });
-    return worst === null ? 3 : worst;
-}
-
-function renderClassroom() {
-    const opts = classroomOptions();
-    const sel = document.getElementById('classroomRoom');
-
-    // Remember the teacher's room between visits so they land on it.
-    if (activeClassroomRoom === null) {
-        let saved = null;
-        try { saved = localStorage.getItem(CLASSROOM_ROOM_KEY); } catch (e) { /* ignore */ }
-        activeClassroomRoom = (saved && opts.some(o => o.roomNumber === saved))
-            ? saved
-            : (opts.length ? opts[0].roomNumber : '');
-    }
-
-    sel.innerHTML = opts.map(o =>
-        '<option value="' + o.roomNumber + '">' + o.label + ' (' + o.count + ')</option>').join('');
-    sel.value = activeClassroomRoom;
-
-    const room = classrooms.find(c => String(c.RoomNumber) === String(activeClassroomRoom));
-    document.getElementById('classroomTeacher').textContent = room && room.TeacherDescription
-        ? room.TeacherDescription : '';
-
-    const roster = classroomRoster(activeClassroomRoom);
-    const cols = teacherColumns();
-    document.getElementById('isbeCount').textContent = roster.length + ' children';
-    document.getElementById('classroomCount').textContent = roster.length
-        ? roster.length + ' children' : '';
-
-    const body = document.getElementById('classroomBody');
-    if (!roster.length) {
-        body.innerHTML = '<div class="cls-empty">No active PFA or PI children in this classroom.</div>';
-        return;
-    }
-
-    // Batch actions first: a teacher works a whole task at a time.
-    const batch = cols.map(col => {
-        // Outstanding means no form on file, so a box ticked with nothing behind it
-        // still appears here. This is the same rule the roster and the compliance
-        // roll-up use; the three views disagreeing is what made the ticks useless.
-        const missing = roster.filter(s =>
-            !ChildForms.isDone(s.Id, col.field, !!(trackingData[s.Id] || {})[col.field]));
-        if (!missing.length) return '';
-        const label = col.label.replace(/<br>/g, ' ');
-        const printBtn = columnHasForm(col)
-            ? '<a href="#" onclick="event.preventDefault();printAllForColumn(\'' + col.field + '\')">print all ' + missing.length + '</a>'
-            : '';
-        return '<div class="cls-batch-row"><span class="cls-batch-label">' + label + '</span>'
-            + '<span class="cls-batch-count">' + missing.length + ' to do</span>' + printBtn + '</div>';
-    }).filter(Boolean).join('');
-
-    const batchBlock = batch
-        ? '<div class="cls-batch"><div class="cls-batch-head">Outstanding for this classroom</div>' + batch + '</div>'
-        : '<div class="cls-alldone">Everything on the classroom checklist is complete for '
-            + activeSchoolYear + '. Nothing outstanding.</div>';
-
-    // Then one card per child, most urgent first.
-    const cards = roster.slice().sort((a, b) => {
-        const d = childUrgency(a) - childUrgency(b);
-        return d !== 0 ? d : sortByName(a, b);
-    }).map(s => {
-        const t = trackingData[s.Id] || {};
-        const chips = cols.map(col => {
-            const st = ChildForms.state(s.Id, col.field, !!t[col.field]);
-            const done = st === 'form' || st === 'tick' || st === 'unknown';
-            const label = col.label.replace(/<br>/g, ' ');
-            // A tick with no form behind it is its own state, not "done" and not
-            // "nothing done". Marked so the teacher knows which of the two it is.
-            let extra = st === 'tick-only'
-                ? '<span class="cls-paper" title="Ticked, but nothing is saved here. '
-                  + 'If it was done on paper that is fine; otherwise open the form.">on paper?</span>'
-                : '';
-            let action = '';
-            if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
-                const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';
-                const period = col.field.indexOf('Beg') === 0 ? 'Beginning' : 'End';
-                action = 'openScreening(' + s.Id + ',\'' + type + '\',\'' + period + '\')';
-                if (!done && period === 'Beginning') {
-                    // Only late enrollees carry an individual clock. Batch children
-                    // are covered by the classroom's batch line, so their chip just
-                    // shows done/not-done without a misleading per-child countdown.
-                    if (isLateEnrollee(s, activeSchoolYear)) {
-                        const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
-                        const dl = screeningDeadline(s, rec && rec.ScreeningDate, activeSchoolYear);
-                        if (dl && (dl.state === 'overdue' || dl.state === 'due')) {
-                            // Appended, so a deadline badge does not wipe out the
-                            // "on paper?" marker when both apply to the same chip.
-                            extra += '<span class="cls-dl cls-dl-' + dl.state + '">' + dl.text + '</span>';
-                        }
-                    }
-                }
-            } else if (col.field === 'PermissionSlip') {
-                action = 'openPermissionSlip(' + s.Id + ')';
-            } else if (col.field === 'ParentInterview') {
-                action = 'openInterview(' + s.Id + ')';
-            }
-            const cls = 'cls-chip' + (done ? ' cls-chip-done' : '');
-            const inner = (done ? '\u2713 ' : '') + label + extra;
-            return action
-                ? '<a href="#" class="' + cls + '" onclick="event.preventDefault();' + action + '">' + inner + '</a>'
-                : '<span class="' + cls + '">' + inner + '</span>';
-        }).join('');
-
-        const outstanding = cols.filter(col =>
-            !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
-        const status = outstanding
-            ? '<span class="cls-out">' + outstanding + ' outstanding</span>'
-            : '<span class="cls-ok">complete</span>';
-
-        return '<div class="cls-card">'
-            + '<div class="cls-card-head">'
-            + '<div><div class="cls-name">' + childNameCell(s) + '</div>'
-            + '<div class="cls-meta">' + (s.PFA_PI_na || '') + (s.Birth_date ? ' &middot; born ' + s.Birth_date : '')
-            + (s.Start_Date ? ' &middot; enrolled ' + s.Start_Date : '') + '</div></div>'
-            + status + '</div>'
-            + '<div class="cls-chips">' + chips + '</div></div>';
-    }).join('');
-
-    body.innerHTML = batchBlock + '<div class="cls-cards">' + cards + '</div>';
-}
+/* ── My Classroom (teacher view) — MOVED ──────────────────────────────────────
+   The teacher's room checklist now lives on My Page (staff-portal.html), which is
+   where teachers work. The room picker, outstanding list and per-child cards were
+   removed from this director-facing compliance page on 10 Sep 2026. My Page opens
+   the Parent Interview, Permission Slip and Screening forms through the shared
+   classroom-forms.js module; this page keeps its own inline copies (below) for the
+   roster and compliance [form] links, saving to the same endpoints either way. */
 
 /* ── What Needs Doing ──
    Answers "what is outstanding right now" for the year in view.

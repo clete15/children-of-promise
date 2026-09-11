@@ -289,6 +289,44 @@
         font: inherit; font-size: 0.76rem; font-weight: 600; color: var(--sp-muted);
     }
     .sp-theme:hover { color: var(--sp-accent); }
+
+    /* ── My Classroom (teacher checklist) ──
+       Ported from the ISBE classroom view, but recoloured onto this page's theme
+       variables so it works in dark mode and — deliberately — carries no amber:
+       the "outstanding"/"on paper?" markers use the indigo attention palette
+       (--sp-warn-*) rather than the brown/amber the director asked us to drop. */
+    .cls-roompick { display:flex;align-items:center;gap:9px;padding:12px 16px;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-radius:10px;margin-bottom:16px;flex-wrap:wrap; }
+    .cls-roompick label { font-size:0.72rem;font-weight:700;color:var(--sp-muted);text-transform:uppercase;letter-spacing:0.04em; }
+    .cls-roompick select { padding:6px 10px;border:1px solid var(--sp-border-in);border-radius:6px;font-size:0.85rem;font-weight:600;font-family:inherit;background:var(--sp-surface);color:var(--sp-text); }
+    .cls-roompick select:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+    .cls-roompick #clsTeacher { font-size:0.76rem;color:var(--sp-muted); }
+    .cls-batch { border:1px solid var(--sp-border);border-radius:10px;overflow:hidden;margin-bottom:18px; }
+    .cls-batch-head { padding:10px 15px;background:var(--sp-surface-2);border-bottom:1px solid var(--sp-border);font-size:0.78rem;font-weight:800;color:var(--sp-text); }
+    .cls-batch-row { display:flex;align-items:center;gap:10px;padding:9px 15px;border-bottom:1px solid var(--sp-border);font-size:0.78rem; }
+    .cls-batch-row:last-child { border-bottom:none; }
+    .cls-batch-label { font-weight:700;color:var(--sp-text-2);flex:1; }
+    .cls-batch-count { font-size:0.72rem;color:var(--sp-warn-fg);background:var(--sp-warn-bg);padding:3px 9px;border-radius:11px;font-weight:700;white-space:nowrap; }
+    .cls-batch-row a { color:var(--sp-accent);text-decoration:none;font-weight:700;font-size:0.72rem;white-space:nowrap; }
+    .cls-batch-row a:hover { text-decoration:underline; }
+    .cls-alldone, .cls-empty { padding:16px;border-radius:10px;font-size:0.8rem;margin-bottom:18px; }
+    .cls-alldone { background:var(--sp-good-bg);color:var(--sp-good-fg);border:1px solid var(--sp-good-br); }
+    .cls-empty { background:var(--sp-surface-2);color:var(--sp-muted);border:1px solid var(--sp-border); }
+    .cls-cards { display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px; }
+    .cls-card { border:1px solid var(--sp-border);border-radius:10px;padding:13px 15px;background:var(--sp-surface); }
+    .cls-card-head { display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px; }
+    .cls-name { font-size:0.88rem;font-weight:700;color:var(--sp-text); }
+    .cls-meta { font-size:0.69rem;color:var(--sp-quiet);margin-top:2px; }
+    .cls-out { font-size:0.66rem;font-weight:700;color:var(--sp-warn-fg);background:var(--sp-warn-bg);padding:3px 9px;border-radius:11px;white-space:nowrap;flex-shrink:0; }
+    .cls-ok { font-size:0.66rem;font-weight:700;color:var(--sp-good-fg);background:var(--sp-good-bg);padding:3px 9px;border-radius:11px;white-space:nowrap;flex-shrink:0; }
+    .cls-chips { display:flex;flex-wrap:wrap;gap:5px; }
+    .cls-chip { display:inline-flex;align-items:center;gap:5px;font-size:0.69rem;font-weight:600;padding:4px 9px;border-radius:6px;border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-text-2);text-decoration:none;white-space:nowrap; }
+    a.cls-chip:hover { border-color:var(--sp-accent);color:var(--sp-accent);background:var(--sp-accent-soft); }
+    .cls-chip-done { background:var(--sp-good-bg);border-color:var(--sp-good-br);color:var(--sp-good-fg); }
+    a.cls-chip-done:hover { background:var(--sp-good-bg);border-color:var(--sp-good-br);color:var(--sp-good-fg); }
+    .cls-dl { font-size:0.62rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px; }
+    .cls-paper { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--sp-warn-bg);color:var(--sp-warn-fg);cursor:help; }
+    .cls-dl-overdue { background:var(--sp-bad-bg);color:var(--sp-bad-fg); }
+    .cls-dl-due { background:var(--sp-warn-bg);color:var(--sp-warn-fg); }
 </style>
 </head>
 <body>
@@ -328,6 +366,15 @@
 
 <!-- The Gateways ECE and Infant Toddler level tables, for the next-steps cards. -->
 <script src="credential-framework.js"></script>
+
+<!-- Child-record form machinery, shared with isbe.html so the My Classroom tab and
+     the ISBE roster's [form] links open the very same forms. child-forms.js tells a
+     tick from a filed form; sign-pad.js is the signature canvas; pi-forms.js holds
+     the PICC document specs; classroom-forms.js is the three modals themselves. -->
+<script src="child-forms.js"></script>
+<script src="sign-pad.js"></script>
+<script src="pi-forms.js"></script>
+<script src="classroom-forms.js"></script>
 <script>
 /* ── One page per staff member ──────────────────────────────────────────────
    Answers the questions a member of staff actually has about their own standing:
@@ -351,6 +398,22 @@ let current = null;
 let WHO = null;
 // Files for whoever is currently displayed, or null while they are being fetched.
 let FILES = null;
+
+/* ── My Classroom data ──────────────────────────────────────────────────────
+   The classroom checklist needs the children, their tracking flags, their
+   screenings and the signature index — none of which the rest of My Page uses.
+   So it is loaded lazily the first time the classroom tab is shown, not on every
+   visit to the page, and CofpForms reads it through the accessors registered in
+   initClassroomForms(). clsState tracks the fetch so the panel can show loading,
+   ready or error without guessing. */
+let CLS_STUDENTS = [];
+let CLS_TRACKING = {};      // by StudentId
+let CLS_SCREENING = {};     // by StudentId -> "TYPE|Period"
+let CLS_SIGNATURES = {};    // by "studentId|Field|role"
+let CLS_YEAR = '';          // active school year, from the tracking endpoint's default
+let clsState = 'idle';      // idle | loading | ready | error
+let clsError = '';
+let activeClsRoom = null;    // room number currently shown in the picker
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -825,6 +888,8 @@ function render() {
     // the elements they belong to each time.
     wireCardActions();
     wireDetailsToggle();
+    // The classroom panel carries its own controls (room picker, chips, print all).
+    if (clsState === 'ready') wireClassroom();
 }
 
 /* Above the tabs, so the name and room stay visible whichever tab is open.
@@ -1066,41 +1131,192 @@ function gatewaysReportAlert() {
 
    Its own tab now, next to Overview, rather than a card buried under the credential
    figures — for a teacher this is the most-used thing on the page. */
-function classroomSection(s) {
-    const myRooms = [s.Classroom, s.SecondaryClassroom]
+/* The staff member's rooms, resolved to room numbers via the classroom list.
+   Room names on a staff record are the exact dimClassrooms names, so an exact
+   match is right; an unmatched name is shown but cannot be opened. */
+function myClassrooms(s) {
+    return [s.Classroom, s.SecondaryClassroom]
         .map(v => String(v || '').trim()).filter(Boolean)
         .map(name => {
             const room = ROOMS.find(r => String(r.Room || '').trim() === name);
             return { name: name, roomNumber: room ? String(room.RoomNumber) : null,
                      secondary: name === String(s.SecondaryClassroom || '').trim() };
         });
+}
 
-    return '<div class="sp-card">'
-        + '<h2>My classroom</h2>'
-        + (myRooms.length
-            ? '<div class="sp-sub">Your children\u2019s screenings, permission slips and parent '
-              + 'interviews. Everything opens and saves here, and a signed paper copy can be '
-              + 'checked in against the child.</div>'
-              + '<div class="sp-links">'
-              /* Same tab, not a new window: the focused classroom view (isbe.html with
-                 view=classroom&room= hides the compliance sidebar) reads as part of My
-                 Page, and its header links back to the My Classroom tab. */
-              + myRooms.map(r => (r.roomNumber
-                    ? '<a class="sp-link" href="isbe.html?view=classroom&room='
-                      + encodeURIComponent(r.roomNumber) + '">'
-                    : '<div class="sp-link">')
-                  + '<div class="n">' + esc(r.name)
-                  + (r.secondary ? ' <span class="sp-pill">part time</span>' : '') + '</div>'
-                  + '<div class="s">' + (r.roomNumber
-                      ? 'Opens your room\u2019s checklist, one card per child.'
-                      : 'This room name is not in the classroom list, so it cannot be opened '
-                        + 'directly \u2014 worth correcting on the staff record.') + '</div>'
-                  + (r.roomNumber ? '</a>' : '</div>')).join('')
-              + '</div>'
-            : '<div class="sp-sub">No classroom is recorded against your staff record, so there '
-              + 'is no room checklist to open. If you are assigned to a room, it needs adding '
-              + 'to your record.</div>')
-        + '</div>';
+/* ── My Classroom ──────────────────────────────────────────────────────────
+   The full room checklist, native to My Page: a room picker (limited to the
+   rooms this person is assigned to), the batch of what is outstanding for the
+   room, then one card per child with a chip for each teacher task. The chips
+   open the very same Parent Interview / Permission Slip / Screening forms the
+   ISBE roster opens, because both pages share classroom-forms.js.
+
+   The data is loaded lazily — this returns a loading state on first paint and
+   kicks off loadClassroomData(), which re-renders this panel when it lands. */
+function classroomSection(s) {
+    const rooms = myClassrooms(s);
+
+    if (!rooms.length) {
+        return '<div class="sp-card"><h2>My Classroom</h2>'
+            + '<div class="sp-sub">No classroom is recorded against your staff record, so there '
+            + 'is no room checklist to show. If you are assigned to a room, it needs adding to '
+            + 'your record.</div></div>';
+    }
+
+    // Kick off the fetch the first time the tab is rendered.
+    if (clsState === 'idle') { setTimeout(loadClassroomData, 0); }
+
+    let inner;
+    if (clsState === 'loading' || clsState === 'idle') {
+        inner = '<div class="sp-sub">Loading your room\u2019s checklist\u2026</div>';
+    } else if (clsState === 'error') {
+        inner = '<div class="sp-sub sp-err">Could not load the classroom checklist: '
+            + esc(clsError) + '</div>';
+    } else {
+        inner = classroomChecklistHtml(rooms);
+    }
+
+    return '<div class="sp-card"><h2>My Classroom</h2>'
+        + '<div class="sp-sub">Your children\u2019s screenings, permission slips and parent '
+        + 'interviews. Everything opens and saves here, and a signed paper copy can be checked '
+        + 'in against the child.</div>'
+        + inner + '</div>';
+}
+
+/* The rendered checklist once the data is in. Kept apart from classroomSection so
+   renderClassroomPanel can rebuild just this without touching the loading/error
+   wrapper logic. */
+function classroomChecklistHtml(rooms) {
+    // Land on the first assigned room that actually has children, else the first.
+    const openable = rooms.filter(r => r.roomNumber);
+    if (activeClsRoom === null || !openable.some(r => r.roomNumber === activeClsRoom)) {
+        activeClsRoom = openable.length ? openable[0].roomNumber : null;
+    }
+    if (!activeClsRoom) {
+        return '<div class="cls-empty">Your room could not be matched to the classroom list, '
+            + 'so its checklist cannot be shown. Worth correcting the room name on your record.</div>';
+    }
+
+    // Room picker — only the rooms this person is assigned to.
+    const pick = openable.length > 1
+        ? '<div class="cls-roompick"><label for="clsRoom">Room</label>'
+          + '<select id="clsRoom">'
+          + openable.map(r => '<option value="' + esc(r.roomNumber) + '"'
+              + (r.roomNumber === activeClsRoom ? ' selected' : '') + '>'
+              + esc(r.name) + (r.secondary ? ' (part time)' : '') + '</option>').join('')
+          + '</select><span id="clsTeacher"></span></div>'
+        : '';
+
+    const roster = classroomRoster(activeClsRoom);
+    const cols = CofpForms.COLUMNS;
+
+    if (!roster.length) {
+        return pick + '<div class="cls-empty">No active PFA or PI children in this classroom.</div>';
+    }
+
+    // Batch actions first: a teacher works a whole task at a time.
+    const batch = cols.map(col => {
+        const missing = roster.filter(s =>
+            !ChildForms.isDone(s.Id, col.field, !!(CLS_TRACKING[s.Id] || {})[col.field]));
+        if (!missing.length) return '';
+        const label = col.label.replace(/<br>/g, ' ');
+        const printBtn = CofpForms.columnHasForm(col.field)
+            ? '<a href="#" data-print="' + esc(col.field) + '">print all ' + missing.length + '</a>'
+            : '';
+        return '<div class="cls-batch-row"><span class="cls-batch-label">' + label + '</span>'
+            + '<span class="cls-batch-count">' + missing.length + ' to do</span>' + printBtn + '</div>';
+    }).filter(Boolean).join('');
+
+    const batchBlock = batch
+        ? '<div class="cls-batch"><div class="cls-batch-head">Outstanding for this classroom</div>' + batch + '</div>'
+        : '<div class="cls-alldone">Everything on the classroom checklist is complete for '
+            + esc(CLS_YEAR) + '. Nothing outstanding.</div>';
+
+    // One card per child, most urgent first.
+    const cards = roster.slice().sort((a, b) => {
+        const d = classroomUrgency(a) - classroomUrgency(b);
+        return d !== 0 ? d : CofpForms.sortByName(a, b);
+    }).map(s => {
+        const t = CLS_TRACKING[s.Id] || {};
+        const chips = cols.map(col => {
+            const st = ChildForms.state(s.Id, col.field, !!t[col.field]);
+            const done = st === 'form' || st === 'tick' || st === 'unknown';
+            const label = col.label.replace(/<br>/g, ' ');
+            let extra = st === 'tick-only'
+                ? '<span class="cls-paper" title="Ticked, but nothing is saved here. '
+                  + 'If it was done on paper that is fine; otherwise open the form.">on paper?</span>'
+                : '';
+            let action = '';
+            if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
+                const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';
+                const period = col.field.indexOf('Beg') === 0 ? 'Beginning' : 'End';
+                action = 'screening|' + s.Id + '|' + type + '|' + period;
+                if (!done && period === 'Beginning' && CofpForms.isLateEnrollee(s, CLS_YEAR)) {
+                    const rec = (CLS_SCREENING[s.Id] || {})[type + '|Beginning'];
+                    const dl = CofpForms.screeningDeadline(s, rec && rec.ScreeningDate, CLS_YEAR);
+                    if (dl && (dl.state === 'overdue' || dl.state === 'due')) {
+                        extra += '<span class="cls-dl cls-dl-' + dl.state + '">' + dl.text + '</span>';
+                    }
+                }
+            } else if (col.field === 'PermissionSlip') {
+                action = 'permission|' + s.Id;
+            } else if (col.field === 'ParentInterview') {
+                action = 'interview|' + s.Id;
+            }
+            const cls = 'cls-chip' + (done ? ' cls-chip-done' : '');
+            const inner = (done ? '\u2713 ' : '') + label + extra;
+            return action
+                ? '<a href="#" class="' + cls + '" data-act="' + esc(action) + '">' + inner + '</a>'
+                : '<span class="' + cls + '">' + inner + '</span>';
+        }).join('');
+
+        const outstanding = cols.filter(col =>
+            !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
+        const status = outstanding
+            ? '<span class="cls-out">' + outstanding + ' outstanding</span>'
+            : '<span class="cls-ok">complete</span>';
+
+        return '<div class="cls-card"><div class="cls-card-head">'
+            + '<div><div class="cls-name">' + esc(s.Last_Name + ', ' + s.First_Name) + '</div>'
+            + '<div class="cls-meta">' + esc(s.PFA_PI_na || '')
+            + (s.Birth_date ? ' \u00b7 born ' + esc(s.Birth_date) : '')
+            + (s.Start_Date ? ' \u00b7 enrolled ' + esc(s.Start_Date) : '') + '</div></div>'
+            + status + '</div>'
+            + '<div class="cls-chips">' + chips + '</div></div>';
+    }).join('');
+
+    return pick + batchBlock + '<div class="cls-cards">' + cards + '</div>';
+}
+
+/* Wire the classroom panel's controls after each render: the room picker, the chip
+   clicks (which open the shared forms), and the Print All links. Delegated through
+   data- attributes rather than inline onclick, so the handlers survive the CSP and
+   there is no global leakage. */
+function wireClassroom() {
+    const teacher = document.getElementById('clsTeacher');
+    if (teacher && activeClsRoom != null) {
+        teacher.textContent = CofpForms.getTeacher(activeClsRoom) || '';
+    }
+    const sel = document.getElementById('clsRoom');
+    if (sel) sel.addEventListener('change', () => {
+        activeClsRoom = sel.value;
+        renderClassroomPanel();
+    });
+    document.querySelectorAll('#sppanel_classroom [data-act]').forEach(a => {
+        a.addEventListener('click', e => {
+            e.preventDefault();
+            const parts = a.getAttribute('data-act').split('|');
+            if (parts[0] === 'interview') CofpForms.openInterview(parseInt(parts[1], 10));
+            else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
+            else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
+        });
+    });
+    document.querySelectorAll('#sppanel_classroom [data-print]').forEach(a => {
+        a.addEventListener('click', e => {
+            e.preventDefault();
+            CofpForms.printAllForColumn(a.getAttribute('data-print'));
+        });
+    });
 }
 
 /* ── Forms ── their plan and the forms that belong to them. */
@@ -1309,6 +1525,128 @@ async function loadFiles(staffId) {
         FILES = { error: e.message || 'could not reach the server' };
     }
     render();
+}
+
+/* The school year in view, computed the same way isbe.html does (July rollover),
+   so a form saved from My Classroom lands in the same year the ISBE roster shows. */
+function currentSchoolYear() {
+    const now = new Date();
+    const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return y + '-' + (y + 1);
+}
+
+/* Register My Page with the shared form module. Called once, before any form is
+   opened. CofpForms reads live data through these accessors, so it never holds a
+   stale snapshot and never needs to know how My Page stores things.
+
+   injectAssets is left on (the default) so the modal markup and CSS are added to
+   this page — staff-portal.html does not ship them inline the way isbe.html does. */
+let clsFormsReady = false;
+function initClassroomForms() {
+    if (clsFormsReady || !window.CofpForms) return;
+    CofpForms.init({
+        getStudents: () => CLS_STUDENTS,
+        getClassrooms: () => ROOMS,
+        getTracking: () => CLS_TRACKING,
+        getScreening: () => CLS_SCREENING,
+        getSignatures: () => CLS_SIGNATURES,
+        setSignatures: sig => { CLS_SIGNATURES = sig || {}; },
+        getYear: () => CLS_YEAR || currentSchoolYear(),
+        apiFetch: (url, opts) => myFetch(url, opts),
+        ChildForms: window.ChildForms,
+        // After a save the module calls this so the open room re-renders with the
+        // new tick, exactly as isbe.html's refreshActiveView does for its views.
+        refreshActiveView: () => renderClassroomPanel(),
+        // Print All in the classroom is scoped to the room on screen.
+        classroomRoster: () => classroomRoster(activeClsRoom)
+    });
+    clsFormsReady = true;
+}
+
+/* Load the classroom dataset once, the first time the tab is opened. Mirrors the
+   fetches isbe.html does in its init: students, tracking, screening, the signature
+   index, and which forms exist (ChildForms). Anything optional degrades quietly —
+   the checklist still works without screenings or signatures, it just cannot show
+   deadlines or signed state. */
+async function loadClassroomData() {
+    if (clsState === 'loading' || clsState === 'ready') return;
+    clsState = 'loading';
+    CLS_YEAR = currentSchoolYear();
+    try {
+        initClassroomForms();
+        const yq = url => url + (url.indexOf('?') === -1 ? '?' : '&') + 'year=' + encodeURIComponent(CLS_YEAR);
+        const [sRes, tRes, scrRes] = await Promise.all([
+            myFetch('/api/students'),
+            myFetch(yq('/api/isbe-tracking')).catch(() => null),
+            myFetch(yq('/api/screening-summary')).catch(() => null),
+            // Which forms actually exist behind a tick, so "on paper?" shows from the
+            // first render. Optional; ChildForms falls back to tick-only if absent.
+            (window.ChildForms && ChildForms.load) ? ChildForms.load(CLS_YEAR, myFetch).catch(() => null) : Promise.resolve(),
+            (window.CofpForms) ? CofpForms.loadSignatures(CLS_YEAR).then(s => { CLS_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve()
+        ]);
+        if (!sRes || !sRes.ok) throw new Error('students: HTTP ' + (sRes ? sRes.status : '—'));
+        CLS_STUDENTS = await sRes.json();
+        if (!Array.isArray(CLS_STUDENTS)) CLS_STUDENTS = [];
+        CLS_TRACKING = {};
+        if (tRes && tRes.ok) {
+            const tData = await tRes.json();
+            (Array.isArray(tData) ? tData : []).forEach(t => { CLS_TRACKING[t.StudentId] = t; });
+        }
+        CLS_SCREENING = {};
+        if (scrRes && scrRes.ok) {
+            try {
+                const scr = await scrRes.json();
+                if (Array.isArray(scr)) scr.forEach(s => {
+                    if (!CLS_SCREENING[s.StudentId]) CLS_SCREENING[s.StudentId] = {};
+                    CLS_SCREENING[s.StudentId][s.ScreeningType + '|' + s.Period] = s;
+                });
+            } catch (e) { /* additive */ }
+        }
+        clsState = 'ready';
+    } catch (e) {
+        console.error('[MY CLASSROOM] load failed', e);
+        clsState = 'error';
+        clsError = e.message;
+    }
+    renderClassroomPanel();
+}
+
+/* Active PFA/PI children in a room, most-relevant program only, sorted by name.
+   Same rule as isbe.html's classroomRoster: only children in a tracked program
+   have a checklist. */
+function classroomRoster(roomNumber) {
+    return CLS_STUDENTS
+        .filter(s => (s.Active === 'Yes' || s.Active === 'YES')
+            && String(s.RoomNumber) === String(roomNumber)
+            && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI'))
+        .sort(CofpForms.sortByName);
+}
+
+/* The soonest deadline affecting a child, so the most urgent card sorts first.
+   Mirrors isbe.html's childUrgency. */
+function classroomUrgency(s) {
+    let worst = null;
+    ['BegASQ', 'BegASE'].forEach(field => {
+        if ((CLS_TRACKING[s.Id] || {})[field]) return;
+        if (!CofpForms.isLateEnrollee(s, CLS_YEAR)) return;
+        const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
+        const rec = (CLS_SCREENING[s.Id] || {})[type + '|Beginning'];
+        const dl = CofpForms.screeningDeadline(s, rec && rec.ScreeningDate, CLS_YEAR);
+        if (!dl) return;
+        const rank = dl.state === 'overdue' ? 0 : dl.state === 'due' ? 1 : 2;
+        if (worst === null || rank < worst) worst = rank;
+    });
+    return worst === null ? 3 : worst;
+}
+
+/* Redraw only the classroom panel in place, so a save or a room change does not
+   rebuild the whole page (which would also collapse any open form). Falls back to
+   a full render if the panel is not on screen. */
+function renderClassroomPanel() {
+    const panel = document.getElementById('sppanel_classroom');
+    if (!panel) { if (current) render(); return; }
+    panel.innerHTML = classroomSection(current);
+    wireClassroom();
 }
 
 async function load() {
