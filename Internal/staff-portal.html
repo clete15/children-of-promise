@@ -81,10 +81,10 @@
         padding: 16px 18px; margin-bottom: 16px;
     }
     .sp-card h2 {
-        font-size: 0.95rem; font-weight: 800; color: var(--sp-text); margin: 0 0 4px;
+        font-size: 1.08rem; font-weight: 800; color: var(--sp-text); margin: 0 0 4px;
     }
     .sp-card .sp-sub {
-        font-size: 0.76rem; color: var(--sp-muted); line-height: 1.6; margin-bottom: 12px;
+        font-size: 0.86rem; color: var(--sp-muted); line-height: 1.6; margin-bottom: 12px;
     }
     .sp-grid { display: flex; flex-wrap: wrap; gap: 12px; }
     .sp-tile {
@@ -92,11 +92,11 @@
         border-radius: 9px; padding: 12px 14px; background: var(--sp-surface-2);
     }
     .sp-tile .lbl {
-        font-size: 0.64rem; font-weight: 700; text-transform: uppercase;
+        font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.04em; color: var(--sp-muted); margin-bottom: 4px;
     }
-    .sp-tile .val { font-size: 1.15rem; font-weight: 800; color: var(--sp-text); line-height: 1.2; }
-    .sp-tile .note { font-size: 0.7rem; color: var(--sp-muted); margin-top: 5px; line-height: 1.5; }
+    .sp-tile .val { font-size: 1.32rem; font-weight: 800; color: var(--sp-text); line-height: 1.2; }
+    .sp-tile .note { font-size: 0.8rem; color: var(--sp-muted); margin-top: 5px; line-height: 1.5; }
     .sp-tile.good { background: var(--sp-good-bg); border-color: var(--sp-good-br); }
     .sp-tile.warn { background: var(--sp-warn-bg); border-color: var(--sp-warn-br); }
     .sp-tile.bad  { background: var(--sp-bad-bg);  border-color: var(--sp-bad-br); }
@@ -109,7 +109,7 @@
         background: var(--sp-surface); color: var(--sp-text);
     }
     .sp-pill {
-        display: inline-block; font-size: 0.68rem; font-weight: 700;
+        display: inline-block; font-size: 0.74rem; font-weight: 700;
         padding: 2px 9px; border-radius: 11px; white-space: nowrap;
         background: var(--sp-pill-bg); color: var(--sp-muted);
     }
@@ -120,8 +120,8 @@
         border-radius: 8px; padding: 11px 14px; margin-bottom: 9px;
         background: var(--sp-surface);
     }
-    .sp-step .t { font-size: 0.84rem; font-weight: 700; color: var(--sp-text); }
-    .sp-step .d { font-size: 0.76rem; color: var(--sp-text-2); line-height: 1.6; margin-top: 4px; }
+    .sp-step .t { font-size: 0.92rem; font-weight: 700; color: var(--sp-text); }
+    .sp-step .d { font-size: 0.85rem; color: var(--sp-text-2); line-height: 1.6; margin-top: 4px; }
     .sp-step.done { border-left-color: #16a34a; background: var(--sp-good-bg); }
     /* Severity variants, replacing the inline border colours the script used to set. */
     .sp-step.alert { border-left-color: #dc2626; margin-top: 12px; }
@@ -148,7 +148,7 @@
     .sp-tabs::-webkit-scrollbar { display: none; }
     .sp-tab {
         appearance: none; -webkit-appearance: none; background: transparent; border: 0;
-        font-family: inherit; font-size: 0.82rem; font-weight: 700; cursor: pointer;
+        font-family: inherit; font-size: 0.92rem; font-weight: 700; cursor: pointer;
         color: var(--sp-muted); padding: 10px 15px 11px; margin-bottom: -1.5px;
         border-bottom: 3px solid transparent; border-radius: 8px 8px 0 0;
         display: flex; align-items: center; gap: 7px; white-space: nowrap;
@@ -169,13 +169,17 @@
     .sp-panel[hidden] { display: none; }
     /* The name sits above the tabs, so it stays visible whichever tab is open. */
     .sp-who { margin-bottom: 14px; }
-    .sp-who .sp-sub { margin-bottom: 0; }
+    .sp-who h2 { font-size: 1.25rem; }
+    .sp-who .sp-sub { margin-bottom: 0; font-size: 0.9rem; }
+    /* The summary tiles now live inside the name card; a little space sets them off
+       from the name/role line above without a second border. */
+    .sp-standing { margin-top: 14px; }
     /* Name on the left, the actions (classroom link + Edit) on the right. */
     .sp-who-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
     .sp-who-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex: 0 0 auto; }
     .sp-edit-btn {
         flex: 0 0 auto; appearance: none; -webkit-appearance: none; cursor: pointer;
-        font-family: inherit; font-size: 0.78rem; font-weight: 700;
+        font-family: inherit; font-size: 0.86rem; font-weight: 700;
         color: var(--sp-accent); background: var(--sp-accent-soft);
         border: 1.5px solid var(--sp-border); border-radius: 8px; padding: 7px 13px;
         display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
@@ -203,9 +207,9 @@
     }
     .sp-link:hover { border-color: var(--sp-accent); background: var(--sp-accent-soft); }
     .sp-link.waiting { border-color: var(--sp-warn-br); background: var(--sp-warn-bg); }
-    .sp-link .n { font-size: 0.82rem; font-weight: 700; color: var(--sp-text); }
-    .sp-link .s { font-size: 0.71rem; color: var(--sp-muted); margin-top: 3px; }
-    .sp-src { font-size: 0.7rem; color: var(--sp-muted); margin-top: 10px; line-height: 1.6; }
+    .sp-link .n { font-size: 0.92rem; font-weight: 700; color: var(--sp-text); }
+    .sp-link .s { font-size: 0.8rem; color: var(--sp-muted); margin-top: 3px; }
+    .sp-src { font-size: 0.78rem; color: var(--sp-muted); margin-top: 10px; line-height: 1.6; }
     .sp-src a { color: var(--sp-accent); }
 
     /* ── Credential routes, two columns ──────────────────────────────────────
@@ -221,9 +225,9 @@
     .sp-cred-head {
         display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;
     }
-    .sp-cred-head .n { font-size: 0.9rem; font-weight: 800; color: var(--sp-text); }
+    .sp-cred-head .n { font-size: 1rem; font-weight: 800; color: var(--sp-text); }
     .sp-cred-head .lvl {
-        font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
         padding: 2px 8px; border-radius: 999px; background: var(--sp-accent-soft); color: var(--sp-accent);
     }
 
@@ -233,13 +237,13 @@
        the right, nothing to interact with. */
     .req-list { margin-top: 2px; }
     .req {
-        display: flex; gap: 10px; padding: 5px 0;
-        border-top: 1px solid var(--sp-border); font-size: 0.78rem; line-height: 1.55;
+        display: flex; gap: 10px; padding: 6px 0;
+        border-top: 1px solid var(--sp-border); font-size: 0.87rem; line-height: 1.55;
     }
     .req:first-child { border-top: 0; }
     .req .k {
-        flex: 0 0 78px; font-weight: 800; color: var(--sp-muted);
-        font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 1px;
+        flex: 0 0 86px; font-weight: 800; color: var(--sp-muted);
+        font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 1px;
     }
     .req .v { flex: 1 1 auto; color: var(--sp-text); }
 
@@ -883,12 +887,9 @@ function render() {
     // edit — so an active tab that no longer exists falls back rather than blanking.
     if (!tabs.some(t => t.key === activeTab)) activeTab = tabs[0].key;
 
-    // "Where you stand" sits between the name card and the tabs, always visible —
-    // it used to be the Overview tab, but it is a summary of the person, not a
-    // separate place to navigate to, so it belongs under their name.
-    body.innerHTML = identityHeader(s)
-        + '<div id="spStanding">' + overviewSection(s) + '</div>'
-        + tabBar(s, tabs) + tabPanels(s, tabs);
+    // "Where you stand" is rendered inside the name card by identityHeader, so the
+    // person and their summary sit in one container.
+    body.innerHTML = identityHeader(s) + tabBar(s, tabs) + tabPanels(s, tabs);
     wireTabs(s, tabs);
     // Handlers are attached after every render, because the markup above replaces
     // the elements they belong to each time.
@@ -932,6 +933,10 @@ function identityHeader(s) {
             : '')
         + '</div>'
         + '</div>'
+        // The "where you stand" figures live inside this same card, right under the
+        // name and role, so the person and their summary read as one thing rather
+        // than as two stacked boxes.
+        + '<div id="spStanding" class="sp-standing">' + standingTiles(s) + '</div>'
         // Hidden until the button is pressed. Kept inside the name card's flow so it
         // opens directly underneath, which is what was asked for.
         + (editable
@@ -982,16 +987,16 @@ function closeDetailsToOverview() {
 /* ── Overview ── the four figures, and the transcript flag if it applies. The
    pending/credential note and the classroom card moved off here: pending lives on
    the Gateways Credentials tab, the classroom is a link in the name card. */
-function overviewSection(s) {
+/* The four "where you stand" figures, WITHOUT a card wrapper, so they can sit
+   inside the name card (the summary is part of the person, not a separate box).
+   The transcript flag rides along when it applies. */
+function standingTiles(s) {
     const hours = pdHours(s);
     const shTotal = parseFloat(s.SemesterHoursTotal);
     const shEce = parseFloat(s.SemesterHoursEce);
     const transcriptMissing = String(s.TranscriptOnFile || '') === 'Not submitted';
 
-    let html = '';
-    html += '<div class="sp-card">'
-        + '<h2>Where you stand</h2>'
-        + '<div class="sp-grid">'
+    let html = '<div class="sp-grid">'
         + tile(credLevel(s, 'ece') ? 'good' : 'warn', 'ECE Credential',
             credLevel(s, 'ece') ? 'Level ' + credLevel(s, 'ece') : 'Not yet held')
         + tile(credLevel(s, 'it') ? 'good' : '', 'Infant Toddler Credential',
@@ -1019,13 +1024,6 @@ function overviewSection(s) {
             + 'credential level, however many hours you have earned. Sending the transcript is '
             + 'usually the single biggest step available.</div></div>';
     }
-    /* The "something is in progress / pending" note used to sit here too. It is a
-       Gateways status about a credential, so it now lives only on the Gateways
-       Credentials tab, where a person is looking at exactly that. Overview stays
-       about where you stand, not what Gateways is chewing on. */
-    html += '</div>';
-
-    // The classroom is a link in the name card now, not a card on Overview.
     return html;
 }
 

@@ -506,10 +506,8 @@ function eceCompetencyText(s, row) {
 function eceSteps(s, held) {
     var steps = [];
 
-    if (held) {
-        steps.push({ done: true, t: 'ECE Credential ' + levelWord(held) + ' held',
-            d: 'Recorded on your staff record from the Gateways report.' });
-    }
+    // The held level is shown in the "Where you stand" tile at the top of the page,
+    // so it is not repeated here as a green step — this column is only next steps.
 
     var next = held ? held + 1 : 1;
     var row = null;
@@ -614,10 +612,8 @@ function itcTargetLevel(s, heldItc, heldEce) {
 function itcSteps(s, heldItc, heldEce) {
     var steps = [];
 
-    if (heldItc) {
-        steps.push({ done: true, t: 'Infant Toddler Credential ' + levelWord(heldItc) + ' held',
-            d: 'This is what the ExceleRate infant and toddler room requirement counts.' });
-    }
+    // The held level is shown in the "Where you stand" tile at the top of the page,
+    // so it is not repeated here as a green step — this column is only next steps.
 
     // The ITC level the CURRENT ECE allows. Never past what ECE supports, so the card
     // shows a level that is actually reachable rather than one gated behind ECE work.
