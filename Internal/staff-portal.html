@@ -200,6 +200,15 @@
        part of the name card rather than a box inside a box. */
     .sp-edit-panel > .sp-card { border: 0; padding: 0; margin: 0; background: transparent; }
 
+    /* Forms grouped by the authority that asks for them (ISBE / Gateways / PAS). A
+       light heading strip and a one-line note above each group's cards. */
+    .sp-formgroup { margin-top: 16px; }
+    .sp-formgroup:first-of-type { margin-top: 4px; }
+    .sp-formgroup-head {
+        font-size: 0.82rem; font-weight: 800; color: var(--sp-text);
+        text-transform: uppercase; letter-spacing: 0.03em;
+    }
+    .sp-formgroup-note { font-size: 0.8rem; color: var(--sp-muted); margin: 2px 0 9px; line-height: 1.5; }
     .sp-links { display: flex; flex-wrap: wrap; gap: 9px; }
     .sp-link {
         display: block; flex: 1 1 220px; min-width: 200px; text-decoration: none;
@@ -510,24 +519,38 @@ function schoolYear() {
     return start + '-' + (start + 1);
 }
 
+/* Each form is tagged with the authority that actually asks for it, so the Forms
+   tab can group them under ISBE / Gateways / ExceleRate-PAS. Where a form serves
+   more than one (the appraisal feeds PICC PI9 AND is a PAS item), it is filed under
+   the stronger requirement — the grant one — and the note still names both.
+     group: 'isbe' | 'gateways' | 'pas'  */
 const MY_FORMS = [
-    { key: 'pas_self_appraisal', scope: 'staff-year', href: '/pas/staff-self-appraisal.html',
+    { key: 'pas_annual_appraisal', group: 'isbe', scope: 'staff-year', href: '/pas/annual-performance-appraisal.html',
+      name: 'Annual Performance Appraisal', note: 'Completed with your supervisor at the end of the year. Its goals feed the PICC PI9 plan, and it is also the PAS staff appraisal.' },
+    { key: 'pas_work_history', group: 'gateways', scope: 'staff', href: '/pas/staff-work-history.html',
+      name: 'My Work History', note: 'Everywhere you have worked with children. Gateways form PD75a, used to verify experience toward a credential level.' },
+    { key: 'pas_self_appraisal', group: 'pas', scope: 'staff-year', href: '/pas/staff-self-appraisal.html',
       name: 'My Self-Appraisal', note: 'Your own reflection. Complete this before your review meeting.' },
-    { key: 'pas_annual_appraisal', scope: 'staff-year', href: '/pas/annual-performance-appraisal.html',
-      name: 'Annual Performance Appraisal', note: 'Completed with your supervisor at the end of the year.' },
-    { key: 'pas_90_day_review', scope: 'staff', href: '/pas/90-day-review-form.html',
-      name: '90-Day Introductory Review', note: 'One-off, in your first three months.' },
-    { key: 'pas_classroom_observation', scope: 'staff-year', href: '/pas/classroom-observation-form.html',
+    { key: 'pas_classroom_observation', group: 'pas', scope: 'staff-year', href: '/pas/classroom-observation-form.html',
       name: 'Classroom Observation', note: 'Completed by whoever observes your room.' },
-    { key: 'pas_new_hire_checklist', scope: 'staff', href: '/pas/new-hire-checklist.html',
+    { key: 'pas_90_day_review', group: 'pas', scope: 'staff', href: '/pas/90-day-review-form.html',
+      name: '90-Day Introductory Review', note: 'One-off, in your first three months.' },
+    { key: 'pas_new_hire_checklist', group: 'pas', scope: 'staff', href: '/pas/new-hire-checklist.html',
       name: 'Onboarding Checklist', note: 'One-off. Everything that had to be covered when you started.' },
-    { key: 'pas_orientation_feedback', scope: 'staff', href: '/pas/orientation-feedback-form.html',
-      name: 'Orientation Feedback', note: 'One-off. What you made of your own orientation.' },
-    /* Cumulative rather than per year, and worth more than it looks: Gateways verifies
-       experience in clock hours, and experience is half of what compiles into an ECE
-       Credential level. */
-    { key: 'pas_work_history', scope: 'staff', href: '/pas/staff-work-history.html',
-      name: 'My Work History', note: 'Everywhere you have worked with children. Used to verify experience for a Gateways credential.' }
+    { key: 'pas_orientation_feedback', group: 'pas', scope: 'staff', href: '/pas/orientation-feedback-form.html',
+      name: 'Orientation Feedback', note: 'One-off. What you made of your own orientation.' }
+];
+
+/* The two forms that are not driven off MY_FORMS (they render specially — the goal
+   plan has its own URL/copy, the survey is anonymous) still need a home in the
+   grouping, so they carry the same group tag here. */
+const FORM_GROUPS = [
+    { key: 'isbe',     label: 'ISBE \u2014 Preschool for All / Prevention Initiative',
+      note: 'Required for the PFA/PI grant (the PICC checklist).' },
+    { key: 'gateways', label: 'Gateways to Opportunity',
+      note: 'For your own credential \u2014 Gateways uses these to verify and advance your level.' },
+    { key: 'pas',      label: 'ExceleRate / PAS',
+      note: 'Quality-rating evidence. Not licensing; these build your PAS score and support good practice.' }
 ];
 
 function formState(f, staffId) {
@@ -1284,38 +1307,53 @@ function wireClassroom() {
 
 /* ── Forms ── their plan and the forms that belong to them. */
 function formsSection(s) {
-    let html = '';
-    html += '<div class="sp-card">'
-        + '<h2>My learning plan and forms</h2>'
-        + '<div class="sp-sub">These open with you already selected. Everything saves on screen \u2014 '
-        + 'nothing here needs printing unless you want a signed paper copy.</div>'
-        + '<div class="sp-links">'
-        /* Named "Goal Plan" first because that is what it is called here and in the
-           PICC. It is the same document either way — the PI9 individual professional
-           development plan — and there is deliberately no second goal form: two
-           places to record the same goals would split the PI9 evidence between them. */
-        + '<a class="sp-link" href="/pas/individual-pd-plan.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" rel="noopener">'
-        + '<div class="n">My Goal Plan</div>'
-        + '<div class="s">Your goals for the year, the development that supports each one, and '
-        + 'the mid-year and year-end reviews. This is the individual PD plan PICC PI9 asks for.</div></a>'
-        + MY_FORMS.map(f => {
-            const done = formState(f, s.Id);
-            return '<a class="sp-link" href="' + f.href + '?staffId=' + encodeURIComponent(s.Id)
-                + '" target="_blank" rel="noopener">'
-                + '<div class="n">' + esc(f.name) + ' '
-                + '<span class="sp-pill' + (done ? ' done' : '') + '">'
-                + (done ? '\u2713 done' : 'not started') + '</span></div>'
-                + '<div class="s">' + esc(f.note) + '</div></a>';
-        }).join('')
-        /* The staff survey is anonymous, so it cannot show done or not done against a
-           name - saying so is better than leaving people wondering why it has no tick. */
-        + '<a class="sp-link" href="/pas/staff-program-evaluation.html" target="_blank" rel="noopener">'
-        + '<div class="n">Staff Program Evaluation <span class="sp-pill"'
-        + '>anonymous</span></div>'
-        + '<div class="s">Your view of how the programme is run. Responses are saved under a '
-        + 'number, not your name, so this cannot show whether you have done it.</div></a>'
-        + '</div></div>';
+    // One card from a MY_FORMS entry.
+    const formCard = f => {
+        const done = formState(f, s.Id);
+        return '<a class="sp-link" href="' + f.href + '?staffId=' + encodeURIComponent(s.Id)
+            + '" target="_blank" rel="noopener">'
+            + '<div class="n">' + esc(f.name) + ' '
+            + '<span class="sp-pill' + (done ? ' done' : '') + '">'
+            + (done ? '\u2713 done' : 'not started') + '</span></div>'
+            + '<div class="s">' + esc(f.note) + '</div></a>';
+    };
 
+    /* The two specially-rendered cards, keyed to their group so they slot in with
+       the rest. The Goal Plan has its own URL and copy; the survey is anonymous, so
+       it deliberately cannot show a done/not-done tick against a name. */
+    const specialCards = {
+        isbe: '<a class="sp-link" href="/pas/individual-pd-plan.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" rel="noopener">'
+            + '<div class="n">My Goal Plan</div>'
+            + '<div class="s">Your goals for the year, the development that supports each one, and '
+            + 'the mid-year and year-end reviews. This is the individual PD plan PICC PI9 asks for.</div></a>',
+        pas: '<a class="sp-link" href="/pas/staff-program-evaluation.html" target="_blank" rel="noopener">'
+            + '<div class="n">Staff Program Evaluation <span class="sp-pill">anonymous</span></div>'
+            + '<div class="s">Your view of how the programme is run. Responses are saved under a '
+            + 'number, not your name, so this cannot show whether you have done it.</div></a>'
+    };
+    // Where each special card sits within its group's row (Goal Plan leads ISBE;
+    // the survey trails PAS).
+    const specialLead = { isbe: [specialCards.isbe], pas: [] };
+    const specialTrail = { pas: [specialCards.pas] };
+
+    let html = '<div class="sp-card">'
+        + '<h2>My learning plan and forms</h2>'
+        + '<div class="sp-sub">Grouped by who asks for them. Everything opens with you already '
+        + 'selected and saves on screen \u2014 nothing here needs printing unless you want a signed '
+        + 'paper copy.</div>';
+
+    FORM_GROUPS.forEach(g => {
+        const cards = (specialLead[g.key] || [])
+            .concat(MY_FORMS.filter(f => f.group === g.key).map(formCard))
+            .concat(specialTrail[g.key] || []);
+        if (!cards.length) return;
+        html += '<div class="sp-formgroup">'
+            + '<div class="sp-formgroup-head">' + esc(g.label) + '</div>'
+            + '<div class="sp-formgroup-note">' + esc(g.note) + '</div>'
+            + '<div class="sp-links">' + cards.join('') + '</div></div>';
+    });
+
+    html += '</div>';
     return html;
 }
 
