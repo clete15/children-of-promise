@@ -352,6 +352,43 @@ function hasPreschoolCda(s) {
     return /\bCDA\b[^.;]{0,40}(pre.?school|pre.?k)/i.test(src);
 }
 
+/* A plain-language note explaining what a CDA does and does NOT do on each ladder,
+   because Gateways does not make this obvious and it is the thing most misread: a
+   CDA is not an ECE level, and the Infant/Toddler one helps the two ladders very
+   unevenly. Returns '' when the person holds no CDA, so it only appears where it is
+   actually relevant. The specific counts come from the same tables the cards use
+   (IT_CDA_ECE / PRESCHOOL_CDA_ECE and IT_CDA_COMPETENCIES), so they cannot drift. */
+function cdaLadderNote(s) {
+    var it = hasInfantToddlerCda(s);
+    var ps = hasPreschoolCda(s);
+    if (!it && !ps) return '';
+
+    var which = it ? 'Infant/Toddler' : 'Preschool';
+    var body = '<b>Your ' + which + ' CDA is a national credential, not a Gateways ECE level</b> '
+        + '\u2014 holding it does not by itself grant ECE Level 2. What it does:'
+        + '<ul style="margin:6px 0 0 18px;padding:0;">';
+
+    if (it) {
+        body += '<li>On the <b>Infant Toddler</b> ladder it is worth a lot: it covers '
+            + IT_CDA_COMPETENCIES.length + ' of the 13 competencies Infant Toddler Level 2 asks for.</li>'
+            + '<li>On the <b>ECE (preschool)</b> ladder it is worth little: only '
+            + IT_CDA_ECE.length + ' of the 12 ECE Level 2 competencies, because it is an '
+            + 'infant/toddler credential being applied to the preschool ladder.</li>';
+    } else {
+        body += '<li>On the <b>ECE (preschool)</b> ladder it covers '
+            + PRESCHOOL_CDA_ECE.length + ' of the 12 ECE Level 2 competencies.</li>'
+            + '<li>It does <b>not</b> count toward the Infant Toddler ladder.</li>';
+    }
+
+    body += '<li>ECE Level 2 itself only needs a <b>high-school diploma or GED</b> for its '
+        + 'education floor \u2014 no college. College credit first becomes required at ECE '
+        + 'Level 3 (9 semester hours) and Level 4 (an Associate\u2019s or 60+ hours).</li>'
+        + '<li>Any <b>college credit the CDA carried</b> only counts once Gateways has the '
+        + 'transcript on file \u2014 earned-but-not-submitted counts for nothing.</li>'
+        + '</ul>';
+    return body;
+}
+
 function num(v) {
     var n = parseFloat(String(v === null || v === undefined ? '' : v).replace(/[^0-9.]/g, ''));
     return isFinite(n) ? n : null;
@@ -680,6 +717,7 @@ root.CredentialFramework = {
     itcTargetLevel: itcTargetLevel,
     hasInfantToddlerCda: hasInfantToddlerCda,
     hasPreschoolCda: hasPreschoolCda,
+    cdaLadderNote: cdaLadderNote,
     formatCompetencies: formatCompetencies,
     degreeRank: degreeRank,
     semesterRank: semesterRank,

@@ -1113,6 +1113,17 @@ function credentialsSection(s) {
        name card (standingTiles) so it shows on every tab rather than only here. Both
        used to render at the top of this section. */
 
+    /* CDA explainer, shown only for someone who holds a CDA. Gateways does not make
+       the CDA-vs-ECE-vs-ITC distinction clear, and it is the thing most misread, so
+       it is spelled out in plain language above the two ladders. */
+    const cdaNote = (window.CredentialFramework && CredentialFramework.cdaLadderNote)
+        ? CredentialFramework.cdaLadderNote(s) : '';
+    if (cdaNote) {
+        html += '<div class="sp-step info" style="margin-bottom:14px;">'
+            + '<div class="t">\uD83E\uDE9C How your CDA counts</div>'
+            + '<div class="d">' + cdaNote + '</div></div>';
+    }
+
     html += '<div class="sp-cred-cols">'
         + credentialColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceSteps(s))
         + credentialColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itSteps(s))
