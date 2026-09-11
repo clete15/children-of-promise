@@ -552,14 +552,24 @@ function levelRequirementStep(credName, row, kind) {
                   + 'Set by the ECE Credential level shown above \u2014 no separate college '
                   + 'requirement.</span></div>';
         }
-        // Training line: the honest statement is that approved training can substitute
-        // for some of the required competencies, not that there is a fixed hour count.
+        /* Training line. This is the part people misread: it is a FALLBACK, not a
+           requirement. Each level has a set of required skill areas ("competencies").
+           You prove each one either through college coursework OR, only where your
+           coursework did not cover it, through an approved Gateways workshop. So
+           training is needed only to fill a specific gap; someone whose coursework
+           (or a credential they already hold) already covers the competencies needs
+           no training at all. The number is a CEILING on how many may be covered this
+           way, not a count of trainings to complete. Worded so it cannot read as a
+           mandatory step. */
         var cap = kind === 'ECE'
             ? (row.level <= 4 ? TRAINING_ALLOWANCE.ece.low : TRAINING_ALLOWANCE.ece.high)
             : (row.level <= 4 ? TRAINING_ALLOWANCE.itc.low : TRAINING_ALLOWANCE.itc.high);
-        lines += '<div class="req"><span class="k">Training</span><span class="v">'
-              + 'Up to ' + cap + ' of the required competencies may come from Gateways '
-              + 'credential-approved training instead of college coursework.</span></div>';
+        lines += '<div class="req"><span class="k">Training <span class="opt">optional</span></span>'
+              + '<span class="v">Only if a required skill area is not already covered by your '
+              + 'coursework. Up to ' + cap + ' of them may be met with an approved Gateways '
+              + 'workshop instead of a college course \u2014 it is a substitute for a gap, not a '
+              + 'requirement on top. If your coursework (or a credential you already hold) covers '
+              + 'them, no training is needed.</span></div>';
 
         // Classroom / work-experience line.
         var workWord = kind === 'ITC'

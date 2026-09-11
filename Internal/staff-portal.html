@@ -271,6 +271,11 @@
         font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 1px;
     }
     .req .v { flex: 1 1 auto; color: var(--sp-text); }
+    /* "optional" tag on the Training row, so it reads as a fallback not a requirement. */
+    .req .k .opt {
+        display: block; font-size: 0.6rem; font-weight: 700; letter-spacing: 0.03em;
+        color: var(--sp-muted); text-transform: none; margin-top: 1px;
+    }
 
     /* Handing in a document. */
     .sp-handin { border-left-color: var(--sp-accent); margin-top: 12px; }
