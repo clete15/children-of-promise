@@ -1,23 +1,24 @@
 /* ══════════════════════════════════════════════════════════════════
    PAS worksheet store
 
-   The PAS self-assessment and its supporting worksheets each kept their
+   The PAS self-assessment and its supporting worksheets once kept their
    answers in browser localStorage. That made the artifact being prepared
    for submission invisible to anyone on another machine and vulnerable to
-   a cleared cache. This moves the answers to the database while changing
-   as little as possible in each worksheet.
+   a cleared cache. Answers now live in the database, and the SERVER IS THE
+   SINGLE SOURCE OF TRUTH — this store no longer touches localStorage at all.
 
-   Design: the pages already read and write synchronously via localStorage,
-   so this exposes `PasStore.storage` with the same getItem/setItem/
-   removeItem shape, backed by an in-memory cache that is filled from the
-   server before the page initialises and written through on every change.
-   A page therefore needs two edits: await PasStore.ready, and use
-   PasStore.storage in place of localStorage. Existing keys keep working.
+   Design: the pages already read and write synchronously via a
+   localStorage-shaped object, so this exposes `PasStore.storage` with the
+   same getItem/setItem/removeItem shape, backed by an in-memory cache that
+   is filled from the server before the page initialises and written through
+   to the server on every change. A page needs two edits: await
+   PasStore.ready, and use PasStore.storage in place of localStorage.
 
-   Migration: on first load any pas_* keys still sitting in this browser's
-   localStorage that the server does not yet know about are pushed up, so
-   work already typed is preserved rather than appearing to vanish. The
-   local copy is left alone as a fallback.
+   No caching, no migration: nothing is mirrored in the browser, so there is
+   no stale local drawer to diverge from the server and no "this browser
+   holds a different copy" conflict to reconcile. If the server cannot be
+   reached the page goes read-only (see the connectivity banner below) rather
+   than quietly saving to a machine no one else can see.
    ══════════════════════════════════════════════════════════════════ */
 
 (function () {
@@ -96,80 +97,18 @@
         if (!data.success) throw new Error(data.error || 'Save failed');
     }
 
-    /* Worksheets this browser holds that the server has a DIFFERENT version of.
-       Reported rather than resolved: picking a winner by size or date would be a
-       guess about whose work matters, and the wrong guess loses a completed
-       assessment. */
-    const conflicts = [];
+    /* The server is the single source of truth for this system. This store no longer
+       reads, writes, or migrates browser localStorage at all — the old migration and
+       the "this browser holds a different copy" conflict banner are gone with it.
 
-    /* Reconcile whatever this browser still has in localStorage with the server,
-       then LEAVE THE BROWSER EMPTY. The record is the server; a copy in the browser
-       is only ever a liability — it is what let one laptop's answers pass for the
-       centre's, and what produced the "6 here / 10 on the server" conflicts.
-
-       Rules, in order:
-         · server has never seen this key   -> push it up (nothing is lost), then
-                                               remove the local copy.
-         · server already has an identical  -> just remove the local copy; it is a
-           copy                                stale mirror from the old version.
-         · server has a DIFFERENT copy      -> do NOT overwrite either side. Report
-                                               it and keep the local copy for now, so
-                                               a real divergence is a decision a person
-                                               makes, not one this code makes silently.
-       After this runs, the only keys left in localStorage are genuine conflicts. */
-    async function migrateLocal() {
-        const candidates = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const k = localStorage.key(i);
-            if (k && k.indexOf('pas_') === 0) candidates.push(k);
-        }
-        const removeLocal = [];
-        for (const key of candidates) {
-            const { worksheet, scope } = splitKey(key);
-            let obj;
-            try { obj = JSON.parse(localStorage.getItem(key)); } catch (e) { removeLocal.push(key); continue; }
-            if (!obj || typeof obj !== 'object') { removeLocal.push(key); continue; }
-
-            if (cache.has(cacheKey(worksheet, scope))) {
-                const mine = JSON.stringify(obj);
-                const theirs = cache.get(cacheKey(worksheet, scope));
-                if (mine === theirs) {
-                    removeLocal.push(key);              // identical mirror, safe to drop
-                } else {
-                    conflicts.push({ key: key, localAnswers: countAnswers(obj),
-                                     serverAnswers: countAnswers(safeParse(theirs)) });
-                    // left in place on purpose: a person decides which wins
-                }
-                continue;
-            }
-            // Server has never seen it. Push, then drop the local copy.
-            try {
-                await push(worksheet, scope, obj);
-                cache.set(cacheKey(worksheet, scope), JSON.stringify(obj));
-                removeLocal.push(key);
-                console.info('[PasStore] migrated "' + key + '" to the server and cleared it locally.');
-            } catch (e) {
-                console.warn('[PasStore] could not migrate "' + key + '": ' + e.message);
-                // keep the local copy; nothing was saved, so losing it would lose work
-            }
-        }
-        removeLocal.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
-    }
-
-    function safeParse(s) { try { return JSON.parse(s); } catch (e) { return {}; } }
-
-    // A rough measure of "how much is filled in", used only to describe a conflict.
-    function countAnswers(obj) {
-        let n = 0;
-        const walk = v => {
-            if (v === null || v === undefined || v === '' || v === false) return;
-            if (Array.isArray(v)) { v.forEach(walk); return; }
-            if (typeof v === 'object') { Object.keys(v).forEach(k => walk(v[k])); return; }
-            n++;
-        };
-        walk(obj);
-        return n;
-    }
+       History (10 Sep 2026): the store used to mirror answers in localStorage and, on
+       load, reconcile that mirror against the server. That reconciliation is what
+       produced the recurring "3 here / 16 on the server" banner: a machine carried a
+       stale drawer the server had long since surpassed, and the code refused to guess
+       which won. With localStorage out of the picture there is nothing to diverge, so
+       the banner cannot occur. The only banner left is the connectivity guard below,
+       which is not caching — it stops a page pretending a save happened when the
+       server was unreachable. */
 
     /* The failure this exists to stop being invisible.
 
@@ -241,14 +180,6 @@
     const ready = (async function () {
         try {
             await fetchAll();
-            await migrateLocal();
-            if (conflicts.length) {
-                const list = conflicts.map(c => '&ldquo;' + c.key + '&rdquo; (this browser has '
-                    + c.localAnswers + ' entries, the server has ' + c.serverAnswers + ')').join('; ');
-                banner('&#9888; This browser holds a different copy of ' + list
-                    + '. Nothing has been overwritten. Tell Clete before entering more, '
-                    + 'so the right version is the one kept.', '#3730a3');
-            }
         } catch (e) {
             lastError = e.message;
             offline = true;
@@ -299,9 +230,9 @@
         },
         refresh: fetchAll,
         get lastError() { return lastError; },
-        // True when answers are going to this browser only. Exposed so a page can
-        // refuse to look finished when nothing has actually been submitted.
-        get offline() { return offline; },
-        get conflicts() { return conflicts.slice(); }
+        // True when the server could not be reached, so the page is read-only and
+        // nothing is being saved. Exposed so a page can refuse to look finished when
+        // nothing has actually reached the server.
+        get offline() { return offline; }
     };
 })();

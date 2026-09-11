@@ -1041,6 +1041,21 @@ function standingTiles(s) {
             + 'credential level, however many hours you have earned. Sending the transcript is '
             + 'usually the single biggest step available.</div></div>';
     }
+
+    /* Gateways is waiting on something — pending credential, awaiting work experience,
+       awaiting additional coursework, etc. This used to show only on the Credentials
+       tab, so it was easy to miss; surfaced here under the name card it is visible on
+       every tab, the same way the transcript flag is. pendingText scans the record for
+       "pending"/"awaiting", so it covers anyone in that state, not one named person. */
+    const waiting = pendingText(s);
+    if (waiting) {
+        html += '<div class="sp-step caution">'
+            + '<div class="t">\u23f3 Gateways is waiting on something</div>'
+            + '<div class="d">Your record shows: \u201c' + esc(waiting) + '\u201d. Until that '
+            + 'clears, Gateways cannot move the credential forward \u2014 a pending or awaited item '
+            + 'does not count until it is awarded. If you think it is already sorted, tell Megan so '
+            + 'the record can be updated.</div></div>';
+    }
     return html;
 }
 
@@ -1068,24 +1083,10 @@ function credentialsSection(s) {
 
     let html = '';
 
-    /* The "Gateways training report is down" note used to sit here. It is a
-       system-wide status, not a fact about this person, so it moved to the shared
-       alerts page (alerts.html) on 10 Sep 2026. */
-
-    /* Gateways-waiting note. Shown whenever the record itself says something is pending
-       or awaited (e.g. "Pending: ECE & IT (Missing Documents)"). Quoted straight from
-       the record rather than paraphrased, so it cannot claim a hold-up the record does
-       not. Same source the Overview tab uses; repeated here because credentials is
-       where a person acts on it. */
-    const waiting = pendingText(s);
-    if (waiting) {
-        html += '<div class="sp-step caution" style="margin-top:0;margin-bottom:12px;">'
-            + '<div class="t">\u23f3 Gateways is waiting on something</div>'
-            + '<div class="d">Your record shows: \u201c' + esc(waiting) + '\u201d. Until that '
-            + 'clears, Gateways cannot move the credential forward \u2014 a pending or awaited item '
-            + 'does not count until it is awarded. If you think it is already sorted, tell Megan so '
-            + 'the record can be updated.</div></div>';
-    }
+    /* The "Gateways training report is down" note moved to the shared alerts page
+       (alerts.html), and the "Gateways is waiting on something" note moved up to the
+       name card (standingTiles) so it shows on every tab rather than only here. Both
+       used to render at the top of this section. */
 
     html += '<div class="sp-cred-cols">'
         + credentialColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceSteps(s))
