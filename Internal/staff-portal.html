@@ -180,6 +180,63 @@
     .sp-src { font-size: 0.7rem; color: var(--sp-muted); margin-top: 10px; line-height: 1.6; }
     .sp-src a { color: var(--sp-accent); }
 
+    /* ── Credential routes, two columns ──────────────────────────────────────
+       ECE on the left, Infant Toddler on the right, because the director asked to
+       see them side by side and because they are genuinely parallel: same person,
+       two ladders. Collapses to one column on a narrow screen so it stays readable
+       on a phone, where several staff open this. */
+    .sp-cred-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 760px) { .sp-cred-cols { grid-template-columns: 1fr; } }
+    .sp-cred-col { min-width: 0; }
+    .sp-cred-col > .sp-card { margin-bottom: 0; }
+    /* A quiet heading strip above each column so it is obvious which ladder is which. */
+    .sp-cred-head {
+        display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;
+    }
+    .sp-cred-head .n { font-size: 0.9rem; font-weight: 800; color: var(--sp-text); }
+    .sp-cred-head .lvl {
+        font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        padding: 2px 8px; border-radius: 999px; background: var(--sp-accent-soft); color: var(--sp-accent);
+    }
+
+    /* ── Competency checklist ─────────────────────────────────────────────────
+       One panel per content area, boxes inside. The boxes are a worksheet, not a
+       saved record: nothing here is stored, and the page says so. Covered items are
+       ticked and locked (they are a documented fact from a held credential); the
+       rest are open boxes to check by hand against a Gateways PD Record. */
+    .sp-comp-summary {
+        display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px;
+    }
+    .sp-comp-summary .chip {
+        font-size: 0.7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+        border: 1.5px solid var(--sp-border); color: var(--sp-text-2);
+    }
+    .sp-comp-summary .chip.good { background: var(--sp-good-bg); color: var(--sp-good-fg); border-color: transparent; }
+    .sp-comp-summary .chip.open { background: var(--sp-warn-bg); color: var(--sp-warn-fg); border-color: transparent; }
+    .sp-comp-area { border: 1px solid var(--sp-border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+    .sp-comp-area > .hdr {
+        padding: 8px 12px; background: var(--sp-surface-2);
+        border-bottom: 1px solid var(--sp-border);
+    }
+    .sp-comp-area .hdr .a { font-size: 0.78rem; font-weight: 800; color: var(--sp-text); }
+    .sp-comp-area .hdr .g { font-size: 0.72rem; color: var(--sp-muted); line-height: 1.5; margin-top: 2px; }
+    .sp-comp-list { padding: 6px 12px 10px; }
+    .sp-comp-item {
+        display: flex; align-items: flex-start; gap: 9px; padding: 5px 0;
+        font-size: 0.78rem; color: var(--sp-text); border-top: 1px solid var(--sp-border);
+    }
+    .sp-comp-item:first-child { border-top: 0; }
+    .sp-comp-item input { margin: 2px 0 0; width: 15px; height: 15px; flex: 0 0 auto; cursor: pointer; }
+    .sp-comp-item input:disabled { cursor: default; }
+    .sp-comp-item .code { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sp-comp-item .txt { color: var(--sp-muted); flex: 1 1 auto; }
+    .sp-comp-item.covered .txt { color: var(--sp-good-fg); }
+    .sp-comp-item.covered { color: var(--sp-good-fg); }
+    .sp-comp-item.covered .tag {
+        font-size: 0.64rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
+        background: var(--sp-good-bg); color: var(--sp-good-fg); padding: 1px 6px; border-radius: 999px;
+    }
+
     /* Handing in a document. */
     .sp-handin { border-left-color: var(--sp-accent); margin-top: 12px; }
     .sp-handin-row { margin-top: 8px; }
@@ -819,36 +876,116 @@ function overviewSection(s) {
     return html;
 }
 
-/* ── Credentials ── the two routes, then what training is recorded. */
-function credentialsSection(s) {
-    let html = '';
-    html += '<div class="sp-card">'
-        + '<h2>Next steps \u2014 Preschool (ECE) Credential</h2>'
-        + '<div class="sp-sub">The ECE Credential is what the ExceleRate preschool staff '
-        + 'requirement counts.</div>'
-        + eceSteps(s).map(st => '<div class="sp-step' + (st.done ? ' done' : '') + '">'
+/* One "next steps" column: a heading strip naming the ladder and the level held,
+   then the steps. Shared by both credentials so ECE and ITC render identically. */
+function credentialColumn(title, heldLevel, heldWord, steps) {
+    return '<div class="sp-cred-col">'
+        + '<div class="sp-cred-head">'
+        + '<span class="n">' + title + '</span>'
+        + '<span class="lvl">' + (heldLevel ? heldWord : 'none held') + '</span>'
+        + '</div>'
+        + '<div class="sp-card">'
+        + steps.map(st => '<div class="sp-step' + (st.done ? ' done' : '') + '">'
             + '<div class="t">' + (st.done ? '\u2713 ' : '') + st.t + '</div>'
             + '<div class="d">' + st.d + '</div></div>').join('')
+        + '</div></div>';
+}
+
+/* The Infant Toddler competency checklist, as a worksheet.
+
+   Read-only on purpose: nothing here saves. The covered items come from a held
+   credential and are ticked and locked, because that is a documented fact; the rest
+   are open boxes to check by hand against a Gateways Professional Development Record.
+   We do not track competencies per person, and a box that looked saved but was not
+   would be worse than an honest worksheet. */
+function itcCompetencyCard(s) {
+    const F = window.CredentialFramework;
+    if (!F || !F.itcCompetencyChecklist) return '';
+
+    const heldItc = credLevel(s, 'it');
+    const heldEce = credLevel(s, 'ece');
+    const target = F.itcTargetLevel(s, heldItc, heldEce);
+    const covered = F.hasInfantToddlerCda(s) ? F.IT_CDA_COMPETENCIES : [];
+    const areas = F.itcCompetencyChecklist(target, covered);
+    if (!areas.length) return '';
+
+    let total = 0, done = 0;
+    areas.forEach(a => a.items.forEach(it => { total++; if (it.covered) done++; }));
+    const outstanding = total - done;
+
+    let html = '<div class="sp-card">'
+        + '<h2>Competency checklist \u2014 Infant Toddler Level ' + target + '</h2>'
+        + '<div class="sp-sub">Every competency Level ' + target + ' asks for, by area. '
+        + 'This is a worksheet to check against your Gateways Professional Development Record '
+        + '\u2014 <strong>nothing here is saved</strong>. Gateways decides what is met, from your '
+        + 'transcript and training.</div>'
+        + '<div class="sp-comp-summary">'
+        + '<span class="chip">' + total + ' required for Level ' + target + '</span>'
+        + (done ? '<span class="chip good">' + done + ' covered by your CDA</span>' : '')
+        + '<span class="chip open">' + outstanding + ' to evidence</span>'
         + '</div>';
 
-    html += '<div class="sp-card">'
-        + '<h2>Next steps \u2014 Infant Toddler Credential</h2>'
-        + '<div class="sp-sub">Counted for staff working with children from birth to age three.</div>'
-        + itSteps(s).map(st => '<div class="sp-step' + (st.done ? ' done' : '') + '">'
-            + '<div class="t">' + (st.done ? '\u2713 ' : '') + st.t + '</div>'
-            + '<div class="d">' + st.d + '</div></div>').join('')
-        + '<div class="sp-src">Level benchmarks are transcribed from the Gateways to Opportunity '
-        + 'framework documents held in our own document library \u2014 '
+    html += areas.map(a => {
+        return '<div class="sp-comp-area">'
+            + '<div class="hdr"><div class="a">' + esc(a.area) + '</div>'
+            + (a.gloss ? '<div class="g">' + esc(a.gloss) + '</div>' : '') + '</div>'
+            + '<div class="sp-comp-list">'
+            + a.items.map(it =>
+                '<label class="sp-comp-item' + (it.covered ? ' covered' : '') + '">'
+                + '<input type="checkbox"' + (it.covered ? ' checked disabled' : '') + '>'
+                + '<span class="code">ITC ' + esc(it.code) + '</span>'
+                + '<span class="txt">' + (it.covered
+                    ? 'Covered by your Infant Toddler CDA'
+                    : 'Evidence from coursework or approved training') + '</span>'
+                + (it.covered ? '<span class="tag">Covered</span>' : '')
+                + '</label>').join('')
+            + '</div></div>';
+    }).join('');
+
+    html += '<div class="sp-src">Areas and their per-level competency codes are transcribed '
+        + 'from the <a href="documents.html" target="_blank" rel="noopener">Infant Toddler '
+        + 'Credential Framework</a> (PD229, 12/19/2022). The framework lists competencies by '
+        + 'area rather than giving each numbered code its own sentence, so two codes in one area '
+        + 'read the same here; the exact per-code benchmark wording is in the Gateways Content '
+        + 'Area Benchmarks. Level ' + target + ' includes every competency from the levels below '
+        + 'it.</div>'
+        + '</div>';
+    return html;
+}
+
+/* ── Credentials ── the two routes side by side, the competency worksheet, then
+   what training is recorded. */
+function credentialsSection(s) {
+    const heldEce = credLevel(s, 'ece');
+    const heldItc = credLevel(s, 'it');
+
+    let html = '<div class="sp-card" style="margin-bottom:12px;">'
+        + '<h2>Credential routes</h2>'
+        + '<div class="sp-sub">Two ladders, shown side by side. The <strong>ECE</strong> '
+        + 'Credential is what the ExceleRate preschool staff requirement counts; the '
+        + '<strong>Infant Toddler</strong> Credential is counted for staff working with children '
+        + 'from birth to age three. The ECE level caps how far the Infant Toddler one can go.</div>'
+        + '</div>';
+
+    html += '<div class="sp-cred-cols">'
+        + credentialColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceSteps(s))
+        + credentialColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itSteps(s))
+        + '</div>';
+
+    // The competency worksheet sits under the two columns, full width, because it is
+    // a long checklist and reads better across the page than squeezed into a column.
+    html += itcCompetencyCard(s);
+
+    html += '<div class="sp-card"><div class="sp-src">Level benchmarks are transcribed from the '
+        + 'Gateways to Opportunity framework documents in our document library \u2014 '
         + '<a href="documents.html" target="_blank" rel="noopener">ECE Credential Framework</a> and '
         + '<a href="documents.html" target="_blank" rel="noopener">Infant Toddler Credential '
         + 'Framework</a>, both PD229 revised 12/19/2022. Current pages: '
         + '<a href="https://www.ilgateways.com/credentials/ece-credential" target="_blank" rel="noopener">'
         + 'ECE Credential</a> and '
         + '<a href="https://www.ilgateways.com/credentials/infant-toddler-credential" target="_blank" rel="noopener">'
-        + 'Infant Toddler Credential</a>. Competencies are listed but not scored here: Gateways '
-        + 'assesses those from your transcript and training record. Content summarised for brevity '
-        + '\u2014 check the source before acting on it.</div>'
-        + '</div>';
+        + 'Infant Toddler Credential</a>. Competencies are listed but not scored: Gateways assesses '
+        + 'those from your transcript and training record.</div></div>';
 
     // Training recorded against this person. Kept with the credential routes because a
     // completion is progress towards a level rather than a subject of its own.

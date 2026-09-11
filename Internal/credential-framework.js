@@ -130,6 +130,90 @@ var ITC_LEVELS = [
     }
 ];
 
+/* ── Competency areas ────────────────────────────────────────────────────────
+   The seven content areas a competency code belongs to, keyed by the letter prefix
+   of the code. `area` is the heading exactly as the Infant Toddler Credential
+   Framework PDF prints it (PD229, 12/19/2022) — used verbatim rather than shortened,
+   because it is the source. `gloss` is a plain-English sentence for a reader who does
+   not know the framework; it summarises the area, and is ours, so it is worded as a
+   summary and not passed off as the framework's own text.
+
+   The framework groups competencies by area per level (it lists "ITC HGD1, HGD2,
+   HGD3" under a heading) but does NOT print a distinct sentence for each numbered
+   code — that per-benchmark wording lives in a separate Gateways Content Area
+   Benchmarks document we do not hold. So a single code is described by its area, and
+   two codes in the same area read the same. That is honest about what the source
+   actually says; inventing a unique sentence per number is exactly the kind of guess
+   the rest of this file refuses to make. */
+var COMPETENCY_AREAS = {
+    HGD: {
+        area: 'Human Growth and Development',
+        gloss: 'Infant and toddler physical, cognitive, language and social-emotional development.'
+    },
+    HSW: {
+        area: 'Health, Safety & Well-Being',
+        gloss: 'Safe environments, sanitation, safe-sleep practice, nutrition and health protocols for very young children.'
+    },
+    IRE: {
+        area: 'Interactions, Relationships, & Environments',
+        gloss: 'Nurturing, responsive interactions and learning environments designed for infants and toddlers.'
+    },
+    FCR: {
+        area: 'Family & Community Relationships',
+        gloss: 'Partnering with families, understanding cultural backgrounds and supporting family systems.'
+    },
+    PPD: {
+        area: 'Personal & Professional Development',
+        gloss: 'Reflective practice, professional ethics and continuing to learn.'
+    },
+    OA: {
+        area: 'Observation & Assessment',
+        gloss: 'Documenting developmental milestones and using observation to guide care.'
+    },
+    CPD: {
+        area: 'Curriculum or Program Design',
+        gloss: 'Curriculum, schedules and responsive routines built around infant and toddler needs.'
+    }
+};
+
+// The area prefix of a code: 'HGD4' -> 'HGD', 'IRE7' -> 'IRE'.
+function areaOf(code) {
+    var m = /^([A-Z]+)/.exec(String(code || ''));
+    return m ? m[1] : '';
+}
+
+/* The competencies a given ITC level requires, grouped by content area and each
+   flagged covered/outstanding, for a checklist. `coveredCodes` is whatever a held
+   credential provably covers (the Infant Toddler CDA list, in practice); everything
+   else is 'to evidence', never guessed as met.
+
+   Returns an ordered array of { key, area, gloss, items:[{code, covered}] } so the
+   UI can render one panel per area with the boxes inside it. Areas appear in the
+   framework's own order. */
+function itcCompetencyChecklist(level, coveredCodes) {
+    var covered = {};
+    (coveredCodes || []).forEach(function (c) { covered[c] = true; });
+    var required = competenciesFor(level);
+    var order = ['HGD', 'HSW', 'IRE', 'FCR', 'PPD', 'OA', 'CPD'];
+    var byArea = {};
+    required.forEach(function (code) {
+        var a = areaOf(code);
+        (byArea[a] = byArea[a] || []).push(code);
+    });
+    // Numeric sort within an area so HGD2 precedes HGD10.
+    var numOf = function (c) { var m = /(\d+)$/.exec(c); return m ? parseInt(m[1], 10) : 0; };
+    return order.filter(function (a) { return byArea[a] && byArea[a].length; })
+        .map(function (a) {
+            return {
+                key: a,
+                area: COMPETENCY_AREAS[a] ? COMPETENCY_AREAS[a].area : a,
+                gloss: COMPETENCY_AREAS[a] ? COMPETENCY_AREAS[a].gloss : '',
+                items: byArea[a].sort(function (x, y) { return numOf(x) - numOf(y); })
+                    .map(function (code) { return { code: code, covered: !!covered[code] }; })
+            };
+        });
+}
+
 // Everything a level needs, its own additions plus every level below it.
 function competenciesFor(level) {
     var all = [];
@@ -453,6 +537,23 @@ function eceSteps(s, held) {
     return steps;
 }
 
+/* The ITC level to aim at, given what is held. Extracted so the competency checklist
+   on the page can show the SAME level itcSteps talks about, rather than recomputing
+   the ceiling logic in the page and risking the two drifting apart.
+
+   The ECE credential caps the ITC; Level 6 additionally needs a graduate degree. You
+   apply for the level you qualify for rather than climbing rung by rung, so this is
+   the ceiling the held ECE allows, never below the next rung up from what is held. */
+function itcTargetLevel(s, heldItc, heldEce) {
+    var ceiling = 2;
+    if (heldEce >= 5) ceiling = (degreeRank(s.Education) >= 6) ? 6 : 5;
+    else if (heldEce >= 2) ceiling = heldEce;
+    var next = Math.max((heldItc || 0) + 1, Math.min(ceiling, 6));
+    if (next < 2) next = 2;
+    if (next > 6) next = 6;
+    return next;
+}
+
 /* ── ITC next steps ─────────────────────────────────────────────────────── */
 function itcSteps(s, heldItc, heldEce) {
     var steps = [];
@@ -489,11 +590,7 @@ function itcSteps(s, heldItc, heldEce) {
 
        Level 6 additionally needs a graduate degree, so it is only offered to someone who
        has one. */
-    var ceiling = 2;
-    if (heldEce >= 5) ceiling = (degreeRank(s.Education) >= 6) ? 6 : 5;
-    else if (heldEce >= 2) ceiling = heldEce;
-    var next = Math.max(heldItc + 1, Math.min(ceiling, 6));
-    if (next < 2) next = 2;
+    var next = itcTargetLevel(s, heldItc, heldEce);
 
     var row = null;
     for (var i = 0; i < ITC_LEVELS.length; i++) if (ITC_LEVELS[i].level === next) row = ITC_LEVELS[i];
@@ -621,6 +718,10 @@ root.CredentialFramework = {
     IT_CDA_ECE: IT_CDA_ECE,
     competenciesFor: competenciesFor,
     eceCompetenciesFor: eceCompetenciesFor,
+    COMPETENCY_AREAS: COMPETENCY_AREAS,
+    areaOf: areaOf,
+    itcCompetencyChecklist: itcCompetencyChecklist,
+    itcTargetLevel: itcTargetLevel,
     hasInfantToddlerCda: hasInfantToddlerCda,
     hasPreschoolCda: hasPreschoolCda,
     formatCompetencies: formatCompetencies,
