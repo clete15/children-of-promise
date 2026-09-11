@@ -170,6 +170,29 @@
     /* The name sits above the tabs, so it stays visible whichever tab is open. */
     .sp-who { margin-bottom: 14px; }
     .sp-who .sp-sub { margin-bottom: 0; }
+    /* Name on the left, the Edit-my-details button on the right. */
+    .sp-who-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .sp-edit-btn {
+        flex: 0 0 auto; appearance: none; -webkit-appearance: none; cursor: pointer;
+        font-family: inherit; font-size: 0.78rem; font-weight: 700;
+        color: var(--sp-accent); background: var(--sp-accent-soft);
+        border: 1.5px solid var(--sp-border); border-radius: 8px; padding: 7px 13px;
+        display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+        transition: border-color 0.12s, background 0.12s;
+    }
+    .sp-edit-btn:hover { border-color: var(--sp-accent); }
+    .sp-edit-btn[aria-expanded="true"] { border-color: var(--sp-accent); }
+    .sp-edit-btn:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+    .sp-edit-btn .sp-count {
+        font-size: 0.64rem; font-weight: 800; padding: 1px 6px; border-radius: 9px;
+        background: var(--sp-warn-bg); color: var(--sp-warn-fg);
+    }
+    /* The self-edit form, revealed under the name card. A rule above the panel sets it
+       off from the identity line without adding a whole second card border. */
+    .sp-edit-panel { margin-top: 14px; border-top: 1px solid var(--sp-border); padding-top: 14px; }
+    /* The form already renders its own .sp-card; drop that nested border so it reads as
+       part of the name card rather than a box inside a box. */
+    .sp-edit-panel > .sp-card { border: 0; padding: 0; margin: 0; background: transparent; }
 
     .sp-links { display: flex; flex-wrap: wrap; gap: 9px; }
     .sp-link {
@@ -621,9 +644,12 @@ function selfEditCard(s) {
             'The highest level you actually finished. Coursework without a degree is "Some College".')
         + field('edRegistryId', 'Gateways Registry number', s.RegistryId,
             'The N-number on your Gateways record.')
+        /* One credentials field, not two. "Gateways credential" used to sit beside this
+           showing the same ECE level again (e.g. "ECE Credential - Level 4" next to
+           "ECE Level 4, ..."), which read as the level listed twice. The Gateways
+           column is derived from this one on save, so it does not need its own box. */
         + field('edEce', 'Credentials held', s.EceCredentials,
             'For example "ECE Level 2, CDA". Leave off anything still pending.')
-        + field('edGateways', 'Gateways credential', s.Gateways, 'As it appears on your Gateways record.')
         + field('edExperience', 'Years of experience', s.ExperienceYears, 'Decimals are fine, e.g. 9.5.')
         + field('edShTotal', 'Total semester hours', s.SemesterHoursTotal,
             'Add up the credit hours column on your transcript. If it shows quarter '
@@ -668,12 +694,16 @@ function selfEditCard(s) {
    The active tab is held here, not in the URL, so a save that redraws the page
    leaves you where you were. A hash still selects a tab on arrival, which keeps
    the "My Files" link on the dashboard landing where it says it will. */
+/* "My details" is no longer a tab. It folds into the name card as an Edit button
+   that reveals the self-edit form directly beneath it — a person editing their own
+   record is not really navigating to a different section, they are correcting the
+   card they are already looking at. The self-edit card still exists; it is just
+   shown under the header rather than behind a tab. */
 const SP_TABS = [
     { key: 'overview',    label: 'Overview' },
     { key: 'credentials', label: 'Gateways Credentials' },
     { key: 'files',       label: 'My files' },
-    { key: 'forms',       label: 'Forms' },
-    { key: 'details',     label: 'My details' }
+    { key: 'forms',       label: 'Forms' }
 ];
 
 let activeTab = 'overview';
@@ -698,13 +728,6 @@ function tabCount(key, s) {
             if (!s || !Array.isArray(MY_FORMS)) return 0;
             return MY_FORMS.filter(f => !formState(f, s.Id)).length;
         }
-        if (key === 'details') {
-            // The two gaps worth chasing: no registry number, no semester hours.
-            let n = 0;
-            if (!String(s.RegistryId || '').trim()) n++;
-            if (!String(s.SemesterHoursTotal || '').trim()) n++;
-            return n;
-        }
     } catch (e) {
         console.error('[MY PAGE] could not count the ' + key + ' tab', e);
     }
@@ -712,7 +735,7 @@ function tabCount(key, s) {
 }
 
 function visibleTabs(s) {
-    return SP_TABS.filter(t => t.key !== 'details' || selfEditCard(s) !== '');
+    return SP_TABS.slice();
 }
 
 function tabBar(s, tabs) {
@@ -735,8 +758,7 @@ function tabPanels(s, tabs) {
         overview: overviewSection,
         credentials: credentialsSection,
         files: filesCard,
-        forms: formsSection,
-        details: selfEditCard
+        forms: formsSection
     };
     return tabs.map(t =>
         '<div class="sp-panel" role="tabpanel" id="sppanel_' + t.key + '" '
@@ -792,18 +814,63 @@ function render() {
     // Handlers are attached after every render, because the markup above replaces
     // the elements they belong to each time.
     wireCardActions();
+    wireDetailsToggle();
 }
 
-// Above the tabs, so the name and room stay visible whichever tab is open.
+/* Above the tabs, so the name and room stay visible whichever tab is open.
+
+   "My details" now lives here: an Edit button on the name card that reveals the
+   self-edit form directly beneath it. The form markup is rendered up front (hidden)
+   so the toggle is instant and the save handler wires the same way it always did. */
 function identityHeader(s) {
     const rooms = [s.Classroom, s.SecondaryClassroom]
         .map(v => String(v || '').trim()).filter(Boolean).join(' and ');
+    const editable = selfEditCard(s);   // '' when this viewer may not edit
+
+    // A small "needs you" count, the same two gaps the old tab badge counted.
+    let gaps = 0;
+    if (!String(s.RegistryId || '').trim()) gaps++;
+    if (!String(s.SemesterHoursTotal || '').trim()) gaps++;
+
     return '<div class="sp-card sp-who">'
+        + '<div class="sp-who-row">'
+        + '<div>'
         + '<h2>' + esc(s.Name) + '</h2>'
         + '<div class="sp-sub">' + esc(s.Role || 'Role not recorded')
         + (rooms ? ' \u00b7 ' + esc(rooms) : ' \u00b7 no classroom assigned')
         + (s.RegistryId ? ' \u00b7 Registry ' + esc(s.RegistryId) : '')
-        + '</div></div>';
+        + '</div>'
+        + '</div>'
+        + (editable
+            ? '<button type="button" id="edToggle" class="sp-edit-btn" aria-expanded="false" '
+              + 'aria-controls="edPanel">\u270e Edit my details'
+              + (gaps ? '<span class="sp-count" aria-label="' + gaps
+                  + ' needing attention">' + gaps + '</span>' : '')
+              + '</button>'
+            : '')
+        + '</div>'
+        // Hidden until the button is pressed. Kept inside the name card's flow so it
+        // opens directly underneath, which is what was asked for.
+        + (editable
+            ? '<div id="edPanel" class="sp-edit-panel" hidden>' + editable + '</div>'
+            : '')
+        + '</div>';
+}
+
+/* Show/hide the self-edit form under the name card. The button remembers its state
+   across a re-render (a save redraws the page) by reading a module flag, so saving
+   does not snap the panel shut under the person mid-edit. */
+let detailsOpen = false;
+function wireDetailsToggle() {
+    const btn = document.getElementById('edToggle');
+    const panel = document.getElementById('edPanel');
+    if (!btn || !panel) return;
+    const apply = () => {
+        panel.hidden = !detailsOpen;
+        btn.setAttribute('aria-expanded', detailsOpen ? 'true' : 'false');
+    };
+    apply();
+    btn.addEventListener('click', () => { detailsOpen = !detailsOpen; apply(); });
 }
 
 /* ── Overview ── the four figures, anything urgent, and the way into your room. */
@@ -1095,11 +1162,21 @@ async function saveMyRecord() {
     const msg = $('edMsg');
     if (!current) return;
 
+    /* Gateways is derived from the credentials text rather than typed separately, so
+       the two can no longer disagree. The staff-cards editor composes it the same way:
+       the ECE level in "ECE Level 4, CDA" becomes "ECE Credential - Level 4". Absent an
+       ECE level, the Gateways column is left as the record already has it. */
+    const eceText = $('edEce').value.trim();
+    const eceLvl = (eceText.match(/ECE(?:\s*Credential)?\s*-?\s*Level\s*(\d)/i) || [])[1];
+    const gatewaysDerived = eceLvl
+        ? 'ECE Credential - Level ' + eceLvl
+        : (current.Gateways || '');
+
     const payload = {
         education: $('edEducation').value,
         registryId: $('edRegistryId').value.trim(),
-        eceCredentials: $('edEce').value.trim(),
-        gateways: $('edGateways').value.trim(),
+        eceCredentials: eceText,
+        gateways: gatewaysDerived,
         experienceYears: $('edExperience').value.trim(),
         semesterHoursTotal: $('edShTotal').value.trim(),
         semesterHoursEce: $('edShEce').value.trim(),
