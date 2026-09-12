@@ -82,10 +82,15 @@
     }
     .sp-card h2 {
         font-size: 1.08rem; font-weight: 800; color: var(--sp-text); margin: 0 0 4px;
+        text-align: center;
     }
     .sp-card .sp-sub {
         font-size: 0.86rem; color: var(--sp-muted); line-height: 1.6; margin-bottom: 12px;
+        text-align: center;
     }
+    /* The name/identity card is the exception: its heading and role line sit in a
+       left/right row with the Edit button, so they stay left-aligned. */
+    .sp-who h2, .sp-who .sp-sub { text-align: left; }
     .sp-grid { display: flex; flex-wrap: wrap; gap: 12px; }
     .sp-tile {
         flex: 1 1 170px; min-width: 150px; border: 1.5px solid var(--sp-border);
@@ -274,49 +279,67 @@
     /* ── "What Level N needs" card (the credential ladder) ──────────────────
        One card per ladder. A heading, then labelled rows (College / Competencies /
        Classroom), with the training-by-area breakdown nested inside Competencies. */
-    .sp-need-card { padding: 14px 16px; }
-    .sp-need-head { font-size: 0.95rem; font-weight: 700; color: var(--sp-text); margin-bottom: 10px; }
+    .sp-need-card { padding: 16px 18px; }
+    .sp-need-head {
+        font-size: 1rem; font-weight: 800; color: var(--sp-text); margin: 0 0 12px;
+        text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--sp-border);
+    }
     .sp-need {
         display: grid; grid-template-columns: 92px 1fr; gap: 12px;
         padding: 10px 0; border-top: 1px solid var(--sp-border);
     }
     .sp-need:first-of-type { border-top: 0; padding-top: 0; }
+    /* Competencies uses the full card width: the label sits on its own line above a
+       full-width body, so the per-area blocks are never crushed into a side column. */
+    .sp-need-full { display: block; }
+    .sp-need-full .sp-need-k { margin-bottom: 6px; }
+    .sp-need-body { min-width: 0; }
     .sp-need-k {
         font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
         color: var(--sp-muted); padding-top: 2px;
     }
     .sp-need-v { font-size: 0.87rem; line-height: 1.55; color: var(--sp-text); min-width: 0; }
     .sp-need-sub { font-size: 0.82rem; color: var(--sp-text-2); margin-top: 4px; }
+    /* Guidance, not error: the "aim your next training here" line uses the indigo
+       ATTENTION palette (--sp-warn-*), never the red alarm palette. */
     .sp-need-focus {
-        font-size: 0.83rem; margin-top: 8px; padding: 7px 10px; border-radius: 7px;
-        background: var(--sp-bad-bg, rgba(220,80,80,0.10)); color: var(--sp-text);
-        border: 1px solid var(--sp-border);
+        font-size: 0.83rem; margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+        background: var(--sp-warn-bg); color: var(--sp-warn-fg);
+        border: 1px solid var(--sp-warn-br); font-weight: 600; line-height: 1.5;
     }
-    .sp-need-focus.ok { background: var(--sp-good-bg, rgba(70,170,90,0.10)); }
+    .sp-need-focus b { color: var(--sp-warn-fg); }
+    .sp-need-focus.ok { background: var(--sp-good-bg); color: var(--sp-good-fg); border-color: var(--sp-good-br); }
+    .sp-need-focus.ok b { color: var(--sp-good-fg); }
 
     /* Per-area coverage inside the Competencies row. Each area is a small stacked
        block: a header line (code badge + full name + tag), then two coverage lines
        (college / training). Stacking keeps it readable in the narrow ladder column. */
-    .sp-area-list { margin-top: 8px; }
+    .sp-area-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
     .sp-area {
-        padding: 8px 10px; border-radius: 7px; margin-bottom: 6px;
-        border-left: 3px solid transparent;
+        padding: 10px 12px; border-radius: 9px; margin: 0;
+        border: 1px solid var(--sp-border); border-left: 3px solid var(--sp-border);
+        background: var(--sp-surface-2);
     }
-    .sp-area.ok { background: var(--sp-good-bg, rgba(70,170,90,0.08)); border-left-color: var(--sp-good-fg, #46aa5a); }
-    .sp-area.thin { background: var(--sp-bad-bg, rgba(220,80,80,0.08)); border-left-color: var(--sp-bad-fg, #d05050); }
-    .sp-area-top { display: flex; align-items: center; gap: 8px; }
+    /* Covered = green edge; needs-attention = indigo edge (never the red alarm). */
+    .sp-area.ok { border-left-color: var(--sp-good-br); }
+    .sp-area.thin { border-left-color: var(--sp-warn-br); background: var(--sp-warn-bg); border-color: var(--sp-warn-br); }
+    .sp-area-top { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
     .sp-area-code {
-        font-weight: 800; font-size: 0.68rem; letter-spacing: 0.03em; color: var(--sp-accent);
-        background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 5px;
-        padding: 2px 6px; white-space: nowrap;
+        font-weight: 800; font-size: 0.66rem; letter-spacing: 0.04em; color: var(--sp-accent);
+        background: var(--sp-accent-soft); border: 1px solid var(--sp-border); border-radius: 5px;
+        padding: 3px 7px; white-space: nowrap; flex: 0 0 auto;
     }
-    .sp-area-name { color: var(--sp-text); font-weight: 600; font-size: 0.85rem; flex: 1; min-width: 0; }
-    .sp-area-tag { font-size: 0.72rem; font-weight: 800; white-space: nowrap; }
-    .sp-area.thin .sp-area-tag { color: var(--sp-bad-fg); }
-    .sp-area.ok .sp-area-tag { color: var(--sp-good-fg); }
-    /* The two coverage lines sit under the header, indented to the name. */
-    .sp-area-cov { margin-top: 5px; display: flex; flex-direction: column; gap: 2px; font-size: 0.8rem; }
-    .sp-cv.yes { color: var(--sp-good-fg); }
+    .sp-area-name { color: var(--sp-text); font-weight: 700; font-size: 0.87rem; flex: 1 1 auto; min-width: 0; }
+    /* The tag is a small pill so covered vs aim-here reads at a glance. */
+    .sp-area-tag {
+        font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
+        white-space: nowrap; flex: 0 0 auto; padding: 2px 8px; border-radius: 999px;
+    }
+    .sp-area.thin .sp-area-tag { color: var(--sp-warn-fg); background: var(--sp-warn-br); }
+    .sp-area.ok .sp-area-tag { color: var(--sp-good-fg); background: var(--sp-good-bg); }
+    /* The two coverage lines sit under the header. */
+    .sp-area-cov { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 3px 18px; font-size: 0.8rem; }
+    .sp-cv.yes { color: var(--sp-good-fg); font-weight: 600; }
     .sp-cv.no { color: var(--sp-muted); }
 
     /* ── Credential routes, two columns ──────────────────────────────────────
@@ -328,14 +351,15 @@
     @media (max-width: 760px) { .sp-cred-cols { grid-template-columns: 1fr; } }
     .sp-cred-col { min-width: 0; }
     .sp-cred-col > .sp-card { margin-bottom: 0; }
-    /* A quiet heading strip above each column so it is obvious which ladder is which. */
+    /* A quiet heading strip above each column so it is obvious which ladder is which.
+       Centred, with the held-level pill beneath the ladder name. */
     .sp-cred-head {
-        display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px;
+        display: flex; flex-direction: column; align-items: center; gap: 5px; margin-bottom: 10px;
     }
-    .sp-cred-head .n { font-size: 1rem; font-weight: 800; color: var(--sp-text); }
+    .sp-cred-head .n { font-size: 1.02rem; font-weight: 800; color: var(--sp-text); text-align: center; }
     .sp-cred-head .lvl {
-        font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
-        padding: 2px 8px; border-radius: 999px; background: var(--sp-accent-soft); color: var(--sp-accent);
+        font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        padding: 2px 10px; border-radius: 999px; background: var(--sp-accent-soft); color: var(--sp-accent);
     }
 
     /* ── Requirement lines ─────────────────────────────────────────────────────
@@ -1237,7 +1261,7 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
                 + '<div class="sp-area-top">'
                 + '<span class="sp-area-code">' + esc(a.code) + '</span>'
                 + '<span class="sp-area-name">' + esc(a.name) + '</span>'
-                + '<span class="sp-area-tag">' + (a.thin ? 'aim here' : '\u2713') + '</span>'
+                + '<span class="sp-area-tag">' + (a.thin ? 'aim here' : 'covered') + '</span>'
                 + '</div>'
                 + '<div class="sp-area-cov">' + college + training + '</div>'
                 + '</div>';
@@ -1254,7 +1278,10 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
                 + 'coursework or training. Gateways confirms the competencies against your record.</div>';
         }
     }
-    body += '<div class="sp-need"><div class="sp-need-k">Competencies</div>' + comp + '</div>';
+    // Competencies spans the FULL card width (label on top) so the per-area blocks
+    // are not squeezed into a narrow value column.
+    body += '<div class="sp-need sp-need-full"><div class="sp-need-k">Competencies</div>'
+        + '<div class="sp-need-body">' + comp + '</div></div>';
 
     // ── Classroom / experience ──
     if (model.classroom) {
