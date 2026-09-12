@@ -767,6 +767,111 @@ function trainingByArea(pdContentAreas, kind, level, thinBelow) {
     };
 }
 
+/* ── The whole "next level" picture for one ladder ───────────────────────────
+   One model the card can render without re-deriving anything. It answers, for the
+   NEXT level a person can aim at on `kind` ('ece' or 'itc'):
+
+     level        the level number being worked toward
+     levelWord    "Level N"
+     reachable    false when a higher ECE Credential gates the next ITC rung; then
+                  `gate` explains it and the rest is omitted
+     education    the education/college gate text for the level (ECE side), or a note
+                  that the ECE credential is the gate (ITC side)
+     collegeHours the person's ECE/CD semester hours on file (string as stored)
+     competencyCount    how many competencies the level needs (own + all below)
+     trainingAllowance  how many of those may be met by approved training not college
+     areas        per-area rows for the areas THIS level needs, each
+                    { code, name, hours, thin }   (thin = little/no training logged)
+     focus        codes of the required areas with little/no training logged
+     hasHours     whether any PDR content-area hours are on file
+     classroom    the supervised/documented experience line, or ''
+
+   Honest by construction: the requirement is stated in COMPETENCIES with the
+   training allowance (the real rule), while training HOURS by area are shown as the
+   actionable signal. It never claims a per-area hour target Gateways does not
+   publish. College hours are shown as a total only — the PDR does not tag courses to
+   content areas, so a per-area college split is not available here. */
+function nextLevelModel(kind, s, heldEce, heldItc, pdContentAreas, thinBelow) {
+    var thin = (typeof thinBelow === 'number') ? thinBelow : 3;
+    var hours = parseContentAreaHours(pdContentAreas);
+    var order = ['HGD', 'HSW', 'OA', 'CPD', 'IRE', 'FCR', 'PPD'];
+
+    var model = {
+        kind: kind, reachable: true, gate: '', level: null, levelWord: '',
+        education: '', collegeHours: (s && s.SemesterHoursEce) ? String(s.SemesterHoursEce) : '',
+        competencyCount: 0, trainingAllowance: 0,
+        areas: [], focus: [], hasHours: !!hours, classroom: '', topped: false
+    };
+
+    var row = null;
+
+    if (kind === 'ece') {
+        var eNext = (heldEce || 0) + 1;
+        if (eNext > 6) { model.topped = true; return model; }
+        for (var i = 0; i < ECE_LEVELS.length; i++) if (ECE_LEVELS[i].level === eNext) row = ECE_LEVELS[i];
+        if (!row) { model.topped = true; return model; }
+        model.level = row.level;
+        model.education = row.education || '';
+    } else {
+        // ITC: the ECE credential can gate the next rung.
+        var nextRung = (heldItc || 1) + 1;
+        if (nextRung > 6) { model.topped = true; return model; }
+        var rungRow = null;
+        for (var r = 0; r < ITC_LEVELS.length; r++) if (ITC_LEVELS[r].level === nextRung) rungRow = ITC_LEVELS[r];
+        if (rungRow && heldEce < rungRow.ece) {
+            model.reachable = false;
+            model.level = nextRung;
+            model.levelWord = levelWord(nextRung);
+            model.gate = 'Infant Toddler ' + levelWord(nextRung) + ' requires ECE Credential '
+                + levelWord(rungRow.ece) + (nextRung < 5 ? ' or higher' : '')
+                + (heldEce ? ', and you hold ECE ' + levelWord(heldEce) + '.' : '.')
+                + (rungRow.gradDegree ? ' Level 6 also requires a graduate degree.' : '');
+            return model;
+        }
+        var target = itcTargetLevel(s, heldItc, heldEce);
+        for (var j = 0; j < ITC_LEVELS.length; j++) if (ITC_LEVELS[j].level === target) row = ITC_LEVELS[j];
+        if (!row) { model.topped = true; return model; }
+        model.level = row.level;
+        model.education = 'Set by the ECE Credential level \u2014 the Infant Toddler credential has no '
+            + 'separate college requirement. See the Preschool (ECE) column.';
+    }
+
+    model.levelWord = levelWord(model.level);
+
+    // Competencies the level needs (own + every level below), and the allowance.
+    var required = kind === 'itc' ? competenciesFor(model.level) : eceCompetenciesFor(model.level);
+    model.competencyCount = required.length;
+    model.trainingAllowance = kind === 'ece'
+        ? (model.level <= 4 ? TRAINING_ALLOWANCE.ece.low : TRAINING_ALLOWANCE.ece.high)
+        : (model.level <= 4 ? TRAINING_ALLOWANCE.itc.low : TRAINING_ALLOWANCE.itc.high);
+
+    // The areas this level touches, with the person's training hours in each.
+    var needed = {};
+    required.forEach(function (c) { var a = areaOf(c); if (a) needed[a] = true; });
+    model.areas = order.filter(function (code) { return needed[code]; }).map(function (code) {
+        var h = hours && isFinite(hours[code]) ? Number(hours[code]) : 0;
+        return {
+            code: code,
+            name: COMPETENCY_AREAS[code] ? COMPETENCY_AREAS[code].area : code,
+            hours: h,
+            thin: h < thin
+        };
+    });
+    model.focus = model.areas.filter(function (a) { return a.thin; }).map(function (a) { return a.code; });
+
+    // Classroom / experience line (documented or supervised).
+    if (row.experience && (row.experience.supervised || row.experience.documented)) {
+        var workWord = kind === 'itc' ? 'with infants, toddlers and their families' : 'of ECE work';
+        var parts = [];
+        if (row.experience.supervised) parts.push(row.experience.supervised + ' hours supervised');
+        if (row.experience.documented) parts.push(row.experience.documented.toLocaleString('en-US')
+            + ' hours documented ' + workWord);
+        model.classroom = parts.join(', or ') + '.';
+    }
+
+    return model;
+}
+
 root.CredentialFramework = {
     ECE_LEVELS: ECE_LEVELS,
     ITC_LEVELS: ITC_LEVELS,
@@ -793,7 +898,8 @@ root.CredentialFramework = {
     itcSteps: itcSteps,
     parseContentAreaHours: parseContentAreaHours,
     areasForLevel: areasForLevel,
-    trainingByArea: trainingByArea
+    trainingByArea: trainingByArea,
+    nextLevelModel: nextLevelModel
 };
 
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));

@@ -271,26 +271,48 @@
     .sp-attn-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
     /* Per-person "Update from PDR" card on the credentials tab (admin only). */
     .sp-pdrup { border-left: 4px solid var(--sp-accent); }
-    /* Training-by-content-area panel (Tier 2). */
-    .sp-ta-list { margin-top: 10px; }
-    .sp-ta-row {
-        display: grid; grid-template-columns: 54px 1fr auto auto; gap: 10px; align-items: center;
-        padding: 7px 8px; border-top: 1px solid var(--sp-border); font-size: 0.88rem;
+    /* ── "What Level N needs" card (the credential ladder) ──────────────────
+       One card per ladder. A heading, then labelled rows (College / Competencies /
+       Classroom), with the training-by-area breakdown nested inside Competencies. */
+    .sp-need-card { padding: 14px 16px; }
+    .sp-need-head { font-size: 0.95rem; font-weight: 700; color: var(--sp-text); margin-bottom: 10px; }
+    .sp-need {
+        display: grid; grid-template-columns: 92px 1fr; gap: 12px;
+        padding: 10px 0; border-top: 1px solid var(--sp-border);
     }
-    .sp-ta-row:first-child { border-top: 0; }
-    .sp-ta-row.need { background: var(--sp-accent-soft); border-radius: 6px; }
-    .sp-ta-code {
-        font-weight: 800; font-size: 0.72rem; letter-spacing: 0.03em; color: var(--sp-accent);
-        background: var(--sp-surface-2); border: 1px solid var(--sp-border); border-radius: 5px;
+    .sp-need:first-of-type { border-top: 0; padding-top: 0; }
+    .sp-need-k {
+        font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        color: var(--sp-muted); padding-top: 2px;
+    }
+    .sp-need-v { font-size: 0.87rem; line-height: 1.55; color: var(--sp-text); min-width: 0; }
+    .sp-need-sub { font-size: 0.82rem; color: var(--sp-text-2); margin-top: 4px; }
+    .sp-need-focus {
+        font-size: 0.83rem; margin-top: 8px; padding: 7px 10px; border-radius: 7px;
+        background: var(--sp-bad-bg, rgba(220,80,80,0.10)); color: var(--sp-text);
+        border: 1px solid var(--sp-border);
+    }
+    .sp-need-focus.ok { background: var(--sp-good-bg, rgba(70,170,90,0.10)); }
+
+    /* Per-area training hours inside the Competencies row. */
+    .sp-area-list { margin-top: 8px; }
+    .sp-area {
+        display: grid; grid-template-columns: 48px 1fr auto 62px; gap: 8px; align-items: center;
+        padding: 6px 8px; border-radius: 6px; font-size: 0.84rem; margin-bottom: 3px;
+    }
+    .sp-area.ok { background: var(--sp-good-bg, rgba(70,170,90,0.08)); }
+    .sp-area.thin { background: var(--sp-bad-bg, rgba(220,80,80,0.08)); }
+    .sp-area-code {
+        font-weight: 800; font-size: 0.7rem; letter-spacing: 0.02em; color: var(--sp-accent);
+        background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 5px;
         padding: 2px 0; text-align: center;
     }
-    .sp-ta-name { color: var(--sp-text); min-width: 0; }
-    .sp-ta-hrs { color: var(--sp-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .sp-ta-flag {
-        font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
-        color: var(--sp-accent); white-space: nowrap;
-    }
-    .sp-ta-row.thin .sp-ta-hrs { color: var(--sp-bad-fg); font-weight: 700; }
+    .sp-area-name { color: var(--sp-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sp-area-hrs { color: var(--sp-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+    .sp-area-tag { font-size: 0.68rem; font-weight: 800; text-align: right; white-space: nowrap; }
+    .sp-area.thin .sp-area-tag { color: var(--sp-bad-fg); }
+    .sp-area.ok .sp-area-tag { color: var(--sp-good-fg); }
+    .sp-area.thin .sp-area-hrs { color: var(--sp-bad-fg); font-weight: 700; }
 
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
@@ -563,99 +585,13 @@ function tile(cls, label, value, note) {
 }
 
 // ── credential next steps ─────────────────────────────────────────────────
-/* The level tables now live in credential-framework.js, transcribed from the two
-   Gateways framework documents in Internal/documents. They used to be omitted here on
-   the grounds that a wrong benchmark sends someone down the wrong path, which was the
-   right worry with no authoritative copy to hand; we have both documents now, so the
-   benchmarks are stated exactly rather than gestured at.
-
-   If the module fails to load the page still renders, with a line saying so, because a
-   blank next-steps card reads as "nothing to do". */
-function eceSteps(s) {
-    const F = window.CredentialFramework;
-    if (!F) return [{ done: false, t: 'Credential requirements unavailable',
-        d: 'The credential framework did not load, so next steps cannot be worked out. '
-         + 'Nothing is wrong with your record.' }];
-    return F.eceSteps(s, credLevel(s, 'ece'));
-}
-
-function itSteps(s) {
-    const F = window.CredentialFramework;
-    if (!F) return [{ done: false, t: 'Credential requirements unavailable',
-        d: 'The credential framework did not load, so next steps cannot be worked out. '
-         + 'Nothing is wrong with your record.' }];
-    return F.itcSteps(s, credLevel(s, 'it'), credLevel(s, 'ece'));
-}
-
-/* ── Training by content area (Tier 2) ───────────────────────────────────────
-   Shows the seven Gateways content areas with the hours this person has logged in
-   each (from their PDR), marks the areas their NEXT credential level's competencies
-   draw on, and flags the ones they are thin in. It is guidance for choosing the
-   next training deliberately, NOT a Gateways ruling — Gateways does not publish
-   per-area hour targets, so this never says a level is met or unmet on hours.
-
-   Returns '' when no PDR has been ingested for the person, so the panel simply does
-   not appear until there is real data behind it. */
-function trainingAreasPanel(s, heldEce, heldItc) {
-    const F = window.CredentialFramework;
-    if (!F || !F.trainingByArea) return '';
-    const raw = s.PdContentAreas;
-    if (!raw) return '';
-
-    // Aim at the next ECE level (the primary ladder for most staff here). If they
-    // work with infants/toddlers, the ITC target is named too so both are covered.
-    const eceNext = (heldEce || 0) + 1 <= 6 ? (heldEce || 0) + 1 : 6;
-    const model = F.trainingByArea(raw, 'ece', eceNext);
-    if (!model.hasData) return '';
-
-    // The union of areas either the next ECE level OR the next ITC level needs, so
-    // an infant/toddler teacher sees the areas that matter to them too.
-    let itcNeeded = {};
-    if (F.worksWithInfantsToddlers && F.worksWithInfantsToddlers(s) && F.itcTargetLevel && F.areasForLevel) {
-        const itcNext = F.itcTargetLevel(s, heldItc, heldEce);
-        itcNeeded = F.areasForLevel('itc', itcNext);
-    }
-
-    const rowsHtml = model.rows.map(r => {
-        const needed = r.needed || !!itcNeeded[r.code];
-        const cls = 'sp-ta-row' + (needed ? ' need' : '') + (r.thin ? ' thin' : '');
-        return '<div class="' + cls + '">'
-            + '<span class="sp-ta-code">' + esc(r.code) + '</span>'
-            + '<span class="sp-ta-name">' + esc(r.name) + '</span>'
-            + '<span class="sp-ta-hrs">' + (r.hours ? esc(String(r.hours)) : '0') + ' hrs</span>'
-            + (needed ? '<span class="sp-ta-flag">next level</span>' : '')
-            + '</div>';
-    }).join('');
-
-    // The plain-English focus line: areas the next level needs where hours are thin.
-    let focusLine = '';
-    const focusNames = model.rows.filter(r => (r.needed || !!itcNeeded[r.code])
-        && r.hours < 3).map(r => r.code + ' \u00b7 ' + r.name);
-    if (focusNames.length) {
-        focusLine = '<div class="sp-step caution" style="margin-top:10px;">'
-            + '<div class="t">Where to aim your next training</div>'
-            + '<div class="d">Your next level\u2019s skill areas lean on these, and your record '
-            + 'shows little training there so far: <b>' + focusNames.map(esc).join('; ')
-            + '</b>. Picking trainings in these areas moves you toward the level rather than '
-            + 'adding hours where you are already strong.</div></div>';
-    } else {
-        focusLine = '<div class="sp-step done" style="margin-top:10px;">'
-            + '<div class="t">\u2713 Broad coverage</div>'
-            + '<div class="d">You already have training across the areas your next level '
-            + 'draws on. Any approved training keeps your annual hours up.</div></div>';
-    }
-
-    return '<div class="sp-card sp-ta">'
-        + '<h2>Training by competency area</h2>'
-        + '<div class="sp-sub">From your Professional Development Record \u2014 registry-approved '
-        + 'training totals by Gateways content area (' + esc(String(model.total)) + ' hrs total). '
-        + 'Areas marked <b>next level</b> are ones your next credential level\u2019s competencies '
-        + 'draw on. This is guidance for choosing training, not a Gateways decision \u2014 they '
-        + 'assess competencies against your transcript and record.</div>'
-        + '<div class="sp-ta-list">' + rowsHtml + '</div>'
-        + focusLine
-        + '</div>';
-}
+/* The level tables live in credential-framework.js, transcribed from the two
+   Gateways framework documents in Internal/documents. The rendering is now driven by
+   CredentialFramework.nextLevelModel and ladderColumn (further down): one card per
+   ladder showing the education gate, the required competencies with the training
+   allowance, the person's training hours BY content area, and the classroom line.
+   The old eceSteps/itSteps/trainingAreasPanel helpers were retired when that card
+   replaced the generic next-steps list and the separate training panel. */
 
 // ── forms ─────────────────────────────────────────────────────────────────
 function schoolYear() {
@@ -1224,19 +1160,103 @@ function standingTiles(s) {
     return html;
 }
 
-/* One "next steps" column: a heading strip naming the ladder and the level held,
-   then the steps. Shared by both credentials so ECE and ITC render identically. */
-function credentialColumn(title, heldLevel, heldWord, steps) {
+/* One ladder column: a heading strip naming the ladder and the level held, then a
+   single "What Level N needs" card driven by CredentialFramework.nextLevelModel.
+
+   The card has three plain sections:
+     College      the education gate for the next level + the person's ECE hours on file
+     Competencies the count the level needs, how many may come from training, and the
+                  person's TRAINING HOURS BY AREA with thin areas flagged "aim here"
+     Classroom    the supervised / documented experience line
+
+   Honest split: the requirement is competencies + the training allowance (the real
+   rule); training hours by area are the actionable signal. No per-area hour target is
+   claimed. College hours are a total only (the PDR does not tag courses to areas). */
+function ladderColumn(title, heldLevel, heldWord, model, kind) {
+    let body = '';
+
+    if (!model || model.topped) {
+        body = '<div class="sp-step done"><div class="t">\u2713 Top of the ladder</div>'
+            + '<div class="d">There is no level above this one.</div></div>';
+        return ladderShell(title, heldLevel, heldWord, body);
+    }
+
+    // ITC gated behind a higher ECE level: say only that, and stop.
+    if (model.reachable === false) {
+        body = '<div class="sp-step caution"><div class="t">Next: reach ECE Credential first</div>'
+            + '<div class="d">' + esc(model.gate) + ' See the Preschool (ECE) column for what that '
+            + 'takes.</div></div>';
+        return ladderShell(title, heldLevel, heldWord, body);
+    }
+
+    body += '<div class="sp-need-head">Working toward <b>' + esc(model.levelWord) + '</b></div>';
+
+    // ── College / education gate ──
+    const collegeVal = model.education
+        ? esc(model.education.replace(/\.\s*$/, '')) + '.'
+        : 'Set by the credential.';
+    let collegeExtra = '';
+    if (kind === 'ece') {
+        collegeExtra = model.collegeHours
+            ? '<div class="sp-need-sub">On file: <b>' + esc(model.collegeHours)
+              + ' ECE/CD semester hours</b>.</div>'
+            : '<div class="sp-need-sub">No ECE college hours are recorded yet.</div>';
+    }
+    body += '<div class="sp-need">'
+        + '<div class="sp-need-k">College</div>'
+        + '<div class="sp-need-v">' + collegeVal + collegeExtra + '</div></div>';
+
+    // ── Competencies + training-by-area ──
+    let comp = '<div class="sp-need-v">'
+        + '<b>' + model.competencyCount + ' skill areas</b> (competencies) across the content '
+        + 'areas below. Up to <b>' + model.trainingAllowance + '</b> may be met with approved '
+        + 'Gateways training instead of college coursework; the rest come from your courses. '
+        + 'Gateways decides this against your transcript and record \u2014 the hours below are a '
+        + 'guide to where your training already is.</div>';
+
+    // Per-area training hours, only the areas THIS level needs.
+    if (model.areas.length) {
+        comp += '<div class="sp-area-list">' + model.areas.map(a => {
+            const cls = 'sp-area' + (a.thin ? ' thin' : ' ok');
+            return '<div class="' + cls + '">'
+                + '<span class="sp-area-code">' + esc(a.code) + '</span>'
+                + '<span class="sp-area-name">' + esc(a.name) + '</span>'
+                + '<span class="sp-area-hrs">' + (a.hours ? esc(String(a.hours)) + ' hrs' : '\u2014')
+                + '</span>'
+                + '<span class="sp-area-tag">' + (a.thin ? 'aim here' : '\u2713') + '</span>'
+                + '</div>';
+        }).join('') + '</div>';
+
+        if (!model.hasHours) {
+            comp += '<div class="sp-need-sub">No training record on file yet. Upload this person\u2019s '
+                + 'PDR (below) to fill in the hours by area.</div>';
+        } else if (model.focus.length) {
+            comp += '<div class="sp-need-focus">\u2192 Little or no training logged in <b>'
+                + model.focus.map(esc).join(', ') + '</b>. Aim the next training there.</div>';
+        } else {
+            comp += '<div class="sp-need-focus ok">\u2713 Training logged across every area this level '
+                + 'draws on.</div>';
+        }
+    }
+    body += '<div class="sp-need"><div class="sp-need-k">Competencies</div>' + comp + '</div>';
+
+    // ── Classroom / experience ──
+    if (model.classroom) {
+        body += '<div class="sp-need">'
+            + '<div class="sp-need-k">Classroom</div>'
+            + '<div class="sp-need-v">' + esc(model.classroom) + '</div></div>';
+    }
+
+    return ladderShell(title, heldLevel, heldWord, body);
+}
+
+function ladderShell(title, heldLevel, heldWord, body) {
     return '<div class="sp-cred-col">'
         + '<div class="sp-cred-head">'
         + '<span class="n">' + title + '</span>'
         + '<span class="lvl">' + (heldLevel ? heldWord : 'none held') + '</span>'
         + '</div>'
-        + '<div class="sp-card">'
-        + steps.map(st => '<div class="sp-step' + (st.done ? ' done' : '') + '">'
-            + '<div class="t">' + (st.done ? '\u2713 ' : '') + st.t + '</div>'
-            + '<div class="d">' + st.d + '</div></div>').join('')
-        + '</div></div>';
+        + '<div class="sp-card sp-need-card">' + body + '</div></div>';
 }
 
 /* ── Credentials ── the two routes side by side, then what training is recorded.
@@ -1264,14 +1284,22 @@ function credentialsSection(s) {
             + '<div class="d">' + cdaNote + '</div></div>';
     }
 
-    html += '<div class="sp-cred-cols">'
-        + credentialColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceSteps(s))
-        + credentialColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itSteps(s))
-        + '</div>';
-
-    // Training by content area, from the PDR (Tier 2). Only appears once a PDR has
-    // been ingested for this person; otherwise it stays hidden.
-    html += trainingAreasPanel(s, heldEce, heldItc);
+    // Build the full "next level" model per ladder (education gate, competencies +
+    // training-by-area, classroom). The training-by-area breakdown now lives INSIDE
+    // each ladder card, so there is no separate panel below.
+    const F = window.CredentialFramework;
+    let eceCol, itcCol;
+    if (F && F.nextLevelModel) {
+        const eceModel = F.nextLevelModel('ece', s, heldEce, heldItc, s.PdContentAreas);
+        const itcModel = F.nextLevelModel('itc', s, heldEce, heldItc, s.PdContentAreas);
+        eceCol = ladderColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceModel, 'ece');
+        itcCol = ladderColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itcModel, 'itc');
+    } else {
+        const na = '<div class="sp-cred-col"><div class="sp-card"><div class="sp-sub">Credential '
+            + 'requirements did not load.</div></div></div>';
+        eceCol = na; itcCol = na;
+    }
+    html += '<div class="sp-cred-cols">' + eceCol + itcCol + '</div>';
 
     /* Admin-only: pull this person's college hours, transcript status and current-year
        PD hours straight from their Gateways PDR. Nothing is written until the admin
