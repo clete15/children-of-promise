@@ -344,22 +344,23 @@
 
     /* Two-column split inside Competencies: course list (left) beside coverage-by-area
        (right). Stacks to one column on a narrow screen. */
+    /* Coverage-by-area (left) is the primary column, so it is the wider one; college
+       coursework sits on the right. */
     .sp-comp-split {
-        display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
         gap: 18px; margin-top: 10px; align-items: stretch;
     }
     @media (max-width: 700px) { .sp-comp-split { grid-template-columns: 1fr; gap: 6px; } }
     .sp-comp-left, .sp-comp-right { min-width: 0; display: flex; flex-direction: column; }
     /* The per-area list has its own top margin from the head; drop the list's extra. */
-    .sp-comp-right .sp-area-list { margin-top: 8px; }
-    /* Let the course list fill the left column's height so the two columns balance
-       (the coverage column on the right is usually taller). The rows spread to fill
-       the space rather than leaving a gap under a short list. */
-    .sp-comp-left .sp-course-list { flex: 1 1 auto; }
-    .sp-comp-left .sp-course { flex: 1 1 auto; }
+    .sp-comp-left .sp-area-list { margin-top: 8px; }
+    /* Let the course list (now on the right) fill its column's height so the two
+       columns balance — the rows spread to fill rather than leaving a bottom gap. */
+    .sp-comp-right .sp-course-list { flex: 1 1 auto; }
+    .sp-comp-right .sp-course { flex: 1 1 auto; }
     /* On a phone the columns stack, so don't stretch rows there. */
     @media (max-width: 700px) {
-        .sp-comp-left .sp-course-list, .sp-comp-left .sp-course { flex: 0 0 auto; }
+        .sp-comp-right .sp-course-list, .sp-comp-right .sp-course { flex: 0 0 auto; }
     }
 
     /* College coursework list: each course with the content-area codes it covers. */
@@ -370,17 +371,17 @@
     .sp-comp-split .sp-course-head { margin-top: 0; }
     .sp-course-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
     .sp-course {
-        display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
-        padding: 6px 9px; border-radius: 7px; background: var(--sp-surface-2);
-        border: 1px solid var(--sp-border); font-size: 0.8rem;
+        display: flex; align-items: center; flex-wrap: wrap; gap: 5px 10px;
+        padding: 9px 12px; border-radius: 8px; background: var(--sp-surface-2);
+        border: 1px solid var(--sp-border); font-size: 0.9rem;
     }
-    .sp-course-nbr { font-weight: 800; color: var(--sp-text); white-space: nowrap; }
+    .sp-course-nbr { font-weight: 800; color: var(--sp-text); white-space: nowrap; font-size: 0.92rem; }
     .sp-course-name { color: var(--sp-text-2); flex: 1 1 auto; min-width: 0; }
-    .sp-course-areas { display: flex; flex-wrap: wrap; gap: 3px; }
+    .sp-course-areas { display: flex; flex-wrap: wrap; gap: 4px; }
     .sp-course-area {
-        font-size: 0.64rem; font-weight: 800; letter-spacing: 0.03em; color: var(--sp-accent);
+        font-size: 0.7rem; font-weight: 800; letter-spacing: 0.03em; color: var(--sp-accent);
         background: var(--sp-accent-soft); border: 1px solid var(--sp-border); border-radius: 4px;
-        padding: 1px 6px; white-space: nowrap;
+        padding: 2px 7px; white-space: nowrap;
     }
     .sp-course-area.none { color: var(--sp-muted); background: transparent; font-weight: 600; }
 
@@ -1360,9 +1361,11 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
     // Course list left, coverage-by-area right (stacks on a narrow screen). When there
     // is no course column (ITC, or no courses on file) the area column takes the width.
     if (courseCol) {
+        // Coverage-by-area on the LEFT (the primary answer to "where do I stand"),
+        // college coursework on the RIGHT.
         comp += '<div class="sp-comp-split">'
-            + '<div class="sp-comp-left">' + courseCol + '</div>'
-            + '<div class="sp-comp-right">' + areaCol + '</div>'
+            + '<div class="sp-comp-left">' + areaCol + '</div>'
+            + '<div class="sp-comp-right">' + courseCol + '</div>'
             + '</div>' + guidance;
     } else {
         comp += areaCol + guidance;
