@@ -1121,20 +1121,13 @@ function render() {
     wireCredPick();
 }
 
-/* Above the tabs, so the name and room stay visible whichever tab is open.
-
-   "My details" now lives here: an Edit button on the name card that reveals the
-   self-edit form directly beneath it. The form markup is rendered up front (hidden)
-   so the toggle is instant and the save handler wires the same way it always did. */
+/* Above the tabs, so the name and room stay visible whichever tab is open. The
+   self-edit form used to hang off an "Edit my details" button here; that was retired
+   once records are maintained from the PDR upload. selfEditCard/setDetailsOpen remain
+   in the code but are no longer surfaced. */
 function identityHeader(s) {
     const rooms = [s.Classroom, s.SecondaryClassroom]
         .map(v => String(v || '').trim()).filter(Boolean).join(' and ');
-    const editable = selfEditCard(s);   // '' when this viewer may not edit
-
-    // A small "needs you" count, the same two gaps the old tab badge counted.
-    let gaps = 0;
-    if (!String(s.RegistryId || '').trim()) gaps++;
-    if (!String(s.SemesterHoursTotal || '').trim()) gaps++;
 
     return '<div class="sp-card sp-who">'
         + '<div class="sp-who-row">'
@@ -1145,25 +1138,14 @@ function identityHeader(s) {
         + (s.RegistryId ? ' \u00b7 Registry ' + esc(s.RegistryId) : '')
         + '</div>'
         + '</div>'
-        + '<div class="sp-who-actions">'
-        + (editable
-            ? '<button type="button" id="edToggle" class="sp-edit-btn" aria-expanded="false" '
-              + 'aria-controls="edPanel">\u270e Edit my details'
-              + (gaps ? '<span class="sp-count" aria-label="' + gaps
-                  + ' needing attention">' + gaps + '</span>' : '')
-              + '</button>'
-            : '')
-        + '</div>'
+        // The "Edit my details" button was retired: records are now maintained from
+        // the PDR upload (admin) rather than hand-edited here. The self-edit form and
+        // its toggle wiring remain in the code, just no longer surfaced.
         + '</div>'
         // The "where you stand" figures live inside this same card, right under the
         // name and role, so the person and their summary read as one thing rather
         // than as two stacked boxes.
         + '<div id="spStanding" class="sp-standing">' + standingTiles(s) + '</div>'
-        // Hidden until the button is pressed. Kept inside the name card's flow so it
-        // opens directly underneath, which is what was asked for.
-        + (editable
-            ? '<div id="edPanel" class="sp-edit-panel" hidden>' + editable + '</div>'
-            : '')
         + '</div>';
 }
 
@@ -1430,6 +1412,24 @@ function credentialsSection(s) {
             + '<span id="pdrMsg" class="sp-savemsg"></span>'
             + '</div>'
             + '<div id="pdrResult"></div>'
+            // The how-to lives inside this card now: collapsed, right where the PDR
+            // is actually uploaded, so pulling it and using it sit together.
+            + '<details class="sp-pdr" style="margin-top:14px;">'
+            + '<summary>How to pull a training record (PDR) from Gateways</summary>'
+            + '<div class="sp-pdr-body">'
+            + '<p>The Professional Development Record lists every approved course with its '
+            + 'Illinois Core Knowledge Areas, dates and credit hours \u2014 it is what we use to '
+            + 'confirm competencies. To pull it:</p>'
+            + '<ol>'
+            + '<li><b>Log in</b> to the Gateways Registry with the personal account.</li>'
+            + '<li>Open the <b>Dashboard</b> (or <b>My Registry</b>) from the top navigation.</li>'
+            + '<li>Find the <b>My PDR</b> (Professional Development Record) section or tile.</li>'
+            + '<li>Click <b>Print/View PDR</b> to generate the official training record.</li>'
+            + '<li><b>Save it as a PDF</b>, then upload it above.</li>'
+            + '</ol>'
+            + '<a class="sp-pdr-btn" href="https://registry.ilgateways.com" target="_blank" rel="noopener">'
+            + 'Open the Gateways Registry \u2192</a>'
+            + '</div></details>'
             + '</div>';
     }
 
@@ -1461,27 +1461,6 @@ function credentialsSection(s) {
     } else {
         html += '<div class="sp-card"><div class="sp-sub">Credential requirements did not load.</div></div>';
     }
-
-    /* How to pull your PDR. Collapsed by default so it does not crowd the ladders,
-       but always available — it is the record that resolves nearly every "waiting on
-       something" and missing-competency question, so it belongs right here. */
-    html += '<div class="sp-card"><details class="sp-pdr">'
-        + '<summary>How to pull your training record (PDR) from Gateways</summary>'
-        + '<div class="sp-pdr-body">'
-        + '<p>Your Professional Development Record lists every approved course with its '
-        + 'Illinois Core Knowledge Areas, dates and credit hours \u2014 it is what we use to '
-        + 'confirm your competencies. To pull it:</p>'
-        + '<ol>'
-        + '<li><b>Log in</b> to the Gateways Registry with your personal account.</li>'
-        + '<li>Open your <b>Dashboard</b> (or <b>My Registry</b>) from the top navigation.</li>'
-        + '<li>Find the <b>My PDR</b> (Professional Development Record) section or tile.</li>'
-        + '<li>Click <b>Print/View PDR</b> to generate your official training record.</li>'
-        + '<li><b>Save it as a PDF or print it</b> and hand it in so we can update your '
-        + 'record with your specific core competencies.</li>'
-        + '</ol>'
-        + '<a class="sp-pdr-btn" href="https://registry.ilgateways.com" target="_blank" rel="noopener">'
-        + 'Open the Gateways Registry \u2192</a>'
-        + '</div></details></div>';
 
     html += '<div class="sp-card"><div class="sp-src">Level benchmarks are transcribed from the '
         + 'Gateways to Opportunity framework documents in our document library \u2014 '
