@@ -342,12 +342,23 @@
     .sp-cv.yes { color: var(--sp-good-fg); font-weight: 600; }
     .sp-cv.no { color: var(--sp-muted); }
 
-    /* College coursework list, shown above the per-area rows: each course with the
-       content-area codes it covers. */
+    /* Two-column split inside Competencies: course list (left) beside coverage-by-area
+       (right). Stacks to one column on a narrow screen. */
+    .sp-comp-split {
+        display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+        gap: 18px; margin-top: 10px; align-items: start;
+    }
+    @media (max-width: 700px) { .sp-comp-split { grid-template-columns: 1fr; gap: 6px; } }
+    .sp-comp-left, .sp-comp-right { min-width: 0; }
+    /* The per-area list has its own top margin from the head; drop the list's extra. */
+    .sp-comp-right .sp-area-list { margin-top: 8px; }
+
+    /* College coursework list: each course with the content-area codes it covers. */
     .sp-course-head {
         font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
         color: var(--sp-muted); margin: 12px 0 6px;
     }
+    .sp-comp-split .sp-course-head { margin-top: 0; }
     .sp-course-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
     .sp-course {
         display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
@@ -1300,11 +1311,12 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
         + 'Gateways decides this against your transcript and record \u2014 the hours below are a '
         + 'guide to where your training already is.</div>';
 
-    /* College coursework on file, with the content areas each course covers. Shown
-       once, above the per-area rows, so the full course list and its mapping are
-       visible in one place (the per-area rows only name the areas the level needs). */
+    /* College coursework on file, with the content areas each course covers. This is
+       the LEFT panel of the split below; the per-area coverage is the RIGHT panel, so
+       the two read side by side on the full-width card. */
+    let courseCol = '';
     if (kind === 'ece' && model.courses && model.courses.length) {
-        comp += '<div class="sp-course-head">College coursework on file</div>'
+        courseCol = '<div class="sp-course-head">College coursework on file</div>'
             + '<div class="sp-course-list">' + model.courses.map(c => {
                 const tags = c.areas.length
                     ? c.areas.map(a => '<span class="sp-course-area">' + esc(a) + '</span>').join('')
@@ -1319,11 +1331,12 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
 
     /* Per-area coverage for the areas THIS level needs. Each area is a small block:
        a header line (code badge + full area name + covered/aim tag), then a coverage
-       line (College + which courses, and Training hours). Stacked rather than a tight
-       grid so it stays readable inside the narrow two-column ladder layout. An area is
-       flagged "aim here" only when it has NEITHER coursework nor training. */
+       line (College + which courses, and Training hours). An area is flagged
+       "aim here" only when it has NEITHER coursework nor training. */
+    let areaCol = '', guidance = '';
     if (model.areas.length) {
-        comp += '<div class="sp-area-list">' + model.areas.map(a => {
+        areaCol = '<div class="sp-course-head">Coverage by content area</div>'
+            + '<div class="sp-area-list">' + model.areas.map(a => {
             const cls = 'sp-area' + (a.thin ? ' thin' : ' ok');
             const college = a.collegeCovered
                 ? '<span class="sp-cv yes">\u2713 College: ' + esc(a.collegeCourses.join(', ')) + '</span>'
@@ -1342,15 +1355,26 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
         }).join('') + '</div>';
 
         if (!model.hasHours && !model.hasCourses) {
-            comp += '<div class="sp-need-sub">No coursework or training on file yet. Upload this '
+            guidance = '<div class="sp-need-sub">No coursework or training on file yet. Upload this '
                 + 'person\u2019s PDR (below) to fill in coverage by area.</div>';
         } else if (model.focus.length) {
-            comp += '<div class="sp-need-focus">\u2192 Neither coursework nor training covers <b>'
+            guidance = '<div class="sp-need-focus">\u2192 Neither coursework nor training covers <b>'
                 + model.focus.map(esc).join(', ') + '</b> yet. Aim the next course or training there.</div>';
         } else {
-            comp += '<div class="sp-need-focus ok">\u2713 Every area this level draws on is covered by '
+            guidance = '<div class="sp-need-focus ok">\u2713 Every area this level draws on is covered by '
                 + 'coursework or training. Gateways confirms the competencies against your record.</div>';
         }
+    }
+
+    // Course list left, coverage-by-area right (stacks on a narrow screen). When there
+    // is no course column (ITC, or no courses on file) the area column takes the width.
+    if (courseCol) {
+        comp += '<div class="sp-comp-split">'
+            + '<div class="sp-comp-left">' + courseCol + '</div>'
+            + '<div class="sp-comp-right">' + areaCol + '</div>'
+            + '</div>' + guidance;
+    } else {
+        comp += areaCol + guidance;
     }
     // Competencies spans the FULL card width (label on top) so the per-area blocks
     // are not squeezed into a narrow value column.
