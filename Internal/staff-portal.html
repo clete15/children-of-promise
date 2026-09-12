@@ -1027,17 +1027,28 @@ function tabCount(key, s) {
     return 0;
 }
 
-/* Clete and Megan get one extra tab the others never see: Admin, holding the
-   Staff Attainments refresh and the whole-centre outstanding-Gateways list. Gated
-   on WHO.admin, which the server sets only for the two admin logins (and for the
-   shared director password). Everyone else's tab strip is unchanged. */
+/* Clete and Megan get admin-only controls (the Staff Attainments refresh, the
+   whole-centre outstanding-Gateways list, the per-person "Update from PDR"). Gated
+   on WHO.admin/director, which the server sets only for the two admin logins and for
+   the shared director password. Everyone else never sees them. */
 function isAdmin() {
     return !!(WHO && (WHO.admin || WHO.director));
 }
 
+/* The Admin TAB shows only when an admin is looking at their OWN record (Clete's or
+   Megan's own page) rather than on every staff record they open — the whole-centre
+   tools belong to the admin's own page, not to whoever they are viewing. The shared
+   director-password login has no staffId (it is not a specific person), so it keeps
+   the tab everywhere. */
+function adminHere(s) {
+    if (!isAdmin()) return false;
+    if (WHO && !WHO.staffId) return true;               // shared director password
+    return !!(s && WHO && String(WHO.staffId) === String(s.Id));
+}
+
 function visibleTabs(s) {
     const tabs = SP_TABS.slice();
-    if (isAdmin()) tabs.push({ key: 'admin', label: 'Admin' });
+    if (adminHere(s)) tabs.push({ key: 'admin', label: 'Admin' });
     return tabs;
 }
 
