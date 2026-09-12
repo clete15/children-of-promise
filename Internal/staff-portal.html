@@ -1785,6 +1785,17 @@ async function load() {
             // names the room instead of linking to it.
             myFetch('/api/classrooms').catch(() => null)
         ]);
+        /* A 401 here means the sign-in has lapsed: the personal token expired (or the
+           shared password is no longer stored), so the server rejected the request.
+           whoAmI can still look "signed in" from a stale token, so the earlier guard
+           does not catch this. Rather than strand the person on "HTTP 401", clear the
+           dead token and send them back through the sign-in, which mints a fresh one
+           and returns them here. */
+        if (sRes.status === 401) {
+            try { if (window.CofpAuth && CofpAuth.staffLogout) CofpAuth.staffLogout(); } catch (e) {}
+            location.replace('/me');
+            return;
+        }
         if (!sRes.ok) throw new Error('staff records: HTTP ' + sRes.status);
         STAFF = await sRes.json();
         if (!Array.isArray(STAFF)) STAFF = [];
