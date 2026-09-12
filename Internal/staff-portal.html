@@ -1658,7 +1658,11 @@ async function applyAttainments(indexes, btn) {
             alert('Applied ' + (data.applied || []).length + ', but ' + data.failed.length
                 + ' failed: ' + data.failed.map(f => f.staffId + ' (' + f.error + ')').join('; '));
         }
-        render();   // redraw; Admin tab shows the reduced outstanding list and preview
+        /* Redraw only the preview list, not the whole page. Applied people now have
+           changed=false, so their cards drop out while the rest of the preview stays
+           put — you are not thrown back to the tab's start. The STAFF rows were
+           updated above, so the "Outstanding" card is correct next time it renders. */
+        renderAttnResults();
     } catch (e) {
         alert('Could not apply: ' + (e.message || e));
         if (btn) { btn.disabled = false; btn.textContent = 'Apply this'; }
