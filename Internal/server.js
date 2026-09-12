@@ -1811,11 +1811,30 @@ function parseAttainments(text) {
      pendingNote - a one-line "Pending: ..." summary for the Notes field, or ''
    These are proposals; the admin approves before anything is written. */
 function attainmentProposal(entry) {
-    // Gateways credential summary: list awarded credentials with their level.
-    const credStr = entry.credentials
-        .map(c => c.level ? (c.type + ' - Level ' + c.level) : c.type)
-        // De-dupe while preserving order.
-        .filter((v, i, a) => a.indexOf(v) === i)
+    /* Gateways credential summary: the HIGHEST level held per credential type.
+       The report lists every level a person has passed through (ECE Level 1 AND
+       Level 2), but holding Level 2 supersedes Level 1 — listing both reads as a
+       mistake. So we keep only the top level for each credential type. Levels are
+       Arabic (1-6) on ECE/ITC and Roman (I-III) on the Director credential, so the
+       rank function handles both. */
+    const ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6 };
+    const levelRank = lv => {
+        const s = String(lv || '').trim().toLowerCase();
+        if (/^\d+$/.test(s)) return parseInt(s, 10);
+        return ROMAN[s] || 0;
+    };
+    const bestByType = {};
+    const typeOrder = [];
+    entry.credentials.forEach(c => {
+        const type = c.type;
+        if (!(type in bestByType)) { bestByType[type] = c; typeOrder.push(type); }
+        else if (levelRank(c.level) > levelRank(bestByType[type].level)) bestByType[type] = c;
+    });
+    const credStr = typeOrder
+        .map(type => {
+            const c = bestByType[type];
+            return c.level ? (type + ' - Level ' + c.level) : type;
+        })
         .join(', ');
 
     // Pending summary, e.g. "Pending: Infant Toddler Credential (Awaiting Work Experience)"
