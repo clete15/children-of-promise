@@ -1825,11 +1825,22 @@ function renderPdrResult() {
             + '</b> (' + esc(p.parsedRegistry || 'no N#') + ').</div>';
     }
 
+    // A readable one-line summary of the content-area breakdown, so a change to it
+    // shows in the diff even when the headline hours are unchanged.
+    const areaSummary = (json) => {
+        const F = window.CredentialFramework;
+        const o = (F && F.parseContentAreaHours) ? F.parseContentAreaHours(json) : null;
+        if (!o) return '';
+        const order = ['HGD', 'HSW', 'OA', 'CPD', 'IRE', 'FCR', 'PPD'];
+        return order.filter(k => o[k] != null).map(k => k + ' ' + o[k]).join(', ');
+    };
+
     const diffs = attnDiff('College credit hours (total)', c.semesterHoursTotal, pr.semesterHoursTotal)
         + attnDiff('ECE / CD credit hours', c.semesterHoursEce, pr.semesterHoursEce)
         + attnDiff('Transcript on file', c.transcriptOnFile, pr.transcriptOnFile)
         + attnDiff('PD training hours (' + esc(ex.year || '') + ')', c.pdHoursYtd, pr.pdHoursYtd)
-        + attnDiff('PD hours year', c.pdHoursYear, pr.pdHoursYear);
+        + attnDiff('PD hours year', c.pdHoursYear, pr.pdHoursYear)
+        + attnDiff('Training by content area', areaSummary(c.pdContentAreas), areaSummary(pr.pdContentAreas));
 
     html += '<div class="sp-attn-card">'
         + '<div class="sp-attn-diff" style="border:0;padding:0;">'
@@ -1837,6 +1848,14 @@ function renderPdrResult() {
         + '<div class="sp-sub">' + (ex.pdHoursThisYear != null ? esc(String(ex.pdHoursThisYear)) : '0')
         + ' contact hours across ' + (ex.trainingRowsCounted || 0) + ' dated training row(s) in '
         + esc(ex.year || 'this year') + ' (verified sections only \u2014 self-reported rows are not counted).</div>'
+        + (ex.contentAreas
+            ? '<div class="sp-attn-diff-lbl" style="margin-top:8px;">Training by content area</div>'
+              + '<div class="sp-sub">' + esc(areaSummary(JSON.stringify(ex.contentAreas)))
+              + ' \u2014 ' + esc(String(ex.contentAreasTotal != null ? ex.contentAreasTotal : ''))
+              + ' hrs total (reconciled with the PDR).</div>'
+            : '<div class="sp-sub" style="margin-top:8px;color:var(--sp-muted);">'
+              + 'The content-area breakdown could not be read from this PDF, so it will not '
+              + 'be written. Everything else above still applies.</div>')
         + '</div>';
 
     if (diffs) {
@@ -1871,7 +1890,8 @@ async function applyPdr() {
                 semesterHoursEce: pr.semesterHoursEce,
                 transcriptOnFile: pr.transcriptOnFile,
                 pdHoursYtd: pr.pdHoursYtd,
-                pdHoursYear: pr.pdHoursYear
+                pdHoursYear: pr.pdHoursYear,
+                pdContentAreas: pr.pdContentAreas
             })
         });
         const data = await res.json();
@@ -1884,6 +1904,7 @@ async function applyPdr() {
             row.TranscriptOnFile = pr.transcriptOnFile;
             row.PdHoursYtd = pr.pdHoursYtd;
             row.PdHoursYear = pr.pdHoursYear;
+            row.PdContentAreas = pr.pdContentAreas;
         }
         if (current && String(current.Id) === String(PDR_PREVIEW.staffId)) {
             current = row || current;
