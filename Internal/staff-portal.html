@@ -1355,15 +1355,23 @@ function credentialsSection(s) {
        name card (standingTiles) so it shows on every tab rather than only here. Both
        used to render at the top of this section. */
 
-    /* CDA explainer, shown only for someone who holds a CDA. Gateways does not make
-       the CDA-vs-ECE-vs-ITC distinction clear, and it is the thing most misread, so
-       it is spelled out in plain language above the two ladders. */
-    const cdaNote = (window.CredentialFramework && CredentialFramework.cdaLadderNote)
-        ? CredentialFramework.cdaLadderNote(s) : '';
-    if (cdaNote) {
-        html += '<div class="sp-step info" style="margin-bottom:14px;">'
-            + '<div class="t">\uD83E\uDE9C How your CDA counts</div>'
-            + '<div class="d">' + cdaNote + '</div></div>';
+    /* Admin-only: the "Update from PDR" control sits ABOVE the credential cards, so
+       the person doing the update sees it first, then the cards update beneath it.
+       Nothing is written until the admin reviews the before/after and clicks Apply.
+       Shown only to Clete/Megan and only on a real record. */
+    if (isAdmin() && s && s.Id) {
+        html += '<div class="sp-card sp-pdrup"><h2>Update from PDR</h2>'
+            + '<div class="sp-sub">Upload <b>' + esc(s.Name || 'this person') + '\u2019s</b> '
+            + 'Professional Development Record (PDF) to refresh their college hours, transcript '
+            + 'status and this year\u2019s PD training hours. You\u2019ll see exactly what changes '
+            + 'before anything is saved.</div>'
+            + '<div class="sp-attn-row">'
+            + '<input type="file" id="pdrFile" accept=".pdf">'
+            + '<button type="button" id="pdrUpload" class="sp-save">Read &amp; preview</button>'
+            + '<span id="pdrMsg" class="sp-savemsg"></span>'
+            + '</div>'
+            + '<div id="pdrResult"></div>'
+            + '</div>';
     }
 
     // Build the full "next level" model per ladder (education gate, competencies +
@@ -1382,25 +1390,6 @@ function credentialsSection(s) {
         eceCol = na; itcCol = na;
     }
     html += '<div class="sp-cred-cols">' + eceCol + itcCol + '</div>';
-
-    /* Admin-only: pull this person's college hours, transcript status and current-year
-       PD hours straight from their Gateways PDR. Nothing is written until the admin
-       reviews the before/after and clicks Apply. Shown only to Clete/Megan and only on
-       a real record. */
-    if (isAdmin() && s && s.Id) {
-        html += '<div class="sp-card sp-pdrup"><h2>Update from PDR</h2>'
-            + '<div class="sp-sub">Upload <b>' + esc(s.Name || 'this person') + '\u2019s</b> '
-            + 'Professional Development Record (PDF) to refresh their college hours, transcript '
-            + 'status and this year\u2019s PD training hours. You\u2019ll see exactly what changes '
-            + 'before anything is saved.</div>'
-            + '<div class="sp-attn-row">'
-            + '<input type="file" id="pdrFile" accept=".pdf">'
-            + '<button type="button" id="pdrUpload" class="sp-save">Read &amp; preview</button>'
-            + '<span id="pdrMsg" class="sp-savemsg"></span>'
-            + '</div>'
-            + '<div id="pdrResult"></div>'
-            + '</div>';
-    }
 
     /* How to pull your PDR. Collapsed by default so it does not crowd the ladders,
        but always available — it is the record that resolves nearly every "waiting on
