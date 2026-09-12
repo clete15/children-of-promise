@@ -85,7 +85,7 @@
         text-align: center;
     }
     .sp-card .sp-sub {
-        font-size: 0.86rem; color: var(--sp-muted); line-height: 1.6; margin-bottom: 12px;
+        font-size: 0.92rem; color: var(--sp-muted); line-height: 1.6; margin-bottom: 12px;
         text-align: center;
     }
     /* The name/identity card is the exception: its heading and role line sit in a
@@ -97,11 +97,11 @@
         border-radius: 9px; padding: 9px 12px; background: var(--sp-surface-2);
     }
     .sp-tile .lbl {
-        font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+        font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.04em; color: var(--sp-muted); margin-bottom: 3px;
     }
-    .sp-tile .val { font-size: 1.05rem; font-weight: 800; color: var(--sp-text); line-height: 1.2; }
-    .sp-tile .note { font-size: 0.76rem; color: var(--sp-muted); margin-top: 5px; line-height: 1.5; }
+    .sp-tile .val { font-size: 1.12rem; font-weight: 800; color: var(--sp-text); line-height: 1.2; }
+    .sp-tile .note { font-size: 0.82rem; color: var(--sp-muted); margin-top: 5px; line-height: 1.5; }
     .sp-tile.good { background: var(--sp-good-bg); border-color: var(--sp-good-br); }
     .sp-tile.warn { background: var(--sp-warn-bg); border-color: var(--sp-warn-br); }
     .sp-tile.bad  { background: var(--sp-bad-bg);  border-color: var(--sp-bad-br); }
@@ -115,7 +115,7 @@
         background: var(--sp-surface); color: var(--sp-text);
     }
     .sp-pill {
-        display: inline-block; font-size: 0.74rem; font-weight: 700;
+        display: inline-block; font-size: 0.8rem; font-weight: 700;
         padding: 2px 9px; border-radius: 11px; white-space: nowrap;
         background: var(--sp-pill-bg); color: var(--sp-muted);
     }
@@ -126,8 +126,8 @@
         border-radius: 8px; padding: 11px 14px; margin-bottom: 9px;
         background: var(--sp-surface);
     }
-    .sp-step .t { font-size: 0.92rem; font-weight: 700; color: var(--sp-text); }
-    .sp-step .d { font-size: 0.85rem; color: var(--sp-text-2); line-height: 1.6; margin-top: 4px; }
+    .sp-step .t { font-size: 0.98rem; font-weight: 700; color: var(--sp-text); }
+    .sp-step .d { font-size: 0.9rem; color: var(--sp-text-2); line-height: 1.6; margin-top: 4px; }
     .sp-step.done { border-left-color: #16a34a; background: var(--sp-good-bg); }
     /* Severity variants, replacing the inline border colours the script used to set. */
     .sp-step.alert { border-left-color: #dc2626; margin-top: 12px; }
@@ -218,7 +218,7 @@
         text-transform: uppercase; letter-spacing: 0.03em;
         display: inline-block; padding-bottom: 3px; border-bottom: 2px solid var(--grp);
     }
-    .sp-formgroup-note { font-size: 0.8rem; color: var(--sp-muted); margin: 4px 0 9px; line-height: 1.5; }
+    .sp-formgroup-note { font-size: 0.86rem; color: var(--sp-muted); margin: 4px 0 9px; line-height: 1.5; }
     /* Cards in a group take that group's accent on their left edge. */
     .sp-formgroup .sp-link { border-left: 4px solid var(--grp); }
     .sp-formgroup .sp-link:hover { border-color: var(--grp); }
@@ -237,9 +237,9 @@
     }
     .sp-link:hover { border-color: var(--sp-accent); background: var(--sp-accent-soft); }
     .sp-link.waiting { border-color: var(--sp-warn-br); background: var(--sp-warn-bg); }
-    .sp-link .n { font-size: 0.92rem; font-weight: 700; color: var(--sp-text); }
-    .sp-link .s { font-size: 0.8rem; color: var(--sp-muted); margin-top: 3px; }
-    .sp-src { font-size: 0.78rem; color: var(--sp-muted); margin-top: 10px; line-height: 1.6; }
+    .sp-link .n { font-size: 0.98rem; font-weight: 700; color: var(--sp-text); }
+    .sp-link .s { font-size: 0.86rem; color: var(--sp-muted); margin-top: 3px; }
+    .sp-src { font-size: 0.84rem; color: var(--sp-muted); margin-top: 10px; line-height: 1.6; }
     .sp-src a { color: var(--sp-accent); }
 
     /* "How to pull your PDR" collapsible. Native <details>, so no JS to wire. */
@@ -295,15 +295,15 @@
     .sp-need-full .sp-need-k { margin-bottom: 6px; }
     .sp-need-body { min-width: 0; }
     .sp-need-k {
-        font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
         color: var(--sp-muted); padding-top: 2px;
     }
-    .sp-need-v { font-size: 0.87rem; line-height: 1.55; color: var(--sp-text); min-width: 0; }
-    .sp-need-sub { font-size: 0.82rem; color: var(--sp-text-2); margin-top: 4px; }
+    .sp-need-v { font-size: 0.93rem; line-height: 1.55; color: var(--sp-text); min-width: 0; }
+    .sp-need-sub { font-size: 0.88rem; color: var(--sp-text-2); margin-top: 4px; }
     /* Guidance, not error: the "aim your next training here" line uses the indigo
        ATTENTION palette (--sp-warn-*), never the red alarm palette. */
     .sp-need-focus {
-        font-size: 0.83rem; margin-top: 10px; padding: 9px 12px; border-radius: 8px;
+        font-size: 0.9rem; margin-top: 10px; padding: 9px 12px; border-radius: 8px;
         background: var(--sp-warn-bg); color: var(--sp-warn-fg);
         border: 1px solid var(--sp-warn-br); font-weight: 600; line-height: 1.5;
     }
@@ -325,20 +325,20 @@
     .sp-area.thin { border-left-color: var(--sp-warn-br); background: var(--sp-warn-bg); border-color: var(--sp-warn-br); }
     .sp-area-top { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
     .sp-area-code {
-        font-weight: 800; font-size: 0.66rem; letter-spacing: 0.04em; color: var(--sp-accent);
+        font-weight: 800; font-size: 0.72rem; letter-spacing: 0.04em; color: var(--sp-accent);
         background: var(--sp-accent-soft); border: 1px solid var(--sp-border); border-radius: 5px;
         padding: 3px 7px; white-space: nowrap; flex: 0 0 auto;
     }
-    .sp-area-name { color: var(--sp-text); font-weight: 700; font-size: 0.87rem; flex: 1 1 auto; min-width: 0; }
+    .sp-area-name { color: var(--sp-text); font-weight: 700; font-size: 0.93rem; flex: 1 1 auto; min-width: 0; }
     /* The tag is a small pill so covered vs aim-here reads at a glance. */
     .sp-area-tag {
-        font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
+        font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
         white-space: nowrap; flex: 0 0 auto; padding: 2px 8px; border-radius: 999px;
     }
     .sp-area.thin .sp-area-tag { color: var(--sp-warn-fg); background: var(--sp-warn-br); }
     .sp-area.ok .sp-area-tag { color: var(--sp-good-fg); background: var(--sp-good-bg); }
     /* The two coverage lines sit under the header. */
-    .sp-area-cov { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 3px 18px; font-size: 0.8rem; }
+    .sp-area-cov { margin-top: 7px; display: flex; flex-wrap: wrap; gap: 3px 18px; font-size: 0.87rem; }
     .sp-cv.yes { color: var(--sp-good-fg); font-weight: 600; }
     .sp-cv.no { color: var(--sp-muted); }
 
@@ -365,7 +365,7 @@
 
     /* College coursework list: each course with the content-area codes it covers. */
     .sp-course-head {
-        font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
         color: var(--sp-muted); margin: 12px 0 6px;
     }
     .sp-comp-split .sp-course-head { margin-top: 0; }
@@ -497,7 +497,7 @@
        is a preference and not part of the task. */
     .sp-theme {
         background: none; border: none; padding: 0; cursor: pointer;
-        font: inherit; font-size: 0.76rem; font-weight: 600; color: var(--sp-muted);
+        font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--sp-muted);
     }
     .sp-theme:hover { color: var(--sp-accent); }
 
@@ -550,16 +550,16 @@
              them one record, their own. -->
         <select id="spStaff"><option value="">Loading…</option></select>
         <strong id="spWhoName" style="display:none;font-size:0.9rem;"></strong>
-        <span id="spMsg" class="sp-quiet" style="font-size:0.76rem;"></span>
+        <span id="spMsg" class="sp-quiet" style="font-size:0.82rem;"></span>
         <!-- Outside the staff-only block, so the director gets the theme choice too. -->
         <button type="button" id="spTheme" class="sp-theme" style="margin-left:auto;"
                 aria-pressed="false" title="Switch between light and dark"></button>
-        <span id="spStaffActions" style="display:none;font-size:0.76rem;">
+        <span id="spStaffActions" style="display:none;font-size:0.82rem;">
             <a href="#" id="spChangePw" style="font-weight:600;">Change my password</a>
             &nbsp;·&nbsp;
             <a href="#" id="spSignOut" class="sp-quiet" style="font-weight:600;">Sign out</a>
         </span>
-        <span id="spBarNote" class="sp-quiet" style="flex-basis:100%;font-size:0.72rem;">
+        <span id="spBarNote" class="sp-quiet" style="flex-basis:100%;font-size:0.8rem;">
             Everything here comes from your staff record. If something is wrong, it is wrong
             in the record — tell Megan rather than working around it.
         </span>
