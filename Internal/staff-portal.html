@@ -255,6 +255,21 @@
     }
     .sp-pdr-btn:hover { filter: brightness(1.08); }
 
+    /* ── Admin: Staff Attainments refresh ── */
+    .sp-attn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
+    .sp-attn-row input[type="file"] { font-size: 0.85rem; color: var(--sp-text-2); max-width: 100%; }
+    .sp-attn-head { margin: 14px 0 6px; }
+    .sp-attn-card {
+        border: 1.5px solid var(--sp-border); border-left: 4px solid var(--sp-accent);
+        border-radius: 9px; padding: 12px 14px; margin-bottom: 10px; background: var(--sp-surface-2);
+    }
+    .sp-attn-name { font-size: 0.95rem; font-weight: 800; color: var(--sp-text); margin-bottom: 8px; }
+    .sp-attn-diff { margin: 6px 0; }
+    .sp-attn-diff-lbl { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--sp-muted); }
+    .sp-attn-before { font-size: 0.84rem; color: var(--sp-bad-fg); text-decoration: line-through; opacity: 0.8; margin-top: 2px; }
+    .sp-attn-after { font-size: 0.84rem; color: var(--sp-good-fg); font-weight: 600; margin-top: 2px; }
+    .sp-attn-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
        see them side by side and because they are genuinely parallel: same person,
@@ -879,8 +894,18 @@ function tabCount(key, s) {
     return 0;
 }
 
+/* Clete and Megan get one extra tab the others never see: Admin, holding the
+   Staff Attainments refresh and the whole-centre outstanding-Gateways list. Gated
+   on WHO.admin, which the server sets only for the two admin logins (and for the
+   shared director password). Everyone else's tab strip is unchanged. */
+function isAdmin() {
+    return !!(WHO && (WHO.admin || WHO.director));
+}
+
 function visibleTabs(s) {
-    return SP_TABS.slice();
+    const tabs = SP_TABS.slice();
+    if (isAdmin()) tabs.push({ key: 'admin', label: 'Admin' });
+    return tabs;
 }
 
 function tabBar(s, tabs) {
@@ -903,7 +928,8 @@ function tabPanels(s, tabs) {
         classroom: classroomSection,
         credentials: credentialsSection,
         files: filesCard,
-        forms: formsSection
+        forms: formsSection,
+        admin: adminSection
     };
     return tabs.map(t =>
         '<div class="sp-panel" role="tabpanel" id="sppanel_' + t.key + '" '
@@ -964,6 +990,8 @@ function render() {
     wireDetailsToggle();
     // The classroom panel carries its own controls (room picker, chips, print all).
     if (clsState === 'ready') wireClassroom();
+    // The admin tab (Clete/Megan only) carries the attainments uploader.
+    if (isAdmin()) wireAdmin();
 }
 
 /* Above the tabs, so the name and room stay visible whichever tab is open.
@@ -1197,6 +1225,17 @@ function credentialsSection(s) {
    Room names on a staff record are the exact dimClassrooms names, so an exact
    match is right; an unmatched name is shown but cannot be opened. */
 function myClassrooms(s) {
+    /* Admins (Clete & Megan) see EVERY room, not just their own assignment, because
+       they work across the whole centre. Everyone else sees only the rooms on their
+       own record. The per-child view and forms are identical either way — this only
+       widens which rooms the picker offers. */
+    if (isAdmin() && Array.isArray(ROOMS) && ROOMS.length) {
+        return ROOMS
+            .slice()
+            .sort((a, b) => (parseInt(a.RoomNumber) || 9999) - (parseInt(b.RoomNumber) || 9999))
+            .map(r => ({ name: String(r.Room || '').trim() || ('Room ' + r.RoomNumber),
+                         roomNumber: String(r.RoomNumber), secondary: false }));
+    }
     return [s.Classroom, s.SecondaryClassroom]
         .map(v => String(v || '').trim()).filter(Boolean)
         .map(name => {
@@ -1431,6 +1470,176 @@ function formsSection(s) {
 
     html += '</div>';
     return html;
+}
+
+/* ── Admin ── Clete & Megan only. Two things live here: a whole-centre list of
+   everyone with an outstanding Gateways item, and the Staff Attainments refresh
+   that reads the uploaded Gateways report and updates records after a per-person
+   preview. Everyone else never sees this tab. */
+function adminSection(s) {
+    // 1. Outstanding Gateways across all staff, read from the already-loaded roster.
+    const waiting = STAFF
+        .filter(x => String(x.Name || '').trim() && !/^new teacher$/i.test(x.Name))
+        .map(x => ({ name: x.Name, reason: pendingText(x), registry: x.RegistryId }))
+        .filter(x => x.reason);
+
+    let html = '<div class="sp-card"><h2>Outstanding with Gateways</h2>'
+        + '<div class="sp-sub">Everyone whose record shows a pending or awaited Gateways item. '
+        + 'This is the whole centre, not just your own room.</div>';
+    if (!waiting.length) {
+        html += '<div class="sp-step done"><div class="t">\u2713 Nothing outstanding</div>'
+            + '<div class="d">No staff record currently shows a pending or awaited item.</div></div>';
+    } else {
+        html += '<div class="sp-links">' + waiting.map(w =>
+            '<div class="sp-link"><div class="n">' + esc(w.name)
+            + (w.registry ? ' <span class="sp-pill">' + esc(w.registry) + '</span>' : '') + '</div>'
+            + '<div class="s">' + esc(w.reason) + '</div></div>').join('') + '</div>';
+    }
+    html += '</div>';
+
+    // 2. Staff Attainments refresh.
+    html += '<div class="sp-card"><h2>Refresh from Gateways report</h2>'
+        + '<div class="sp-sub">Upload the current Gateways \u201cStaff Education and Credentials\u201d '
+        + 'report (PDF). The server reads it, matches each person by Registry number, and shows you '
+        + 'exactly what would change before anything is saved. The uploaded file also replaces the '
+        + 'stored copy.</div>'
+        + '<div class="sp-attn-row">'
+        + '<input type="file" id="attnFile" accept=".pdf">'
+        + '<button type="button" id="attnUpload" class="sp-save">Read &amp; preview</button>'
+        + '<span id="attnMsg" class="sp-savemsg"></span>'
+        + '</div>'
+        + '<div id="attnResults"></div>'
+        + '</div>';
+
+    return html;
+}
+
+/* Wire the Admin tab: the upload button and, after a preview lands, the per-person
+   Apply / Apply-all buttons. Attached fresh each render like the other cards. */
+let ATTN_RESULTS = [];      // last preview, so Apply can resend the proposed values
+function wireAdmin() {
+    const btn = $('attnUpload');
+    if (btn) btn.addEventListener('click', runAttainmentsPreview);
+    // Apply buttons are wired when the preview is rendered (renderAttnResults).
+}
+
+async function runAttainmentsPreview() {
+    const fileEl = $('attnFile');
+    const msg = $('attnMsg');
+    const out = $('attnResults');
+    if (!fileEl || !fileEl.files || !fileEl.files.length) {
+        if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Choose the PDF first.'; }
+        return;
+    }
+    const btn = $('attnUpload');
+    if (btn) { btn.disabled = true; btn.textContent = 'Reading\u2026'; }
+    if (msg) { msg.className = 'sp-savemsg'; msg.textContent = 'Uploading and reading the report\u2026'; }
+    try {
+        const form = new FormData();
+        form.append('file', fileEl.files[0]);
+        // Multipart: let the browser set the boundary; attach the token by hand.
+        const headers = (window.CofpAuth && CofpAuth.personalHeaders) ? CofpAuth.personalHeaders() : {};
+        delete headers['Content-Type'];
+        const res = await fetch('/api/staff-attainments-preview', { method: 'POST', headers: headers, body: form });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+        ATTN_RESULTS = data.results || [];
+        if (msg) { msg.className = 'sp-savemsg good'; msg.textContent = 'Read ' + data.count + ' record(s). Review below.'; }
+        renderAttnResults();
+    } catch (e) {
+        if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Could not read it: ' + (e.message || e); }
+        if (out) out.innerHTML = '';
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Read & preview'; }
+    }
+}
+
+function renderAttnResults() {
+    const out = $('attnResults');
+    if (!out) return;
+    const changed = ATTN_RESULTS.filter(r => r.matched && r.changed);
+    const noChange = ATTN_RESULTS.filter(r => r.matched && !r.changed);
+    const unmatched = ATTN_RESULTS.filter(r => !r.matched);
+
+    let html = '';
+    if (changed.length) {
+        html += '<div class="sp-attn-head">'
+            + '<button type="button" id="attnApplyAll" class="sp-save">Looks good \u2014 apply all '
+            + changed.length + '</button></div>';
+        html += changed.map((r, i) => {
+            const idx = ATTN_RESULTS.indexOf(r);
+            return '<div class="sp-attn-card" data-i="' + idx + '">'
+                + '<div class="sp-attn-name">' + esc(r.staffName || r.parsedName)
+                + ' <span class="sp-pill">' + esc(r.registryId || '')
+                + (r.matchBy === 'name' ? ' \u00b7 matched by name' : '') + '</span></div>'
+                + attnDiff('Gateways credential', r.current.gateways, r.proposed.gateways)
+                + attnDiff('Notes (pending)', r.current.notes, r.proposed.notes)
+                + '<div class="sp-attn-actions">'
+                + '<button type="button" class="sp-save attn-apply-one" data-i="' + idx + '">Apply this</button>'
+                + '<span class="sp-savemsg attn-one-msg"></span>'
+                + '</div></div>';
+        }).join('');
+    } else {
+        html += '<div class="sp-step done"><div class="t">\u2713 Nothing to change</div>'
+            + '<div class="d">Every matched record already agrees with the report.</div></div>';
+    }
+    if (noChange.length) {
+        html += '<div class="sp-sub" style="margin-top:12px;">' + noChange.length
+            + ' record(s) matched and already up to date.</div>';
+    }
+    if (unmatched.length) {
+        html += '<div class="sp-step caution" style="margin-top:12px;"><div class="t">'
+            + unmatched.length + ' not matched to a staff record</div><div class="d">'
+            + unmatched.map(u => esc(u.parsedName || '(no name)') + ' (' + esc(u.registryId || 'no N#') + ')').join(', ')
+            + '. These were in the report but no active staff record has that Registry number. '
+            + 'Add the Registry number to their record, then re-run.</div></div>';
+    }
+    out.innerHTML = html;
+
+    const applyAll = $('attnApplyAll');
+    if (applyAll) applyAll.addEventListener('click', () => applyAttainments(changed.map(r => ATTN_RESULTS.indexOf(r))));
+    out.querySelectorAll('.attn-apply-one').forEach(b => {
+        b.addEventListener('click', () => applyAttainments([parseInt(b.getAttribute('data-i'), 10)], b));
+    });
+}
+
+// One "before -> after" line, shown only when the value actually changes.
+function attnDiff(label, before, after) {
+    if (String(before || '') === String(after || '')) return '';
+    return '<div class="sp-attn-diff"><div class="sp-attn-diff-lbl">' + esc(label) + '</div>'
+        + '<div class="sp-attn-before">' + (before ? esc(before) : '<em>(empty)</em>') + '</div>'
+        + '<div class="sp-attn-after">' + (after ? esc(after) : '<em>(cleared)</em>') + '</div></div>';
+}
+
+async function applyAttainments(indexes, btn) {
+    const changes = indexes
+        .map(i => ATTN_RESULTS[i])
+        .filter(r => r && r.matched && r.staffId)
+        .map(r => ({ staffId: r.staffId, gateways: r.proposed.gateways, notes: r.proposed.notes }));
+    if (!changes.length) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Applying\u2026'; }
+    try {
+        const res = await myFetch('/api/staff-attainments-apply', {
+            method: 'POST', body: JSON.stringify({ changes: changes })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+        // Reflect applied rows in the loaded STAFF list so the outstanding view and
+        // the rest of the page update without a full reload, then re-render.
+        (data.applied || []).forEach(id => {
+            const row = STAFF.find(x => String(x.Id) === String(id));
+            const src = ATTN_RESULTS.find(r => String(r.staffId) === String(id));
+            if (row && src) { row.Gateways = src.proposed.gateways; row.Notes = src.proposed.notes; src.changed = false; }
+        });
+        if (data.failed && data.failed.length) {
+            alert('Applied ' + (data.applied || []).length + ', but ' + data.failed.length
+                + ' failed: ' + data.failed.map(f => f.staffId + ' (' + f.error + ')').join('; '));
+        }
+        render();   // redraw; Admin tab shows the reduced outstanding list and preview
+    } catch (e) {
+        alert('Could not apply: ' + (e.message || e));
+        if (btn) { btn.disabled = false; btn.textContent = 'Apply this'; }
+    }
 }
 
 /* Buttons inside the rendered cards. Attached fresh each render rather than

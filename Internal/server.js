@@ -1681,6 +1681,166 @@ const OFFICE_NO_REDIRECT = ['/api/office-file', '/api/office-callback'];
 const ONLYOFFICE_SECRET = process.env.COFP_ONLYOFFICE_SECRET || '';
 const ONLYOFFICE_ON = !!(ONLYOFFICE_URL && ONLYOFFICE_SECRET);
 
+/* ── Staff Attainments ingest ───────────────────────────────────────────────
+   Path to Poppler's pdftotext.exe, used to read an uploaded Gateways "Staff
+   Education and Credentials" report so admins can refresh everyone's records
+   from it. The project takes no npm dependencies, so extraction shells out to a
+   real tool the same way the SQL transport shells out to sqlcmd.
+
+   Set COFP_PDFTOTEXT to the full path if it is not on PATH. A few common install
+   locations are tried so a plain "winget install" often needs no env var. If none
+   is found the ingest endpoint fails loudly with instructions rather than guessing. */
+const PDFTOTEXT_CANDIDATES = [
+    process.env.COFP_PDFTOTEXT,
+    'pdftotext',
+    'C:\\Program Files\\poppler\\Library\\bin\\pdftotext.exe',
+    'C:\\Program Files\\poppler\\bin\\pdftotext.exe',
+    'C:\\poppler\\Library\\bin\\pdftotext.exe',
+    'C:\\poppler\\bin\\pdftotext.exe'
+].filter(Boolean);
+
+// The uploaded report is kept beside the app, replacing the previous copy, so
+// there is always exactly one current "Staff Attainments" file the server owns.
+const ATTAINMENTS_DIR = path.join(__dirname, 'documents');
+const ATTAINMENTS_FILE = 'Staff Attainments (current).pdf';
+
+/* Extract text from a PDF using pdftotext -layout (preserves the column layout,
+   which this parser relies on). Returns { ok, text } or { ok:false, error }. */
+function pdfToText(pdfPath) {
+    let lastErr = 'pdftotext was not found';
+    for (const exe of PDFTOTEXT_CANDIDATES) {
+        try {
+            // -layout keeps columns roughly aligned; - sends text to stdout.
+            const out = execSync('"' + exe + '" -layout -enc UTF-8 "' + pdfPath + '" -',
+                { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+            return { ok: true, text: out };
+        } catch (e) {
+            lastErr = (e && (e.stderr || e.message)) || String(e);
+            // ENOENT means this candidate path is not the tool; try the next.
+        }
+    }
+    return { ok: false, error: lastErr };
+}
+
+/* Parse the pdftotext output of a Gateways Staff Education and Credentials report
+   into one entry per person. Each entry:
+     { name, registryId, credentials:[{type,level,awarded,expires}],
+       pending:[{credential,level,received,reason}], raw }
+
+   The report repeats a fixed block per person: a name line, then
+   "Registry Member ID: N#####", a "Current Credentials" table, and a
+   "Pending Gateways Credential Applications" table. We split on the Registry Member
+   ID line (every person has exactly one) and read the two tables within each block.
+
+   Deliberately forgiving: a line that does not look like a credential/pending row is
+   skipped rather than guessed at, and the admin sees a preview before anything is
+   written, so a mis-parse is caught by a human, never applied silently. */
+function parseAttainments(text) {
+    const lines = String(text || '').split(/\r?\n/);
+
+    // Find every "Registry Member ID: N#####" and the name that precedes it.
+    const idRe = /Registry\s+Member\s+ID:\s*(N\d+)/i;
+    const blocks = [];
+    for (let i = 0; i < lines.length; i++) {
+        const m = lines[i].match(idRe);
+        if (!m) continue;
+        // The person's name is the most recent non-empty line above this one that is
+        // not itself a label. In the report the name sits on its own line just above.
+        let name = '';
+        for (let j = i - 1; j >= 0 && j >= i - 6; j--) {
+            const t = lines[j].trim();
+            if (!t) continue;
+            if (/Registry\s+Member|Expiration|Report as of|Gateways to Opportunity|Staff Education/i.test(t)) continue;
+            name = t;
+            break;
+        }
+        blocks.push({ name: name, registryId: m[1].toUpperCase(), start: i });
+    }
+    // Each block runs until the next block's start (or end of document).
+    for (let b = 0; b < blocks.length; b++) {
+        blocks[b].end = (b + 1 < blocks.length) ? blocks[b + 1].start : lines.length;
+    }
+
+    const CRED_TYPES = /(ECE Credential|Infant Toddler Credential|Illinois Director Credential|Director Credential)/i;
+    const LEVEL_RE = /Level\s+(\d+|I{1,3}|IV|V?I{0,3})/i;
+
+    return blocks.map(bk => {
+        const body = lines.slice(bk.start, bk.end);
+        const credentials = [];
+        const pending = [];
+        let section = '';
+        body.forEach(line => {
+            const t = line.trim();
+            if (!t) return;
+            if (/^Current Credentials/i.test(t)) { section = 'cred'; return; }
+            if (/^Pending Gateways Credential Applications/i.test(t)) { section = 'pending'; return; }
+            if (/^Educational Qualifications|^Current Employment|^Completed Degrees|^Some Coursework/i.test(t)) { section = ''; return; }
+
+            if (section === 'cred') {
+                // e.g. "ECE Credential - Level 4   Department of Human Services   4/2/2025   12/31/2030"
+                const cm = t.match(CRED_TYPES);
+                if (!cm) return;
+                const lv = t.match(LEVEL_RE);
+                credentials.push({
+                    type: cm[1].replace(/\s+/g, ' ').trim(),
+                    level: lv ? lv[1] : '',
+                    line: t
+                });
+            } else if (section === 'pending') {
+                // e.g. "1156631428  Infant Toddler Credential  not yet determined  1/21/2025  Awaiting Work Experience"
+                if (/^Application ID/i.test(t)) return;           // header row
+                const pm = t.match(/^(\d{6,})\s+(.*)$/);          // starts with the application id
+                if (!pm) return;
+                const rest = pm[2];
+                const cm = rest.match(CRED_TYPES);
+                const reason = (rest.match(/(Awaiting[^.;]*|Pending[^.;]*|Missing[^.;]*)$/i) || [,''])[1].trim()
+                    || rest.split(/\s{2,}/).pop().trim();
+                pending.push({
+                    applicationId: pm[1],
+                    credential: cm ? cm[1].replace(/\s+/g, ' ').trim() : (rest.split(/\s{2,}/)[0] || '').trim(),
+                    reason: reason
+                });
+            }
+        });
+        return { name: bk.name, registryId: bk.registryId, credentials, pending };
+    });
+}
+
+/* Build the values we would write for one parsed entry:
+     gateways  - the highest/awarded credential line(s), summarised
+     pendingNote - a one-line "Pending: ..." summary for the Notes field, or ''
+   These are proposals; the admin approves before anything is written. */
+function attainmentProposal(entry) {
+    // Gateways credential summary: list awarded credentials with their level.
+    const credStr = entry.credentials
+        .map(c => c.level ? (c.type + ' - Level ' + c.level) : c.type)
+        // De-dupe while preserving order.
+        .filter((v, i, a) => a.indexOf(v) === i)
+        .join(', ');
+
+    // Pending summary, e.g. "Pending: Infant Toddler Credential (Awaiting Work Experience)"
+    const pendingStr = entry.pending.length
+        ? 'Pending: ' + entry.pending.map(p =>
+            p.credential + (p.reason ? ' (' + p.reason + ')' : '')).join('; ')
+        : '';
+
+    return { gateways: credStr, pendingNote: pendingStr };
+}
+
+/* Replace an existing "Pending: ..." sentence in a Notes field with a fresh one,
+   or append it, without disturbing the rest of the human-written trail. Returns the
+   updated notes. If there is no pending item, any existing "Pending: ..." sentence is
+   removed (the item cleared). */
+function applyPendingToNotes(notes, pendingNote) {
+    let n = String(notes || '');
+    // Strip any existing "Pending: ... ." sentence (up to a period or end).
+    n = n.replace(/\s*Pending:[^.]*\.?/i, '').replace(/\s{2,}/g, ' ').trim();
+    if (pendingNote) {
+        n = (n ? n + ' ' : '') + pendingNote + '.';
+    }
+    return n;
+}
+
 // Which extensions OnlyOffice can actually edit, as opposed to only display.
 const OFFICE_EDITABLE = { '.docx': 'word', '.xlsx': 'cell', '.pptx': 'slide' };
 const OFFICE_VIEWABLE = { '.doc': 'word', '.xls': 'cell', '.ppt': 'slide', '.pdf': 'word' };
@@ -3829,12 +3989,168 @@ ELSE
         });
     }
 
-    /* POST hand in a missing document.
+    /* POST hand in a missing document — the handler is below, after the two Staff
+       Attainments ingest routes. Removing a chase: most teaching records have no
+       semester hours because the office does not have the transcript, and asking the
+       person who already owns a copy is quicker than asking their college again. */
 
-       The point is to remove a chase. Most teaching records have no semester hours
-       because the office does not have the transcript, and asking the person who
-       already owns a copy is quicker than asking their college for another.
+    /* ── Staff Attainments ingest: PREVIEW ──────────────────────────────────
+       Admin (Clete/Megan) uploads the Gateways Staff Education and Credentials PDF.
+       We save it (replacing the current copy), run pdftotext, parse it per person,
+       match each to a Staff row by Registry N-number (name fallback), and return
+       current-vs-proposed for each. NOTHING is written here — the admin approves in
+       the UI, then /api/staff-attainments-apply does the writes. */
+    if (req.method === 'POST' && url.startsWith('/api/staff-attainments-preview')) {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        if (!(actor.director || actor.admin)) {
+            return sendJSON(res, 403, { error: 'Only an administrator can refresh staff records.' });
+        }
 
+        let chunks = [];
+        let total = 0;
+        let tooBig = false;
+        req.on('data', chunk => {
+            total += chunk.length;
+            if (total > STAFF_UPLOAD_MAX_BYTES) { tooBig = true; return; }
+            chunks.push(chunk);
+        });
+        req.on('end', () => {
+            if (tooBig) return sendJSON(res, 413, { error: 'That file is over 15 MB.' });
+            const buf = Buffer.concat(chunks);
+            const boundary = (req.headers['content-type'] || '').split('boundary=')[1];
+            if (!boundary) return sendJSON(res, 400, { error: 'No file was received.' });
+
+            // Same hand-rolled multipart handling as /api/staff-file-upload.
+            const parts = buf.toString('binary').split('--' + boundary);
+            let fileData = null;
+            for (const part of parts) {
+                if (!part.includes('filename=')) continue;
+                const nameMatch = part.match(/filename="([^"]+)"/);
+                if (!nameMatch || !nameMatch[1]) continue;
+                if (path.extname(nameMatch[1]).toLowerCase() !== '.pdf') {
+                    return sendJSON(res, 400, { error: 'Please upload the Gateways report as a PDF.' });
+                }
+                const headerEnd = part.indexOf('\r\n\r\n');
+                if (headerEnd < 0) continue;
+                fileData = Buffer.from(part.slice(headerEnd + 4, part.lastIndexOf('\r\n')), 'binary');
+                break;
+            }
+            if (!fileData || !fileData.length) return sendJSON(res, 400, { error: 'No PDF found in that upload.' });
+
+            // Save/replace the current copy beside the app.
+            try {
+                if (!fs.existsSync(ATTAINMENTS_DIR)) fs.mkdirSync(ATTAINMENTS_DIR, { recursive: true });
+                fs.writeFileSync(path.join(ATTAINMENTS_DIR, ATTAINMENTS_FILE), fileData);
+            } catch (e) {
+                return sendJSON(res, 500, { error: 'Could not save the file: ' + e.message });
+            }
+
+            // Extract text.
+            const ex = pdfToText(path.join(ATTAINMENTS_DIR, ATTAINMENTS_FILE));
+            if (!ex.ok) {
+                return sendJSON(res, 500, {
+                    error: 'The file was saved, but the server could not read the PDF. This needs '
+                         + 'pdftotext installed on the server (Poppler). Details: ' + ex.error
+                });
+            }
+
+            const entries = parseAttainments(ex.text);
+            if (!entries.length) {
+                return sendJSON(res, 422, {
+                    error: 'The PDF was read but no staff records were recognised in it. Is it the '
+                         + 'Gateways "Staff Education and Credentials" report?'
+                });
+            }
+
+            // Load the current staff rows to match against.
+            const sr = runSQLRows(
+                `SELECT Id, ISNULL(Name,'') AS Name, ISNULL(RegistryId,'') AS RegistryId,
+                        ISNULL(EceCredentials,'') AS EceCredentials, ISNULL(Gateways,'') AS Gateways,
+                        ISNULL(Notes,'') AS Notes
+                 FROM Staff WHERE ISNULL(Active,1)=1`,
+                staffEnsureSQL() + 'GO\n');
+            if (!sr.ok) return sendJSON(res, 500, { error: sr.error });
+            const staff = sr.rows;
+
+            const norm = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+            const results = entries.map(entry => {
+                // Match on Registry N-number first; fall back to normalised name.
+                let row = staff.find(r => r.RegistryId && entry.registryId
+                    && r.RegistryId.toUpperCase() === entry.registryId);
+                let matchBy = row ? 'registry' : '';
+                if (!row && entry.name) {
+                    row = staff.find(r => norm(r.Name) === norm(entry.name));
+                    if (row) matchBy = 'name';
+                }
+                const proposal = attainmentProposal(entry);
+                const out = {
+                    parsedName: entry.name,
+                    registryId: entry.registryId,
+                    credentials: entry.credentials,
+                    pending: entry.pending,
+                    matched: !!row,
+                    matchBy: matchBy
+                };
+                if (row) {
+                    out.staffId = row.Id;
+                    out.staffName = row.Name;
+                    out.current = { gateways: row.Gateways, notes: row.Notes };
+                    out.proposed = {
+                        gateways: proposal.gateways,
+                        notes: applyPendingToNotes(row.Notes, proposal.pendingNote)
+                    };
+                    // Flag whether anything actually changes, so the UI can show "no change".
+                    out.changed = (out.proposed.gateways && out.proposed.gateways !== row.Gateways)
+                        || (out.proposed.notes !== row.Notes);
+                }
+                return out;
+            });
+
+            console.log('[ATTAINMENTS] parsed ' + entries.length + ' entries, matched '
+                + results.filter(r => r.matched).length);
+            return sendJSON(res, 200, { success: true, count: entries.length, results: results });
+        });
+        return;
+    }
+
+    /* ── Staff Attainments ingest: APPLY ────────────────────────────────────
+       Writes the changes the admin approved in the preview. Body is
+       { changes: [ { staffId, gateways, notes } ] }. Admin only. An admin applying
+       is the office maintaining the record, so it stays reviewed. */
+    if (req.method === 'POST' && url === '/api/staff-attainments-apply') {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        if (!(actor.director || actor.admin)) {
+            return sendJSON(res, 403, { error: 'Only an administrator can update staff records.' });
+        }
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const changes = Array.isArray(d.changes) ? d.changes : [];
+            if (!changes.length) return sendJSON(res, 400, { error: 'Nothing to apply.' });
+
+            const applied = [];
+            const failed = [];
+            for (const c of changes) {
+                const id = parseInt(c.staffId, 10);
+                if (!id) { failed.push({ staffId: c.staffId, error: 'no id' }); continue; }
+                const sets = [];
+                if (typeof c.gateways === 'string' && c.gateways.trim()) sets.push(`Gateways=${esc(c.gateways)}`);
+                if (typeof c.notes === 'string') sets.push(`Notes=${esc(c.notes)}`);
+                if (!sets.length) { failed.push({ staffId: id, error: 'nothing to set' }); continue; }
+                const sql = staffEnsureSQL() + 'GO\n'
+                    + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
+                const r = runSQL(sql);
+                if (!r.ok || r.sqlError) { failed.push({ staffId: id, error: r.error || r.sqlError }); continue; }
+                applied.push(id);
+            }
+            console.log('[ATTAINMENTS] applied ' + applied.length + ', failed ' + failed.length);
+            return sendJSON(res, 200, { success: failed.length === 0, applied: applied, failed: failed });
+        });
+        return;
+    }
+
+    /* ── A staff member hands in their own transcript / Gateways report ──────
        It lands as Pending, so it is visible to them and waiting for the office
        rather than silently becoming verified evidence. A staff member uploads only
        against themselves — the id comes from the token, never the request. */
