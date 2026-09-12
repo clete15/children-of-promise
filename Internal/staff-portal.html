@@ -269,6 +269,8 @@
     .sp-attn-before { font-size: 0.84rem; color: var(--sp-bad-fg); text-decoration: line-through; opacity: 0.8; margin-top: 2px; }
     .sp-attn-after { font-size: 0.84rem; color: var(--sp-good-fg); font-weight: 600; margin-top: 2px; }
     .sp-attn-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    /* Per-person "Update from PDR" card on the credentials tab (admin only). */
+    .sp-pdrup { border-left: 4px solid var(--sp-accent); }
 
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
@@ -992,6 +994,8 @@ function render() {
     if (clsState === 'ready') wireClassroom();
     // The admin tab (Clete/Megan only) carries the attainments uploader.
     if (isAdmin()) wireAdmin();
+    // The per-person "Update from PDR" card lives on the credentials tab, admin only.
+    if (isAdmin()) wirePdr();
 }
 
 /* Above the tabs, so the name and room stay visible whichever tab is open.
@@ -1174,6 +1178,25 @@ function credentialsSection(s) {
         + credentialColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceSteps(s))
         + credentialColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itSteps(s))
         + '</div>';
+
+    /* Admin-only: pull this person's college hours, transcript status and current-year
+       PD hours straight from their Gateways PDR. Nothing is written until the admin
+       reviews the before/after and clicks Apply. Shown only to Clete/Megan and only on
+       a real record. */
+    if (isAdmin() && s && s.Id) {
+        html += '<div class="sp-card sp-pdrup"><h2>Update from PDR</h2>'
+            + '<div class="sp-sub">Upload <b>' + esc(s.Name || 'this person') + '\u2019s</b> '
+            + 'Professional Development Record (PDF) to refresh their college hours, transcript '
+            + 'status and this year\u2019s PD training hours. You\u2019ll see exactly what changes '
+            + 'before anything is saved.</div>'
+            + '<div class="sp-attn-row">'
+            + '<input type="file" id="pdrFile" accept=".pdf">'
+            + '<button type="button" id="pdrUpload" class="sp-save">Read &amp; preview</button>'
+            + '<span id="pdrMsg" class="sp-savemsg"></span>'
+            + '</div>'
+            + '<div id="pdrResult"></div>'
+            + '</div>';
+    }
 
     /* How to pull your PDR. Collapsed by default so it does not crowd the ladders,
        but always available — it is the record that resolves nearly every "waiting on
@@ -1639,6 +1662,139 @@ async function applyAttainments(indexes, btn) {
     } catch (e) {
         alert('Could not apply: ' + (e.message || e));
         if (btn) { btn.disabled = false; btn.textContent = 'Apply this'; }
+    }
+}
+
+/* ── Update from PDR (one person, admin only) ──────────────────────────────
+   Lives on the credentials tab of whichever record is open. Uploads that person's
+   PDR, previews the before/after for college hours / transcript / PD hours, and on
+   Apply writes them to their record. */
+let PDR_PREVIEW = null;     // last preview payload for this person
+function wirePdr() {
+    const btn = $('pdrUpload');
+    if (btn) btn.addEventListener('click', runPdrPreview);
+}
+
+async function runPdrPreview() {
+    const fileEl = $('pdrFile');
+    const msg = $('pdrMsg');
+    const out = $('pdrResult');
+    if (!current || !current.Id) return;
+    if (!fileEl || !fileEl.files || !fileEl.files.length) {
+        if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Choose the PDR PDF first.'; }
+        return;
+    }
+    const btn = $('pdrUpload');
+    if (btn) { btn.disabled = true; btn.textContent = 'Reading\u2026'; }
+    if (msg) { msg.className = 'sp-savemsg'; msg.textContent = 'Uploading and reading the PDR\u2026'; }
+    try {
+        const form = new FormData();
+        form.append('file', fileEl.files[0]);
+        // Multipart: browser sets the boundary; token attached by hand as this person.
+        const headers = (window.CofpAuth && CofpAuth.personalHeaders) ? CofpAuth.personalHeaders() : {};
+        delete headers['Content-Type'];
+        const res = await fetch('/api/staff-pdr-preview?staffId=' + encodeURIComponent(current.Id),
+            { method: 'POST', headers: headers, body: form });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+        PDR_PREVIEW = data;
+        if (msg) { msg.className = 'sp-savemsg good'; msg.textContent = 'Read the PDR. Review below.'; }
+        renderPdrResult();
+    } catch (e) {
+        if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Could not read it: ' + (e.message || e); }
+        if (out) out.innerHTML = '';
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Read & preview'; }
+    }
+}
+
+function renderPdrResult() {
+    const out = $('pdrResult');
+    if (!out || !PDR_PREVIEW) return;
+    const p = PDR_PREVIEW;
+    const c = p.current || {}, pr = p.proposed || {}, ex = p.extracted || {};
+
+    let html = '';
+
+    // Warn loudly if the PDR's Registry number does not match this record.
+    if (p.idMismatch) {
+        html += '<div class="sp-step caution"><div class="t">\u26a0 This PDR may be for someone else</div>'
+            + '<div class="d">The PDR reads <b>' + esc(p.parsedName || '?') + ' (' + esc(p.parsedRegistry || 'no N#')
+            + ')</b>, but this record is <b>' + esc(p.staffName || '') + '</b>. '
+            + 'Check you uploaded the right file before applying.</div></div>';
+    } else if (p.parsedName) {
+        html += '<div class="sp-sub" style="margin-top:8px;">Read PDR for <b>' + esc(p.parsedName)
+            + '</b> (' + esc(p.parsedRegistry || 'no N#') + ').</div>';
+    }
+
+    const diffs = attnDiff('College credit hours (total)', c.semesterHoursTotal, pr.semesterHoursTotal)
+        + attnDiff('ECE / CD credit hours', c.semesterHoursEce, pr.semesterHoursEce)
+        + attnDiff('Transcript on file', c.transcriptOnFile, pr.transcriptOnFile)
+        + attnDiff('PD training hours (' + esc(ex.year || '') + ')', c.pdHoursYtd, pr.pdHoursYtd)
+        + attnDiff('PD hours year', c.pdHoursYear, pr.pdHoursYear);
+
+    html += '<div class="sp-attn-card">'
+        + '<div class="sp-attn-diff" style="border:0;padding:0;">'
+        + '<div class="sp-attn-diff-lbl">PD hours read from the PDR</div>'
+        + '<div class="sp-sub">' + (ex.pdHoursThisYear != null ? esc(String(ex.pdHoursThisYear)) : '0')
+        + ' contact hours across ' + (ex.trainingRowsCounted || 0) + ' dated training row(s) in '
+        + esc(ex.year || 'this year') + ' (verified sections only \u2014 self-reported rows are not counted).</div>'
+        + '</div>';
+
+    if (diffs) {
+        html += diffs
+            + '<div class="sp-attn-actions">'
+            + '<button type="button" id="pdrApply" class="sp-save">Looks good \u2014 apply</button>'
+            + '<span id="pdrApplyMsg" class="sp-savemsg"></span>'
+            + '</div>';
+    } else {
+        html += '<div class="sp-step done"><div class="t">\u2713 Nothing to change</div>'
+            + '<div class="d">This record already matches the PDR.</div></div>';
+    }
+    html += '</div>';
+    out.innerHTML = html;
+
+    const apply = $('pdrApply');
+    if (apply) apply.addEventListener('click', applyPdr);
+}
+
+async function applyPdr() {
+    if (!PDR_PREVIEW || !PDR_PREVIEW.staffId) return;
+    const pr = PDR_PREVIEW.proposed || {};
+    const btn = $('pdrApply');
+    const msg = $('pdrApplyMsg');
+    if (btn) { btn.disabled = true; btn.textContent = 'Applying\u2026'; }
+    try {
+        const res = await myFetch('/api/staff-pdr-apply', {
+            method: 'POST',
+            body: JSON.stringify({
+                staffId: PDR_PREVIEW.staffId,
+                semesterHoursTotal: pr.semesterHoursTotal,
+                semesterHoursEce: pr.semesterHoursEce,
+                transcriptOnFile: pr.transcriptOnFile,
+                pdHoursYtd: pr.pdHoursYtd,
+                pdHoursYear: pr.pdHoursYear
+            })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+        // Reflect on the loaded record so the ladders and tiles update without reload.
+        const row = STAFF.find(x => String(x.Id) === String(PDR_PREVIEW.staffId));
+        if (row) {
+            row.SemesterHoursTotal = pr.semesterHoursTotal;
+            row.SemesterHoursEce = pr.semesterHoursEce;
+            row.TranscriptOnFile = pr.transcriptOnFile;
+            row.PdHoursYtd = pr.pdHoursYtd;
+            row.PdHoursYear = pr.pdHoursYear;
+        }
+        if (current && String(current.Id) === String(PDR_PREVIEW.staffId)) {
+            current = row || current;
+        }
+        PDR_PREVIEW = null;
+        render();
+    } catch (e) {
+        if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Could not apply: ' + (e.message || e); }
+        if (btn) { btn.disabled = false; btn.textContent = 'Looks good \u2014 apply'; }
     }
 }
 

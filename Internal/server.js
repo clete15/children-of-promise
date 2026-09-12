@@ -1860,6 +1860,89 @@ function applyPendingToNotes(notes, pendingNote) {
     return n;
 }
 
+/* ── Professional Development Record (PDR) parse ─────────────────────────────
+   One person per PDR. From pdftotext output we read the Section One summary tables
+   (they are unambiguous) and the dated training rows:
+
+     registryId       from "Record for: Name (N#####)"
+     name             the name in that same line
+     totalCreditHours from the "Total Credit Hours  ECE/CD  ECE-Related ..." table
+     eceCdHours       the ECE/CD column of that table
+     transcriptReviewed  true if "Official Transcripts have been reviewed" appears
+     pdHoursThisYear  sum of training contact hours whose date is in the CURRENT
+                      calendar year (the ExceleRate 20-hr/yr figure)
+
+   PD hours are counted from Section Three (Registry-approved, verified attendance)
+   plus Sections Four/Five (verified conferences). Section Six is self-reported and
+   largely duplicates Section Three, so it is NOT added — counting it would roughly
+   double the total. Every training row carries a date, so "this year" is decided per
+   row. The admin sees the number in a preview before it is written. */
+function parsePdr(text) {
+    const lines = String(text || '').split(/\r?\n/);
+    const out = {
+        registryId: '', name: '',
+        totalCreditHours: null, eceCdHours: null, eceRelatedHours: null,
+        transcriptReviewed: false, pdHoursThisYear: 0, trainingRowsCounted: 0
+    };
+
+    // "Record for: Paige Holliday (N452129)"
+    for (const l of lines) {
+        const m = l.match(/Record for:\s*(.+?)\s*\((N\d+)\)/i);
+        if (m) { out.name = m[1].trim(); out.registryId = m[2].toUpperCase(); break; }
+    }
+
+    out.transcriptReviewed = /Official Transcripts have been reviewed/i.test(text);
+
+    /* College hours summary. The header row is
+         "Total Credit Hours   ECE / CD   ECE-Related   School-Age / Youth   Business / Admin"
+       and the very next line with numbers holds the values in the same order. */
+    for (let i = 0; i < lines.length; i++) {
+        if (/Total Credit Hours/i.test(lines[i]) && /ECE\s*\/\s*CD/i.test(lines[i])) {
+            // Find the next line that is a row of numbers.
+            for (let j = i + 1; j < Math.min(i + 4, lines.length); j++) {
+                const nums = (lines[j].match(/\d+(?:\.\d+)?/g) || []).map(Number);
+                if (nums.length >= 3) {
+                    out.totalCreditHours = nums[0];
+                    out.eceCdHours = nums[1];
+                    out.eceRelatedHours = nums[2];
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    /* Training hours for the current calendar year. Training rows begin with a
+       M/D/YYYY date and end with a contact-hours number. We only sum rows inside
+       Sections Three/Four/Five (verified), stopping at Section Six (self-reported)
+       so hours are not double counted. */
+    const thisYear = new Date().getFullYear();
+    let counting = false;
+    for (const raw of lines) {
+        const l = raw.trim();
+        if (/^Section Three/i.test(l)) { counting = true; continue; }
+        if (/^Section Six/i.test(l)) { counting = false; continue; }   // self-reported: skip
+        if (/^Section (One|Two)/i.test(l)) { counting = false; continue; }
+        if (!counting) continue;
+        // A training row: starts with a date, ends with an hours value.
+        const dm = l.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\b/);
+        if (!dm) continue;
+        const year = parseInt(dm[3], 10);
+        // The contact hours are the last number on the line (e.g. "... 8.00").
+        const hrsMatch = l.match(/(\d+(?:\.\d+)?)\s*$/);
+        if (!hrsMatch) continue;
+        const hrs = parseFloat(hrsMatch[1]);
+        if (year === thisYear && isFinite(hrs)) {
+            out.pdHoursThisYear += hrs;
+            out.trainingRowsCounted++;
+        }
+    }
+    // Round to 2dp to avoid float noise like 63.00000001.
+    out.pdHoursThisYear = Math.round(out.pdHoursThisYear * 100) / 100;
+
+    return out;
+}
+
 // Which extensions OnlyOffice can actually edit, as opposed to only display.
 const OFFICE_EDITABLE = { '.docx': 'word', '.xlsx': 'cell', '.pptx': 'slide' };
 const OFFICE_VIEWABLE = { '.doc': 'word', '.xls': 'cell', '.ppt': 'slide', '.pdf': 'word' };
@@ -4165,6 +4248,159 @@ ELSE
             }
             console.log('[ATTAINMENTS] applied ' + applied.length + ', failed ' + failed.length);
             return sendJSON(res, 200, { success: failed.length === 0, applied: applied, failed: failed });
+        });
+        return;
+    }
+
+    /* ── PDR ingest: PREVIEW (one person) ───────────────────────────────────
+       Admin uploads ONE staff member's Professional Development Record PDF from
+       that person's record. ?staffId= names whose record is open. We read the PDR,
+       pull college hours / transcript status / current-year PD hours, confirm the
+       PDR's Registry number matches that record, and return current-vs-proposed.
+       Writes nothing — the admin approves, then /api/staff-pdr-apply writes. */
+    if (req.method === 'POST' && url.startsWith('/api/staff-pdr-preview')) {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        if (!(actor.director || actor.admin)) {
+            return sendJSON(res, 403, { error: 'Only an administrator can refresh staff records.' });
+        }
+        const askedId = parseInt(new URLSearchParams(req.url.split('?')[1] || '').get('staffId') || 0, 10);
+        if (!askedId) return sendJSON(res, 400, { error: 'Which staff member? (no staffId)' });
+
+        let chunks = [];
+        let total = 0;
+        let tooBig = false;
+        req.on('data', chunk => {
+            total += chunk.length;
+            if (total > STAFF_UPLOAD_MAX_BYTES) { tooBig = true; return; }
+            chunks.push(chunk);
+        });
+        req.on('end', () => {
+            if (tooBig) return sendJSON(res, 413, { error: 'That file is over 15 MB.' });
+            const buf = Buffer.concat(chunks);
+            const boundary = (req.headers['content-type'] || '').split('boundary=')[1];
+            if (!boundary) return sendJSON(res, 400, { error: 'No file was received.' });
+
+            const parts = buf.toString('binary').split('--' + boundary);
+            let fileData = null;
+            for (const part of parts) {
+                if (!part.includes('filename=')) continue;
+                const nameMatch = part.match(/filename="([^"]+)"/);
+                if (!nameMatch || !nameMatch[1]) continue;
+                if (path.extname(nameMatch[1]).toLowerCase() !== '.pdf') {
+                    return sendJSON(res, 400, { error: 'Please upload the PDR as a PDF.' });
+                }
+                const headerEnd = part.indexOf('\r\n\r\n');
+                if (headerEnd < 0) continue;
+                fileData = Buffer.from(part.slice(headerEnd + 4, part.lastIndexOf('\r\n')), 'binary');
+                break;
+            }
+            if (!fileData || !fileData.length) return sendJSON(res, 400, { error: 'No PDF found in that upload.' });
+
+            // Scratch file the server owns; overwritten each time.
+            const tmp = path.join(ATTAINMENTS_DIR, '_pdr_scratch.pdf');
+            try {
+                if (!fs.existsSync(ATTAINMENTS_DIR)) fs.mkdirSync(ATTAINMENTS_DIR, { recursive: true });
+                fs.writeFileSync(tmp, fileData);
+            } catch (e) {
+                return sendJSON(res, 500, { error: 'Could not save the file: ' + e.message });
+            }
+
+            const ex = pdfToText(tmp);
+            if (!ex.ok) {
+                return sendJSON(res, 500, {
+                    error: 'Could not read the PDF. This needs pdftotext (Poppler) on the server. '
+                         + 'Details: ' + ex.error
+                });
+            }
+            const pdr = parsePdr(ex.text);
+
+            // Load the record whose page is open.
+            const sr = runSQLRows(
+                `SELECT Id, ISNULL(Name,'') AS Name, ISNULL(RegistryId,'') AS RegistryId,
+                        ISNULL(SemesterHoursTotal,'') AS SemesterHoursTotal,
+                        ISNULL(SemesterHoursEce,'') AS SemesterHoursEce,
+                        ISNULL(TranscriptOnFile,'') AS TranscriptOnFile,
+                        ISNULL(PdHoursYtd,'') AS PdHoursYtd, ISNULL(PdHoursYear,'') AS PdHoursYear
+                 FROM Staff WHERE Id=${askedId}`, staffEnsureSQL() + 'GO\n');
+            if (!sr.ok) return sendJSON(res, 500, { error: sr.error });
+            if (!sr.rows.length) return sendJSON(res, 404, { error: 'Staff record not found.' });
+            const row = sr.rows[0];
+
+            // Guard: the PDR must belong to this person. Registry number is the check.
+            const idMismatch = pdr.registryId && row.RegistryId
+                && pdr.registryId.toUpperCase() !== row.RegistryId.toUpperCase();
+
+            const thisYear = String(new Date().getFullYear());
+            const proposed = {
+                semesterHoursTotal: pdr.totalCreditHours != null ? String(pdr.totalCreditHours) : row.SemesterHoursTotal,
+                semesterHoursEce:   pdr.eceCdHours != null ? String(pdr.eceCdHours) : row.SemesterHoursEce,
+                transcriptOnFile:   pdr.transcriptReviewed ? 'On file with Gateways' : row.TranscriptOnFile,
+                pdHoursYtd:         String(pdr.pdHoursThisYear),
+                pdHoursYear:        thisYear
+            };
+            const current = {
+                semesterHoursTotal: row.SemesterHoursTotal,
+                semesterHoursEce:   row.SemesterHoursEce,
+                transcriptOnFile:   row.TranscriptOnFile,
+                pdHoursYtd:         row.PdHoursYtd,
+                pdHoursYear:        row.PdHoursYear
+            };
+
+            console.log('[PDR] parsed ' + (pdr.registryId || '?') + ' for staff ' + askedId
+                + ' (PD ' + pdr.pdHoursThisYear + ' hrs ' + thisYear + ', ' + pdr.trainingRowsCounted + ' rows)');
+            return sendJSON(res, 200, {
+                success: true,
+                staffId: row.Id,
+                staffName: row.Name,
+                parsedName: pdr.name,
+                parsedRegistry: pdr.registryId,
+                idMismatch: idMismatch,
+                current: current,
+                proposed: proposed,
+                extracted: {
+                    totalCreditHours: pdr.totalCreditHours,
+                    eceCdHours: pdr.eceCdHours,
+                    eceRelatedHours: pdr.eceRelatedHours,
+                    transcriptReviewed: pdr.transcriptReviewed,
+                    pdHoursThisYear: pdr.pdHoursThisYear,
+                    trainingRowsCounted: pdr.trainingRowsCounted,
+                    year: thisYear
+                }
+            });
+        });
+        return;
+    }
+
+    /* ── PDR ingest: APPLY (one person) ─────────────────────────────────────
+       Writes the approved PDR-derived fields to one Staff row. Admin only. */
+    if (req.method === 'POST' && url === '/api/staff-pdr-apply') {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        if (!(actor.director || actor.admin)) {
+            return sendJSON(res, 403, { error: 'Only an administrator can update staff records.' });
+        }
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const id = parseInt(d.staffId, 10);
+            if (!id) return sendJSON(res, 400, { error: 'staffId required' });
+            const map = [
+                ['SemesterHoursTotal', 'semesterHoursTotal'],
+                ['SemesterHoursEce', 'semesterHoursEce'],
+                ['TranscriptOnFile', 'transcriptOnFile'],
+                ['PdHoursYtd', 'pdHoursYtd'],
+                ['PdHoursYear', 'pdHoursYear']
+            ];
+            const sets = map.filter(([, k]) => typeof d[k] === 'string' && d[k] !== undefined)
+                .map(([c, k]) => `${c}=${esc(d[k])}`);
+            if (!sets.length) return sendJSON(res, 400, { error: 'Nothing to apply.' });
+            const sql = staffEnsureSQL() + 'GO\n'
+                + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            if (r.sqlError) return sendJSON(res, 500, { error: 'The database refused this change: ' + r.sqlError });
+            console.log('[PDR] applied to staff ' + id);
+            return sendJSON(res, 200, { success: true });
         });
         return;
     }
