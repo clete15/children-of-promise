@@ -897,6 +897,16 @@ GO
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PdContentAreas')
     ALTER TABLE Staff ADD PdContentAreas NVARCHAR(400);
 GO
+/* The individual college courses from the PDR's Section Two, as a JSON array of
+   { nbr, name, hours }, e.g. [{"nbr":"ECE 112","name":"Growth and Development...",
+   "hours":3}]. It lets the credential card map coursework to the Gateways content
+   areas each course covers (via the course->area map in credential-framework.js),
+   so an area can be shown as college-covered even though the PDR does not itself tag
+   courses by area. Written only by the PDR ingest. NVARCHAR(2000) holds a dozen-plus
+   courses comfortably. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PdCourses')
+    ALTER TABLE Staff ADD PdCourses NVARCHAR(2000);
+GO
 /* ── Per-staff sign-in ──
 
    Until now the site had one shared password and therefore no idea WHO was using
@@ -957,7 +967,8 @@ const STAFF_COLUMNS = [
     ['StaffGroup', 'staffGroup'], ['SecondaryClassroom', 'secondaryClassroom'],
     ['SemesterHoursTotal', 'semesterHoursTotal'], ['SemesterHoursEce', 'semesterHoursEce'],
     ['TranscriptOnFile', 'transcriptOnFile'], ['PdHoursYtd', 'pdHoursYtd'],
-    ['PdHoursYear', 'pdHoursYear'], ['PdContentAreas', 'pdContentAreas']
+    ['PdHoursYear', 'pdHoursYear'], ['PdContentAreas', 'pdContentAreas'],
+    ['PdCourses', 'pdCourses']
 ];
 
 /* What a staff member may change on their OWN record. Everything else on the card
@@ -1908,7 +1919,7 @@ function parsePdr(text) {
         registryId: '', name: '',
         totalCreditHours: null, eceCdHours: null, eceRelatedHours: null,
         transcriptReviewed: false, pdHoursThisYear: 0, trainingRowsCounted: 0,
-        contentAreas: null, contentAreasTotal: null
+        contentAreas: null, contentAreasTotal: null, courses: []
     };
 
     // "Record for: Paige Holliday (N452129)"
@@ -2030,6 +2041,37 @@ function parsePdr(text) {
         }
         out.contentAreas = byCode;
         out.contentAreasTotal = printedTotal != null ? printedTotal : sum;
+    })();
+
+    /* ── Section Two: the individual college courses ─────────────────────────
+       "Detailed Course Listing" lists each course as:
+         Semester  Year  Prefix Nbr  Course Name                     Credit Hours
+         Summer    2024  ECE 114     Child Health Maintenance         3.00
+       We read the course prefix+number (e.g. "ECE 114"), the name, and the trailing
+       credit hours. These let the card map a person's coursework to the Gateways
+       content areas it covers. We only read between "Section Two" (Detailed Course
+       Listing) and "Section Three", so training rows are never mistaken for courses. */
+    (function parseCourses() {
+        let inSection = false;
+        for (const raw of lines) {
+            const l = raw.trim();
+            if (/^Section Two/i.test(l) || /Detailed Course Listing/i.test(l)) { inSection = true; continue; }
+            if (/^Section Three/i.test(l)) break;
+            if (!inSection) continue;
+            // Skip headers, institution names, and total lines.
+            if (/^(Semester|Total|ECE\/CD Coursework|ECE-Related Coursework|Note:)/i.test(l)) continue;
+            /* A course row: a term word, a year, then PREFIX NBR, a name, and hours.
+               Match a 2-4 letter prefix + number anywhere in the line, the trailing
+               credit-hours number, and take the text between them as the name. */
+            const cm = l.match(/\b([A-Z]{2,4})\s+(\d{2,4}[A-Z]?)\b\s+(.+?)\s+(\d+(?:\.\d+)?)\s*$/);
+            if (!cm) continue;
+            const nbr = cm[1] + ' ' + cm[2];
+            const name = cm[3].replace(/\s{2,}/g, ' ').trim();
+            const hours = parseFloat(cm[4]);
+            // Guard against picking up a term/year prefix as the course name.
+            if (!name || /^\d/.test(name)) continue;
+            out.courses.push({ nbr: nbr, name: name, hours: isFinite(hours) ? hours : null });
+        }
     })();
 
     return out;
@@ -4414,7 +4456,7 @@ ELSE
                         ISNULL(SemesterHoursEce,'') AS SemesterHoursEce,
                         ISNULL(TranscriptOnFile,'') AS TranscriptOnFile,
                         ISNULL(PdHoursYtd,'') AS PdHoursYtd, ISNULL(PdHoursYear,'') AS PdHoursYear,
-                        ISNULL(PdContentAreas,'') AS PdContentAreas
+                        ISNULL(PdContentAreas,'') AS PdContentAreas, ISNULL(PdCourses,'') AS PdCourses
                  FROM Staff WHERE Id=${askedId}`, staffEnsureSQL() + 'GO\n');
             if (!sr.ok) return sendJSON(res, 500, { error: sr.error });
             if (!sr.rows.length) return sendJSON(res, 404, { error: 'Staff record not found.' });
@@ -4428,13 +4470,17 @@ ELSE
             // The per-area breakdown is stored as a compact JSON string, e.g.
             // {"HGD":23,"HSW":12,...}. Only propose it when the parse reconciled.
             const areasJson = pdr.contentAreas ? JSON.stringify(pdr.contentAreas) : '';
+            // The Section Two course list, stored as a JSON array; only propose it when
+            // at least one course was read.
+            const coursesJson = (pdr.courses && pdr.courses.length) ? JSON.stringify(pdr.courses) : '';
             const proposed = {
                 semesterHoursTotal: pdr.totalCreditHours != null ? String(pdr.totalCreditHours) : row.SemesterHoursTotal,
                 semesterHoursEce:   pdr.eceCdHours != null ? String(pdr.eceCdHours) : row.SemesterHoursEce,
                 transcriptOnFile:   pdr.transcriptReviewed ? 'On file with Gateways' : row.TranscriptOnFile,
                 pdHoursYtd:         String(pdr.pdHoursThisYear),
                 pdHoursYear:        thisYear,
-                pdContentAreas:     areasJson || row.PdContentAreas
+                pdContentAreas:     areasJson || row.PdContentAreas,
+                pdCourses:          coursesJson || row.PdCourses
             };
             const current = {
                 semesterHoursTotal: row.SemesterHoursTotal,
@@ -4442,7 +4488,8 @@ ELSE
                 transcriptOnFile:   row.TranscriptOnFile,
                 pdHoursYtd:         row.PdHoursYtd,
                 pdHoursYear:        row.PdHoursYear,
-                pdContentAreas:     row.PdContentAreas
+                pdContentAreas:     row.PdContentAreas,
+                pdCourses:          row.PdCourses
             };
 
             console.log('[PDR] parsed ' + (pdr.registryId || '?') + ' for staff ' + askedId
@@ -4466,7 +4513,8 @@ ELSE
                     trainingRowsCounted: pdr.trainingRowsCounted,
                     year: thisYear,
                     contentAreas: pdr.contentAreas,
-                    contentAreasTotal: pdr.contentAreasTotal
+                    contentAreasTotal: pdr.contentAreasTotal,
+                    courses: pdr.courses
                 }
             });
         });
@@ -4491,7 +4539,8 @@ ELSE
                 ['TranscriptOnFile', 'transcriptOnFile'],
                 ['PdHoursYtd', 'pdHoursYtd'],
                 ['PdHoursYear', 'pdHoursYear'],
-                ['PdContentAreas', 'pdContentAreas']
+                ['PdContentAreas', 'pdContentAreas'],
+                ['PdCourses', 'pdCourses']
             ];
             const sets = map.filter(([, k]) => typeof d[k] === 'string' && d[k] !== undefined)
                 .map(([c, k]) => `${c}=${esc(d[k])}`);

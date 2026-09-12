@@ -767,6 +767,69 @@ function trainingByArea(pdContentAreas, kind, level, thinBelow) {
     };
 }
 
+/* ── College course → Gateways content areas ─────────────────────────────────
+   The PDR lists a person's college courses (Section Two) but does NOT tag them to
+   the seven Gateways content areas. This map does, so the card can show an area as
+   "college-covered (ECE 112)" from the coursework a person has on file.
+
+   Transcribed from the SWIC/SIUE course mapping supplied by the centre (Sep 2026).
+   Keyed by course number as it prints on the PDR ("ECE 112", "HES 152"). A course
+   maps to every area it substantively covers, following that table. This is a
+   coverage map, not an hours map: Gateways assesses whether a competency area is
+   MET by coursework, not how many hours sit in it, so an area is "covered" when any
+   mapped course touches it. Adding a course here only ever GRANTS coverage; it never
+   changes a level's requirements. */
+var COURSE_AREA_MAP = {
+    // Southwestern Illinois College
+    'ECE 101': ['PPD', 'CPD'],
+    'ECE 102': ['CPD', 'IRE'],
+    'ECE 110': ['IRE', 'PPD'],
+    'ECE 112': ['HGD'],
+    'ECE 114': ['HSW'],
+    'ECE 116': ['HGD', 'CPD', 'IRE'],
+    'ECE 118': ['IRE', 'OA', 'PPD'],
+    'ECE 121': ['CPD', 'OA'],
+    'ECE 122': ['HGD', 'IRE', 'HSW'],
+    'ECE 125': ['PPD', 'CPD', 'FCR'],
+    'ECE 210': ['IRE', 'HGD'],
+    'ECE 250': ['FCR', 'PPD'],
+    'HES 152': ['HSW'],
+    // Southern Illinois University Edwardsville
+    'ECE 201': ['IRE', 'CPD'],
+    'ECE 314': ['CPD', 'OA', 'IRE'],
+    'PSYC 201': ['HGD']
+};
+
+/* Parse the stored PdCourses JSON (array of { nbr, name, hours }) to an array.
+   Accepts an already-parsed array or a JSON string; returns [] on anything else. */
+function parseCourses(pdCourses) {
+    if (!pdCourses) return [];
+    if (Array.isArray(pdCourses)) return pdCourses;
+    try {
+        var a = JSON.parse(pdCourses);
+        return Array.isArray(a) ? a : [];
+    } catch (e) { return []; }
+}
+
+/* Which content areas a person's college coursework covers, and by which courses.
+   Returns { HGD: ['ECE 112'], HSW: ['ECE 114','HES 152'], ... } listing only the
+   areas that at least one course covers. Unknown course numbers are simply ignored
+   (they contribute no coverage rather than a wrong one). */
+function collegeCoverageByArea(pdCourses) {
+    var courses = parseCourses(pdCourses);
+    var cover = {};
+    courses.forEach(function (c) {
+        var nbr = String((c && c.nbr) || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        var areas = COURSE_AREA_MAP[nbr];
+        if (!areas) return;
+        areas.forEach(function (a) {
+            (cover[a] = cover[a] || []);
+            if (cover[a].indexOf(nbr) === -1) cover[a].push(nbr);
+        });
+    });
+    return cover;
+}
+
 /* ── The whole "next level" picture for one ladder ───────────────────────────
    One model the card can render without re-deriving anything. It answers, for the
    NEXT level a person can aim at on `kind` ('ece' or 'itc'):
@@ -791,16 +854,18 @@ function trainingByArea(pdContentAreas, kind, level, thinBelow) {
    actionable signal. It never claims a per-area hour target Gateways does not
    publish. College hours are shown as a total only — the PDR does not tag courses to
    content areas, so a per-area college split is not available here. */
-function nextLevelModel(kind, s, heldEce, heldItc, pdContentAreas, thinBelow) {
+function nextLevelModel(kind, s, heldEce, heldItc, pdContentAreas, pdCourses, thinBelow) {
     var thin = (typeof thinBelow === 'number') ? thinBelow : 3;
     var hours = parseContentAreaHours(pdContentAreas);
+    var coverage = collegeCoverageByArea(pdCourses);   // { area: [courseNbrs] }
     var order = ['HGD', 'HSW', 'OA', 'CPD', 'IRE', 'FCR', 'PPD'];
 
     var model = {
         kind: kind, reachable: true, gate: '', level: null, levelWord: '',
         education: '', collegeHours: (s && s.SemesterHoursEce) ? String(s.SemesterHoursEce) : '',
         competencyCount: 0, trainingAllowance: 0,
-        areas: [], focus: [], hasHours: !!hours, classroom: '', topped: false
+        areas: [], focus: [], hasHours: !!hours,
+        hasCourses: parseCourses(pdCourses).length > 0, classroom: '', topped: false
     };
 
     var row = null;
@@ -850,11 +915,22 @@ function nextLevelModel(kind, s, heldEce, heldItc, pdContentAreas, thinBelow) {
     required.forEach(function (c) { var a = areaOf(c); if (a) needed[a] = true; });
     model.areas = order.filter(function (code) { return needed[code]; }).map(function (code) {
         var h = hours && isFinite(hours[code]) ? Number(hours[code]) : 0;
+        var courses = coverage[code] || [];
+        var collegeCovered = courses.length > 0;
+        var trainingCovered = h >= thin;   // a meaningful amount of training logged
+        /* Option 3: an area is "covered" if the person's coursework covers it OR they
+           have training hours in it. It is flagged "aim here" ONLY when it has
+           neither \u2014 that is a genuine gap the next training/course should fill. An
+           area with college coverage is never flagged, however few training hours it
+           has, because Gateways can meet the competency from the course. */
         return {
             code: code,
             name: COMPETENCY_AREAS[code] ? COMPETENCY_AREAS[code].area : code,
             hours: h,
-            thin: h < thin
+            collegeCovered: collegeCovered,
+            collegeCourses: courses,
+            covered: collegeCovered || trainingCovered,
+            thin: !collegeCovered && !trainingCovered
         };
     });
     model.focus = model.areas.filter(function (a) { return a.thin; }).map(function (a) { return a.code; });
@@ -899,7 +975,10 @@ root.CredentialFramework = {
     parseContentAreaHours: parseContentAreaHours,
     areasForLevel: areasForLevel,
     trainingByArea: trainingByArea,
-    nextLevelModel: nextLevelModel
+    nextLevelModel: nextLevelModel,
+    COURSE_AREA_MAP: COURSE_AREA_MAP,
+    parseCourses: parseCourses,
+    collegeCoverageByArea: collegeCoverageByArea
 };
 
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));

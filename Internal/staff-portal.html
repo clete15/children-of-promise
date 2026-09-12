@@ -294,10 +294,11 @@
     }
     .sp-need-focus.ok { background: var(--sp-good-bg, rgba(70,170,90,0.10)); }
 
-    /* Per-area training hours inside the Competencies row. */
+    /* Per-area coverage inside the Competencies row: code, name, then a coverage
+       cell (college courses + training hours) and a covered/aim-here tag. */
     .sp-area-list { margin-top: 8px; }
     .sp-area {
-        display: grid; grid-template-columns: 48px 1fr auto 62px; gap: 8px; align-items: center;
+        display: grid; grid-template-columns: 44px minmax(0, 1fr) 66px; gap: 8px; align-items: start;
         padding: 6px 8px; border-radius: 6px; font-size: 0.84rem; margin-bottom: 3px;
     }
     .sp-area.ok { background: var(--sp-good-bg, rgba(70,170,90,0.08)); }
@@ -305,14 +306,19 @@
     .sp-area-code {
         font-weight: 800; font-size: 0.7rem; letter-spacing: 0.02em; color: var(--sp-accent);
         background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 5px;
-        padding: 2px 0; text-align: center;
+        padding: 2px 0; text-align: center; grid-row: span 2;
     }
     .sp-area-name { color: var(--sp-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sp-area-hrs { color: var(--sp-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
-    .sp-area-tag { font-size: 0.68rem; font-weight: 800; text-align: right; white-space: nowrap; }
+    /* Coverage cell sits under the name, spanning the middle column. */
+    .sp-area-cov { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.78rem; }
+    .sp-area-col.yes { color: var(--sp-good-fg); font-weight: 600; }
+    .sp-area-col.no { color: var(--sp-muted); }
+    .sp-area-hrs { color: var(--sp-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sp-area-hrs.none { color: var(--sp-muted); }
+    .sp-area-tag { grid-column: 3; grid-row: span 2; font-size: 0.68rem; font-weight: 800; text-align: right; white-space: nowrap; align-self: center; }
     .sp-area.thin .sp-area-tag { color: var(--sp-bad-fg); }
     .sp-area.ok .sp-area-tag { color: var(--sp-good-fg); }
-    .sp-area.thin .sp-area-hrs { color: var(--sp-bad-fg); font-weight: 700; }
+    .sp-area.thin .sp-area-hrs { color: var(--sp-bad-fg); }
 
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
@@ -1214,28 +1220,36 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
         + 'Gateways decides this against your transcript and record \u2014 the hours below are a '
         + 'guide to where your training already is.</div>';
 
-    // Per-area training hours, only the areas THIS level needs.
+    /* Per-area coverage for the areas THIS level needs. Each row shows two sources
+       of coverage side by side: College (which courses cover it) and Training (hours
+       logged). An area is flagged "aim here" only when it has NEITHER. */
     if (model.areas.length) {
         comp += '<div class="sp-area-list">' + model.areas.map(a => {
             const cls = 'sp-area' + (a.thin ? ' thin' : ' ok');
+            const college = a.collegeCovered
+                ? '<span class="sp-area-col yes" title="' + esc(a.collegeCourses.join(', '))
+                  + '">\u2713 ' + esc(a.collegeCourses.join(', ')) + '</span>'
+                : '<span class="sp-area-col no">College \u2014</span>';
+            const training = a.hours
+                ? '<span class="sp-area-hrs">' + esc(String(a.hours)) + ' hrs</span>'
+                : '<span class="sp-area-hrs none">no training</span>';
             return '<div class="' + cls + '">'
                 + '<span class="sp-area-code">' + esc(a.code) + '</span>'
                 + '<span class="sp-area-name">' + esc(a.name) + '</span>'
-                + '<span class="sp-area-hrs">' + (a.hours ? esc(String(a.hours)) + ' hrs' : '\u2014')
-                + '</span>'
-                + '<span class="sp-area-tag">' + (a.thin ? 'aim here' : '\u2713') + '</span>'
+                + '<span class="sp-area-cov">' + college + training + '</span>'
+                + '<span class="sp-area-tag">' + (a.thin ? 'aim here' : '\u2713 covered') + '</span>'
                 + '</div>';
         }).join('') + '</div>';
 
-        if (!model.hasHours) {
-            comp += '<div class="sp-need-sub">No training record on file yet. Upload this person\u2019s '
-                + 'PDR (below) to fill in the hours by area.</div>';
+        if (!model.hasHours && !model.hasCourses) {
+            comp += '<div class="sp-need-sub">No coursework or training on file yet. Upload this '
+                + 'person\u2019s PDR (below) to fill in coverage by area.</div>';
         } else if (model.focus.length) {
-            comp += '<div class="sp-need-focus">\u2192 Little or no training logged in <b>'
-                + model.focus.map(esc).join(', ') + '</b>. Aim the next training there.</div>';
+            comp += '<div class="sp-need-focus">\u2192 Neither coursework nor training covers <b>'
+                + model.focus.map(esc).join(', ') + '</b> yet. Aim the next course or training there.</div>';
         } else {
-            comp += '<div class="sp-need-focus ok">\u2713 Training logged across every area this level '
-                + 'draws on.</div>';
+            comp += '<div class="sp-need-focus ok">\u2713 Every area this level draws on is covered by '
+                + 'coursework or training. Gateways confirms the competencies against your record.</div>';
         }
     }
     body += '<div class="sp-need"><div class="sp-need-k">Competencies</div>' + comp + '</div>';
@@ -1290,8 +1304,8 @@ function credentialsSection(s) {
     const F = window.CredentialFramework;
     let eceCol, itcCol;
     if (F && F.nextLevelModel) {
-        const eceModel = F.nextLevelModel('ece', s, heldEce, heldItc, s.PdContentAreas);
-        const itcModel = F.nextLevelModel('itc', s, heldEce, heldItc, s.PdContentAreas);
+        const eceModel = F.nextLevelModel('ece', s, heldEce, heldItc, s.PdContentAreas, s.PdCourses);
+        const itcModel = F.nextLevelModel('itc', s, heldEce, heldItc, s.PdContentAreas, s.PdCourses);
         eceCol = ladderColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceModel, 'ece');
         itcCol = ladderColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itcModel, 'itc');
     } else {
@@ -1862,13 +1876,21 @@ function renderPdrResult() {
         const order = ['HGD', 'HSW', 'OA', 'CPD', 'IRE', 'FCR', 'PPD'];
         return order.filter(k => o[k] != null).map(k => k + ' ' + o[k]).join(', ');
     };
+    // A readable one-line summary of the college course list.
+    const courseSummary = (json) => {
+        const F = window.CredentialFramework;
+        const arr = (F && F.parseCourses) ? F.parseCourses(json) : [];
+        if (!arr.length) return '';
+        return arr.map(c => c.nbr).join(', ');
+    };
 
     const diffs = attnDiff('College credit hours (total)', c.semesterHoursTotal, pr.semesterHoursTotal)
         + attnDiff('ECE / CD credit hours', c.semesterHoursEce, pr.semesterHoursEce)
         + attnDiff('Transcript on file', c.transcriptOnFile, pr.transcriptOnFile)
         + attnDiff('PD training hours (' + esc(ex.year || '') + ')', c.pdHoursYtd, pr.pdHoursYtd)
         + attnDiff('PD hours year', c.pdHoursYear, pr.pdHoursYear)
-        + attnDiff('Training by content area', areaSummary(c.pdContentAreas), areaSummary(pr.pdContentAreas));
+        + attnDiff('Training by content area', areaSummary(c.pdContentAreas), areaSummary(pr.pdContentAreas))
+        + attnDiff('College courses on file', courseSummary(c.pdCourses), courseSummary(pr.pdCourses));
 
     html += '<div class="sp-attn-card">'
         + '<div class="sp-attn-diff" style="border:0;padding:0;">'
@@ -1884,6 +1906,12 @@ function renderPdrResult() {
             : '<div class="sp-sub" style="margin-top:8px;color:var(--sp-muted);">'
               + 'The content-area breakdown could not be read from this PDF, so it will not '
               + 'be written. Everything else above still applies.</div>')
+        + (ex.courses && ex.courses.length
+            ? '<div class="sp-attn-diff-lbl" style="margin-top:8px;">College courses read</div>'
+              + '<div class="sp-sub">' + esc(ex.courses.map(c => c.nbr).join(', '))
+              + ' (' + ex.courses.length + ' course' + (ex.courses.length === 1 ? '' : 's')
+              + ') \u2014 used to map coursework to content areas.</div>'
+            : '')
         + '</div>';
 
     if (diffs) {
@@ -1919,7 +1947,8 @@ async function applyPdr() {
                 transcriptOnFile: pr.transcriptOnFile,
                 pdHoursYtd: pr.pdHoursYtd,
                 pdHoursYear: pr.pdHoursYear,
-                pdContentAreas: pr.pdContentAreas
+                pdContentAreas: pr.pdContentAreas,
+                pdCourses: pr.pdCourses
             })
         });
         const data = await res.json();
@@ -1933,6 +1962,7 @@ async function applyPdr() {
             row.PdHoursYtd = pr.pdHoursYtd;
             row.PdHoursYear = pr.pdHoursYear;
             row.PdContentAreas = pr.pdContentAreas;
+            row.PdCourses = pr.pdCourses;
         }
         if (current && String(current.Id) === String(PDR_PREVIEW.staffId)) {
             current = row || current;
