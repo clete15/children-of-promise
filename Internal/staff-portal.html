@@ -237,6 +237,24 @@
     .sp-src { font-size: 0.78rem; color: var(--sp-muted); margin-top: 10px; line-height: 1.6; }
     .sp-src a { color: var(--sp-accent); }
 
+    /* "How to pull your PDR" collapsible. Native <details>, so no JS to wire. */
+    .sp-pdr > summary {
+        cursor: pointer; font-size: 0.9rem; font-weight: 700; color: var(--sp-accent);
+        list-style: none; display: flex; align-items: center; gap: 8px;
+    }
+    .sp-pdr > summary::-webkit-details-marker { display: none; }
+    .sp-pdr > summary::before { content: '\25B8'; font-size: 0.8rem; transition: transform 0.15s; }
+    .sp-pdr[open] > summary::before { transform: rotate(90deg); }
+    .sp-pdr-body { font-size: 0.86rem; color: var(--sp-text-2); line-height: 1.6; margin-top: 10px; }
+    .sp-pdr-body ol { margin: 8px 0 0 20px; padding: 0; }
+    .sp-pdr-body li { margin-bottom: 5px; }
+    .sp-pdr-btn {
+        display: inline-block; margin-top: 12px; padding: 8px 15px; border-radius: 7px;
+        background: var(--sp-accent); color: #fff; font-size: 0.85rem; font-weight: 700;
+        text-decoration: none;
+    }
+    .sp-pdr-btn:hover { filter: brightness(1.08); }
+
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
        see them side by side and because they are genuinely parallel: same person,
@@ -1128,6 +1146,27 @@ function credentialsSection(s) {
         + credentialColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceSteps(s))
         + credentialColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itSteps(s))
         + '</div>';
+
+    /* How to pull your PDR. Collapsed by default so it does not crowd the ladders,
+       but always available — it is the record that resolves nearly every "waiting on
+       something" and missing-competency question, so it belongs right here. */
+    html += '<div class="sp-card"><details class="sp-pdr">'
+        + '<summary>How to pull your training record (PDR) from Gateways</summary>'
+        + '<div class="sp-pdr-body">'
+        + '<p>Your Professional Development Record lists every approved course with its '
+        + 'Illinois Core Knowledge Areas, dates and credit hours \u2014 it is what we use to '
+        + 'confirm your competencies. To pull it:</p>'
+        + '<ol>'
+        + '<li><b>Log in</b> to the Gateways Registry with your personal account.</li>'
+        + '<li>Open your <b>Dashboard</b> (or <b>My Registry</b>) from the top navigation.</li>'
+        + '<li>Find the <b>My PDR</b> (Professional Development Record) section or tile.</li>'
+        + '<li>Click <b>Print/View PDR</b> to generate your official training record.</li>'
+        + '<li><b>Save it as a PDF or print it</b> and hand it in so we can update your '
+        + 'record with your specific core competencies.</li>'
+        + '</ol>'
+        + '<a class="sp-pdr-btn" href="https://registry.ilgateways.com" target="_blank" rel="noopener">'
+        + 'Open the Gateways Registry \u2192</a>'
+        + '</div></details></div>';
 
     html += '<div class="sp-card"><div class="sp-src">Level benchmarks are transcribed from the '
         + 'Gateways to Opportunity framework documents in our document library \u2014 '
