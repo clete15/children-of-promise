@@ -860,12 +860,25 @@ function nextLevelModel(kind, s, heldEce, heldItc, pdContentAreas, pdCourses, th
     var coverage = collegeCoverageByArea(pdCourses);   // { area: [courseNbrs] }
     var order = ['HGD', 'HSW', 'OA', 'CPD', 'IRE', 'FCR', 'PPD'];
 
+    // The person's college courses, each with the Gateways areas it covers, so the
+    // card can list "ECE 112 Growth and Development -> HGD" independent of the per-area
+    // rows. Unknown courses (not in the map) still list, with an empty area set.
+    var courseList = parseCourses(pdCourses).map(function (c) {
+        var nbr = String((c && c.nbr) || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        return {
+            nbr: nbr,
+            name: (c && c.name) ? String(c.name) : '',
+            hours: (c && isFinite(c.hours)) ? Number(c.hours) : null,
+            areas: COURSE_AREA_MAP[nbr] || []
+        };
+    });
+
     var model = {
         kind: kind, reachable: true, gate: '', level: null, levelWord: '',
         education: '', collegeHours: (s && s.SemesterHoursEce) ? String(s.SemesterHoursEce) : '',
         competencyCount: 0, trainingAllowance: 0,
         areas: [], focus: [], hasHours: !!hours,
-        hasCourses: parseCourses(pdCourses).length > 0, classroom: '', topped: false
+        hasCourses: courseList.length > 0, courses: courseList, classroom: '', topped: false
     };
 
     var row = null;

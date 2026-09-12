@@ -342,6 +342,28 @@
     .sp-cv.yes { color: var(--sp-good-fg); font-weight: 600; }
     .sp-cv.no { color: var(--sp-muted); }
 
+    /* College coursework list, shown above the per-area rows: each course with the
+       content-area codes it covers. */
+    .sp-course-head {
+        font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        color: var(--sp-muted); margin: 12px 0 6px;
+    }
+    .sp-course-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
+    .sp-course {
+        display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px;
+        padding: 6px 9px; border-radius: 7px; background: var(--sp-surface-2);
+        border: 1px solid var(--sp-border); font-size: 0.8rem;
+    }
+    .sp-course-nbr { font-weight: 800; color: var(--sp-text); white-space: nowrap; }
+    .sp-course-name { color: var(--sp-text-2); flex: 1 1 auto; min-width: 0; }
+    .sp-course-areas { display: flex; flex-wrap: wrap; gap: 3px; }
+    .sp-course-area {
+        font-size: 0.64rem; font-weight: 800; letter-spacing: 0.03em; color: var(--sp-accent);
+        background: var(--sp-accent-soft); border: 1px solid var(--sp-border); border-radius: 4px;
+        padding: 1px 6px; white-space: nowrap;
+    }
+    .sp-course-area.none { color: var(--sp-muted); background: transparent; font-weight: 600; }
+
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
        see them side by side and because they are genuinely parallel: same person,
@@ -1242,6 +1264,23 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
         + 'Gateways training instead of college coursework; the rest come from your courses. '
         + 'Gateways decides this against your transcript and record \u2014 the hours below are a '
         + 'guide to where your training already is.</div>';
+
+    /* College coursework on file, with the content areas each course covers. Shown
+       once, above the per-area rows, so the full course list and its mapping are
+       visible in one place (the per-area rows only name the areas the level needs). */
+    if (kind === 'ece' && model.courses && model.courses.length) {
+        comp += '<div class="sp-course-head">College coursework on file</div>'
+            + '<div class="sp-course-list">' + model.courses.map(c => {
+                const tags = c.areas.length
+                    ? c.areas.map(a => '<span class="sp-course-area">' + esc(a) + '</span>').join('')
+                    : '<span class="sp-course-area none">not mapped</span>';
+                return '<div class="sp-course">'
+                    + '<span class="sp-course-nbr">' + esc(c.nbr) + '</span>'
+                    + '<span class="sp-course-name">' + esc(c.name || '') + '</span>'
+                    + '<span class="sp-course-areas">' + tags + '</span>'
+                    + '</div>';
+            }).join('') + '</div>';
+    }
 
     /* Per-area coverage for the areas THIS level needs. Each area is a small block:
        a header line (code badge + full area name + covered/aim tag), then a coverage
