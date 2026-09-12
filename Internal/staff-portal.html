@@ -294,31 +294,30 @@
     }
     .sp-need-focus.ok { background: var(--sp-good-bg, rgba(70,170,90,0.10)); }
 
-    /* Per-area coverage inside the Competencies row: code, name, then a coverage
-       cell (college courses + training hours) and a covered/aim-here tag. */
+    /* Per-area coverage inside the Competencies row. Each area is a small stacked
+       block: a header line (code badge + full name + tag), then two coverage lines
+       (college / training). Stacking keeps it readable in the narrow ladder column. */
     .sp-area-list { margin-top: 8px; }
     .sp-area {
-        display: grid; grid-template-columns: 44px minmax(0, 1fr) 66px; gap: 8px; align-items: start;
-        padding: 6px 8px; border-radius: 6px; font-size: 0.84rem; margin-bottom: 3px;
+        padding: 8px 10px; border-radius: 7px; margin-bottom: 6px;
+        border-left: 3px solid transparent;
     }
-    .sp-area.ok { background: var(--sp-good-bg, rgba(70,170,90,0.08)); }
-    .sp-area.thin { background: var(--sp-bad-bg, rgba(220,80,80,0.08)); }
+    .sp-area.ok { background: var(--sp-good-bg, rgba(70,170,90,0.08)); border-left-color: var(--sp-good-fg, #46aa5a); }
+    .sp-area.thin { background: var(--sp-bad-bg, rgba(220,80,80,0.08)); border-left-color: var(--sp-bad-fg, #d05050); }
+    .sp-area-top { display: flex; align-items: center; gap: 8px; }
     .sp-area-code {
-        font-weight: 800; font-size: 0.7rem; letter-spacing: 0.02em; color: var(--sp-accent);
+        font-weight: 800; font-size: 0.68rem; letter-spacing: 0.03em; color: var(--sp-accent);
         background: var(--sp-surface); border: 1px solid var(--sp-border); border-radius: 5px;
-        padding: 2px 0; text-align: center; grid-row: span 2;
+        padding: 2px 6px; white-space: nowrap;
     }
-    .sp-area-name { color: var(--sp-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    /* Coverage cell sits under the name, spanning the middle column. */
-    .sp-area-cov { grid-column: 2; display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.78rem; }
-    .sp-area-col.yes { color: var(--sp-good-fg); font-weight: 600; }
-    .sp-area-col.no { color: var(--sp-muted); }
-    .sp-area-hrs { color: var(--sp-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .sp-area-hrs.none { color: var(--sp-muted); }
-    .sp-area-tag { grid-column: 3; grid-row: span 2; font-size: 0.68rem; font-weight: 800; text-align: right; white-space: nowrap; align-self: center; }
+    .sp-area-name { color: var(--sp-text); font-weight: 600; font-size: 0.85rem; flex: 1; min-width: 0; }
+    .sp-area-tag { font-size: 0.72rem; font-weight: 800; white-space: nowrap; }
     .sp-area.thin .sp-area-tag { color: var(--sp-bad-fg); }
     .sp-area.ok .sp-area-tag { color: var(--sp-good-fg); }
-    .sp-area.thin .sp-area-hrs { color: var(--sp-bad-fg); }
+    /* The two coverage lines sit under the header, indented to the name. */
+    .sp-area-cov { margin-top: 5px; display: flex; flex-direction: column; gap: 2px; font-size: 0.8rem; }
+    .sp-cv.yes { color: var(--sp-good-fg); }
+    .sp-cv.no { color: var(--sp-muted); }
 
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
@@ -1220,24 +1219,27 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
         + 'Gateways decides this against your transcript and record \u2014 the hours below are a '
         + 'guide to where your training already is.</div>';
 
-    /* Per-area coverage for the areas THIS level needs. Each row shows two sources
-       of coverage side by side: College (which courses cover it) and Training (hours
-       logged). An area is flagged "aim here" only when it has NEITHER. */
+    /* Per-area coverage for the areas THIS level needs. Each area is a small block:
+       a header line (code badge + full area name + covered/aim tag), then a coverage
+       line (College + which courses, and Training hours). Stacked rather than a tight
+       grid so it stays readable inside the narrow two-column ladder layout. An area is
+       flagged "aim here" only when it has NEITHER coursework nor training. */
     if (model.areas.length) {
         comp += '<div class="sp-area-list">' + model.areas.map(a => {
             const cls = 'sp-area' + (a.thin ? ' thin' : ' ok');
             const college = a.collegeCovered
-                ? '<span class="sp-area-col yes" title="' + esc(a.collegeCourses.join(', '))
-                  + '">\u2713 ' + esc(a.collegeCourses.join(', ')) + '</span>'
-                : '<span class="sp-area-col no">College \u2014</span>';
+                ? '<span class="sp-cv yes">\u2713 College: ' + esc(a.collegeCourses.join(', ')) + '</span>'
+                : '<span class="sp-cv no">\u2014 No college course</span>';
             const training = a.hours
-                ? '<span class="sp-area-hrs">' + esc(String(a.hours)) + ' hrs</span>'
-                : '<span class="sp-area-hrs none">no training</span>';
+                ? '<span class="sp-cv yes">\u2713 Training: ' + esc(String(a.hours)) + ' hrs</span>'
+                : '<span class="sp-cv no">\u2014 No training logged</span>';
             return '<div class="' + cls + '">'
+                + '<div class="sp-area-top">'
                 + '<span class="sp-area-code">' + esc(a.code) + '</span>'
                 + '<span class="sp-area-name">' + esc(a.name) + '</span>'
-                + '<span class="sp-area-cov">' + college + training + '</span>'
-                + '<span class="sp-area-tag">' + (a.thin ? 'aim here' : '\u2713 covered') + '</span>'
+                + '<span class="sp-area-tag">' + (a.thin ? 'aim here' : '\u2713') + '</span>'
+                + '</div>'
+                + '<div class="sp-area-cov">' + college + training + '</div>'
                 + '</div>';
         }).join('') + '</div>';
 
