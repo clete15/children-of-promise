@@ -886,6 +886,17 @@ GO
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PdHoursYear')
     ALTER TABLE Staff ADD PdHoursYear NVARCHAR(10);
 GO
+/* Training contact hours broken out by Gateways Content Area, from the PDR's
+   Section Three summary table, stored as a compact JSON string such as
+   {"HGD":23,"HSW":12,"OA":3,"CPD":5,"IRE":16,"FCR":2,"PPD":2}. It drives the
+   "training by competency area" guidance on the credentials tab — showing which
+   areas a person already has hours in, so their next training is a deliberate
+   choice rather than a guess. Written only by the PDR ingest, and only when the
+   parsed breakdown reconciled with the PDR's printed total. NVARCHAR(400) is
+   ample for seven short keys and numbers. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='PdContentAreas')
+    ALTER TABLE Staff ADD PdContentAreas NVARCHAR(400);
+GO
 /* ── Per-staff sign-in ──
 
    Until now the site had one shared password and therefore no idea WHO was using
@@ -946,7 +957,7 @@ const STAFF_COLUMNS = [
     ['StaffGroup', 'staffGroup'], ['SecondaryClassroom', 'secondaryClassroom'],
     ['SemesterHoursTotal', 'semesterHoursTotal'], ['SemesterHoursEce', 'semesterHoursEce'],
     ['TranscriptOnFile', 'transcriptOnFile'], ['PdHoursYtd', 'pdHoursYtd'],
-    ['PdHoursYear', 'pdHoursYear']
+    ['PdHoursYear', 'pdHoursYear'], ['PdContentAreas', 'pdContentAreas']
 ];
 
 /* What a staff member may change on their OWN record. Everything else on the card
@@ -1877,12 +1888,27 @@ function applyPendingToNotes(notes, pendingNote) {
    largely duplicates Section Three, so it is NOT added — counting it would roughly
    double the total. Every training row carries a date, so "this year" is decided per
    row. The admin sees the number in a preview before it is written. */
+/* The seven Gateways Content Areas, in the exact order the PDR's Section Three
+   summary table prints them, keyed to the same three-letter codes the credential
+   framework uses (HGD/HSW/OA/CPD/IRE/FCR/PPD). Order matters: the parser pairs the
+   area rows to their hour figures by this order. */
+const PDR_CONTENT_AREAS = [
+    { code: 'HGD', name: 'Human Growth and Development' },
+    { code: 'HSW', name: 'Health, Safety and Well-Being' },
+    { code: 'OA',  name: 'Observation and Assessment' },
+    { code: 'CPD', name: 'Curriculum or Program Design' },
+    { code: 'IRE', name: 'Interactions, Relationships and Environments' },
+    { code: 'FCR', name: 'Family and Community Relationships' },
+    { code: 'PPD', name: 'Personal and Professional Development' }
+];
+
 function parsePdr(text) {
     const lines = String(text || '').split(/\r?\n/);
     const out = {
         registryId: '', name: '',
         totalCreditHours: null, eceCdHours: null, eceRelatedHours: null,
-        transcriptReviewed: false, pdHoursThisYear: 0, trainingRowsCounted: 0
+        transcriptReviewed: false, pdHoursThisYear: 0, trainingRowsCounted: 0,
+        contentAreas: null, contentAreasTotal: null
     };
 
     // "Record for: Paige Holliday (N452129)"
@@ -1939,6 +1965,85 @@ function parsePdr(text) {
     }
     // Round to 2dp to avoid float noise like 63.00000001.
     out.pdHoursThisYear = Math.round(out.pdHoursThisYear * 100) / 100;
+
+    /* ── Training hours by Gateways Content Area ─────────────────────────────
+       Section Three ends with a table Gateways has already totalled by content
+       area — far more reliable than trying to code each training title. It prints
+       as two side-by-side tables ("Gateways to Opportunity Content Area" and "CDA
+       Subject Area"); we want only the Gateways side.
+
+       pdftotext can lay this out two ways depending on the PDF's internal boxes:
+         (a) each area name and its hours on the SAME line (the visual table), or
+         (b) all seven area names stacked, then all seven numbers stacked below.
+       Case (a) is unambiguous — match the name, read the number on that line.
+       Case (b) we pair by ORDER, which is safe only because the names print in the
+       fixed framework order (PDR_CONTENT_AREAS). Either way we then check the sum
+       against the printed "Total Hours in Gateways Areas" and only trust the result
+       if it matches, so a mis-pairing cannot quietly write wrong numbers. */
+    (function parseContentAreas() {
+        // Find the Gateways content-area block. It starts at the header and ends at
+        // "Total Hours in Gateways Areas". Everything after "CDA Subject Area" on the
+        // same rows belongs to the other table, but we only read Gateways area names.
+        let start = -1, printedTotal = null;
+        for (let i = 0; i < lines.length; i++) {
+            if (/Gateways to Opportunity Content Area/i.test(lines[i])) { start = i; break; }
+        }
+        if (start < 0) return;
+        for (let i = start; i < lines.length; i++) {
+            const tm = lines[i].match(/Total Hours in Gateways Areas:?\s*(\d+(?:\.\d+)?)/i);
+            if (tm) { printedTotal = parseFloat(tm[1]); break; }
+        }
+
+        const byCode = {};
+        // Case (a): name and number share a line.
+        let sameLineHits = 0;
+        for (const area of PDR_CONTENT_AREAS) {
+            for (let i = start; i < lines.length; i++) {
+                if (lines[i].indexOf(area.name) === -1) continue;
+                // Number on that same line, after the name.
+                const after = lines[i].slice(lines[i].indexOf(area.name) + area.name.length);
+                const nm = after.match(/(\d+(?:\.\d+)?)/);
+                if (nm) { byCode[area.code] = parseFloat(nm[1]); sameLineHits++; }
+                break;
+            }
+        }
+
+        let chosen = null;
+        if (sameLineHits === PDR_CONTENT_AREAS.length) {
+            chosen = byCode;
+        } else {
+            // Case (b): collect the names in order, then the numbers in order, pair them.
+            // Between the header and "Total Hours", the area names appear first (each on
+            // its own line), then the seven numeric lines. Pair by position.
+            const nums = [];
+            for (let i = start; i < lines.length; i++) {
+                if (/Total Hours in Gateways Areas/i.test(lines[i])) break;
+                // A pure-number line (the hour figures print alone, e.g. " 23.00").
+                const only = lines[i].trim();
+                if (/^\d+(?:\.\d+)?$/.test(only)) nums.push(parseFloat(only));
+            }
+            // The Gateways table has seven areas; if we see 7 (or the first 7) numbers,
+            // pair them to the fixed area order.
+            if (nums.length >= PDR_CONTENT_AREAS.length) {
+                const paired = {};
+                PDR_CONTENT_AREAS.forEach((a, idx) => { paired[a.code] = nums[idx]; });
+                chosen = paired;
+            }
+        }
+
+        if (!chosen) return;
+        const sum = Math.round(Object.keys(chosen)
+            .reduce((t, k) => t + (isFinite(chosen[k]) ? chosen[k] : 0), 0) * 100) / 100;
+        // Only trust the breakdown if it reconciles with the printed total (allow a
+        // small rounding tolerance). Otherwise leave it null rather than write a guess.
+        if (printedTotal != null && Math.abs(sum - printedTotal) > 0.5) {
+            out.contentAreas = null;
+            out.contentAreasTotal = printedTotal;
+            return;
+        }
+        out.contentAreas = chosen;
+        out.contentAreasTotal = printedTotal != null ? printedTotal : sum;
+    })();
 
     return out;
 }
@@ -4321,7 +4426,8 @@ ELSE
                         ISNULL(SemesterHoursTotal,'') AS SemesterHoursTotal,
                         ISNULL(SemesterHoursEce,'') AS SemesterHoursEce,
                         ISNULL(TranscriptOnFile,'') AS TranscriptOnFile,
-                        ISNULL(PdHoursYtd,'') AS PdHoursYtd, ISNULL(PdHoursYear,'') AS PdHoursYear
+                        ISNULL(PdHoursYtd,'') AS PdHoursYtd, ISNULL(PdHoursYear,'') AS PdHoursYear,
+                        ISNULL(PdContentAreas,'') AS PdContentAreas
                  FROM Staff WHERE Id=${askedId}`, staffEnsureSQL() + 'GO\n');
             if (!sr.ok) return sendJSON(res, 500, { error: sr.error });
             if (!sr.rows.length) return sendJSON(res, 404, { error: 'Staff record not found.' });
@@ -4332,19 +4438,24 @@ ELSE
                 && pdr.registryId.toUpperCase() !== row.RegistryId.toUpperCase();
 
             const thisYear = String(new Date().getFullYear());
+            // The per-area breakdown is stored as a compact JSON string, e.g.
+            // {"HGD":23,"HSW":12,...}. Only propose it when the parse reconciled.
+            const areasJson = pdr.contentAreas ? JSON.stringify(pdr.contentAreas) : '';
             const proposed = {
                 semesterHoursTotal: pdr.totalCreditHours != null ? String(pdr.totalCreditHours) : row.SemesterHoursTotal,
                 semesterHoursEce:   pdr.eceCdHours != null ? String(pdr.eceCdHours) : row.SemesterHoursEce,
                 transcriptOnFile:   pdr.transcriptReviewed ? 'On file with Gateways' : row.TranscriptOnFile,
                 pdHoursYtd:         String(pdr.pdHoursThisYear),
-                pdHoursYear:        thisYear
+                pdHoursYear:        thisYear,
+                pdContentAreas:     areasJson || row.PdContentAreas
             };
             const current = {
                 semesterHoursTotal: row.SemesterHoursTotal,
                 semesterHoursEce:   row.SemesterHoursEce,
                 transcriptOnFile:   row.TranscriptOnFile,
                 pdHoursYtd:         row.PdHoursYtd,
-                pdHoursYear:        row.PdHoursYear
+                pdHoursYear:        row.PdHoursYear,
+                pdContentAreas:     row.PdContentAreas
             };
 
             console.log('[PDR] parsed ' + (pdr.registryId || '?') + ' for staff ' + askedId
@@ -4365,7 +4476,9 @@ ELSE
                     transcriptReviewed: pdr.transcriptReviewed,
                     pdHoursThisYear: pdr.pdHoursThisYear,
                     trainingRowsCounted: pdr.trainingRowsCounted,
-                    year: thisYear
+                    year: thisYear,
+                    contentAreas: pdr.contentAreas,
+                    contentAreasTotal: pdr.contentAreasTotal
                 }
             });
         });
@@ -4389,7 +4502,8 @@ ELSE
                 ['SemesterHoursEce', 'semesterHoursEce'],
                 ['TranscriptOnFile', 'transcriptOnFile'],
                 ['PdHoursYtd', 'pdHoursYtd'],
-                ['PdHoursYear', 'pdHoursYear']
+                ['PdHoursYear', 'pdHoursYear'],
+                ['PdContentAreas', 'pdContentAreas']
             ];
             const sets = map.filter(([, k]) => typeof d[k] === 'string' && d[k] !== undefined)
                 .map(([c, k]) => `${c}=${esc(d[k])}`);

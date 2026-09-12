@@ -271,6 +271,26 @@
     .sp-attn-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
     /* Per-person "Update from PDR" card on the credentials tab (admin only). */
     .sp-pdrup { border-left: 4px solid var(--sp-accent); }
+    /* Training-by-content-area panel (Tier 2). */
+    .sp-ta-list { margin-top: 10px; }
+    .sp-ta-row {
+        display: grid; grid-template-columns: 54px 1fr auto auto; gap: 10px; align-items: center;
+        padding: 7px 8px; border-top: 1px solid var(--sp-border); font-size: 0.88rem;
+    }
+    .sp-ta-row:first-child { border-top: 0; }
+    .sp-ta-row.need { background: var(--sp-accent-soft); border-radius: 6px; }
+    .sp-ta-code {
+        font-weight: 800; font-size: 0.72rem; letter-spacing: 0.03em; color: var(--sp-accent);
+        background: var(--sp-surface-2); border: 1px solid var(--sp-border); border-radius: 5px;
+        padding: 2px 0; text-align: center;
+    }
+    .sp-ta-name { color: var(--sp-text); min-width: 0; }
+    .sp-ta-hrs { color: var(--sp-text-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sp-ta-flag {
+        font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em;
+        color: var(--sp-accent); white-space: nowrap;
+    }
+    .sp-ta-row.thin .sp-ta-hrs { color: var(--sp-bad-fg); font-weight: 700; }
 
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
@@ -565,6 +585,76 @@ function itSteps(s) {
         d: 'The credential framework did not load, so next steps cannot be worked out. '
          + 'Nothing is wrong with your record.' }];
     return F.itcSteps(s, credLevel(s, 'it'), credLevel(s, 'ece'));
+}
+
+/* ── Training by content area (Tier 2) ───────────────────────────────────────
+   Shows the seven Gateways content areas with the hours this person has logged in
+   each (from their PDR), marks the areas their NEXT credential level's competencies
+   draw on, and flags the ones they are thin in. It is guidance for choosing the
+   next training deliberately, NOT a Gateways ruling — Gateways does not publish
+   per-area hour targets, so this never says a level is met or unmet on hours.
+
+   Returns '' when no PDR has been ingested for the person, so the panel simply does
+   not appear until there is real data behind it. */
+function trainingAreasPanel(s, heldEce, heldItc) {
+    const F = window.CredentialFramework;
+    if (!F || !F.trainingByArea) return '';
+    const raw = s.PdContentAreas;
+    if (!raw) return '';
+
+    // Aim at the next ECE level (the primary ladder for most staff here). If they
+    // work with infants/toddlers, the ITC target is named too so both are covered.
+    const eceNext = (heldEce || 0) + 1 <= 6 ? (heldEce || 0) + 1 : 6;
+    const model = F.trainingByArea(raw, 'ece', eceNext);
+    if (!model.hasData) return '';
+
+    // The union of areas either the next ECE level OR the next ITC level needs, so
+    // an infant/toddler teacher sees the areas that matter to them too.
+    let itcNeeded = {};
+    if (F.worksWithInfantsToddlers && F.worksWithInfantsToddlers(s) && F.itcTargetLevel && F.areasForLevel) {
+        const itcNext = F.itcTargetLevel(s, heldItc, heldEce);
+        itcNeeded = F.areasForLevel('itc', itcNext);
+    }
+
+    const rowsHtml = model.rows.map(r => {
+        const needed = r.needed || !!itcNeeded[r.code];
+        const cls = 'sp-ta-row' + (needed ? ' need' : '') + (r.thin ? ' thin' : '');
+        return '<div class="' + cls + '">'
+            + '<span class="sp-ta-code">' + esc(r.code) + '</span>'
+            + '<span class="sp-ta-name">' + esc(r.name) + '</span>'
+            + '<span class="sp-ta-hrs">' + (r.hours ? esc(String(r.hours)) : '0') + ' hrs</span>'
+            + (needed ? '<span class="sp-ta-flag">next level</span>' : '')
+            + '</div>';
+    }).join('');
+
+    // The plain-English focus line: areas the next level needs where hours are thin.
+    let focusLine = '';
+    const focusNames = model.rows.filter(r => (r.needed || !!itcNeeded[r.code])
+        && r.hours < 3).map(r => r.code + ' \u00b7 ' + r.name);
+    if (focusNames.length) {
+        focusLine = '<div class="sp-step caution" style="margin-top:10px;">'
+            + '<div class="t">Where to aim your next training</div>'
+            + '<div class="d">Your next level\u2019s skill areas lean on these, and your record '
+            + 'shows little training there so far: <b>' + focusNames.map(esc).join('; ')
+            + '</b>. Picking trainings in these areas moves you toward the level rather than '
+            + 'adding hours where you are already strong.</div></div>';
+    } else {
+        focusLine = '<div class="sp-step done" style="margin-top:10px;">'
+            + '<div class="t">\u2713 Broad coverage</div>'
+            + '<div class="d">You already have training across the areas your next level '
+            + 'draws on. Any approved training keeps your annual hours up.</div></div>';
+    }
+
+    return '<div class="sp-card sp-ta">'
+        + '<h2>Training by competency area</h2>'
+        + '<div class="sp-sub">From your Professional Development Record \u2014 registry-approved '
+        + 'training totals by Gateways content area (' + esc(String(model.total)) + ' hrs total). '
+        + 'Areas marked <b>next level</b> are ones your next credential level\u2019s competencies '
+        + 'draw on. This is guidance for choosing training, not a Gateways decision \u2014 they '
+        + 'assess competencies against your transcript and record.</div>'
+        + '<div class="sp-ta-list">' + rowsHtml + '</div>'
+        + focusLine
+        + '</div>';
 }
 
 // ── forms ─────────────────────────────────────────────────────────────────
@@ -1178,6 +1268,10 @@ function credentialsSection(s) {
         + credentialColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceSteps(s))
         + credentialColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itSteps(s))
         + '</div>';
+
+    // Training by content area, from the PDR (Tier 2). Only appears once a PDR has
+    // been ingested for this person; otherwise it stays hidden.
+    html += trainingAreasPanel(s, heldEce, heldItc);
 
     /* Admin-only: pull this person's college hours, transcript status and current-year
        PD hours straight from their Gateways PDR. Nothing is written until the admin

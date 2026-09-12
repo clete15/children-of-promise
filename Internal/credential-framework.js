@@ -703,6 +703,70 @@ function itcSteps(s, heldItc, heldEce) {
     return steps;
 }
 
+/* ── Training hours by content area (from the PDR) ───────────────────────────
+   Tier 2. The PDR's Section Three totals a person's registry-approved training by
+   the same seven content areas this file already uses. `pdContentAreas` is the
+   stored JSON string, e.g. {"HGD":23,"HSW":12,...}. Given that plus the level the
+   person is working toward, build a panel model: every area with its code, name,
+   hours held, whether the target level's competencies touch that area, and a plain
+   flag for areas the level needs where the person has little or nothing yet.
+
+   This is guidance, not a Gateways ruling. Gateways assesses competencies against
+   transcripts and training; it does NOT publish "you need N hours of HGD for Level
+   3". So this never says a level is met or unmet on hours — it only shows where a
+   person's training already sits and where the next level's skills cluster, so the
+   NEXT training is a deliberate choice. The rest of this file's honesty rule holds:
+   we do not invent per-area requirements that the source does not state. */
+function parseContentAreaHours(pdContentAreas) {
+    if (!pdContentAreas) return null;
+    if (typeof pdContentAreas === 'object') return pdContentAreas;
+    try {
+        var o = JSON.parse(pdContentAreas);
+        return (o && typeof o === 'object') ? o : null;
+    } catch (e) { return null; }
+}
+
+/* Which of the seven areas a level's competencies fall in. `kind` is 'ece' or
+   'itc'. Returns a set-like object { HGD:true, ... } of areas the level touches. */
+function areasForLevel(kind, level) {
+    var codes = kind === 'itc' ? competenciesFor(level) : eceCompetenciesFor(level);
+    var set = {};
+    codes.forEach(function (c) { var a = areaOf(c); if (a) set[a] = true; });
+    return set;
+}
+
+/* The panel model. `hours` is the parsed per-area object (or null), `kind`/`level`
+   name the level being worked toward so we can mark the areas it leans on. A "thin"
+   area is one the level needs where the person has under `thinBelow` hours (default
+   3, roughly one workshop-and-a-half) — a nudge, not a threshold from Gateways.
+
+   Returns { hasData, total, rows:[{code,name,hours,needed,thin}], focus:[codes] }.
+   Rows are in the framework's own area order so the panel always reads the same. */
+function trainingByArea(pdContentAreas, kind, level, thinBelow) {
+    var hours = parseContentAreaHours(pdContentAreas);
+    var order = ['HGD', 'HSW', 'OA', 'CPD', 'IRE', 'FCR', 'PPD'];
+    var needed = (kind && level) ? areasForLevel(kind, level) : {};
+    var thin = (typeof thinBelow === 'number') ? thinBelow : 3;
+    var total = 0;
+    var rows = order.map(function (code) {
+        var h = hours && isFinite(hours[code]) ? Number(hours[code]) : 0;
+        total += h;
+        return {
+            code: code,
+            name: COMPETENCY_AREAS[code] ? COMPETENCY_AREAS[code].area : code,
+            hours: h,
+            needed: !!needed[code],
+            thin: !!needed[code] && h < thin
+        };
+    });
+    return {
+        hasData: !!hours,
+        total: Math.round(total * 100) / 100,
+        rows: rows,
+        focus: rows.filter(function (r) { return r.thin; }).map(function (r) { return r.code; })
+    };
+}
+
 root.CredentialFramework = {
     ECE_LEVELS: ECE_LEVELS,
     ITC_LEVELS: ITC_LEVELS,
@@ -726,7 +790,10 @@ root.CredentialFramework = {
     worksWithInfantsToddlers: worksWithInfantsToddlers,
     hoursPerWeek: hoursPerWeek,
     eceSteps: eceSteps,
-    itcSteps: itcSteps
+    itcSteps: itcSteps,
+    parseContentAreaHours: parseContentAreaHours,
+    areasForLevel: areasForLevel,
+    trainingByArea: trainingByArea
 };
 
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : this));
