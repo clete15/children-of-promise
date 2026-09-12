@@ -1981,85 +1981,58 @@ function parsePdr(text) {
        against the printed "Total Hours in Gateways Areas" and only trust the result
        if it matches, so a mis-pairing cannot quietly write wrong numbers. */
     (function parseContentAreas() {
-        // Find the Gateways content-area block. It starts at the header and ends at
-        // "Total Hours in Gateways Areas". Everything after "CDA Subject Area" on the
-        // same rows belongs to the other table, but we only read Gateways area names.
+        /* The real pdftotext layout (confirmed against Paige's PDR) prints the two
+           tables SIDE BY SIDE, one row per line:
+
+             Human Growth and Development        23.00   Health & Safety        21.00
+             Health, Safety and Well-Being       12.00   Physical/Intellectual   9.00
+             ...
+
+           So each Gateways area name is followed on the SAME line by its hours, and
+           then by the CDA column's name and number. We match each Gateways area name
+           and take the FIRST number after it — that is the Gateways figure. The CDA
+           number sits further right and is never the first match. */
         let start = -1, printedTotal = null;
         for (let i = 0; i < lines.length; i++) {
             if (/Gateways to Opportunity Content Area/i.test(lines[i])) { start = i; break; }
         }
         if (start < 0) return;
+
+        // Where the block ends: the "Total Hours in Gateways Areas: 63.00" line.
+        let end = lines.length;
         for (let i = start; i < lines.length; i++) {
             const tm = lines[i].match(/Total Hours in Gateways Areas:?\s*(\d+(?:\.\d+)?)/i);
-            if (tm) { printedTotal = parseFloat(tm[1]); break; }
+            if (tm) { printedTotal = parseFloat(tm[1]); end = i; break; }
         }
 
         const byCode = {};
-        // Case (a): name and number share a line.
-        let sameLineHits = 0;
+        let hits = 0;
         for (const area of PDR_CONTENT_AREAS) {
-            for (let i = start; i < lines.length; i++) {
-                if (lines[i].indexOf(area.name) === -1) continue;
-                // Number on that same line, after the name.
-                const after = lines[i].slice(lines[i].indexOf(area.name) + area.name.length);
+            for (let i = start; i < end; i++) {
+                const pos = lines[i].indexOf(area.name);
+                if (pos === -1) continue;
+                const after = lines[i].slice(pos + area.name.length);
                 const nm = after.match(/(\d+(?:\.\d+)?)/);
-                if (nm) { byCode[area.code] = parseFloat(nm[1]); sameLineHits++; }
+                if (nm) { byCode[area.code] = parseFloat(nm[1]); hits++; }
                 break;
             }
         }
+        if (!hits) return;
 
-        let chosen = null;
-        if (sameLineHits === PDR_CONTENT_AREAS.length) {
-            chosen = byCode;
-        } else {
-            // Case (b): collect the names in order, then the numbers in order, pair them.
-            // Between the header and "Total Hours", the area names appear first (each on
-            // its own line), then the seven numeric lines. Pair by position.
-            const nums = [];
-            for (let i = start; i < lines.length; i++) {
-                if (/Total Hours in Gateways Areas/i.test(lines[i])) break;
-                // A pure-number line (the hour figures print alone, e.g. " 23.00").
-                const only = lines[i].trim();
-                if (/^\d+(?:\.\d+)?$/.test(only)) nums.push(parseFloat(only));
-            }
-            // The Gateways table has seven areas; if we see 7 (or the first 7) numbers,
-            // pair them to the fixed area order.
-            if (nums.length >= PDR_CONTENT_AREAS.length) {
-                const paired = {};
-                PDR_CONTENT_AREAS.forEach((a, idx) => { paired[a.code] = nums[idx]; });
-                chosen = paired;
-            }
-        }
-
-        if (!chosen) return;
-        const sum = Math.round(Object.keys(chosen)
-            .reduce((t, k) => t + (isFinite(chosen[k]) ? chosen[k] : 0), 0) * 100) / 100;
-        // Only trust the breakdown if it reconciles with the printed total (allow a
-        // small rounding tolerance). Otherwise leave it null rather than write a guess.
+        const sum = Math.round(Object.keys(byCode)
+            .reduce((t, k) => t + (isFinite(byCode[k]) ? byCode[k] : 0), 0) * 100) / 100;
+        // Trust the breakdown only if it reconciles with the printed total (small
+        // rounding tolerance). Otherwise leave it null rather than write a guess.
         if (printedTotal != null && Math.abs(sum - printedTotal) > 0.5) {
             out.contentAreas = null;
             out.contentAreasTotal = printedTotal;
             return;
         }
-        out.contentAreas = chosen;
+        out.contentAreas = byCode;
         out.contentAreasTotal = printedTotal != null ? printedTotal : sum;
     })();
 
     return out;
-}
-
-// TEMP DEBUG helper: the raw pdftotext lines from the Gateways content-area header
-// down to "Total Hours in Gateways Areas", so the parser can be matched to the real
-// layout. Removed once the content-area parse is confirmed.
-function pdrDebugAreaText(text) {
-    const DL = String(text || '').split(/\r?\n/);
-    let da = -1, db = -1;
-    for (let i = 0; i < DL.length; i++) {
-        if (da < 0 && /Gateways to Opportunity Content Area/i.test(DL[i])) da = i;
-        if (da >= 0 && /Total Hours in Gateways Areas/i.test(DL[i])) { db = i; break; }
-    }
-    if (da < 0) return '(content-area header not found)';
-    return DL.slice(da, (db < 0 ? da + 30 : db + 1)).join('\n');
 }
 
 // Which extensions OnlyOffice can actually edit, as opposed to only display.
@@ -4475,10 +4448,6 @@ ELSE
             console.log('[PDR] parsed ' + (pdr.registryId || '?') + ' for staff ' + askedId
                 + ' (PD ' + pdr.pdHoursThisYear + ' hrs ' + thisYear + ', ' + pdr.trainingRowsCounted + ' rows)');
 
-            // TEMP DEBUG: capture the raw pdftotext lines around the Gateways
-            // content-area table so the parser can be matched to the real layout.
-            var debugAreaText = pdrDebugAreaText(ex.text);
-
             return sendJSON(res, 200, {
                 success: true,
                 staffId: row.Id,
@@ -4498,9 +4467,7 @@ ELSE
                     year: thisYear,
                     contentAreas: pdr.contentAreas,
                     contentAreasTotal: pdr.contentAreasTotal
-                },
-                // TEMP DEBUG: removed once the content-area parse is confirmed.
-                debugAreaText: debugAreaText
+                }
             });
         });
         return;
