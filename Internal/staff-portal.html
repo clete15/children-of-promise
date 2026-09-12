@@ -373,6 +373,34 @@
     @media (max-width: 760px) { .sp-cred-cols { grid-template-columns: 1fr; } }
     .sp-cred-col { min-width: 0; }
     .sp-cred-col > .sp-card { margin-bottom: 0; }
+    /* Single-credential view: one full-width card instead of the two-column grid. */
+    .sp-cred-solo .sp-cred-col { width: 100%; }
+
+    /* ── ECE / ITC picker (segmented toggle) ────────────────────────────────
+       Choose which credential's "what's next" to view. One is always selected. */
+    .sp-credpick {
+        display: flex; gap: 6px; margin-bottom: 14px;
+        background: var(--sp-surface-2); border: 1px solid var(--sp-border);
+        border-radius: 10px; padding: 5px;
+    }
+    .sp-credpick-btn {
+        flex: 1 1 0; appearance: none; -webkit-appearance: none; cursor: pointer;
+        font-family: inherit; font-size: 0.9rem; font-weight: 800; color: var(--sp-muted);
+        background: transparent; border: 1px solid transparent; border-radius: 8px;
+        padding: 9px 12px; display: flex; flex-direction: column; align-items: center; gap: 3px;
+        transition: background 0.12s, color 0.12s, border-color 0.12s;
+    }
+    .sp-credpick-btn:hover { color: var(--sp-text); }
+    .sp-credpick-btn.on {
+        background: var(--sp-surface); color: var(--sp-accent);
+        border-color: var(--sp-border); box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .sp-credpick-lvl {
+        font-size: 0.66rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+        color: var(--sp-muted);
+    }
+    .sp-credpick-btn.on .sp-credpick-lvl { color: var(--sp-accent); }
+    .sp-credpick-btn:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
     /* A quiet heading strip above each column so it is obvious which ladder is which.
        Centred, with the held-level pill beneath the ladder name. */
     .sp-cred-head {
@@ -947,6 +975,11 @@ const SP_TABS = [
    card, always visible. So the default tab is the first remaining one. */
 let activeTab = 'credentials';
 
+/* Which credential the Gateways Credentials tab is showing — 'ece' or 'itc'. The two
+   ladders used to sit side by side; now one shows at a time (full width) and this
+   picks which. Defaults to ECE, the ladder that gates the other. */
+let credView = 'ece';
+
 /* Anything the person can act on, counted for the tab strip. Nothing else gets a badge.
 
    Wrapped, and every read guarded, because of what happened on 10 Sep 2026: this reached
@@ -1073,6 +1106,8 @@ function render() {
     if (isAdmin()) wireAdmin();
     // The per-person "Update from PDR" card lives on the credentials tab, admin only.
     if (isAdmin()) wirePdr();
+    // The ECE/ITC credential picker on the credentials tab (everyone).
+    wireCredPick();
 }
 
 /* Above the tabs, so the name and room stay visible whichever tab is open.
@@ -1374,22 +1409,34 @@ function credentialsSection(s) {
             + '</div>';
     }
 
-    // Build the full "next level" model per ladder (education gate, competencies +
-    // training-by-area, classroom). The training-by-area breakdown now lives INSIDE
-    // each ladder card, so there is no separate panel below.
+    /* One credential at a time, chosen with a segmented toggle. Showing both ladders
+       side by side wasted the whole right column (the ITC side is often a single "reach
+       ECE first" line) and squeezed the active card. Picking one gives it the full
+       width so the competency rows and course list read easily. Defaults to ECE. */
     const F = window.CredentialFramework;
-    let eceCol, itcCol;
     if (F && F.nextLevelModel) {
-        const eceModel = F.nextLevelModel('ece', s, heldEce, heldItc, s.PdContentAreas, s.PdCourses);
-        const itcModel = F.nextLevelModel('itc', s, heldEce, heldItc, s.PdContentAreas, s.PdCourses);
-        eceCol = ladderColumn('Preschool (ECE) Credential', heldEce, 'Level ' + heldEce, eceModel, 'ece');
-        itcCol = ladderColumn('Infant Toddler Credential', heldItc, 'Level ' + heldItc, itcModel, 'itc');
+        // The toggle: ECE | ITC, each button showing the level held on that ladder.
+        html += '<div class="sp-credpick" role="tablist" aria-label="Which credential">'
+            + '<button type="button" class="sp-credpick-btn' + (credView === 'ece' ? ' on' : '') + '" '
+            + 'data-cred="ece" role="tab" aria-selected="' + (credView === 'ece') + '">'
+            + 'Preschool (ECE)<span class="sp-credpick-lvl">' + (heldEce ? 'Level ' + heldEce : 'none held') + '</span>'
+            + '</button>'
+            + '<button type="button" class="sp-credpick-btn' + (credView === 'itc' ? ' on' : '') + '" '
+            + 'data-cred="itc" role="tab" aria-selected="' + (credView === 'itc') + '">'
+            + 'Infant Toddler<span class="sp-credpick-lvl">' + (heldItc ? 'Level ' + heldItc : 'none held') + '</span>'
+            + '</button>'
+            + '</div>';
+
+        const kind = credView === 'itc' ? 'itc' : 'ece';
+        const model = F.nextLevelModel(kind, s, heldEce, heldItc, s.PdContentAreas, s.PdCourses);
+        const title = kind === 'itc' ? 'Infant Toddler Credential' : 'Preschool (ECE) Credential';
+        const held = kind === 'itc' ? heldItc : heldEce;
+        // One full-width card for the chosen credential (sp-cred-solo drops the column grid).
+        html += '<div class="sp-cred-solo">'
+            + ladderColumn(title, held, 'Level ' + held, model, kind) + '</div>';
     } else {
-        const na = '<div class="sp-cred-col"><div class="sp-card"><div class="sp-sub">Credential '
-            + 'requirements did not load.</div></div></div>';
-        eceCol = na; itcCol = na;
+        html += '<div class="sp-card"><div class="sp-sub">Credential requirements did not load.</div></div>';
     }
-    html += '<div class="sp-cred-cols">' + eceCol + itcCol + '</div>';
 
     /* How to pull your PDR. Collapsed by default so it does not crowd the ladders,
        but always available — it is the record that resolves nearly every "waiting on
@@ -1870,6 +1917,18 @@ let PDR_PREVIEW = null;     // last preview payload for this person
 function wirePdr() {
     const btn = $('pdrUpload');
     if (btn) btn.addEventListener('click', runPdrPreview);
+}
+
+/* The ECE / ITC picker on the credentials tab. Clicking one switches which
+   credential's "what's next" card is shown and re-renders. The credentials tab stays
+   active across the re-render because activeTab is unchanged. */
+function wireCredPick() {
+    document.querySelectorAll('.sp-credpick-btn').forEach(b => {
+        b.addEventListener('click', () => {
+            const c = b.getAttribute('data-cred');
+            if (c && c !== credView) { credView = c; render(); }
+        });
+    });
 }
 
 async function runPdrPreview() {
