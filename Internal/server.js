@@ -2048,6 +2048,20 @@ function parsePdr(text) {
     return out;
 }
 
+// TEMP DEBUG helper: the raw pdftotext lines from the Gateways content-area header
+// down to "Total Hours in Gateways Areas", so the parser can be matched to the real
+// layout. Removed once the content-area parse is confirmed.
+function pdrDebugAreaText(text) {
+    const DL = String(text || '').split(/\r?\n/);
+    let da = -1, db = -1;
+    for (let i = 0; i < DL.length; i++) {
+        if (da < 0 && /Gateways to Opportunity Content Area/i.test(DL[i])) da = i;
+        if (da >= 0 && /Total Hours in Gateways Areas/i.test(DL[i])) { db = i; break; }
+    }
+    if (da < 0) return '(content-area header not found)';
+    return DL.slice(da, (db < 0 ? da + 30 : db + 1)).join('\n');
+}
+
 // Which extensions OnlyOffice can actually edit, as opposed to only display.
 const OFFICE_EDITABLE = { '.docx': 'word', '.xlsx': 'cell', '.pptx': 'slide' };
 const OFFICE_VIEWABLE = { '.doc': 'word', '.xls': 'cell', '.ppt': 'slide', '.pdf': 'word' };
@@ -4460,6 +4474,11 @@ ELSE
 
             console.log('[PDR] parsed ' + (pdr.registryId || '?') + ' for staff ' + askedId
                 + ' (PD ' + pdr.pdHoursThisYear + ' hrs ' + thisYear + ', ' + pdr.trainingRowsCounted + ' rows)');
+
+            // TEMP DEBUG: capture the raw pdftotext lines around the Gateways
+            // content-area table so the parser can be matched to the real layout.
+            var debugAreaText = pdrDebugAreaText(ex.text);
+
             return sendJSON(res, 200, {
                 success: true,
                 staffId: row.Id,
@@ -4479,7 +4498,9 @@ ELSE
                     year: thisYear,
                     contentAreas: pdr.contentAreas,
                     contentAreasTotal: pdr.contentAreasTotal
-                }
+                },
+                // TEMP DEBUG: removed once the content-area parse is confirmed.
+                debugAreaText: debugAreaText
             });
         });
         return;

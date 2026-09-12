@@ -1852,6 +1852,16 @@ function renderPdrResult() {
     html += '</div>';
     out.innerHTML = html;
 
+    // TEMP DEBUG: show the raw content-area table text so the parser can be matched
+    // to the real pdftotext layout. Removed once confirmed.
+    if (p.debugAreaText) {
+        out.insertAdjacentHTML('beforeend',
+            '<div class="sp-card"><h2 style="font-size:0.9rem;">Debug: content-area table (temporary)</h2>'
+            + '<pre style="white-space:pre-wrap;font-size:0.72rem;overflow:auto;max-height:320px;'
+            + 'background:var(--sp-surface-2);padding:8px;border-radius:6px;">'
+            + esc(p.debugAreaText) + '</pre></div>');
+    }
+
     const apply = $('pdrApply');
     if (apply) apply.addEventListener('click', applyPdr);
 }
