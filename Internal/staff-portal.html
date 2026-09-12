@@ -1136,8 +1136,9 @@ function render() {
     if (clsState === 'ready') wireClassroom();
     // The admin tab (Clete/Megan only) carries the attainments uploader.
     if (isAdmin()) wireAdmin();
-    // The per-person "Update from PDR" card lives on the credentials tab, admin only.
-    if (isAdmin()) wirePdr();
+    // The "Update from PDR" card lives on the credentials tab for everyone (the
+    // server allows only your own record; an admin, anyone's).
+    wirePdr();
     // The ECE/ITC credential picker on the credentials tab (everyone).
     wireCredPick();
 }
@@ -1419,11 +1420,12 @@ function credentialsSection(s) {
        name card (standingTiles) so it shows on every tab rather than only here. Both
        used to render at the top of this section. */
 
-    /* Admin-only: the "Update from PDR" control sits ABOVE the credential cards, so
-       the person doing the update sees it first, then the cards update beneath it.
-       Nothing is written until the admin reviews the before/after and clicks Apply.
-       Shown only to Clete/Megan and only on a real record. */
-    if (isAdmin() && s && s.Id) {
+    /* The "Update from PDR" control sits ABOVE the credential cards, so whoever is
+       doing the update sees it first, then the cards update beneath it. Anyone can
+       update their OWN record from their PDR; an admin, anyone's. The server enforces
+       the own-record rule, so showing it to everyone on a record is safe. Nothing is
+       written until the before/after is reviewed and Apply is clicked. */
+    if (s && s.Id) {
         html += '<div class="sp-card sp-pdrup"><h2>Update from PDR</h2>'
             + '<div class="sp-sub">Upload <b>' + esc(s.Name || 'this person') + '\u2019s</b> '
             + 'Professional Development Record (PDF) to refresh their college hours, transcript '

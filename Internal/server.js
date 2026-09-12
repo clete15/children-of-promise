@@ -4395,11 +4395,12 @@ ELSE
     if (req.method === 'POST' && url.startsWith('/api/staff-pdr-preview')) {
         const actor = requireActor(req, res);
         if (!actor) return;
-        if (!(actor.director || actor.admin)) {
-            return sendJSON(res, 403, { error: 'Only an administrator can refresh staff records.' });
-        }
         const askedId = parseInt(new URLSearchParams(req.url.split('?')[1] || '').get('staffId') || 0, 10);
         if (!askedId) return sendJSON(res, 400, { error: 'Which staff member? (no staffId)' });
+        // A staff member may refresh their OWN record from their PDR; an admin, anyone's.
+        if (!actorMayTouch(actor, askedId)) {
+            return sendJSON(res, 403, { error: 'You can only update your own record from a PDR.' });
+        }
 
         let chunks = [];
         let total = 0;
@@ -4522,17 +4523,18 @@ ELSE
     }
 
     /* ── PDR ingest: APPLY (one person) ─────────────────────────────────────
-       Writes the approved PDR-derived fields to one Staff row. Admin only. */
+       Writes the approved PDR-derived fields to one Staff row. A staff member may
+       apply to their OWN record; an admin, to anyone's. */
     if (req.method === 'POST' && url === '/api/staff-pdr-apply') {
         const actor = requireActor(req, res);
         if (!actor) return;
-        if (!(actor.director || actor.admin)) {
-            return sendJSON(res, 403, { error: 'Only an administrator can update staff records.' });
-        }
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const id = parseInt(d.staffId, 10);
             if (!id) return sendJSON(res, 400, { error: 'staffId required' });
+            if (!actorMayTouch(actor, id)) {
+                return sendJSON(res, 403, { error: 'You can only update your own record from a PDR.' });
+            }
             const map = [
                 ['SemesterHoursTotal', 'semesterHoursTotal'],
                 ['SemesterHoursEce', 'semesterHoursEce'],
