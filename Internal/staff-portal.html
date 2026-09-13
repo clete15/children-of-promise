@@ -173,6 +173,25 @@
         background: var(--sp-warn-bg); color: var(--sp-warn-fg);
     }
     .sp-panel[hidden] { display: none; }
+    /* PDR button at the right end of the tab strip — opens the Update-from-PDR panel. */
+    .sp-pdrtoggle {
+        margin-left: auto; align-self: center; appearance: none; -webkit-appearance: none;
+        cursor: pointer; font-family: inherit; font-size: 0.78rem; font-weight: 800;
+        letter-spacing: 0.05em; color: var(--sp-accent); background: var(--sp-accent-soft);
+        border: 1.5px solid var(--sp-border); border-radius: 8px; padding: 6px 13px;
+        white-space: nowrap; transition: border-color 0.12s, background 0.12s;
+    }
+    .sp-pdrtoggle:hover { border-color: var(--sp-accent); }
+    .sp-pdrtoggle.on { background: var(--sp-accent); color: #fff; border-color: var(--sp-accent); }
+    .sp-pdrtoggle:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+    /* Close (×) on the PDR panel. */
+    .sp-pdrup { position: relative; }
+    .sp-pdrclose {
+        position: absolute; top: 10px; right: 12px; appearance: none; -webkit-appearance: none;
+        cursor: pointer; border: none; background: transparent; color: var(--sp-muted);
+        font-size: 1.4rem; line-height: 1; padding: 2px 6px; border-radius: 6px;
+    }
+    .sp-pdrclose:hover { color: var(--sp-text); background: var(--sp-surface-2); }
     /* The name sits above the tabs, so it stays visible whichever tab is open. */
     .sp-who { margin-bottom: 14px; }
     .sp-who h2 { font-size: 1.25rem; }
@@ -1001,6 +1020,11 @@ let activeTab = 'credentials';
    picks which. Defaults to ECE, the ladder that gates the other. */
 let credView = 'ece';
 
+/* Whether the "Update from PDR" panel is open. It is hidden until the PDR button in
+   the tab strip is pressed, and closes again after a successful apply or via its own
+   close control. */
+let pdrOpen = false;
+
 /* Anything the person can act on, counted for the tab strip. Nothing else gets a badge.
 
    Wrapped, and every read guarded, because of what happened on 10 Sep 2026: this reached
@@ -1064,6 +1088,14 @@ function tabBar(s, tabs) {
                 + (n ? '<span class="sp-count" aria-label="' + n + ' needing attention">' + n + '</span>' : '')
                 + '</button>';
         }).join('')
+        // A PDR button at the right end of the strip opens the "Update from PDR" panel
+        // on the credentials tab. Shown on a real record; the server allows only your
+        // own record (an admin, anyone's).
+        + (s && s.Id
+            ? '<button type="button" id="pdrToggle" class="sp-pdrtoggle' + (pdrOpen ? ' on' : '')
+              + '" aria-pressed="' + (pdrOpen ? 'true' : 'false') + '" '
+              + 'title="Update this record from a Gateways PDR">PDR</button>'
+            : '')
         + '</div>';
 }
 
@@ -1425,8 +1457,10 @@ function credentialsSection(s) {
        update their OWN record from their PDR; an admin, anyone's. The server enforces
        the own-record rule, so showing it to everyone on a record is safe. Nothing is
        written until the before/after is reviewed and Apply is clicked. */
-    if (s && s.Id) {
-        html += '<div class="sp-card sp-pdrup"><h2>Update from PDR</h2>'
+    if (s && s.Id && pdrOpen) {
+        html += '<div class="sp-card sp-pdrup">'
+            + '<button type="button" id="pdrClose" class="sp-pdrclose" title="Close" aria-label="Close">\u00d7</button>'
+            + '<h2>Update from PDR</h2>'
             + '<div class="sp-sub">Upload <b>' + esc(s.Name || 'this person') + '\u2019s</b> '
             + 'Professional Development Record (PDF) to refresh their college hours, transcript '
             + 'status and this year\u2019s PD training hours. You\u2019ll see exactly what changes '
@@ -1945,6 +1979,17 @@ let PDR_PREVIEW = null;     // last preview payload for this person
 function wirePdr() {
     const btn = $('pdrUpload');
     if (btn) btn.addEventListener('click', runPdrPreview);
+
+    // The PDR button in the tab strip opens the panel (switching to the credentials
+    // tab so the panel is visible); the × inside the panel closes it.
+    const toggle = $('pdrToggle');
+    if (toggle) toggle.addEventListener('click', () => {
+        pdrOpen = !pdrOpen;
+        if (pdrOpen) activeTab = 'credentials';
+        render();
+    });
+    const close = $('pdrClose');
+    if (close) close.addEventListener('click', () => { pdrOpen = false; PDR_PREVIEW = null; render(); });
 }
 
 /* The ECE / ITC picker on the credentials tab. Clicking one switches which
@@ -2112,6 +2157,7 @@ async function applyPdr() {
             current = row || current;
         }
         PDR_PREVIEW = null;
+        pdrOpen = false;   // done — close the panel
         render();
     } catch (e) {
         if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Could not apply: ' + (e.message || e); }
