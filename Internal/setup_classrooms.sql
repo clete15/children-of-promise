@@ -21,10 +21,10 @@ VALUES
 (1, 1, 'Infant',                  'Tara / Sue',          'PI',     '4',   '0 - 12 Months',  5),
 (2, 1, 'Infants / Toddlers',      'Paige / Sue',         'PI',     '5',   '8 - 20 Months',  7),
 (3, 1, 'Toddlers',                'Megan / New Teacher', 'INCCRA', '5',   '15 - 24 Months', 6),
-(4, 2, '2 Year Olds / Toddlers',  'Renee / Raquel',      'INCCRA', '5',   '18 - 36 Months', 8),
+(4, 2, 'Toddlers / 2 Year Olds',  'Renee / Raquel',      'INCCRA', '5',   '18 - 36 Months', 8),
 (5, 2, '2 Year Olds',             'Janelle / Renee',     'PI',     '9',   '24 - 36 Months', 8),
 (6, 1, 'Pre-School',              'Keyona / Maddie',     'PFA',    '15',  '3 to 5 yrs',     18),
-(7, 1, 'Pre-School 2',            'Lindsey',             'INCCRA', '12',  '3 to 5 yrs',     12),
+(7, 1, '2 & 3 Year Olds',         'Janelle',             'INCCRA', '12',  '24 - 48 Months', 12),
 (8, 1, 'Before and Afterschool',  'Pam / Jeremy / Sara', 'n/a',    'n/a', '5 to 12 yrs',    20);
 
 PRINT 'dimClassrooms loaded successfully.';
