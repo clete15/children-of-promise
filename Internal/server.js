@@ -2626,6 +2626,57 @@ function parseRows(raw) {
         });
 }
 
+/* ── sqlcmd pipe-output parsing, one place ───────────────────────────────────
+   runSQL() returns sqlcmd's text: one line per row, columns separated by " | ",
+   plus noise lines ("rows affected", separator dashes, "Changed database", etc.).
+   Nearly every route re-wrote the same filter+split, which is easy to get subtly
+   wrong. These three helpers capture the two real strategies used across the file.
+
+   sqlDataLines(raw): the data lines only, noise removed. The standard filter used
+   almost everywhere. Use sqlIdLines when a free-text column may contain a newline
+   (see below).
+
+   sqlRows(raw, columns): data lines mapped to objects keyed by `columns`, in order.
+   Missing trailing cells become ''.
+
+   sqlCells(raw): data lines as arrays of trimmed cells (for callers that index by
+   position, e.g. the reports builder).
+
+   sqlIdLines / sqlIdRows: STRICTER — keep only lines that start with a numeric id
+   (`^\s*\d+\s*\|`). Free-text columns (notes, addresses) can carry embedded newlines
+   that sqlcmd prints as extra lines; anchoring on the leading id drops those stray
+   continuation lines instead of turning them into bogus rows. Use these for the
+   PreEnrollment / dev-plan / screening style tables. */
+function sqlDataLines(raw) {
+    return String(raw || '').trim().split('\n').filter(l =>
+        l.trim() && l.includes('|')
+        && !l.includes('rows affected')
+        && !l.includes('Changed database')
+        && !l.includes('Commands completed')
+        && !/^[-|]+$/.test(l.trim()));
+}
+function sqlCells(raw) {
+    return sqlDataLines(raw).map(l => l.split('|').map(x => x.trim()));
+}
+function sqlRows(raw, columns) {
+    return sqlCells(raw).map(v => {
+        const o = {};
+        columns.forEach((c, i) => { o[c] = v[i] !== undefined ? v[i] : ''; });
+        return o;
+    });
+}
+function sqlIdLines(raw) {
+    return String(raw || '').trim().split('\n').filter(l => /^\s*\d+\s*\|/.test(l));
+}
+function sqlIdRows(raw, columns) {
+    return sqlIdLines(raw).map(l => {
+        const v = l.split('|').map(x => x.trim());
+        const o = {};
+        columns.forEach((c, i) => { o[c] = v[i] !== undefined ? v[i] : ''; });
+        return o;
+    });
+}
+
 function sendJSON(res, status, body) {
     res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
     res.end(JSON.stringify(body));
@@ -2864,20 +2915,14 @@ function handleRequest(req, res) {
         runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='CCAPStartDate') ALTER TABLE rptMasterEnrollment ADD CCAPStartDate NVARCHAR(20)`);
         const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const rows = r.data.trim().split('\n')
-            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()) && !l.includes('Changed database') && !l.includes('Commands completed') && l.includes('|'))
-            .map(l => {
-                const v = l.split('|').map(x => x.trim());
-                return {
-                    Id: v[0], Last_Name: v[1], First_Name: v[2], Birth_date: v[3], Start_Date: v[4],
-                    City_Town: v[5], Days_Old: v[6], RoomNumber: v[7], Room: v[8],
-                    TeacherDescription: v[9], Type: v[10], Room_Capacity: v[11],
-                    Monday: v[12], Tuesday: v[13], Wednesday: v[14], Thursday: v[15], Friday: v[16],
-                    Active: v[17], Category: v[18], PFA_PI_na: v[19], F_R_P_Food: v[20],
-                    IEP: v[21], Military: v[22], HouseholdIncome: v[23],
-                    ProofOfIncomeFile: v[24], ProofOfIncomeUploaded: v[25], PublicBenefits: v[26], HouseholdSize: v[27], CCAPStartDate: v[28]
-                };
-            });
+        // NB the SELECT's 12th column is DCFSCapacity but the API exposes it as
+        // Room_Capacity, so the key list here is authoritative, not the SELECT aliases.
+        const rows = sqlRows(r.data, [
+            'Id','Last_Name','First_Name','Birth_date','Start_Date','City_Town','Days_Old',
+            'RoomNumber','Room','TeacherDescription','Type','Room_Capacity',
+            'Monday','Tuesday','Wednesday','Thursday','Friday','Active','Category','PFA_PI_na',
+            'F_R_P_Food','IEP','Military','HouseholdIncome','ProofOfIncomeFile',
+            'ProofOfIncomeUploaded','PublicBenefits','HouseholdSize','CCAPStartDate']);
         return sendJSON(res, 200, rows);
     }
 
@@ -2886,12 +2931,7 @@ function handleRequest(req, res) {
         if (!checkAuth(req, res)) return;
         const r = runSQL(`SELECT ${ROOM_COLS.join(',')} FROM dimClassrooms ORDER BY RoomNumber`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const rows = r.data.trim().split('\n')
-            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
-            .map(l => {
-                const v = l.split('|').map(x => x.trim());
-                return { RoomNumber: v[0], Building: v[1], Room: v[2], TeacherDescription: v[3], Type: v[4], RequiredSlots: v[5], AgeRange: v[6], DCFSCapacity: v[7] };
-            });
+        const rows = sqlRows(r.data, ['RoomNumber','Building','Room','TeacherDescription','Type','RequiredSlots','AgeRange','DCFSCapacity']);
         return sendJSON(res, 200, rows);
     }
 
@@ -3960,9 +4000,7 @@ ELSE
             SELECT pc.StudentId,pc.Code,e.First_Name,e.Last_Name FROM ParentCodes pc JOIN rptMasterEnrollment e ON pc.StudentId=e.Id ORDER BY e.Last_Name`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const rows = r.data.trim().split('\n')
-            .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
-            .map(l => { const v = l.split('|').map(x => x.trim()); return { StudentId:v[0], Code:v[1], First_Name:v[2], Last_Name:v[3] }; });
+        const rows = sqlRows(r.data, ['StudentId','Code','First_Name','Last_Name']);
         return sendJSON(res, 200, rows);
     }
 
@@ -6121,9 +6159,7 @@ ELSE
         for (const [key, sql] of Object.entries(queries)) {
             const r = runSQL(sql);
             if (!r.ok) { results[key] = { error: r.error }; continue; }
-            results[key] = r.data.trim().split('\n')
-                .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
-                .map(l => l.split('|').map(x => x.trim()));
+            results[key] = sqlCells(r.data);
         }
         return sendJSON(res, 200, results);
     }
