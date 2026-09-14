@@ -6,6 +6,31 @@
     <title>Children Of Promise - Pre-Enrollment</title>
     <link rel="stylesheet" href="./styles.css">
     <style>
+        /* Segmented Yes/No (and Both/Single, Yes/No/Unsure) buttons that replace the
+           dropdown-then-select for the eligibility questions — one tap instead of two. */
+        .yn-group { display: inline-flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+        .yn-btn {
+            padding: 9px 20px;
+            border: 1.5px solid var(--border);
+            border-radius: 8px;
+            background: white;
+            color: var(--text);
+            font-size: 0.9rem;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+        }
+        .yn-btn:hover { border-color: var(--primary); }
+        .yn-btn.on {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            box-shadow: 0 2px 8px rgba(37,99,235,0.25);
+        }
+        /* When a required question has not been answered yet and the user tries to submit. */
+        .yn-group.invalid .yn-btn { border-color: var(--danger); }
+
         .child-block {
             border: 1.5px solid var(--border);
             border-radius: 8px;
@@ -464,6 +489,60 @@
 </footer>
 
 <script>
+/* Replace the eligibility dropdowns with one-tap segmented buttons.
+
+   Progressive enhancement, not a rewrite: the original <select> stays in the DOM
+   (visually hidden) so every existing read — getElementById(id).value, the per-child
+   .child-iep, native required validation, and form reset — keeps working untouched.
+   The buttons simply set the select's value and fire its change event, so anything
+   already listening (toggleAgeGroup, autoPayType) still runs.
+
+   Applies to short choice questions (2–3 options) such as Yes/No, Yes/No/Not sure,
+   and Both Parents/Single Parent. The Program picker is left as a dropdown — it has
+   more options and its own behaviour. */
+function enhanceYesNo(root) {
+    const selects = (root || document).querySelectorAll('select:not([data-yn])');
+    selects.forEach(sel => {
+        if (sel.classList.contains('child-ageGroup')) return;       // program picker stays a dropdown
+        const opts = [...sel.options].filter(o => o.value !== '');   // real choices
+        if (opts.length < 2 || opts.length > 3) return;              // only short choice lists
+
+        sel.setAttribute('data-yn', '1');
+        sel.style.display = 'none';
+
+        const group = document.createElement('div');
+        group.className = 'yn-group';
+        group.setAttribute('role', 'group');
+
+        opts.forEach(o => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'yn-btn';
+            b.textContent = o.textContent;
+            b.dataset.value = o.value;
+            b.addEventListener('click', () => {
+                sel.value = o.value;
+                sel.dispatchEvent(new Event('change', { bubbles: true }));
+                syncYnGroup(sel);
+            });
+            group.appendChild(b);
+        });
+
+        sel.insertAdjacentElement('afterend', group);
+        // Keep buttons in step if the value changes elsewhere (reset, programmatic set).
+        sel.addEventListener('change', () => syncYnGroup(sel));
+        syncYnGroup(sel);
+    });
+}
+
+function syncYnGroup(sel) {
+    const group = sel.nextElementSibling;
+    if (!group || !group.classList.contains('yn-group')) return;
+    group.querySelectorAll('.yn-btn').forEach(b =>
+        b.classList.toggle('on', b.dataset.value === sel.value && sel.value !== ''));
+    if (sel.value !== '') group.classList.remove('invalid');
+}
+
 /* Pick the program from the child's date of birth so families do not have to work
    out which age band applies. It sets the program select and then runs the same
    toggleAgeGroup the manual pick would, so the scored-questions section stays in
@@ -513,7 +592,10 @@ function toggleAgeGroup(select) {
     } else if ([...allSelects].every(s => s.value === 'ba')) {
         scoredSection.style.display = 'none';
         // Remove required from hidden scored fields
-        scoredSection.querySelectorAll('select').forEach(s => { s.removeAttribute('required'); s.value = 'No'; });
+        scoredSection.querySelectorAll('select').forEach(s => {
+            s.removeAttribute('required'); s.value = 'No';
+            if (typeof syncYnGroup === 'function') syncYnGroup(s);
+        });
     }
 }
 
@@ -549,6 +631,8 @@ function toggleNotBorn(checkbox) {
         iepSelect.setAttribute('required', '');
         iepSelect.value = '';
     }
+    // Keep the IEP buttons in step with the value this just set.
+    if (typeof syncYnGroup === 'function') syncYnGroup(iepSelect);
 }
 
 let childCount = 1;
@@ -620,6 +704,7 @@ function addChild() {
             </div>
         </div>`;
     container.appendChild(div);
+    enhanceYesNo(div);   // give the new child's IEP question the button treatment too
     div.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -718,6 +803,24 @@ function calcScore(d) {
 
 document.getElementById('preEnrollForm').addEventListener('submit', async e => {
     e.preventDefault();
+
+    /* The button-backed questions hide their <select>, and browsers skip native
+       validation on hidden fields — so an unanswered required question is checked
+       here instead. Only visible ones count (a hidden scored section is not
+       required). Marks the first unanswered group and stops. */
+    const missing = [...document.querySelectorAll('select[data-yn][required]')]
+        .filter(sel => sel.value === '' && sel.offsetParent !== null);
+    if (missing.length) {
+        missing.forEach(sel => {
+            const g = sel.nextElementSibling;
+            if (g && g.classList.contains('yn-group')) g.classList.add('invalid');
+        });
+        const g = missing[0].nextElementSibling;
+        if (g) g.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        notify('Please answer the highlighted question' + (missing.length > 1 ? 's' : '') + '.', 'error');
+        return;
+    }
+
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
     btn.textContent = 'Submitting...';
@@ -772,12 +875,17 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
         notify(`Thank you! ${successCount} child${successCount > 1 ? 'ren' : ''} submitted successfully. We will be in touch soon.`);
         e.target.reset();
         document.getElementById('country').value = 'United States';
+        // reset() clears the hidden selects but fires no change event, so re-sync the buttons.
+        document.querySelectorAll('select[data-yn]').forEach(syncYnGroup);
         // Remove additional child blocks
         [...document.querySelectorAll('.child-block.additional')].forEach(b => b.remove());
         childCount = 1;
         document.getElementById('addChildPrompt').style.display = 'none';
     }
 });
+
+// Turn the eligibility dropdowns into one-tap buttons once the page is parsed.
+enhanceYesNo(document);
 </script>
 </body>
 </html>

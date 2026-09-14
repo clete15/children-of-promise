@@ -6339,7 +6339,9 @@ ELSE
         console.log('[PUBLIC]', url, '->', filePath);
         fs.readFile(filePath, (err, data) => {
             if (err) { console.error('[PUBLIC 404]', filePath); res.writeHead(404); return res.end('Not found'); }
-            res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' });
+            res.writeHead(200, Object.assign(
+                { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' },
+                noStoreFor(filePath)));
             res.end(data);
         });
         return;
@@ -6350,7 +6352,7 @@ ELSE
         const rootIndex = path.join(__dirname, '..', 'index.html');
         fs.readFile(rootIndex, (err, data) => {
             if (err) { res.writeHead(404); return res.end('Not found'); }
-            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.writeHead(200, Object.assign({ 'Content-Type': 'text/html' }, noStoreFor('index.html')));
             res.end(data);
         });
         return;
@@ -6361,7 +6363,8 @@ ELSE
         const parentPage = path.join(__dirname, 'parent.html');
         fs.readFile(parentPage, (err, data) => {
             if (err) { res.writeHead(404); return res.end('Not found'); }
-            res.writeHead(200, { 'Content-Type': 'text/html' });
+            // No-store so parents always get the current page, not a stale cached copy.
+            res.writeHead(200, Object.assign({ 'Content-Type': 'text/html' }, noStoreFor('parent.html')));
             res.end(data);
         });
         return;
@@ -6372,7 +6375,7 @@ ELSE
         const pubIndex = path.join(EXTERNAL_DIR, 'index.html');
         fs.readFile(pubIndex, (err, data) => {
             if (err) { res.writeHead(404); return res.end('Not found'); }
-            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.writeHead(200, Object.assign({ 'Content-Type': 'text/html' }, noStoreFor('index.html')));
             res.end(data);
         });
         return;
