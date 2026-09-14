@@ -229,6 +229,34 @@
     <a class="header-back" href="/staff/">← Staff Portal</a>
 </header>
 
+<!-- Shared Enrollment Management sub-nav (see ems.html for the note). -->
+<style>
+    .em-subnav {
+        display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+        max-width: 1400px; margin: 0 auto; padding: 10px 20px 0;
+    }
+    .em-subnav .em-subnav-label {
+        font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
+        color: #94a3b8; margin-right: 10px;
+    }
+    .em-subnav a {
+        font-size: 0.9rem; font-weight: 700; text-decoration: none; color: #475569;
+        padding: 8px 15px; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent;
+        transition: color 0.12s, background 0.12s, border-color 0.12s;
+    }
+    .em-subnav a:hover { color: #1e293b; background: #f1f5f9; }
+    .em-subnav a.on { color: #2563eb; border-bottom-color: #2563eb; }
+    .em-subnav-wrap { border-bottom: 1.5px solid #e2e8f0; }
+</style>
+<div class="em-subnav-wrap">
+    <nav class="em-subnav" aria-label="Enrollment management">
+        <span class="em-subnav-label">Enrollment</span>
+        <a href="/staff/waitinglist.html" class="on" aria-current="page">Waiting List</a>
+        <a href="/staff/ems.html">Enrolled Students</a>
+        <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
+    </nav>
+</div>
+
 <div class="wl-toolbar">
     <div class="mode-toggle">
         <button class="toggle-btn active" id="tab-infant" onclick="setTab('infant')">🍼 Infant <span class="tab-count" id="count-infant"></span><div class="tab-pending" id="pending-infant"></div></button>

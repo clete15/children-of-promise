@@ -314,35 +314,11 @@
                 <a href="/staff/alerts.html" id="alertBadgePortal" style="display:none;background:#dc2626;color:white;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:10px;text-decoration:none;cursor:pointer;animation:pulse-badge 2s infinite;" title="Click to view alerts">🔔 <span id="alertCountPortal"></span></a>
             </div>
             <div class="dash-group">
-                <a class="dash-item" href="/staff/waitinglist.html">
-                    <div class="di-icon">📝</div>
-                    <div class="di-content">
-                        <div class="di-title">Waiting List</div>
-                        <div class="di-desc">Pre-enrollment queue, scoring, and status management</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
                 <a class="dash-item" href="/staff/roster.html">
                     <div class="di-icon">🏫</div>
                     <div class="di-content">
                         <div class="di-title">Room Roster</div>
                         <div class="di-desc">View and manage classroom assignments and capacity</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
-                <a class="dash-item" id="emsCard" href="/staff/ems.html">
-                    <div class="di-icon">📋</div>
-                    <div class="di-content">
-                        <div class="di-title">Enrollment Management</div>
-                        <div class="di-desc">Add, edit, and browse student records</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
-                <a class="dash-item" href="/staff/benefits.html">
-                    <div class="di-icon">💳</div>
-                    <div class="di-content">
-                        <div class="di-title">Benefits Roster</div>
-                        <div class="di-desc">Income, household size, pay type, and public benefits</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
@@ -359,6 +335,40 @@
                     <div class="di-content">
                         <div class="di-title">Food Program</div>
                         <div class="di-desc">Meal counts, roster, menus, and CACFP reporting</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- One system, three views. Waiting List (the intake queue), Enrolled Students
+             (the per-child record), and Benefits & Eligibility (income/pay/benefits) all
+             work the same student records and now share a tab bar, so they are grouped
+             here rather than scattered through Daily Operations. -->
+        <div class="dash-section">
+            <div class="dash-section-title">Enrollment Management</div>
+            <div class="dash-group">
+                <a class="dash-item" href="/staff/waitinglist.html">
+                    <div class="di-icon">📝</div>
+                    <div class="di-content">
+                        <div class="di-title">Waiting List</div>
+                        <div class="di-desc">The pre-enrollment queue: scoring, risk factors, program, and status</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+                <a class="dash-item" id="emsCard" href="/staff/ems.html">
+                    <div class="di-icon">📋</div>
+                    <div class="di-content">
+                        <div class="di-title">Enrolled Students</div>
+                        <div class="di-desc">Add, edit, and browse enrolled student records by room</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+                <a class="dash-item" href="/staff/benefits.html">
+                    <div class="di-icon">💳</div>
+                    <div class="di-content">
+                        <div class="di-title">Benefits &amp; Eligibility</div>
+                        <div class="di-desc">Income, household size, pay type, benefits, and F/R/P by room</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>

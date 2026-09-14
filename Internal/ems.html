@@ -47,6 +47,36 @@
     <a class="header-back" href="/staff/">← Staff Portal</a>
 </header>
 
+<!-- Shared Enrollment Management sub-nav. The three student-record pages (waiting
+     list, enrolled students, benefits) are one system; this bar moves between them in
+     one click. Self-contained styles so it renders the same on every page. -->
+<style>
+    .em-subnav {
+        display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+        max-width: 1400px; margin: 0 auto; padding: 10px 20px 0;
+    }
+    .em-subnav .em-subnav-label {
+        font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
+        color: #94a3b8; margin-right: 10px;
+    }
+    .em-subnav a {
+        font-size: 0.9rem; font-weight: 700; text-decoration: none; color: #475569;
+        padding: 8px 15px; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent;
+        transition: color 0.12s, background 0.12s, border-color 0.12s;
+    }
+    .em-subnav a:hover { color: #1e293b; background: #f1f5f9; }
+    .em-subnav a.on { color: #2563eb; border-bottom-color: #2563eb; }
+    .em-subnav-wrap { border-bottom: 1.5px solid #e2e8f0; }
+</style>
+<div class="em-subnav-wrap">
+    <nav class="em-subnav" aria-label="Enrollment management">
+        <span class="em-subnav-label">Enrollment</span>
+        <a href="/staff/waitinglist.html">Waiting List</a>
+        <a href="/staff/ems.html" class="on" aria-current="page">Enrolled Students</a>
+        <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
+    </nav>
+</div>
+
 <div class="em-layout">
     <div class="em-wrapper">
         <div class="em-sidebar" id="viewSidebar"></div>
@@ -177,6 +207,25 @@
                                 <div class="checkbox-item"><input type="checkbox" id="benCCAP" onchange="calcFRP('householdIncome','householdSize','frpFood','');autoPayType()"><label for="benCCAP">CCAP</label></div>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Read-only benefits & eligibility summary. Income, household size,
+                         pay type and public benefits have ONE home now: the Benefits &
+                         Eligibility page. Here they are shown for reference with a link
+                         to edit. Hidden while adding a new student (nothing to show yet,
+                         and the New Student flow sets pay type on the editable control). -->
+                    <div class="card" id="benSummaryCard" style="grid-column: 1 / -1; display:none;">
+                        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                            <span>Benefits &amp; Eligibility</span>
+                            <a id="benSummaryLink" href="/staff/benefits.html"
+                               style="font-size:0.78rem;font-weight:700;text-decoration:none;color:#2563eb;white-space:nowrap;">Edit on Benefits &amp; Eligibility →</a>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Pay Type</label><div id="benSumPay" style="font-weight:700;">—</div></div>
+                            <div class="form-group"><label>Household Income</label><div id="benSumIncome" style="font-weight:700;">—</div></div>
+                            <div class="form-group"><label>Household Size</label><div id="benSumSize" style="font-weight:700;">—</div></div>
+                        </div>
+                        <div class="form-group" style="margin-top:8px;"><label>Public Benefits</label><div id="benSumBenefits" style="font-weight:700;">—</div></div>
                     </div>
 
                     <!-- Income (managed on the Benefits Roster page; kept for F/R/P calc) -->
@@ -374,6 +423,33 @@ function loadRecord(i) {
     document.getElementById('proofOfIncome').checked = (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1);
 
     calcFRP('householdIncome','householdSize','frpFood','');
+
+    // Benefits/income/pay type are edited on the Benefits & Eligibility page now, so
+    // here they are read-only: show the summary, lock the Pay Type control, and point
+    // the "edit" link at that student's room on the Benefits page.
+    setBenefitsReadOnly(true, s);
+}
+
+/* Toggle the benefits fields between read-only (editing an existing record) and
+   editable (adding a new student, where pay type still has to be captured). */
+function setBenefitsReadOnly(readOnly, s) {
+    const card = document.getElementById('benSummaryCard');
+    const pay = document.getElementById('category');
+    if (readOnly) {
+        if (card) card.style.display = '';
+        if (pay) pay.disabled = true;
+        // Fill the summary from the loaded record.
+        const val = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v || '—'; };
+        val('benSumPay', normalizePayType(s && s.Category));
+        val('benSumIncome', s && s.HouseholdIncome ? '$' + Number(s.HouseholdIncome).toLocaleString('en-US') : '');
+        val('benSumSize', s && s.HouseholdSize ? String(s.HouseholdSize) : '');
+        val('benSumBenefits', s && s.PublicBenefits ? s.PublicBenefits : 'None recorded');
+        const link = document.getElementById('benSummaryLink');
+        if (link) link.href = '/staff/benefits.html' + (s && s.RoomNumber ? '?room=' + encodeURIComponent(s.RoomNumber) : '');
+    } else {
+        if (card) card.style.display = 'none';
+        if (pay) pay.disabled = false;
+    }
 }
 
 function clearForm() {
@@ -408,6 +484,7 @@ function autoPayType() {
 function startNewStudent() {
     isNewMode = true;
     clearForm();
+    setBenefitsReadOnly(false);   // pay type editable, summary hidden while adding
     document.getElementById('viewStudentName').textContent = 'New Student';
     document.getElementById('viewRecordCounter').textContent = '';
     document.getElementById('btnUpdate').style.display = 'none';
