@@ -1737,46 +1737,110 @@ function resolveDocPath(ref) {
    Unlike the PFA/PI monitoring evidence, the grant folders are just an ordinary
    folder tree — no PICC item numbers to match on. They moved off SharePoint into
    the same server-owned library (DOC_ROOT/…/Operations), under one top folder that
-   holds a handful of grant sub-folders (SSWG Grant, SSTG Grant, Appeal, Email, …).
+   holds grant sub-folders (SSWG Grant, SSTG Grant, Appeal, Email, …), and inside
+   SSWG Grant one folder per submission round (…/FY 2027 Round 2 Oct, Nov, Dec 2026).
 
-   This lists that tree one level of sub-folders deep, grouped by sub-folder, and
-   returns each file's path relative to DOC_ROOT so the page opens it through the
-   same authenticated /api/doc-file endpoint the rest of the library uses. Files at
-   the top level (loose in the grant folder) are grouped under a "" key. */
+   Browsed one folder at a time — a plain file explorer — so every past round stays
+   archived and reachable rather than being flattened away. The page lands on the
+   newest round by default and can walk up and down from there. Paths are kept
+   relative to DOC_ROOT so files open through the same authenticated /api/doc-file
+   endpoint the rest of the library uses.
+
+   The process and timelines are not modelled yet on purpose: until that is worked
+   out, this is deliberately just a browser over the folder as it already exists. */
 const GRANT_ROOT_FOLDER = 'INCCRA - SSWG';
 
-function listGrantFolder() {
+/* Resolves a caller-supplied sub-path to an absolute path INSIDE the grant folder,
+   or null if it escapes. Same containment idea as resolveDocPath, scoped to the
+   grant root so a request cannot browse the rest of the library from here. */
+function resolveGrantPath(sub) {
     const DOC_ROOT = findDocRoot();
-    if (!DOC_ROOT) return { ok: false, error: 'The document library is not reachable from the server.' };
-    const base = path.join(DOC_ROOT, GRANT_ROOT_FOLDER);
-    if (!fs.existsSync(base)) {
-        return { ok: false, error: 'No "' + GRANT_ROOT_FOLDER + '" folder in the library yet.', folder: GRANT_ROOT_FOLDER };
-    }
-    const groups = {};
-    const relOf = full => path.relative(DOC_ROOT, full).replace(/\\/g, '/');
-    const fileEntry = full => ({
-        name: path.basename(full),
-        rel: relOf(full),
-        ext: path.extname(full).toLowerCase(),
-        size: (() => { try { return fs.statSync(full).size; } catch (e) { return 0; } })()
-    });
-    let entries = [];
-    try { entries = fs.readdirSync(base, { withFileTypes: true }); }
-    catch (e) { return { ok: false, error: 'Could not read the grant folder: ' + e.message }; }
+    if (!DOC_ROOT) return { error: 'The document library is not reachable from the server.' };
+    const base = path.resolve(path.join(DOC_ROOT, GRANT_ROOT_FOLDER));
+    const decoded = String(sub || '').replace(/\\/g, '/');
+    if (decoded.includes('\0')) return { error: 'Invalid path' };
+    const full = path.resolve(base, decoded);
+    const baseWithSep = base.endsWith(path.sep) ? base : base + path.sep;
+    if (full !== base && !full.startsWith(baseWithSep)) return { error: 'Invalid path' };
+    return { DOC_ROOT, base, full };
+}
 
+/* Lists one directory inside the grant folder: its sub-folders and files, plus
+   breadcrumb segments and the parent so the page can navigate. When called for the
+   grant root with no sub-path, also reports the newest immediate SSWG round folder
+   (by modified time) so the page can open straight on it. */
+function browseGrantFolder(sub) {
+    const r = resolveGrantPath(sub);
+    if (r.error) return { ok: false, error: r.error, folder: GRANT_ROOT_FOLDER };
+    const { DOC_ROOT, base, full } = r;
+    if (!fs.existsSync(full)) {
+        return { ok: false, error: 'That folder is not in the library.', folder: GRANT_ROOT_FOLDER };
+    }
+    const relOf = p => path.relative(DOC_ROOT, p).replace(/\\/g, '/');
+    // Path relative to the grant root, used for navigation (breadcrumbs, sub-folders).
+    const subOf = p => path.relative(base, p).replace(/\\/g, '/');
+
+    let entries = [];
+    try { entries = fs.readdirSync(full, { withFileTypes: true }); }
+    catch (e) { return { ok: false, error: 'Could not read the folder: ' + e.message }; }
+
+    const folders = [];
+    const files = [];
     entries.forEach(e => {
-        const full = path.join(base, e.name);
-        if (e.isFile()) {
-            (groups[''] = groups[''] || []).push(fileEntry(full));
-        } else if (e.isDirectory()) {
-            const key = e.name;
-            const list = groups[key] = groups[key] || [];
-            let sub = [];
-            try { sub = fs.readdirSync(full, { withFileTypes: true }); } catch (err) { /* unreadable sub-folder */ }
-            sub.filter(s => s.isFile()).forEach(s => list.push(fileEntry(path.join(full, s.name))));
+        const p = path.join(full, e.name);
+        let mtime = 0, size = 0;
+        try { const st = fs.statSync(p); mtime = st.mtimeMs; size = st.size; } catch (err) { /* skip stat */ }
+        if (e.isDirectory()) {
+            folders.push({ name: e.name, sub: subOf(p), mtime });
+        } else if (e.isFile()) {
+            files.push({ name: e.name, rel: relOf(p), ext: path.extname(e.name).toLowerCase(), size, mtime });
         }
     });
-    return { ok: true, root: DOC_ROOT, folder: GRANT_ROOT_FOLDER, groups };
+    folders.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+    files.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+    // Breadcrumb from the grant root down to the current folder.
+    const here = subOf(full);
+    const crumbs = [{ name: GRANT_ROOT_FOLDER, sub: '' }];
+    if (here) {
+        const parts = here.split('/');
+        let acc = '';
+        parts.forEach(seg => { acc = acc ? acc + '/' + seg : seg; crumbs.push({ name: seg, sub: acc }); });
+    }
+    const parent = here ? here.split('/').slice(0, -1).join('/') : null;
+
+    /* Where a first-time visitor should land: the most recent SSWG submission round.
+       The rounds live one level down, inside the "SSWG Grant" folder, so from the root
+       we descend into the SSWG folder first and pick ITS newest child. Falls back to the
+       newest folder at the current level if there is no SSWG sub-folder. Only computed at
+       the grant root; deeper folders return null so navigation stays put. */
+    let newest = null;
+    if (!here && folders.length) {
+        const sswg = folders.find(f => /sswg/i.test(f.name));
+        if (sswg) {
+            const inner = resolveGrantPath(sswg.sub);
+            if (!inner.error && fs.existsSync(inner.full)) {
+                let kids = [];
+                try {
+                    kids = fs.readdirSync(inner.full, { withFileTypes: true })
+                        .filter(d => d.isDirectory())
+                        .map(d => {
+                            const p = path.join(inner.full, d.name);
+                            let m = 0; try { m = fs.statSync(p).mtimeMs; } catch (e) { /* skip */ }
+                            return { sub: path.relative(base, p).replace(/\\/g, '/'), mtime: m };
+                        });
+                } catch (e) { /* fall through */ }
+                if (kids.length) newest = kids.reduce((a, b) => (b.mtime > a.mtime ? b : a)).sub;
+                else newest = sswg.sub; // SSWG folder holds files directly, not rounds
+            }
+        }
+        if (!newest) newest = folders.reduce((a, b) => (b.mtime > a.mtime ? b : a)).sub;
+    }
+
+    return {
+        ok: true, root: DOC_ROOT, folder: GRANT_ROOT_FOLDER,
+        here, parent, crumbs, folders, files, newest
+    };
 }
 
 /* ── Office editing (OnlyOffice Docs) ───────────────────────────────────────
@@ -5320,12 +5384,14 @@ ELSE
         });
     }
 
-    /* Lists the INCCRA – SSWG grant folder tree. Same authenticated library, but a
-       plain folder listing rather than the PICC-indexed compliance view. Files open
-       and edit through /api/doc-file and office.html exactly as the rest do. */
+    /* Browses the INCCRA – SSWG grant folder one directory at a time (a plain file
+       explorer), so every archived round stays reachable. ?path= is a sub-path inside
+       the grant folder; omitted means the grant root. Files open and edit through
+       /api/doc-file and office.html exactly as the rest of the library does. */
     if (req.method === 'GET' && url.startsWith('/api/grant-folder')) {
         if (!checkAuth(req, res)) return;
-        return sendJSON(res, 200, listGrantFolder());
+        const sub = new URLSearchParams(req.url.split('?')[1] || '').get('path') || '';
+        return sendJSON(res, 200, browseGrantFolder(sub));
     }
 
     /* Is Office editing available, and can this file be edited?
