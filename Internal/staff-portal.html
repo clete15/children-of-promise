@@ -572,7 +572,7 @@
 
 <div class="sp-wrap">
     <div class="sp-bar">
-        <strong style="font-size:0.9rem;">My Page</strong>
+        <strong style="font-size:0.9rem;">Staff Portal</strong>
         <!-- The chooser is the director's control. A staff member sees their own name
              instead, because there is nothing for them to choose: the server sends
              them one record, their own. -->
@@ -2696,6 +2696,29 @@ $('spChangePw').addEventListener('click', e => {
 });
 
 load();
+
+/* Safety net: the page must never sit frozen on "Loading your record…". If load()
+   has not replaced the placeholder within a few seconds — a stalled endpoint, a
+   request that never returns, or an unexpected auth state — say so plainly and offer
+   the two things that actually help, rather than an endless spinner. */
+setTimeout(() => {
+    const body = $('spBody');
+    if (body && /Loading your record/i.test(body.textContent)) {
+        body.innerHTML =
+            '<div class="sp-card"><div class="sp-sub sp-err">'
+            + 'This is taking longer than expected to load your record. '
+            + 'The server may be busy or your sign-in may have lapsed.</div>'
+            + '<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">'
+            + '<button type="button" class="sp-save" onclick="location.reload()">Reload</button>'
+            + '<a class="sp-cancel" href="/me" style="text-decoration:none;">Sign in again</a>'
+            + '</div></div>';
+        // Stop the "Loading…" chooser looking live too.
+        const sel = $('spStaff');
+        if (sel && /Loading/i.test(sel.textContent)) {
+            sel.innerHTML = '<option value="">—</option>';
+        }
+    }
+}, 12000);
 </script>
 
 <!-- Deploy / Restart controls, so a change can be shipped from here without going
