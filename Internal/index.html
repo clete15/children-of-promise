@@ -314,6 +314,18 @@
                 <a href="/staff/alerts.html" id="alertBadgePortal" style="display:none;background:#dc2626;color:white;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:10px;text-decoration:none;cursor:pointer;animation:pulse-badge 2s infinite;" title="Click to view alerts">🔔 <span id="alertCountPortal"></span></a>
             </div>
             <div class="dash-group">
+                <!-- One card, one system: the Waiting List (intake queue), Enrolled
+                     Students (per-child record) and Benefits & Eligibility all work the
+                     same student records and share a tab bar, so this one door opens the
+                     combined system and every view is reachable by its tab from there. -->
+                <a class="dash-item" id="emsCard" href="/staff/ems.html">
+                    <div class="di-icon">📋</div>
+                    <div class="di-content">
+                        <div class="di-title">Enrollment Management</div>
+                        <div class="di-desc">Waiting list, enrolled student records, and benefits &amp; eligibility — one system, switch views with the tab bar</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
                 <a class="dash-item" href="/staff/roster.html">
                     <div class="di-icon">🏫</div>
                     <div class="di-content">
@@ -335,25 +347,6 @@
                     <div class="di-content">
                         <div class="di-title">Food Program</div>
                         <div class="di-desc">Meal counts, roster, menus, and CACFP reporting</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
-            </div>
-        </div>
-
-        <!-- One card, one system. The Waiting List (intake queue), Enrolled Students
-             (per-child record) and Benefits & Eligibility (income/pay/benefits) all work
-             the same student records and now share a tab bar, so they no longer need three
-             separate doors — this opens the combined system and every view is reachable by
-             its tab from there. -->
-        <div class="dash-section">
-            <div class="dash-section-title">Enrollment Management</div>
-            <div class="dash-group">
-                <a class="dash-item" id="emsCard" href="/staff/ems.html">
-                    <div class="di-icon">📋</div>
-                    <div class="di-content">
-                        <div class="di-title">Enrollment Management</div>
-                        <div class="di-desc">Waiting list, enrolled student records, and benefits &amp; eligibility — one system, switch views with the tab bar</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
