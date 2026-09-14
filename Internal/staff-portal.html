@@ -278,6 +278,15 @@
         text-decoration: none;
     }
     .sp-pdr-btn:hover { filter: brightness(1.08); }
+    /* Inline Gateways link that sits in the PDR upload row, beside "Read & preview".
+       Outline rather than solid so it does not compete with the primary action. */
+    .sp-pdr-link {
+        display: inline-block; padding: 9px 16px; border-radius: 7px;
+        border: 1.5px solid var(--sp-accent); background: transparent;
+        color: var(--sp-accent); font-size: 0.85rem; font-weight: 700;
+        text-decoration: none; white-space: nowrap;
+    }
+    .sp-pdr-link:hover { background: var(--sp-accent-soft); }
 
     /* ── Admin: Staff Attainments refresh ── */
     .sp-attn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
@@ -1468,6 +1477,11 @@ function credentialsSection(s) {
             + '<div class="sp-attn-row">'
             + '<input type="file" id="pdrFile" accept=".pdf">'
             + '<button type="button" id="pdrUpload" class="sp-save">Read &amp; preview</button>'
+            /* Straight to the Registry to fetch the PDR, sitting right beside the upload
+               so the two steps — get it, upload it — are together. Styled as an outline
+               button so it reads as "go get the file" rather than the primary action. */
+            + '<a class="sp-pdr-link" href="https://registry.ilgateways.com/login" target="_blank" rel="noopener">'
+            + '\u2197 Open my Gateways page</a>'
             + '<span id="pdrMsg" class="sp-savemsg"></span>'
             + '</div>'
             + '<div id="pdrResult"></div>'

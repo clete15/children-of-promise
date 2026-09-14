@@ -1733,6 +1733,52 @@ function resolveDocPath(ref) {
     return full;
 }
 
+/* ── Grant document folders (INCCRA – SSWG) ──────────────────────────────────
+   Unlike the PFA/PI monitoring evidence, the grant folders are just an ordinary
+   folder tree — no PICC item numbers to match on. They moved off SharePoint into
+   the same server-owned library (DOC_ROOT/…/Operations), under one top folder that
+   holds a handful of grant sub-folders (SSWG Grant, SSTG Grant, Appeal, Email, …).
+
+   This lists that tree one level of sub-folders deep, grouped by sub-folder, and
+   returns each file's path relative to DOC_ROOT so the page opens it through the
+   same authenticated /api/doc-file endpoint the rest of the library uses. Files at
+   the top level (loose in the grant folder) are grouped under a "" key. */
+const GRANT_ROOT_FOLDER = 'INCCRA - SSWG';
+
+function listGrantFolder() {
+    const DOC_ROOT = findDocRoot();
+    if (!DOC_ROOT) return { ok: false, error: 'The document library is not reachable from the server.' };
+    const base = path.join(DOC_ROOT, GRANT_ROOT_FOLDER);
+    if (!fs.existsSync(base)) {
+        return { ok: false, error: 'No "' + GRANT_ROOT_FOLDER + '" folder in the library yet.', folder: GRANT_ROOT_FOLDER };
+    }
+    const groups = {};
+    const relOf = full => path.relative(DOC_ROOT, full).replace(/\\/g, '/');
+    const fileEntry = full => ({
+        name: path.basename(full),
+        rel: relOf(full),
+        ext: path.extname(full).toLowerCase(),
+        size: (() => { try { return fs.statSync(full).size; } catch (e) { return 0; } })()
+    });
+    let entries = [];
+    try { entries = fs.readdirSync(base, { withFileTypes: true }); }
+    catch (e) { return { ok: false, error: 'Could not read the grant folder: ' + e.message }; }
+
+    entries.forEach(e => {
+        const full = path.join(base, e.name);
+        if (e.isFile()) {
+            (groups[''] = groups[''] || []).push(fileEntry(full));
+        } else if (e.isDirectory()) {
+            const key = e.name;
+            const list = groups[key] = groups[key] || [];
+            let sub = [];
+            try { sub = fs.readdirSync(full, { withFileTypes: true }); } catch (err) { /* unreadable sub-folder */ }
+            sub.filter(s => s.isFile()).forEach(s => list.push(fileEntry(path.join(full, s.name))));
+        }
+    });
+    return { ok: true, root: DOC_ROOT, folder: GRANT_ROOT_FOLDER, groups };
+}
+
 /* ── Office editing (OnlyOffice Docs) ───────────────────────────────────────
    Editing a Word or Excel file in the browser needs a document server; nothing
    in Node can render .docx faithfully. OnlyOffice Docs Community Edition does
@@ -5272,6 +5318,14 @@ ELSE
                 + (idx.childFiles || []).filter(f => f.stale).length,
             meta
         });
+    }
+
+    /* Lists the INCCRA – SSWG grant folder tree. Same authenticated library, but a
+       plain folder listing rather than the PICC-indexed compliance view. Files open
+       and edit through /api/doc-file and office.html exactly as the rest do. */
+    if (req.method === 'GET' && url.startsWith('/api/grant-folder')) {
+        if (!checkAuth(req, res)) return;
+        return sendJSON(res, 200, listGrantFolder());
     }
 
     /* Is Office editing available, and can this file be edited?

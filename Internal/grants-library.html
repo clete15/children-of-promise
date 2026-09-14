@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INCCRA – SSWG Documents – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
+        .gl-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
+        .gl-wrapper { width:100%;max-width:900px; }
+        .gl-card {
+            background: var(--sp-surface); border:1px solid var(--sp-border);
+            border-radius:12px; box-shadow:0 4px 24px rgba(0,0,0,0.12); overflow:hidden;
+        }
+        .gl-header { padding:14px 20px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;gap:12px; }
+        .gl-header h2 { font-size:1rem;font-weight:800;color:var(--sp-text);margin:0; }
+        .gl-msg { font-size:0.75rem;color:var(--sp-muted);margin-left:auto; }
+        .gl-body { padding:16px 20px 24px; }
+        .gl-note {
+            font-size:0.78rem;color:var(--sp-text-2);background:var(--sp-surface-2);
+            border:1px solid var(--sp-border);border-radius:8px;padding:10px 14px;margin-bottom:16px;
+        }
+        .gl-group { border:1px solid var(--sp-border);border-radius:10px;margin-bottom:12px;overflow:hidden; }
+        .gl-group > summary {
+            list-style:none;cursor:pointer;padding:11px 16px;background:var(--sp-surface-2);
+            display:flex;align-items:center;gap:10px;font-weight:700;font-size:0.9rem;color:var(--sp-text);
+        }
+        .gl-group > summary::-webkit-details-marker { display:none; }
+        .gl-group > summary::before { content:'\25B8';color:var(--sp-quiet);font-size:0.8rem;transition:transform 0.12s; }
+        .gl-group[open] > summary::before { transform:rotate(90deg); }
+        .gl-cnt { margin-left:auto;font-size:0.72rem;font-weight:600;color:var(--sp-muted); }
+        .gl-files { padding:4px 0; }
+        .gl-file {
+            display:flex;align-items:center;gap:12px;padding:9px 16px;
+            border-top:1px solid var(--sp-border);font-size:0.82rem;
+        }
+        .gl-file:first-child { border-top:none; }
+        .gl-fname { flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sp-text); }
+        .gl-ficon { font-size:1.1rem;flex-shrink:0; }
+        .gl-fsize { font-size:0.7rem;color:var(--sp-quiet);flex-shrink:0;white-space:nowrap; }
+        .gl-btn {
+            padding:5px 12px;border:1.5px solid var(--sp-border);border-radius:6px;
+            background:var(--sp-surface);color:var(--sp-text-2);font-size:0.74rem;font-weight:700;
+            text-decoration:none;cursor:pointer;white-space:nowrap;flex-shrink:0;
+        }
+        .gl-btn:hover { border-color:var(--sp-accent);color:var(--sp-accent); }
+        .gl-empty { padding:26px;text-align:center;color:var(--sp-muted);font-size:0.85rem; }
+        .gl-empty code { background:var(--sp-surface-2);padding:2px 6px;border-radius:4px;font-size:0.78rem; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>INCCRA – SSWG Documents &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <div class="header-actions">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/inccra.html">← INCCRA Grants</a>
+    </div>
+</header>
+
+<div class="gl-layout">
+    <div class="gl-wrapper">
+        <div class="gl-card">
+            <div class="gl-header">
+                <h2>📂 INCCRA – SSWG Documents</h2>
+                <span class="gl-msg" id="glMsg"></span>
+            </div>
+            <div class="gl-body" id="glBody">
+                <div class="gl-empty">Reading the grant folder…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+/* Lists the INCCRA – SSWG grant folder through /api/grant-folder and opens each file
+   through /api/doc-file — the same authenticated library plumbing documents.html uses,
+   so there is no Microsoft sign-in and no second copy. Word/Excel get an Edit button
+   when the OnlyOffice editor is configured on the server. */
+
+let officeEnabled = false;
+let officeEditable = [];
+
+function esc(v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function extIcon(ext) {
+    if (ext === '.pdf') return '📕';
+    if (['.doc', '.docx'].includes(ext)) return '📘';
+    if (['.xls', '.xlsx', '.csv'].includes(ext)) return '📗';
+    if (['.png', '.jpg', '.jpeg', '.gif', '.webp'].includes(ext)) return '🖼️';
+    return '📄';
+}
+
+function fmtSize(n) {
+    if (!n) return '';
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
+    return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+async function probeOffice() {
+    try {
+        const r = await apiFetch('/api/office-status');
+        if (!r.ok) return;
+        const d = await r.json();
+        officeEnabled = !!(d && d.enabled);
+        officeEditable = (d && d.editable) || [];
+    } catch (e) { /* editing stays off */ }
+}
+
+function fileRow(f) {
+    const href = '/api/doc-file?path=' + encodeURIComponent(f.rel);
+    const canEdit = officeEnabled && officeEditable.indexOf(f.ext) !== -1;
+    return '<div class="gl-file">'
+        + '<span class="gl-ficon">' + extIcon(f.ext) + '</span>'
+        + '<span class="gl-fname" title="' + esc(f.name) + '">' + esc(f.name) + '</span>'
+        + '<span class="gl-fsize">' + fmtSize(f.size) + '</span>'
+        + '<a class="gl-btn" href="' + href + '" target="_blank" rel="noopener">Open</a>'
+        + (canEdit
+            ? '<a class="gl-btn" href="office.html?path=' + encodeURIComponent(f.rel)
+              + '" target="_blank" rel="noopener" title="Edit in the browser and save straight back">Edit</a>'
+            : '')
+        + '</div>';
+}
+
+function render(data) {
+    const body = document.getElementById('glBody');
+    if (!data || !data.ok) {
+        const why = (data && data.error) ? esc(data.error) : 'The grant folder could not be read.';
+        body.innerHTML = '<div class="gl-empty">' + why
+            + (data && data.folder ? '<br><br>Expected folder: <code>' + esc(data.folder) + '</code>' : '')
+            + '</div>';
+        return;
+    }
+    const groups = data.groups || {};
+    /* Named sub-folders first (alphabetical), then any loose top-level files last. */
+    const keys = Object.keys(groups).filter(k => k !== '').sort((a, b) => a.localeCompare(b));
+    if (groups[''] && groups[''].length) keys.push('');
+
+    if (!keys.length) {
+        body.innerHTML = '<div class="gl-empty">The grant folder is empty.</div>';
+        return;
+    }
+
+    let html = '<div class="gl-note">Files stay in the shared grant library on the server and open '
+        + 'here without a Microsoft sign-in. Word and Excel files can be edited in the browser and '
+        + 'saved straight back.</div>';
+
+    keys.forEach((k, i) => {
+        const files = (groups[k] || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+        if (!files.length) return;
+        const label = k === '' ? 'Loose files' : k;
+        html += '<details class="gl-group"' + (i === 0 ? ' open' : '') + '>'
+            + '<summary>' + esc(label)
+            + '<span class="gl-cnt">' + files.length + ' file' + (files.length !== 1 ? 's' : '') + '</span>'
+            + '</summary>'
+            + '<div class="gl-files">' + files.map(fileRow).join('') + '</div>'
+            + '</details>';
+    });
+    body.innerHTML = html;
+}
+
+async function load() {
+    const msg = document.getElementById('glMsg');
+    msg.textContent = 'Loading…';
+    try {
+        const res = await apiFetch('/api/grant-folder');
+        const data = await res.json();
+        render(data);
+        msg.textContent = data && data.ok ? (data.folder || '') : '';
+    } catch (e) {
+        document.getElementById('glBody').innerHTML =
+            '<div class="gl-empty">Could not read the grant library: ' + esc(e.message) + '</div>';
+        msg.textContent = '';
+    }
+}
+
+(async function () {
+    await probeOffice();
+    await load();
+})();
+</script>
+</body>
+</html>
