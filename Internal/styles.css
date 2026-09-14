@@ -1,18 +1,67 @@
+/* ── DESIGN TOKENS ──
+   Single source of truth for the whole staff-facing app. These --sp-* tokens are
+   identical to the ones in staff-portal.html so every page shares one palette and
+   one light/dark toggle (see THEME_KEY 'copStaffTheme'). The older generic tokens
+   (--bg, --card-bg, --border, --text, --text-muted, --primary) are kept as aliases
+   that point at the --sp-* tokens, so all existing components become theme-aware
+   automatically without touching their rules. */
 :root {
-    --primary: #2563eb;
+    --sp-bg: #f1f5f9;
+    --sp-surface: #ffffff;
+    --sp-surface-2: #f8fafc;
+    --sp-border: #e2e8f0;
+    --sp-border-in: #cbd5e1;
+    --sp-text: #1e293b;
+    --sp-text-2: #475569;
+    --sp-muted: #64748b;
+    --sp-quiet: #94a3b8;
+    --sp-accent: #2563eb;
+    --sp-accent-soft: #f8fbff;
+
+    --sp-good-bg: #f0fdf4;  --sp-good-br: #86efac;  --sp-good-fg: #166534;
+    --sp-warn-bg: #eef2ff;  --sp-warn-br: #a5b4fc;  --sp-warn-fg: #3730a3;
+    --sp-bad-bg:  #fef2f2;  --sp-bad-br:  #fca5a5;  --sp-bad-fg:  #991b1b;
+    --sp-pill-bg: #f8fafc;
+
+    /* Fixed brand colours (same in both themes) */
+    --primary: var(--sp-accent);
     --primary-dark: #1d4ed8;
     --accent: #f59e0b;
     --accent-dark: #d97706;
     --danger: #dc2626;
     --success: #16a34a;
-    --bg: #f1f5f9;
-    --card-bg: #ffffff;
-    --border: #e2e8f0;
-    --text: #1e293b;
-    --text-muted: #64748b;
     --radius: 8px;
     --shadow: 0 1px 4px rgba(0,0,0,0.08);
     --shadow-md: 0 4px 14px rgba(0,0,0,0.12);
+
+    /* Aliases → tokens, so legacy component rules follow the theme */
+    --bg: var(--sp-bg);
+    --card-bg: var(--sp-surface);
+    --border: var(--sp-border);
+    --text: var(--sp-text);
+    --text-muted: var(--sp-muted);
+}
+body.sp-dark {
+    --sp-bg: #0f172a;
+    --sp-surface: #1a2235;
+    --sp-surface-2: #212b41;
+    --sp-border: #2f3b52;
+    --sp-border-in: #45526b;
+    --sp-text: #e8edf6;
+    --sp-text-2: #bcc7da;
+    --sp-muted: #9aa7bd;
+    --sp-quiet: #7d8a9f;
+    --sp-accent: #7ea6ff;
+    --sp-accent-soft: #1e2a44;
+
+    --sp-good-bg: #14301f;  --sp-good-br: #2f6b45;  --sp-good-fg: #86efac;
+    --sp-warn-bg: #1e2450;  --sp-warn-br: #4f5bb0;  --sp-warn-fg: #c7d2fe;
+    --sp-bad-bg:  #3a1a1c;  --sp-bad-br:  #8a3a3f;  --sp-bad-fg:  #fca5a5;
+    --sp-pill-bg: #212b41;
+
+    /* In dark mode the "primary" accent needs the lighter blue for contrast */
+    --primary: #7ea6ff;
+    --primary-dark: #6690e8;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -64,6 +113,25 @@ body {
 }
 .header-back:hover { background: rgba(255,255,255,0.15); color: white; }
 
+/* Right-hand header cluster so the theme toggle and the back link sit together. */
+.header-actions { display: flex; align-items: center; gap: 10px; }
+/* Theme toggle lives on the blue gradient header, so it is styled like .header-back
+   (translucent white) rather than with surface tokens. */
+.header-theme-btn {
+    color: rgba(255,255,255,0.9);
+    background: transparent;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.4);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    font-family: inherit;
+}
+.header-theme-btn:hover { background: rgba(255,255,255,0.15); color: white; }
+
 /* ── MODE TOGGLE ── */
 .mode-toggle-bar {
     background: var(--bg);
@@ -73,7 +141,7 @@ body {
 }
 .mode-toggle {
     display: inline-flex;
-    background: #e2e8f0;
+    background: var(--sp-border);
     border-radius: 10px;
     padding: 4px;
     gap: 4px;
@@ -97,12 +165,12 @@ body {
 }
 .toggle-btn .toggle-icon { font-size: 0.95rem; }
 .toggle-btn.active {
-    background: white;
+    background: var(--sp-surface);
     color: var(--primary);
     box-shadow: 0 1px 6px rgba(0,0,0,0.12);
 }
 .toggle-btn:not(.active):hover {
-    background: rgba(255,255,255,0.5);
+    background: var(--sp-surface-2);
     color: var(--text);
 }
 
@@ -163,8 +231,8 @@ body {
     box-shadow: 0 6px 16px rgba(37,99,235,0.4);
 }
 .nav-arrow:disabled {
-    background: #cbd5e1;
-    color: #94a3b8;
+    background: var(--sp-border-in);
+    color: var(--sp-quiet);
     cursor: not-allowed;
     box-shadow: none;
     transform: none;
@@ -199,7 +267,7 @@ body {
     padding: 5px 13px;
     border-radius: 20px;
     border: 1.5px solid var(--border);
-    background: white;
+    background: var(--sp-surface);
     color: var(--text-muted);
     font-size: 0.78rem;
     font-weight: 600;
@@ -230,7 +298,7 @@ body {
     grid-template-columns: 2fr 1.6fr 1.4fr 1.1fr 1.1fr 0.8fr 70px;
     gap: 10px;
     padding: 10px 16px;
-    background: #f8fafc;
+    background: var(--sp-surface-2);
     border-bottom: 2px solid var(--border);
     font-size: 0.72rem;
     font-weight: 700;
@@ -260,8 +328,8 @@ body {
     flex: 1;
 }
 .roster-row:last-child { border-bottom: none; }
-.roster-row:hover { background: #f8fafc; }
-.roster-row.row-changed { background: #fffbeb; }
+.roster-row:hover { background: var(--sp-surface-2); }
+.roster-row.row-changed { background: var(--sp-warn-bg); }
 .roster-name {
     font-weight: 600;
     font-size: 0.85rem;
@@ -278,7 +346,7 @@ body {
     border-radius: 5px;
     font-size: 0.8rem;
     color: var(--text);
-    background: white;
+    background: var(--sp-surface);
     cursor: pointer;
     transition: border-color 0.15s;
 }
@@ -359,7 +427,7 @@ input, select {
     border-radius: 5px;
     font-size: 0.8rem;
     color: var(--text);
-    background: white;
+    background: var(--sp-surface);
     transition: border-color 0.15s, box-shadow 0.15s;
     font-family: inherit;
 }
@@ -368,7 +436,7 @@ input:focus, select:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
 }
-input[readonly] { background: #f8fafc; color: var(--text-muted); }
+input[readonly] { background: var(--sp-surface-2); color: var(--text-muted); }
 
 .required { color: var(--danger); }
 
@@ -413,12 +481,12 @@ input[readonly] { background: #f8fafc; color: var(--text-muted); }
 .btn-update:hover { background: var(--accent-dark); box-shadow: 0 5px 16px rgba(245,158,11,0.45); }
 
 .btn-secondary {
-    background: #f1f5f9;
+    background: var(--sp-surface-2);
     color: var(--text-muted);
     border: 1px solid var(--border);
     min-width: 140px;
 }
-.btn-secondary:hover { background: #e2e8f0; color: var(--text); }
+.btn-secondary:hover { background: var(--sp-border); color: var(--text); }
 
 /* ── NOTIFICATION ── */
 .notification {

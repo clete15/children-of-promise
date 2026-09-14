@@ -6,7 +6,7 @@
     <title>Waiting List – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; margin: 0; }
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; margin: 0; }
 
         /* ── TOOLBAR ── */
         .wl-toolbar {
@@ -27,18 +27,19 @@
             border-radius: 6px;
             font-size: 0.82rem;
             font-family: inherit;
-            background: rgba(255,255,255,0.9);
+            background: var(--sp-surface);
+            color: var(--sp-text);
         }
         .wl-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-        .wl-count { font-size: 0.78rem; color: rgba(255,255,255,0.8); white-space: nowrap; }
+        .wl-count { font-size: 0.78rem; color: var(--sp-muted); white-space: nowrap; }
 
         /* ── TABS ── */
-        .mode-toggle { display:flex; background:rgba(255,255,255,0.15); border-radius:10px; padding:4px; gap:4px; }
-        .toggle-btn { padding:8px 14px; border:none; border-radius:7px; font-size:0.78rem; font-weight:700; cursor:pointer; color:rgba(255,255,255,0.8); background:transparent; transition:background 0.18s,color 0.18s; white-space:nowrap; text-align:center; line-height:1.3; }
-        .toggle-btn.active { background:white; color:var(--primary); box-shadow:0 1px 6px rgba(0,0,0,0.12); }
+        .mode-toggle { display:flex; background:var(--sp-surface-2); border:1px solid var(--sp-border); border-radius:10px; padding:4px; gap:4px; }
+        .toggle-btn { padding:8px 14px; border:none; border-radius:7px; font-size:0.78rem; font-weight:700; cursor:pointer; color:var(--sp-muted); background:transparent; transition:background 0.18s,color 0.18s; white-space:nowrap; text-align:center; line-height:1.3; }
+        .toggle-btn.active { background:var(--sp-surface); color:var(--primary); box-shadow:0 1px 6px rgba(0,0,0,0.12); }
         .tab-count { font-size: 0.72rem; font-weight: 600; opacity: 0.75; }
-        .tab-pending { font-size: 0.62rem; font-weight: 700; color: #fca5a5; }
-        .toggle-btn.active .tab-pending { color: #dc2626; }
+        .tab-pending { font-size: 0.62rem; font-weight: 700; color: var(--sp-bad-br); }
+        .toggle-btn.active .tab-pending { color: var(--danger); }
 
         /* ── TABLE CONTAINER ── */
         .wl-container {
@@ -60,7 +61,7 @@
             overflow-x: auto;
             overflow-y: hidden;
             border-radius: var(--radius) var(--radius) 0 0;
-            background: white;
+            background: var(--sp-surface);
         }
         .wl-scroll-top-inner {
             height: 1px;
@@ -71,11 +72,11 @@
             width: 100%;
             min-width: 1000px;
             border-collapse: collapse;
-            background: white;
+            background: var(--sp-surface);
             font-size: 0.76rem;
         }
         .wl-table thead tr {
-            background: #f8fafc;
+            background: var(--sp-surface-2);
             border-bottom: 2px solid var(--border);
             position: sticky;
             top: 0;
@@ -97,9 +98,9 @@
             vertical-align: top;
         }
         .wl-table tbody tr:last-child td { border-bottom: none; }
-        .wl-table tbody tr:hover { background: #f8fafc; }
-        .wl-table tbody tr.row-pending { background: #fffde7; }
-        .wl-table tbody tr.row-pending:hover { background: #fff9c4; }
+        .wl-table tbody tr:hover { background: var(--sp-surface-2); }
+        .wl-table tbody tr.row-pending { background: var(--sp-warn-bg); }
+        .wl-table tbody tr.row-pending:hover { background: var(--sp-warn-bg); filter: brightness(0.97); }
 
         /* ── NOTES ── */
         .notes-cell { min-width: 180px; max-width: 220px; height: 100%; }
@@ -114,6 +115,7 @@
             resize: none;
             min-height: 60px;
             color: var(--text);
+            background: var(--sp-surface);
         }
         .notes-input:focus { outline: none; border-color: var(--primary); }
         .btn-save-notes {
@@ -130,7 +132,7 @@
         }
         .btn-save-notes:hover { background: var(--primary-dark); }
         /* Highlight rows whose program was never set, so they stand out as needing triage */
-        .program-unassigned { border-color: #f59e0b !important; background: #fffbeb !important; }
+        .program-unassigned { border-color: var(--sp-warn-br) !important; background: var(--sp-warn-bg) !important; }
 
         /* ── BADGES ── */
         .score-badge {
@@ -141,9 +143,9 @@
             font-size: 0.72rem;
             white-space: nowrap;
         }
-        .score-high   { background: #fef2f2; color: var(--danger); }
-        .score-medium { background: #fffbeb; color: #b45309; }
-        .score-low    { background: #f0fdf4; color: var(--success); }
+        .score-high   { background: var(--sp-bad-bg); color: var(--sp-bad-fg); }
+        .score-medium { background: var(--sp-warn-bg); color: var(--sp-warn-fg); }
+        .score-low    { background: var(--sp-good-bg); color: var(--sp-good-fg); }
 
         .flag-list { display: flex; flex-wrap: wrap; gap: 3px; max-width: 180px; }
         .flag {
@@ -151,11 +153,11 @@
             border-radius: 3px;
             font-size: 0.62rem;
             font-weight: 700;
-            background: #eff6ff;
+            background: var(--sp-accent-soft);
             color: var(--primary);
             white-space: nowrap;
         }
-        .flag.high { background: #fef2f2; color: var(--danger); }
+        .flag.high { background: var(--sp-bad-bg); color: var(--sp-bad-fg); }
 
         .status-select {
             padding: 5px 6px;
@@ -190,7 +192,7 @@
         }
         .modal-overlay.open { display: flex; }
         .modal {
-            background: white;
+            background: var(--sp-surface);
             border-radius: var(--radius);
             padding: 28px 32px;
             width: 100%;
@@ -207,13 +209,13 @@
         .modal-group label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); }
         .modal-group input, .modal-group select { padding: 7px 10px; border: 1px solid var(--border); border-radius: 5px; font-size: 0.82rem; font-family: inherit; color: var(--text); }
         .modal-group input:focus, .modal-group select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-        .modal-group input[readonly] { background: #f8fafc; color: var(--text-muted); }
+        .modal-group input[readonly] { background: var(--sp-surface-2); color: var(--text-muted); }
         .modal-teacher-hint { font-size: 0.72rem; color: var(--danger); font-weight: 600; min-height: 1em; }
         .modal-days { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 4px; }
         .modal-days label { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
         .modal-days input[type=checkbox] { width: auto; accent-color: var(--primary); }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); }
-        .modal-note { font-size: 0.75rem; color: var(--text-muted); background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; }
+        .modal-note { font-size: 0.75rem; color: var(--sp-warn-fg); background: var(--sp-warn-bg); border: 1px solid var(--sp-warn-br); border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; }
     </style>
 </head>
 <body>
@@ -226,7 +228,10 @@
             <p>Pre-Enrollment Waiting List &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="/staff/">← Staff Portal</a>
+    <div class="header-actions">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/">← Staff Portal</a>
+    </div>
 </header>
 
 <!-- Shared Enrollment Management sub-nav (see ems.html for the note). -->
@@ -237,16 +242,16 @@
     }
     .em-subnav .em-subnav-label {
         font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
-        color: #94a3b8; margin-right: 10px;
+        color: var(--sp-quiet); margin-right: 10px;
     }
     .em-subnav a {
-        font-size: 0.9rem; font-weight: 700; text-decoration: none; color: #475569;
+        font-size: 0.9rem; font-weight: 700; text-decoration: none; color: var(--sp-text-2);
         padding: 8px 15px; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent;
         transition: color 0.12s, background 0.12s, border-color 0.12s;
     }
-    .em-subnav a:hover { color: #1e293b; background: #f1f5f9; }
-    .em-subnav a.on { color: #2563eb; border-bottom-color: #2563eb; }
-    .em-subnav-wrap { border-bottom: 1.5px solid #e2e8f0; }
+    .em-subnav a:hover { color: var(--sp-text); background: var(--sp-surface-2); }
+    .em-subnav a.on { color: var(--sp-accent); border-bottom-color: var(--sp-accent); }
+    .em-subnav-wrap { border-bottom: 1.5px solid var(--sp-border); }
 </style>
 <div class="em-subnav-wrap">
     <nav class="em-subnav" aria-label="Enrollment management">
@@ -287,7 +292,7 @@
                     <th>Program</th>
                     <th>Score</th>
                     <th>Risk Factors</th>
-                    <th style="background:#fffbeb;color:#92400e;">Income</th>
+                    <th style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);">Income</th>
                     <th>Submitted</th>
                     <th>Status</th>
                     <th>Notes</th>
@@ -471,7 +476,7 @@ function renderTable() {
             <td>${programSelect(r)}</td>
             <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
             <td><div class="flag-list">${flags}</div></td>
-            <td style="background:#fffbeb;font-weight:600;font-size:0.74rem;">${r.HouseholdIncome || '<span style="color:#92400e;">—</span>'}</td>
+            <td style="background:var(--sp-warn-bg);font-weight:600;font-size:0.74rem;">${r.HouseholdIncome || '<span style="color:var(--sp-warn-fg);">—</span>'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td>
                 <select class="status-select" id="status-${r.Id}" onchange="handleStatusChange(${parseInt(r.Id)}, this)">

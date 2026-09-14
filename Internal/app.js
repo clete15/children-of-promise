@@ -228,3 +228,51 @@ function isCCAPEligible(s) {
     if (!income || !hh) return false;
     return income <= CCAP_THRESHOLDS[Math.max(0, Math.min(hh - 1, 7))];
 }
+
+// ── THEME (light / dark) ──
+/* One toggle for the whole staff app. The choice is remembered per browser under
+   the same key the staff portal uses (copStaffTheme), so picking dark on one page
+   makes every page dark. First-time visitors follow the operating system; once
+   someone chooses, that sticks. The class is applied as soon as this script runs
+   so pages don't flash light and then switch. */
+const THEME_KEY = 'copStaffTheme';
+
+function prefersDark() {
+    try {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    } catch (e) { return false; }
+}
+
+function applyTheme(dark) {
+    document.body.classList.toggle('sp-dark', !!dark);
+    const btn = document.getElementById('spTheme');
+    if (btn) {
+        // Names what clicking does, not what is currently on.
+        btn.textContent = dark ? '\u2600 Light mode' : '\u263e Dark mode';
+        btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+    }
+}
+
+function initTheme() {
+    let saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* private browsing */ }
+    applyTheme(saved === null ? prefersDark() : saved === 'dark');
+
+    const btn = document.getElementById('spTheme');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            const dark = !document.body.classList.contains('sp-dark');
+            applyTheme(dark);
+            try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) {}
+        });
+    }
+}
+
+/* Run now if the body is already parsed (app.js is loaded at the end of the body on
+   these pages), otherwise wait for it. Either way the button — which lives in the
+   page header — exists before we attach the click handler. */
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initTheme);
+} else {
+    initTheme();
+}
