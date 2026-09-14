@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
+        .at-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
+        .at-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:960px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        .at-sidebar { width:200px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .at-sidebar button {
+            display:block;width:100%;text-align:left;padding:11px 16px;border:none;cursor:pointer;
+            background:transparent;font-size:0.86rem;font-weight:700;color:var(--sp-text);
+            border-left:3px solid transparent;transition:background 0.15s;
+        }
+        .at-sidebar button:hover:not(.on) { background:var(--sp-surface); }
+        .at-sidebar button.on { background:var(--sp-accent-soft);border-left-color:var(--sp-accent);color:var(--sp-accent); }
+        .at-room-cap { font-size:0.72rem;font-weight:600;color:var(--sp-muted);margin-top:2px; }
+        .at-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;max-height:calc(100vh - 130px); }
+        .at-head { padding:12px 20px;border-bottom:1px solid var(--sp-border); }
+        .at-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
+        .at-body { overflow-y:auto;flex:1;padding:20px 24px; }
+        .at-room-name { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-bottom:16px;text-align:center; }
+        .at-chart { display:flex;align-items:flex-end;gap:14px;padding:0 8px; }
+        .at-col { display:flex;flex-direction:column;align-items:center;gap:8px;flex:1; }
+        .at-count { font-size:0.9rem;font-weight:800;color:var(--sp-text); }
+        .at-bar-track {
+            position:relative;width:100%;background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);
+            border-radius:6px 6px 0 0;display:flex;align-items:flex-end;overflow:hidden;
+        }
+        .at-bar-fill { width:100%;background:var(--sp-accent);border-radius:6px 6px 0 0;transition:height 0.4s; }
+        .at-over .at-bar-fill { background:var(--sp-bad-fg); }
+        .at-day { font-size:0.84rem;font-weight:700;color:var(--sp-muted); }
+        .at-legend { display:flex;gap:18px;margin-top:16px;justify-content:center;flex-wrap:wrap; }
+        .at-legend > div { display:flex;align-items:center;gap:7px;font-size:0.8rem;color:var(--sp-text-2); }
+        .at-swatch { width:15px;height:15px;border-radius:3px; }
+        .at-empty { padding:40px;text-align:center;color:var(--sp-muted);font-size:0.9rem; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Projected Attendance &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <div class="header-actions">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/">← Staff Portal</a>
+    </div>
+</header>
+
+<!-- Shared Enrollment Management sub-nav (see ems.html for the note). -->
+<style>
+    .em-subnav {
+        display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+        max-width: 1400px; margin: 0 auto; padding: 10px 20px 0;
+    }
+    .em-subnav .em-subnav-label {
+        font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
+        color: var(--sp-quiet); margin-right: 10px;
+    }
+    .em-subnav a {
+        font-size: 0.9rem; font-weight: 700; text-decoration: none; color: var(--sp-text-2);
+        padding: 8px 15px; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent;
+        transition: color 0.12s, background 0.12s, border-color 0.12s;
+    }
+    .em-subnav a:hover { color: var(--sp-text); background: var(--sp-surface-2); }
+    .em-subnav a.on { color: var(--sp-accent); border-bottom-color: var(--sp-accent); }
+    .em-subnav-wrap { border-bottom: 1.5px solid var(--sp-border); }
+</style>
+<div class="em-subnav-wrap">
+    <nav class="em-subnav" aria-label="Enrollment management">
+        <a href="/staff/waitinglist.html">Waiting List</a>
+        <a href="/staff/ems.html">Enrolled Students</a>
+        <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
+        <a href="/staff/attendance.html" class="on" aria-current="page">Attendance</a>
+    </nav>
+</div>
+
+<div class="at-layout">
+    <div class="at-wrapper">
+        <div class="at-sidebar" id="atSidebar"></div>
+        <div class="at-card">
+            <div class="at-head">
+                <div class="at-title">Projected Attendance by Room</div>
+            </div>
+            <div class="at-body" id="atBody">
+                <div class="at-empty">Loading…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+/* Projected attendance by room, rebuilt into the Enrollment Management system from the
+   Reports page. Same data source (/api/reports -> byRoomDaily): each row is
+   [roomName, capacity, Mon, Tue, Wed, Thu, Fri] of projected daily counts, derived from
+   each enrolled child's attending days. This view only reads and charts it. */
+
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const CHART_H = 220;
+let dailyData = [];
+let activeRoom = 0;
+
+function esc(v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderSidebar() {
+    const box = document.getElementById('atSidebar');
+    box.innerHTML = dailyData.map((r, i) => {
+        const cap = parseInt(r[1] || 0);
+        return `<button id="atRoom${i}" onclick="showRoom(${i})">
+            <div>${esc(r[0] || 'Unknown')}</div>
+            <div class="at-room-cap">Capacity ${cap}</div>
+        </button>`;
+    }).join('');
+}
+
+function showRoom(idx) {
+    activeRoom = idx;
+    dailyData.forEach((_, i) => {
+        const btn = document.getElementById('atRoom' + i);
+        if (btn) btn.classList.toggle('on', i === idx);
+    });
+
+    const r = dailyData[idx];
+    const room = r[0] || 'Unknown';
+    const capacity = Math.max(parseInt(r[1] || 1), 1);
+    const counts = [2, 3, 4, 5, 6].map(c => parseInt(r[c] || 0));
+
+    const cols = DAYS.map((day, i) => {
+        const count = counts[i];
+        const over = count > capacity;
+        const fillH = Math.round(Math.min(count / capacity, 1) * CHART_H);
+        return `<div class="at-col${over ? ' at-over' : ''}">
+            <div class="at-count">${count}/${capacity}</div>
+            <div class="at-bar-track" style="height:${CHART_H}px;">
+                <div class="at-bar-fill" style="height:${fillH}px;"></div>
+            </div>
+            <div class="at-day">${day}</div>
+        </div>`;
+    }).join('');
+
+    document.getElementById('atBody').innerHTML = `
+        <div class="at-room-name">${esc(room)}</div>
+        <div class="at-chart" style="height:${CHART_H + 56}px;">${cols}</div>
+        <div class="at-legend">
+            <div><span class="at-swatch" style="background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);"></span> Capacity (${capacity})</div>
+            <div><span class="at-swatch" style="background:var(--sp-accent);"></span> Projected</div>
+        </div>`;
+}
+
+async function load() {
+    try {
+        const res = await apiFetch('/api/reports');
+        const data = await res.json();
+        dailyData = (data && data.byRoomDaily) || [];
+        if (!dailyData.length) {
+            document.getElementById('atBody').innerHTML = '<div class="at-empty">No attendance data yet.</div>';
+            return;
+        }
+        renderSidebar();
+        showRoom(0);
+    } catch (e) {
+        document.getElementById('atBody').innerHTML =
+            '<div class="at-empty">Could not load attendance: ' + esc(e.message) + '</div>';
+    }
+}
+
+load();
+</script>
+</body>
+</html>
