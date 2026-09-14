@@ -24,13 +24,17 @@ function apiFetch(url, opts = {}) {
 }
 
 // ── ELIGIBILITY THRESHOLDS ──
-// USDA Income Eligibility Guidelines — each entry is effective July 1 of that
-// year through June 30 of the next. Only official published numbers, no estimates.
+/* The server (Internal/server.js) is the single source of truth for these numbers,
+   because it computes the value that actually gets saved. Each page fetches them at
+   load via loadGuidelines() below, so the tables only need updating in ONE place.
+
+   The tables below are a FALLBACK, used only if that fetch fails (offline, or an old
+   server) so eligibility hints still render. Keep them roughly current, but the server
+   copy is authoritative — if the two ever disagree, the server wins on save. */
 const USDA_GUIDELINES = {
     2025: { free: [20163,27339,34515,41691,48867,56043,63219,70395], reduced: [28694,38907,49120,59333,69546,79759,89972,100185] },
     2026: { free: [20748,28132,35516,42900,50284,57668,65052,72436], reduced: [29526,40034,50542,61050,71558,82066,92574,103082] },
 };
-// Illinois CCAP eligibility (225% FPL) — update annually when IL DHS publishes.
 const CCAP_GUIDELINES = {
     2025: [35213,47588,59963,72338,84713,97088,109463,121838],
     2026: [35910,48690,61470,74250,87030,99810,112590,125370],
@@ -39,10 +43,29 @@ const CCAP_GUIDELINES = {
 const _now = new Date();
 const _usdaYear = _now.getMonth() >= 6 ? _now.getFullYear() : _now.getFullYear() - 1;
 const _guidelines = USDA_GUIDELINES[_usdaYear] || USDA_GUIDELINES[Object.keys(USDA_GUIDELINES).pop()];
-const USDA_FREE_THRESHOLDS = _guidelines.free;
-const USDA_REDUCED_THRESHOLDS = _guidelines.reduced;
-const CCAP_THRESHOLDS = CCAP_GUIDELINES[_usdaYear] || CCAP_GUIDELINES[Object.keys(CCAP_GUIDELINES).pop()];
-const _thresholdsExpired = !USDA_GUIDELINES[_usdaYear] || !CCAP_GUIDELINES[_usdaYear];
+// These are `let` so loadGuidelines() can replace them with the server's authoritative
+// tables. computeFRP/isCCAPEligible read them at call time, so a later swap is safe.
+let USDA_FREE_THRESHOLDS = _guidelines.free;
+let USDA_REDUCED_THRESHOLDS = _guidelines.reduced;
+let CCAP_THRESHOLDS = CCAP_GUIDELINES[_usdaYear] || CCAP_GUIDELINES[Object.keys(CCAP_GUIDELINES).pop()];
+let _thresholdsExpired = !USDA_GUIDELINES[_usdaYear] || !CCAP_GUIDELINES[_usdaYear];
+
+/* Pull the authoritative guidelines from the server. Called alongside loadStudents/
+   loadClassrooms in each page's init(), so the tables are fresh before anything renders.
+   On any failure it silently keeps the fallback tables above. */
+async function loadGuidelines() {
+    try {
+        const res = await apiFetch('/api/frp-guidelines');
+        if (!res.ok) return;
+        const g = await res.json();
+        if (Array.isArray(g.usdaFree) && Array.isArray(g.usdaReduced) && Array.isArray(g.ccap)) {
+            USDA_FREE_THRESHOLDS = g.usdaFree;
+            USDA_REDUCED_THRESHOLDS = g.usdaReduced;
+            CCAP_THRESHOLDS = g.ccap;
+            _thresholdsExpired = false;
+        }
+    } catch (e) { /* keep the fallback tables */ }
+}
 
 // ── SHARED DATA ──
 let students = [];
@@ -76,6 +99,37 @@ function getClassroom(roomNumber) {
 function getRoomName(roomNumber) {
     const c = getClassroom(roomNumber);
     return c ? c.Room : '';
+}
+
+/* Shared room-picker sidebar. Enrolled Students and Benefits both list every room as
+   a button with a name and a per-room note; only the note text, the highlighted room,
+   the click handler and the CSS class prefix differ. This renders the common shell so
+   each page supplies just those.
+
+   opts:
+     el          the sidebar container element (or its id)
+     activeRoom  the RoomNumber currently selected (string/number)
+     onSelect    name of the global click handler, called as onSelect('<RoomNumber>')
+     note        (roomNumber) => HTML for the secondary line (omitted when empty)
+     nameHtml    (room) => HTML for the room-name line (defaults to the room name)
+     classPrefix 'em' or 'bn' — picks the existing .<prefix>-room name style
+     noteClass   CSS class for the secondary line (defaults to '<prefix>-room-count')
+   Rooms come from the shared `classrooms` model in room-number order. */
+function renderRoomSidebar(opts) {
+    const el = typeof opts.el === 'string' ? document.getElementById(opts.el) : opts.el;
+    if (!el) return;
+    const p = opts.classPrefix || 'em';
+    const noteClass = opts.noteClass || (p + '-room-count');
+    el.innerHTML = classrooms.map(r => {
+        const rn = r.RoomNumber;
+        const on = String(opts.activeRoom) === String(rn);
+        const note = opts.note ? opts.note(rn) : '';
+        const name = opts.nameHtml ? opts.nameHtml(r) : (r.Room || rn);
+        return `<button class="${on ? 'active' : ''}" onclick="${opts.onSelect}('${rn}')">`
+            + `<div class="${p}-room">${name}</div>`
+            + (note ? `<div class="${noteClass}">${note}</div>` : '')
+            + `</button>`;
+    }).join('');
 }
 
 // ── HELPERS ──

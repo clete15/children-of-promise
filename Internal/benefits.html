@@ -104,7 +104,7 @@ let activeBenefitsRoom = null;
 const BENEFIT_KEYS = ['WIC','Medicaid','SNAP','TANF','CCAP'];
 
 async function init() {
-    await Promise.all([loadClassrooms(), loadStudents()]);
+    await Promise.all([loadClassrooms(), loadStudents(), loadGuidelines()]);
     // Deep link from Enrolled Students ("Edit on Benefits & Eligibility →") lands on
     // that student's room via ?room=<RoomNumber>.
     const wantRoom = new URLSearchParams(location.search).get('room');
@@ -130,18 +130,22 @@ function needsAttention(s) {
 }
 
 function buildBenefitsRoster() {
-    const sidebar = document.getElementById('benefitsSidebar');
     const rooms = classrooms.map(r => r.RoomNumber);
     if (!activeBenefitsRoom && rooms.length) activeBenefitsRoom = rooms[0];
-    sidebar.innerHTML = rooms.map(rn => {
-        const cr = getClassroom(rn);
-        const isActive = String(activeBenefitsRoom) === String(rn);
-        const attn = roomRoster(rn).filter(needsAttention).length;
-        return `<button class="${isActive ? 'active' : ''}" onclick="selectBenefitsRoom('${rn}')">
-            <div class="bn-room">${cr ? cr.Room : rn}${attn ? ' <span style="color:#fca5a5;">*</span>' : ''}</div>
-            ${attn ? `<div class="bn-attn">${attn} need attention</div>` : ''}
-        </button>`;
-    }).join('');
+    // Shared shell (renderRoomSidebar in app.js); this page marks rooms that need
+    // attention (missing income/HH or CCAP-eligible) and keeps its own .bn-attn style.
+    renderRoomSidebar({
+        el: 'benefitsSidebar',
+        activeRoom: activeBenefitsRoom,
+        onSelect: 'selectBenefitsRoom',
+        classPrefix: 'bn',
+        noteClass: 'bn-attn',
+        nameHtml: r => `${r.Room || r.RoomNumber}${roomRoster(r.RoomNumber).filter(needsAttention).length ? ' <span style="color:#fca5a5;">*</span>' : ''}`,
+        note: rn => {
+            const attn = roomRoster(rn).filter(needsAttention).length;
+            return attn ? `${attn} need attention` : '';
+        },
+    });
     renderBenefitsRoom();
 }
 

@@ -89,7 +89,7 @@ const REPORT_IDS = {
 const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
 
 async function init() {
-    await Promise.all([loadClassrooms(), loadStudents()]);
+    await Promise.all([loadClassrooms(), loadStudents(), loadGuidelines()]);
     await loadReports();
 }
 

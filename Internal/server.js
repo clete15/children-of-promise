@@ -2895,6 +2895,21 @@ function handleRequest(req, res) {
         return sendJSON(res, 200, rows);
     }
 
+    /* GET the F/R/P + CCAP guidelines and the in-force year (internal - protected).
+       The server is the single source of truth for these numbers; the client fetches
+       them here at page load instead of keeping its own copy, so updating the tables
+       in ONE place (this file) flows to every page automatically. */
+    if (req.method === 'GET' && url === '/api/frp-guidelines') {
+        if (!checkAuth(req, res)) return;
+        const t = usdaTables();
+        return sendJSON(res, 200, {
+            year: t.year,
+            usdaFree: t.free,
+            usdaReduced: t.reduced,
+            ccap: ccapTable(),
+        });
+    }
+
     // POST new classroom (internal - protected)
     if (req.method === 'POST' && url === '/api/classrooms') {
         if (!checkAuth(req, res)) return;

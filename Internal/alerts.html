@@ -67,7 +67,8 @@ async function init() {
         const [sRes, wRes, stRes] = await Promise.all([
             apiFetch('/api/students'),
             apiFetch('/api/waitinglist'),
-            apiFetch('/api/staff').catch(() => null)
+            apiFetch('/api/staff').catch(() => null),
+            loadGuidelines()   // authoritative CCAP thresholds from the server
         ]);
         const students = await sRes.json();
         const waitlist = await wRes.json();

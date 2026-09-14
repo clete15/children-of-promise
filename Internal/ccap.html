@@ -84,6 +84,7 @@ async function init() {
         const [sRes, cRes] = await Promise.all([apiFetch('/api/students'), apiFetch('/api/classrooms')]);
         students = await sRes.json();
         classrooms = await cRes.json();
+        await loadGuidelines();   // authoritative CCAP thresholds from the server
         showTab('roster');
     } catch (e) {
         document.getElementById('ccapBody').innerHTML = '<div style="color:red;padding:20px;">Error loading data: ' + e.message + '</div>';

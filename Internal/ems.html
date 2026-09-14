@@ -274,7 +274,7 @@ let isNewMode = false;
 let waitlistId = null;
 
 async function init() {
-    await Promise.all([loadClassrooms(), loadStudents()]);
+    await Promise.all([loadClassrooms(), loadStudents(), loadGuidelines()]);
     populateRoomDropdowns();
     buildRoomNav();
     applyFilter();
@@ -312,26 +312,25 @@ function onActiveOnlyChange() {
 }
 
 function buildViewSidebar() {
-    const sidebar = document.getElementById('viewSidebar');
-    if (!sidebar) return;
     const rooms = classrooms.map(r => r.RoomNumber);
     if ((!activeRoom || activeRoom === 'All') && rooms.length) { activeRoom = rooms[0]; activeRoomIndex = 0; }
     const hideInactive = activeOnly();
-    sidebar.innerHTML = rooms.map(rn => {
-        const cr = getClassroom(rn);
-        const inRoom = students.filter(s => String(s.RoomNumber) === String(rn));
-        const activeCount = inRoom.filter(s => isTruthy(s.Active)).length;
-        const inactiveCount = inRoom.length - activeCount;
-        const count = hideInactive ? activeCount : inRoom.length;
-        const isActive = String(activeRoom) === String(rn);
-        // When showing everyone, call out how many of them are inactive.
-        const note = (!hideInactive && inactiveCount)
-            ? ` <span style="color:#fca5a5;">(${inactiveCount} inactive)</span>` : '';
-        return `<button class="${isActive ? 'active' : ''}" onclick="setRoomFilter('${rn}')">
-            <div class="em-room">${cr ? cr.Room : rn}</div>
-            <div class="em-room-count">${count} student${count !== 1 ? 's' : ''}${note}</div>
-        </button>`;
-    }).join('');
+    // Shared shell (renderRoomSidebar in app.js); this page supplies the student-count note.
+    renderRoomSidebar({
+        el: 'viewSidebar',
+        activeRoom: activeRoom,
+        onSelect: 'setRoomFilter',
+        classPrefix: 'em',
+        note: rn => {
+            const inRoom = students.filter(s => String(s.RoomNumber) === String(rn));
+            const activeCount = inRoom.filter(s => isTruthy(s.Active)).length;
+            const inactiveCount = inRoom.length - activeCount;
+            const count = hideInactive ? activeCount : inRoom.length;
+            const extra = (!hideInactive && inactiveCount)
+                ? ` <span style="color:#fca5a5;">(${inactiveCount} inactive)</span>` : '';
+            return `${count} student${count !== 1 ? 's' : ''}${extra}`;
+        },
+    });
 }
 
 function setRoomFilter(room) {
