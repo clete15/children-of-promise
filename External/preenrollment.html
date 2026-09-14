@@ -158,7 +158,7 @@
             <div class="form-row">
                 <div class="form-group child-birthDateGroup">
                     <label class="child-birthDateLabel">Child's Date of Birth <span class="required">*</span></label>
-                    <input type="date" class="child-birthDate" required>
+                    <input type="date" class="child-birthDate" required onchange="deriveProgram(this)">
                 </div>
                 <div class="form-group">
                     <label class="child-startDateLabel">Desired Start Date</label>
@@ -255,14 +255,6 @@
                 <option value="">Select</option>
                 <option value="Both Parents">Both Parents</option>
                 <option value="Single Parent">Single Parent</option>
-            </select>
-        </div>
-        <div class="form-group">
-            <label>Does the child have an IEP or have they been referred for special education evaluation? <span class="required">*</span></label>
-            <select id="iep" required>
-                <option value="">Select</option>
-                <option value="Yes">Yes</option>
-                <option value="No">No</option>
             </select>
         </div>
     </div>
@@ -472,6 +464,42 @@
 </footer>
 
 <script>
+/* Pick the program from the child's date of birth so families do not have to work
+   out which age band applies. It sets the program select and then runs the same
+   toggleAgeGroup the manual pick would, so the scored-questions section stays in
+   sync. Bands match the program options:
+     under 2 years        -> 0-2  Infant & Toddler
+     2 up to 3 years      -> 2-3  2-Year-Old Program
+     3 up to 5 years      -> 3-5  Pre-School
+     5 years and older    -> ba   Before & Afterschool (school age)
+   Families can still change the choice afterward; this only fills it in. */
+function deriveProgram(birthInput) {
+    const block = birthInput.closest('.child-block');
+    if (!block) return;
+    // If the child is not yet born, toggleNotBorn already sets the band; leave it.
+    const notBorn = block.querySelector('.child-notBorn');
+    if (notBorn && notBorn.checked) return;
+
+    const ageSelect = block.querySelector('.child-ageGroup');
+    if (!ageSelect || !birthInput.value) return;
+
+    const dob = new Date(birthInput.value);
+    if (isNaN(dob)) return;
+    const now = new Date();
+    let years = now.getFullYear() - dob.getFullYear();
+    const m = now.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) years--;
+
+    let band;
+    if (years < 2)      band = '0-2';
+    else if (years < 3) band = '2-3';
+    else if (years < 5) band = '3-5';
+    else                band = 'ba';
+
+    ageSelect.value = band;
+    toggleAgeGroup(ageSelect);
+}
+
 function toggleAgeGroup(select) {
     const scoredSection = document.getElementById('scoredQuestionsSection');
     if (!scoredSection) return;
@@ -556,7 +584,7 @@ function addChild() {
         <div class="form-row">
             <div class="form-group child-birthDateGroup">
                 <label class="child-birthDateLabel">Child's Date of Birth <span class="required">*</span></label>
-                <input type="date" class="child-birthDate child-highlight" required>
+                <input type="date" class="child-birthDate child-highlight" required onchange="deriveProgram(this)">
             </div>
             <div class="form-group">
                 <label class="child-startDateLabel">Desired Start Date</label>

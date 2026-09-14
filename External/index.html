@@ -6,6 +6,12 @@
     <title>Children Of Promise - Home</title>
     <link rel="stylesheet" href="./styles.css">
     <style>
+        html { scroll-behavior: smooth; }
+        /* Gentle bounce on the "scroll down for pictures" arrow. */
+        @keyframes cofp-bounce {
+            0%, 100% { transform: translateY(0); }
+            50%      { transform: translateY(6px); }
+        }
         .hero-photo {
             position: relative;
             background: url(,'./images/websitepics/main-building-porch.jpg') center/cover no-repeat;
@@ -95,10 +101,16 @@
         </div>
     </div>
     <a href="./preenrollment.html" class="btn" style="display:inline-block;background:var(--accent);color:#1e293b;padding:13px 36px;border-radius:var(--radius);font-weight:700;text-decoration:none;font-size:0.95rem;box-shadow:0 4px 12px rgba(0,0,0,0.2);transition:transform 0.15s;">Start Pre Enrollment</a>
+
+    <!-- Points visitors at the facility photos further down the page. -->
+    <a href="#our-facility" style="display:block;margin-top:18px;color:rgba(255,255,255,0.92);text-decoration:none;font-size:0.9rem;font-weight:600;">
+        Scroll down for pictures of our facilities
+        <div style="font-size:1.6rem;line-height:1;margin-top:4px;animation:cofp-bounce 1.8s ease-in-out infinite;">↓</div>
+    </a>
 </div>
 
 <!-- PHOTO GALLERY -->
-<div class="gallery-section">
+<div class="gallery-section" id="our-facility">
     <h2>Our Facility</h2>
     <p class="subtitle">A look inside our campus — 9 acres of learning, play, and growth.</p>
 
