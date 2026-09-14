@@ -2633,42 +2633,11 @@ function applyIdentityToBar() {
 }
 
 /* ── Theme ──
-   Remembered per browser rather than per person, because it is a property of the
-   screen someone is looking at, not of their record. Applied before the record
-   loads so the page never flashes light and then switches.
-
-   Honours the operating system's setting on a first visit and then stops, because
-   once somebody has chosen, that choice should stick even if they later change the
-   system default. */
-const THEME_KEY = 'copStaffTheme';
-
-function prefersDark() {
-    try {
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    } catch (e) { return false; }
-}
-
-function applyTheme(dark) {
-    document.body.classList.toggle('sp-dark', !!dark);
-    const btn = $('spTheme');
-    if (btn) {
-        // Names what clicking does, not what is currently on.
-        btn.textContent = dark ? '\u2600 Light mode' : '\u263e Dark mode';
-        btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
-    }
-}
-
-(function initTheme() {
-    let saved = null;
-    try { saved = localStorage.getItem(THEME_KEY); } catch (e) { /* private browsing */ }
-    applyTheme(saved === null ? prefersDark() : saved === 'dark');
-})();
-
-$('spTheme').addEventListener('click', () => {
-    const dark = !document.body.classList.contains('sp-dark');
-    applyTheme(dark);
-    try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch (e) {}
-});
+   The light/dark toggle (THEME_KEY, prefersDark, applyTheme, initTheme, and the
+   #spTheme click handler) now lives once in app.js, which this page loads. It was
+   also declared here, and two top-level `const THEME_KEY` in the same global scope
+   is a redeclaration SyntaxError that stopped the WHOLE inline script from running —
+   which is why the portal froze on "Loading…". Removed from here; app.js owns it. */
 
 /* Bar actions, for a staff member signed in as themselves. Attached once: these
    elements live in the page shell rather than the rendered body. */
