@@ -16,7 +16,9 @@ USE CofPMillstadt;
 
      Room 7:  "Pre-School 2"            ->  "2 & 3 Year Olds"
               (converted from a second pre-school room into a 2s-and-3s room;
-               AgeRange updated from "3 to 5 yrs" to "24 - 48 Months")
+               AgeRange "3 to 5 yrs" -> "24 - 48 Months"; DCFSCapacity 12 -> 8.
+               The lower capacity flows to the attendance chart and every other
+               place automatically, because they all read DCFSCapacity by RoomNumber.)
 
    The ONE place that matches a room by NAME rather than by number is the PAS
    cross-check, which compares each staff member's free-text Classroom against the
@@ -31,7 +33,9 @@ UPDATE dimClassrooms
 
 UPDATE dimClassrooms
    SET Room = '2 & 3 Year Olds',
-       AgeRange = '24 - 48 Months'
+       AgeRange = '24 - 48 Months',
+       DCFSCapacity = 8,     -- was 12 as Pre-School 2; a 2s-and-3s room licenses 8
+       RequiredSlots = '8'   -- kept in step with the licensed capacity
  WHERE RoomNumber = 7;
 
 -- ── 2. Legacy rptMasterEnrollment.Room string ──
