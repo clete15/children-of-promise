@@ -440,6 +440,79 @@ function bit(v) {
     return 'NULL';
 }
 
+/* ── Free/Reduced/Paid + CCAP eligibility — ONE source of truth ──────────────
+   The persisted F_R_P_Food value is set here on the server, so the server is the
+   authority. This used to be computed in three inconsistent server places (POST and
+   PUT hardcoded to the 2026 table, the bulk recalc date-based, the CCAP report fixed
+   to 2025) — which meant an individual save and a bulk recalc could disagree, and the
+   saved value used next year's thresholds before July 1. Consolidated here and made
+   date-based so every path agrees and rolls over on July 1 like the client (app.js).
+
+   The numbers MUST match Internal/app.js USDA_GUIDELINES / CCAP_GUIDELINES — the client
+   only draws a live preview; if the two drift the preview lies about what gets saved.
+   Each array is 8 entries indexed by household size 1..8 (8 = "8 or more"); add the
+   next year's official published figures here (and in app.js) each spring. */
+const USDA_GUIDELINES = {
+    2025: { free: [20163,27339,34515,41691,48867,56043,63219,70395], reduced: [28694,38907,49120,59333,69546,79759,89972,100185] },
+    2026: { free: [20748,28132,35516,42900,50284,57668,65052,72436], reduced: [29526,40034,50542,61050,71558,82066,92574,103082] },
+};
+const CCAP_GUIDELINES = {
+    2025: [35213,47588,59963,72338,84713,97088,109463,121838],
+    2026: [35910,48690,61470,74250,87030,99810,112590,125370],
+};
+
+// Which guideline year is in force: effective July 1 (month index 6) each year.
+function frpYear(now) {
+    const d = now || new Date();
+    return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1;
+}
+function usdaTables() {
+    const y = frpYear();
+    const g = USDA_GUIDELINES[y] || USDA_GUIDELINES[Object.keys(USDA_GUIDELINES).pop()];
+    return { year: y, free: g.free, reduced: g.reduced };
+}
+function ccapTable() {
+    const y = frpYear();
+    return CCAP_GUIDELINES[y] || CCAP_GUIDELINES[Object.keys(CCAP_GUIDELINES).pop()];
+}
+
+/* The single F/R/P rule. Free is categorical (any public benefit, foster, military,
+   PFA) or income at/below the free line; Reduced is at/below the reduced line; else
+   Paid. Blank income is treated as 100000 (→ Paid) exactly as the client does. */
+function computeFrp({ income, householdSize, benefits, isFoster, isMilitary, isPFA }) {
+    const t = usdaTables();
+    const idx = Math.max(1, Math.min(parseInt(householdSize, 10) || 1, 8)) - 1;
+    const inc = parseInt(income, 10) || 100000;
+    if (benefits || isFoster || isMilitary || isPFA || inc <= t.free[idx]) return 'Free';
+    if (inc <= t.reduced[idx]) return 'Reduced';
+    return 'Paid';
+}
+
+// The F_R_P_Food column as a SQL CASE, from the in-force tables. Used by the bulk
+// recalculate so it applies the exact same rule and year as an individual save.
+function frpSqlCase() {
+    const t = usdaTables();
+    const bySize = arr => 'CASE ISNULL(HouseholdSize,1) '
+        + arr.map((v, i) => i < 7 ? `WHEN ${i + 1} THEN ${v}` : `ELSE ${v}`).join(' ') + ' END';
+    return `CASE
+        WHEN ISNULL(PublicBenefits,'') <> '' THEN 'Free'
+        WHEN Category = 'Foster' THEN 'Free'
+        WHEN Military = 'Yes' OR Military = 'YES' THEN 'Free'
+        WHEN PFA_PI_na = 'PFA' THEN 'Free'
+        WHEN ISNULL(HouseholdIncome,100000) <= ${bySize(t.free)} THEN 'Free'
+        WHEN ISNULL(HouseholdIncome,100000) <= ${bySize(t.reduced)} THEN 'Reduced'
+        ELSE 'Paid' END`;
+}
+
+// The CCAP-eligible income test as a SQL boolean expression, from the in-force CCAP
+// table — so the Reports "families who may qualify for CCAP" list rolls over too.
+function ccapSqlPredicate(incomeCol, sizeCol) {
+    const c = ccapTable();
+    return '(' + c.map((v, i) =>
+        i < 7 ? `(${sizeCol}=${i + 1} AND ${incomeCol}<=${v})`
+              : `(${sizeCol}>=8 AND ${incomeCol}<=${v})`).join(' OR ') + ')';
+}
+
 // ── sqlcmd transport encoding ──
 // runSQL() shells out to sqlcmd with `-s "|" -W -h -1`, so results come back as
 // one line per row with columns separated by '|'. That means any stored value
@@ -2864,18 +2937,15 @@ function handleRequest(req, res) {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             console.log('[POST] Saving:', d.firstName, d.lastName);
-            // Auto-calculate F/R/P based on USDA income guidelines (2026-2027)
-            const freeThresholds  = [20748,28132,35516,42900,50284,57668,65052,72436];
-            const reducedThresholds = [29526,40034,50542,61050,71558,82066,92574,103082];
-            const hhSize = Math.max(1, Math.min(parseInt(d.householdSize)||1, 8)) - 1;
-            const income = parseInt(d.householdIncome) || 100000;
-            const benefits = d.publicBenefits || '';
-            const isFoster = d.category === 'Foster';
-            const isMilitary = d.military === true || d.military === 'Yes';
-            const isPFA = d.pfaPiNa === 'PFA';
-            let frpFood = 'Paid';
-            if (benefits || isFoster || isMilitary || isPFA || income <= freeThresholds[hhSize]) frpFood = 'Free';
-            else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
+            // Auto-calculate F/R/P from the one shared, date-based rule (see computeFrp).
+            const frpFood = computeFrp({
+                income: d.householdIncome,
+                householdSize: d.householdSize,
+                benefits: d.publicBenefits || '',
+                isFoster: d.category === 'Foster',
+                isMilitary: d.military === true || d.military === 'Yes',
+                isPFA: d.pfaPiNa === 'PFA',
+            });
             // Keep the link back to the pre-enrollment intake record so the rich
             // family/risk-factor data stays reachable after the child is enrolled.
             const preId = parseInt(d.preEnrollmentId);
@@ -2973,22 +3043,19 @@ function handleRequest(req, res) {
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
 
-            // Auto-calculate F_R_P_Food from income/size/benefits (USDA 2026-2027)
-            const freeThresholds  = [20748,28132,35516,42900,50284,57668,65052,72436];
-            const reducedThresholds = [29526,40034,50542,61050,71558,82066,92574,103082];
+            // Recompute F_R_P_Food only when both income and size are supplied, using the
+            // one shared, date-based rule (see computeFrp) so a save and a bulk recalc agree.
             const hasIncome = d.householdIncome !== undefined && d.householdIncome !== '';
             const hasSize   = d.householdSize !== undefined && d.householdSize !== '';
             if (hasIncome && hasSize) {
-                const hhSize = Math.max(1, Math.min(parseInt(d.householdSize)||1, 8)) - 1;
-                const income = parseInt(d.householdIncome) || 100000;
-                const benefits = d.publicBenefits || '';
-                const isFoster = d.category === 'Foster';
-                const isMilitary = d.military === true || d.military === 'Yes';
-                const isPFA = d.pfaPiNa === 'PFA';
-                let frpFood = 'Paid';
-                if (benefits || isFoster || isMilitary || isPFA || income <= freeThresholds[hhSize]) frpFood = 'Free';
-                else if (income <= reducedThresholds[hhSize]) frpFood = 'Reduced';
-                d.frpFood = frpFood;
+                d.frpFood = computeFrp({
+                    income: d.householdIncome,
+                    householdSize: d.householdSize,
+                    benefits: d.publicBenefits || '',
+                    isFoster: d.category === 'Foster',
+                    isMilitary: d.military === true || d.military === 'Yes',
+                    isPFA: d.pfaPiNa === 'PFA',
+                });
             }
 
             const fields = [];
@@ -6007,31 +6074,14 @@ ELSE
     // POST recalculate all F/R/P values (internal - protected)
     if (req.method === 'POST' && url === '/api/recalculate-frp') {
         if (!checkAuth(req, res)) return;
-        // Auto-select thresholds based on current date (effective July 1 each year)
-        const now = new Date();
-        const usdaYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-        const guidelines = {
-            2025: { free: [20163,27339,34515,41691,48867,56043,63219,70395], reduced: [28694,38907,49120,59333,69546,79759,89972,100185] },
-            2026: { free: [20748,28132,35516,42900,50284,57668,65052,72436], reduced: [29526,40034,50542,61050,71558,82066,92574,103082] },
-        };
-        const g = guidelines[usdaYear] || guidelines[2026];
-        const f = g.free;
-        const r2 = g.reduced;
-        console.log(`[FRP] Using ${usdaYear}-${usdaYear+1} thresholds`);
-        const sql = `UPDATE rptMasterEnrollment SET F_R_P_Food = 
-            CASE 
-                WHEN ISNULL(PublicBenefits,'') <> '' THEN 'Free'
-                WHEN Category = 'Foster' THEN 'Free'
-                WHEN Military = 'Yes' OR Military = 'YES' THEN 'Free'
-                WHEN PFA_PI_na = 'PFA' THEN 'Free'
-                WHEN ISNULL(HouseholdIncome,100000) <= CASE ISNULL(HouseholdSize,1) WHEN 1 THEN ${f[0]} WHEN 2 THEN ${f[1]} WHEN 3 THEN ${f[2]} WHEN 4 THEN ${f[3]} WHEN 5 THEN ${f[4]} WHEN 6 THEN ${f[5]} WHEN 7 THEN ${f[6]} ELSE ${f[7]} END THEN 'Free'
-                WHEN ISNULL(HouseholdIncome,100000) <= CASE ISNULL(HouseholdSize,1) WHEN 1 THEN ${r2[0]} WHEN 2 THEN ${r2[1]} WHEN 3 THEN ${r2[2]} WHEN 4 THEN ${r2[3]} WHEN 5 THEN ${r2[4]} WHEN 6 THEN ${r2[5]} WHEN 7 THEN ${r2[6]} ELSE ${r2[7]} END THEN 'Reduced'
-                ELSE 'Paid'
-            END
+        // Same rule and same date-based year as an individual save (see frpSqlCase).
+        const yr = frpYear();
+        console.log(`[FRP] bulk recalculate using ${yr}-${yr + 1} thresholds`);
+        const sql = `UPDATE rptMasterEnrollment SET F_R_P_Food = ${frpSqlCase()}
             WHERE Active = 'Yes' OR Active = 'YES'`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        sendJSON(res, 200, { success: true, message: `All F/R/P values recalculated using ${usdaYear}-${usdaYear+1} thresholds` });
+        sendJSON(res, 200, { success: true, message: `All F/R/P values recalculated using ${yr}-${yr + 1} thresholds` });
         return;
     }
 
@@ -6048,7 +6098,7 @@ ELSE
             incomeProof:   `SELECT SUM(CASE WHEN ISNULL(ProofOfIncomeUploaded,0)=1 THEN 1 ELSE 0 END) AS Uploaded, SUM(CASE WHEN ISNULL(ProofOfIncomeUploaded,0)=0 THEN 1 ELSE 0 END) AS Missing FROM rptMasterEnrollment WHERE (Active='Yes' OR Active='YES') AND (PFA_PI_na='PFA' OR PFA_PI_na='PI')`,
             flags:         `SELECT SUM(CASE WHEN IEP='Yes' OR IEP='YES' THEN 1 ELSE 0 END) AS IEP, SUM(CASE WHEN Military='Yes' OR Military='YES' THEN 1 ELSE 0 END) AS Military FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES'`,
             waitlistSummary: `SELECT AgeGroup, COUNT(*) AS Total, AVG(CAST(Score AS FLOAT)) AS AvgScore FROM PreEnrollment WHERE WaitlistStatus NOT IN ('Enrolled','Declined') GROUP BY AgeGroup`,
-            ccapEligible:  `SELECT e.First_Name,e.Last_Name,r.Room,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(p.FirstName+' '+p.LastName,'') AS ParentName,ISNULL(p.Phone,'') AS ParentPhone FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber LEFT JOIN (SELECT ChildName,FirstName,LastName,Phone,ROW_NUMBER() OVER (PARTITION BY ChildName ORDER BY Id DESC) AS rn FROM PreEnrollment) p ON p.ChildName LIKE '%'+e.First_Name+'%' AND p.rn=1 WHERE (e.Active='Yes' OR e.Active='YES') AND e.Category<>'CCAP' AND e.Category<>'Foster' AND ISNULL(e.HouseholdIncome,0)>0 AND ISNULL(e.HouseholdSize,0)>0 AND ((e.HouseholdSize=1 AND e.HouseholdIncome<=35213) OR (e.HouseholdSize=2 AND e.HouseholdIncome<=47588) OR (e.HouseholdSize=3 AND e.HouseholdIncome<=59963) OR (e.HouseholdSize=4 AND e.HouseholdIncome<=72338) OR (e.HouseholdSize=5 AND e.HouseholdIncome<=84713) OR (e.HouseholdSize=6 AND e.HouseholdIncome<=97088) OR (e.HouseholdSize=7 AND e.HouseholdIncome<=109463) OR (e.HouseholdSize>=8 AND e.HouseholdIncome<=121838)) ORDER BY e.Last_Name`,
+            ccapEligible:  `SELECT e.First_Name,e.Last_Name,r.Room,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(p.FirstName+' '+p.LastName,'') AS ParentName,ISNULL(p.Phone,'') AS ParentPhone FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber LEFT JOIN (SELECT ChildName,FirstName,LastName,Phone,ROW_NUMBER() OVER (PARTITION BY ChildName ORDER BY Id DESC) AS rn FROM PreEnrollment) p ON p.ChildName LIKE '%'+e.First_Name+'%' AND p.rn=1 WHERE (e.Active='Yes' OR e.Active='YES') AND e.Category<>'CCAP' AND e.Category<>'Foster' AND ISNULL(e.HouseholdIncome,0)>0 AND ISNULL(e.HouseholdSize,0)>0 AND ${ccapSqlPredicate('e.HouseholdIncome','e.HouseholdSize')} ORDER BY e.Last_Name`,
             foodDetail:    `SELECT r.Room,e.Last_Name,e.First_Name,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.F_R_P_Food,'') AS FRP,ISNULL(e.PublicBenefits,'') AS Benefits FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber WHERE e.Active='Yes' OR e.Active='YES' ORDER BY r.Room,e.Last_Name`,
             summerProgram: `IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='SummerProgram') SELECT s.ChildLastName,s.ChildFirstName,s.ChildAge,ISNULL(e.F_R_P_Food,'Unknown') AS FRP,s.Days,s.ParentLastName,s.ParentFirstName,s.ParentPhone FROM SummerProgram s LEFT JOIN rptMasterEnrollment e ON s.ChildFirstName=e.First_Name AND s.ChildLastName=e.Last_Name ORDER BY s.ChildLastName`,
         };
