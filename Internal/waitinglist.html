@@ -10,8 +10,12 @@
 
         /* ── TOOLBAR ── */
         .wl-toolbar {
-            max-width: 100%;
-            margin: 12px 20px 0;
+            /* Same cap and centring as the table below, so the tabs and search sit
+               over the columns rather than off to the far edges. */
+            max-width: 1300px;
+            width: 100%;
+            margin: 12px auto 0;
+            padding: 0 20px;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -43,7 +47,13 @@
 
         /* ── TABLE CONTAINER ── */
         .wl-container {
-            margin: 10px 20px 30px;
+            /* Capped and centred so the columns sit at a readable density instead of
+               being stretched edge-to-edge across a wide screen. On narrower screens
+               it still fills the width and scrolls horizontally. */
+            max-width: 1300px;
+            margin: 10px auto 30px;
+            padding: 0 20px;
+            width: 100%;
             display: flex;
             flex-direction: column;
             height: calc(100vh - 160px);
