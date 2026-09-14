@@ -223,7 +223,6 @@
                                 <div class="checkbox-item"><input type="checkbox" id="benMedicaid" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benMedicaid">Medicaid</label></div>
                                 <div class="checkbox-item"><input type="checkbox" id="benSNAP" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benSNAP">SNAP</label></div>
                                 <div class="checkbox-item"><input type="checkbox" id="benTANF" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benTANF">TANF</label></div>
-                                <div class="checkbox-item"><input type="checkbox" id="benCCAP" onchange="calcFRP('householdIncome','householdSize','frpFood','');autoPayType()"><label for="benCCAP">CCAP</label></div>
                             </div>
                         </div>
                     </div>
@@ -437,7 +436,6 @@ function loadRecord(i) {
     document.getElementById('benMedicaid').checked = ben.includes('Medicaid');
     document.getElementById('benSNAP').checked     = ben.includes('SNAP');
     document.getElementById('benTANF').checked     = ben.includes('TANF');
-    document.getElementById('benCCAP').checked     = ben.includes('CCAP');
     document.getElementById('proofOfIncome').checked = (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1);
 
     calcFRP('householdIncome','householdSize','frpFood','');
@@ -473,7 +471,7 @@ function setBenefitsReadOnly(readOnly, s) {
 function clearForm() {
     ['firstName','lastName','birthDate','startDate','cityTown','daysOld','householdIncome','householdSize']
         .forEach(id => document.getElementById(id).value = '');
-    ['monday','tuesday','wednesday','thursday','friday','iep','military','benWIC','benMedicaid','benSNAP','benTANF','benCCAP','proofOfIncome']
+    ['monday','tuesday','wednesday','thursday','friday','iep','military','benWIC','benMedicaid','benSNAP','benTANF','proofOfIncome']
         .forEach(id => document.getElementById(id).checked = false);
     document.getElementById('active').value = 'Yes';
     document.getElementById('category').value = '';
@@ -487,15 +485,6 @@ function calcDaysOld() {
     if (!bd) { el.value = ''; return; }
     const diff = Math.floor((Date.now() - new Date(bd).getTime()) / 86400000);
     el.value = diff > 0 ? diff : '';
-}
-
-// Checking CCAP as a benefit implies the CCAP pay type (and unchecking clears it).
-function autoPayType() {
-    const ccapChecked = document.getElementById('benCCAP')?.checked;
-    const payType = document.getElementById('category');
-    if (!payType) return;
-    if (ccapChecked && (payType.value === '' || payType.value === 'Paid')) payType.value = 'CCAP';
-    else if (!ccapChecked && payType.value === 'CCAP') payType.value = '';
 }
 
 // ── NEW STUDENT ──
@@ -637,7 +626,11 @@ function maybePrefillFromWaitlist() {
         document.getElementById('benMedicaid').checked = ben.includes('medicaid');
         document.getElementById('benSNAP').checked     = ben.includes('snap');
         document.getElementById('benTANF').checked     = ben.includes('tanf');
-        document.getElementById('benCCAP').checked     = ben.includes('ccap');
+    }
+    // A family that reported CCAP on the waiting list is set to the CCAP pay type
+    // (CCAP is a subsidy/pay type now, not a public-benefit checkbox).
+    if ((d.publicBenefits || '').toLowerCase().includes('ccap')) {
+        document.getElementById('category').value = 'CCAP';
     }
     if (d.fosterAdopted) document.getElementById('category').value = 'Foster';
 

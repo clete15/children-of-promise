@@ -101,10 +101,10 @@
 <script src="/staff/auth.js"></script>
 <script>
 let activeBenefitsRoom = null;
-/* CCAP is included so the Benefits & Eligibility page is the single, complete home
-   for public benefits — matching the five checkboxes ems used to carry. Adding it here
-   flows through the header, the per-row checkbox, and the save filter automatically. */
-const BENEFIT_KEYS = ['WIC','Medicaid','SNAP','TANF','CCAP'];
+/* CCAP is intentionally NOT a public-benefit checkbox: it is a subsidy / pay type (set
+   in the Pay column), not a food-program benefit like WIC/Medicaid/SNAP/TANF. It used to
+   appear in both places, which double-recorded the same fact. */
+const BENEFIT_KEYS = ['WIC','Medicaid','SNAP','TANF'];
 
 async function init() {
     await Promise.all([loadClassrooms(), loadStudents(), loadGuidelines()]);

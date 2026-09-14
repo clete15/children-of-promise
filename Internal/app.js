@@ -190,7 +190,7 @@ function collectBenefits(prefix) {
     if (document.getElementById(p + 'benMedicaid')?.checked) b.push('Medicaid');
     if (document.getElementById(p + 'benSNAP')?.checked)     b.push('SNAP');
     if (document.getElementById(p + 'benTANF')?.checked)     b.push('TANF');
-    if (document.getElementById(p + 'benCCAP')?.checked)     b.push('CCAP');
+    // CCAP is a pay type (Category), not a public benefit — it is not collected here.
     return b.join(', ');
 }
 
