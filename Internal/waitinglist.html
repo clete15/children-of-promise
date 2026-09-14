@@ -476,7 +476,7 @@ function renderTable() {
             <td>${programSelect(r)}</td>
             <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
             <td><div class="flag-list">${flags}</div></td>
-            <td style="background:var(--sp-warn-bg);font-weight:600;font-size:0.74rem;">${r.HouseholdIncome || '<span style="color:var(--sp-warn-fg);">—</span>'}</td>
+            <td style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);font-weight:700;font-size:0.74rem;">${r.HouseholdIncome || '—'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td>
                 <select class="status-select" id="status-${r.Id}" onchange="handleStatusChange(${parseInt(r.Id)}, this)">

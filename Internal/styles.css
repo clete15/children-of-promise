@@ -47,10 +47,13 @@ body.sp-dark {
     --sp-surface-2: #212b41;
     --sp-border: #2f3b52;
     --sp-border-in: #45526b;
-    --sp-text: #e8edf6;
-    --sp-text-2: #bcc7da;
-    --sp-muted: #9aa7bd;
-    --sp-quiet: #7d8a9f;
+    --sp-text: #f1f5fb;
+    --sp-text-2: #cdd7e8;
+    /* Brightened for dark mode: the old muted/quiet greys (#9aa7bd / #7d8a9f) were
+       too dim on the dark surfaces — table headers, contact/city/date cells and other
+       secondary text washed out. These lift the contrast so that text stays legible. */
+    --sp-muted: #b3c0d6;
+    --sp-quiet: #93a1b8;
     --sp-accent: #7ea6ff;
     --sp-accent-soft: #1e2a44;
 
