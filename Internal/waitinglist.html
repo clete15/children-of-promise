@@ -25,23 +25,23 @@
         .wl-search {
             flex: 1;
             min-width: 180px;
-            max-width: 320px;
-            padding: 7px 12px;
-            border: 1px solid var(--border);
+            max-width: 340px;
+            padding: 8px 12px;
+            border: 1px solid var(--sp-border-in);
             border-radius: 6px;
-            font-size: 0.82rem;
+            font-size: 0.88rem;
             font-family: inherit;
-            background: var(--sp-surface);
+            background: var(--sp-field-bg);
             color: var(--sp-text);
         }
         .wl-search:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-        .wl-count { font-size: 0.78rem; color: var(--sp-muted); white-space: nowrap; }
+        .wl-count { font-size: 0.85rem; color: var(--sp-muted); white-space: nowrap; }
 
         /* ── TABS ── */
         .mode-toggle { display:flex; background:var(--sp-surface-2); border:1px solid var(--sp-border); border-radius:10px; padding:4px; gap:4px; }
-        .toggle-btn { padding:8px 14px; border:none; border-radius:7px; font-size:0.78rem; font-weight:700; cursor:pointer; color:var(--sp-muted); background:transparent; transition:background 0.18s,color 0.18s; white-space:nowrap; text-align:center; line-height:1.3; }
+        .toggle-btn { padding:9px 15px; border:none; border-radius:7px; font-size:0.86rem; font-weight:700; cursor:pointer; color:var(--sp-muted); background:transparent; transition:background 0.18s,color 0.18s; white-space:nowrap; text-align:center; line-height:1.3; }
         .toggle-btn.active { background:var(--sp-surface); color:var(--primary); box-shadow:0 1px 6px rgba(0,0,0,0.12); }
-        .tab-count { font-size: 0.72rem; font-weight: 600; opacity: 0.75; }
+        .tab-count { font-size: 0.78rem; font-weight: 600; opacity: 0.75; }
         .tab-pending { font-size: 0.62rem; font-weight: 700; color: var(--sp-bad-br); }
         .toggle-btn.active .tab-pending { color: var(--danger); }
 
@@ -83,7 +83,7 @@
             min-width: 1000px;
             border-collapse: collapse;
             background: var(--sp-surface);
-            font-size: 0.76rem;
+            font-size: 0.86rem;
         }
         .wl-table thead tr {
             background: var(--sp-surface-2);
@@ -93,9 +93,9 @@
             z-index: 2;
         }
         .wl-table th {
-            padding: 8px 8px;
+            padding: 9px 8px;
             text-align: left;
-            font-size: 0.65rem;
+            font-size: 0.74rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -122,7 +122,7 @@
                editable field against the row rather than blending into it. */
             border: 1px solid var(--sp-border-in);
             border-radius: 4px;
-            font-size: 0.74rem;
+            font-size: 0.82rem;
             font-family: inherit;
             resize: none;
             min-height: 60px;
@@ -149,21 +149,23 @@
         /* ── BADGES ── */
         .score-badge {
             display: inline-block;
-            padding: 2px 8px;
+            padding: 3px 10px;
             border-radius: 20px;
             font-weight: 700;
-            font-size: 0.72rem;
+            font-size: 0.82rem;
             white-space: nowrap;
         }
         .score-high   { background: var(--sp-bad-bg); color: var(--sp-bad-fg); }
         .score-medium { background: var(--sp-warn-bg); color: var(--sp-warn-fg); }
         .score-low    { background: var(--sp-good-bg); color: var(--sp-good-fg); }
 
-        .flag-list { display: flex; flex-wrap: wrap; gap: 3px; max-width: 180px; }
+        /* Risk factors listed one per line in a single column, each as its own pill,
+           so a family's flags read down the cell instead of wrapping side to side. */
+        .flag-list { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 200px; }
         .flag {
-            padding: 1px 6px;
-            border-radius: 3px;
-            font-size: 0.62rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.74rem;
             font-weight: 700;
             background: var(--sp-accent-soft);
             color: var(--primary);
@@ -172,10 +174,10 @@
         .flag.high { background: var(--sp-bad-bg); color: var(--sp-bad-fg); }
 
         .status-select {
-            padding: 5px 6px;
-            border: 1px solid var(--border);
+            padding: 6px 8px;
+            border: 1px solid var(--sp-border-in);
             border-radius: 4px;
-            font-size: 0.72rem;
+            font-size: 0.82rem;
             font-family: inherit;
             cursor: pointer;
             width: 100%;
@@ -193,7 +195,7 @@
             color: var(--text-muted);
             font-size: 0.9rem;
         }
-        .submitted-date { font-size: 0.68rem; color: var(--text-muted); }
+        .submitted-date { font-size: 0.8rem; color: var(--text-muted); }
 
         /* ── ENROLL MODAL ── */
         .modal-overlay {
@@ -479,18 +481,18 @@ function renderTable() {
         const isPending = status === 'Pending';
 
         return `<tr class="${isPending ? 'row-pending' : ''}">
-            <td style="font-size:0.7rem;color:var(--text-muted);">${i + 1}</td>
+            <td style="font-size:0.8rem;color:var(--text-muted);">${i + 1}</td>
             <td style="white-space:nowrap;">
-                <strong style="font-size:0.78rem;">${r.LastName}, ${r.FirstName}</strong>
-                <div style="font-size:0.72rem;margin-top:2px;">${r.Phone || '—'}</div>
-                <div style="color:var(--text-muted);font-size:0.72rem;">${r.Email || ''}</div>
+                <strong style="font-size:0.9rem;">${r.LastName}, ${r.FirstName}</strong>
+                <div style="font-size:0.82rem;margin-top:3px;">${fmtPhone(r.Phone) || '—'}</div>
+                <div style="color:var(--text-muted);font-size:0.82rem;">${r.Email || ''}</div>
             </td>
-            <td style="font-size:0.72rem;white-space:nowrap;">${r.City || '—'}</td>
-            <td style="font-size:0.72rem;max-width:120px;">${r.ChildrenInfo || '—'}</td>
+            <td style="font-size:0.82rem;white-space:nowrap;">${r.City || '—'}</td>
+            <td style="font-size:0.82rem;max-width:140px;">${r.ChildrenInfo || '—'}</td>
             <td>${programSelect(r)}</td>
             <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
             <td><div class="flag-list">${flags}</div></td>
-            <td style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);font-weight:700;font-size:0.74rem;">${r.HouseholdIncome || '—'}</td>
+            <td style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);font-weight:700;font-size:0.86rem;">${r.HouseholdIncome ? fmtMoney(r.HouseholdIncome) : '—'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td>
                 <select class="status-select" id="status-${r.Id}" onchange="handleStatusChange(${parseInt(r.Id)}, this)">
@@ -533,7 +535,7 @@ function buildFlags(r) {
     if (r.ActiveMilitary === 'Yes')     flags.push(lo('Military'));
     if (r.PublicBenefits)               flags.push(lo('Public Benefits'));
     if (r.LivingSituation === 'Single Parent') flags.push(lo('Single Parent'));
-    return flags.join('') || '<span style="color:var(--text-muted);font-size:0.68rem;">None</span>';
+    return flags.join('') || '<span style="color:var(--text-muted);font-size:0.8rem;">None</span>';
 }
 
 function handleStatusChange(id, selectEl) {

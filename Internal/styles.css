@@ -411,7 +411,7 @@ body {
     box-shadow: var(--shadow);
 }
 .card-title {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -425,14 +425,14 @@ body {
 .form-row { display: flex; gap: 10px; }
 .form-row .form-group { flex: 1; }
 .form-group { margin-bottom: 9px; }
-.form-group label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); margin-bottom: 3px; }
+.form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); margin-bottom: 3px; }
 
 input, select, textarea {
     width: 100%;
-    padding: 6px 9px;
+    padding: 7px 10px;
     border: 1px solid var(--sp-border-in);
     border-radius: 5px;
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     /* Explicit, not inherited: some browsers force a near-black default fill and a
        dark text colour on form controls in dark mode, which made typed values and
        placeholders invisible. Setting both here keeps fields readable in both themes. */
@@ -461,7 +461,7 @@ input[readonly], input:disabled, select:disabled {
 }
 .checkbox-item { display: flex; align-items: center; gap: 5px; }
 .checkbox-item input[type="checkbox"] { width: auto; accent-color: var(--primary); }
-.checkbox-item label { font-size: 0.78rem; font-weight: 600; color: var(--text); margin: 0; cursor: pointer; }
+.checkbox-item label { font-size: 0.82rem; font-weight: 600; color: var(--text); margin: 0; cursor: pointer; }
 
 /* ── BUTTONS ── */
 .btn {

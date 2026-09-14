@@ -32,6 +32,22 @@
         .student-nav-arrow:disabled { background:var(--sp-border);color:var(--sp-quiet);cursor:not-allowed; }
         #viewStudentName { font-size:1rem;font-weight:800;color:var(--text); }
         #viewRecordCounter { font-size:0.72rem;color:var(--text-muted);margin-top:2px; }
+
+        /* Read-only Benefits & Eligibility summary values, styled to match the input
+           fields on the editable cards: same size, padding and field fill, so the
+           read-only summary reads as part of the same form rather than loose text. */
+        .bn-sum-val {
+            padding: 6px 9px;
+            border: 1px solid var(--sp-border);
+            border-radius: 5px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--sp-text);
+            background: var(--sp-surface-2);
+            min-height: 32px;
+            display: flex;
+            align-items: center;
+        }
     </style>
 </head>
 <body>
@@ -223,11 +239,11 @@
                                style="font-size:0.78rem;font-weight:700;text-decoration:none;color:var(--sp-accent);white-space:nowrap;">Edit on Benefits &amp; Eligibility →</a>
                         </div>
                         <div class="form-row">
-                            <div class="form-group"><label>Pay Type</label><div id="benSumPay" style="font-weight:700;">—</div></div>
-                            <div class="form-group"><label>Household Income</label><div id="benSumIncome" style="font-weight:700;">—</div></div>
-                            <div class="form-group"><label>Household Size</label><div id="benSumSize" style="font-weight:700;">—</div></div>
+                            <div class="form-group"><label>Pay Type</label><div id="benSumPay" class="bn-sum-val">—</div></div>
+                            <div class="form-group"><label>Household Income</label><div id="benSumIncome" class="bn-sum-val">—</div></div>
+                            <div class="form-group"><label>Household Size</label><div id="benSumSize" class="bn-sum-val">—</div></div>
                         </div>
-                        <div class="form-group" style="margin-top:8px;"><label>Public Benefits</label><div id="benSumBenefits" style="font-weight:700;">—</div></div>
+                        <div class="form-group" style="margin-top:8px;"><label>Public Benefits</label><div id="benSumBenefits" class="bn-sum-val">—</div></div>
                     </div>
 
                     <!-- Income (managed on the Benefits Roster page; kept for F/R/P calc) -->

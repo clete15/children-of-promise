@@ -276,3 +276,26 @@ if (document.readyState === 'loading') {
 } else {
     initTheme();
 }
+
+// ── DISPLAY FORMATTERS ──
+/* Small, shared display helpers so every page formats the same way. They only
+   change how a value is shown, never what is stored. */
+
+// "6184406114" -> "618-440-6114". Leaves anything that isn't a 10-digit (or
+// 11-digit leading-1) US number untouched, so odd data still shows as entered.
+function fmtPhone(v) {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return '';
+    const d = s.replace(/\D/g, '');
+    if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6);
+    if (d.length === 11 && d[0] === '1') return d.slice(1, 4) + '-' + d.slice(4, 7) + '-' + d.slice(7);
+    return s;
+}
+
+// 50400 -> "50,400". Non-numeric input is returned unchanged.
+function fmtMoney(v) {
+    if (v == null || v === '') return '';
+    const n = Number(String(v).replace(/[^0-9.-]/g, ''));
+    if (!isFinite(n)) return String(v);
+    return n.toLocaleString('en-US');
+}
