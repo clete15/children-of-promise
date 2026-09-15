@@ -42,7 +42,7 @@ var ECE_LEVELS = [
     },
     {
         level: 2,
-        education: 'High school diploma or GED',
+        education: 'A high school diploma or GED is required.',
         rank: 2,
         experience: { supervised: 10, supervisedLabel: 'hours of ECE observation', documented: 200 },
         /* Note IRE stops at 2 here, where the ITC list runs to IRE3. The two credentials
@@ -53,9 +53,9 @@ var ECE_LEVELS = [
     },
     {
         level: 3,
-        education: 'Nine semester hours \u2014 three each of Math, English and a General Education '
-                 + 'elective such as Psychology, Sociology or Science. All nine must be credit '
-                 + 'bearing, non-developmental, and 100 level or above.',
+        education: 'Nine college semester hours are required \u2014 three each in Math, English and a '
+                 + 'General Education elective (such as Psychology, Sociology or Science). All nine '
+                 + 'must be credit-bearing, non-developmental, and 100 level or above.',
         rank: 3,
         experience: { supervised: 10, documented: 400 },
         adds: ['HSW3', 'HSW4', 'HSW5', 'OA1', 'OA2', 'OA3', 'CPD1', 'CPD2', 'CPD3',
@@ -63,8 +63,8 @@ var ECE_LEVELS = [
     },
     {
         level: 4,
-        education: 'An Associate\u2019s degree, or 60+ semester hours including the nine listed at '
-                 + 'Level 3',
+        education: 'An Associate\u2019s degree is required, or 60+ semester hours including the '
+                 + 'nine listed at Level 3.',
         rank: 4,
         experience: { supervised: 100, documented: 600 },
         adds: ['HGD4', 'HSW6', 'OA4', 'OA5', 'OA6', 'CPD4', 'CPD5', 'CPD6', 'CPD7', 'CPD8',
@@ -82,9 +82,9 @@ var ECE_LEVELS = [
     },
     {
         level: 6,
-        education: 'A graduate degree, plus mastery in at least three of the seven Level 6 skill '
-                 + 'areas, plus six professional contributions demonstrating competency in three '
-                 + 'different areas within the last five years',
+        education: 'A graduate degree is required, plus mastery in at least three of the seven '
+                 + 'Level 6 skill areas, plus six professional contributions demonstrating '
+                 + 'competency in three different areas within the last five years.',
         rank: 6,
         experience: { documented: 6000 }
     }
