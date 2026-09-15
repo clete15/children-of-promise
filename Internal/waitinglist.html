@@ -246,6 +246,12 @@
         .modal-days input[type=checkbox] { width: auto; accent-color: var(--primary); }
         .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--border); }
         .modal-note { font-size: 0.75rem; color: var(--sp-warn-fg); background: var(--sp-warn-bg); border: 1px solid var(--sp-warn-br); border-radius: 6px; padding: 8px 12px; margin-bottom: 16px; }
+        /* Header Deploy button — same green as the deploy widget, so it reads as the
+           same action. Present only while this area is under active development. */
+        .header-deploy { padding: 7px 13px; border: none; border-radius: 7px; font-size: 0.82rem;
+            font-weight: 700; cursor: pointer; color: #fff; background: #16a34a; font-family: inherit;
+            white-space: nowrap; transition: background 0.15s; }
+        .header-deploy:hover { background: #15803d; }
     </style>
 </head>
 <body>
@@ -261,6 +267,12 @@
     <div class="header-actions">
         <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
         <a class="header-back" href="/staff/">← Staff Portal</a>
+        <!-- Deploy in the header while this area is under active development. It just
+             triggers the floating deploy widget's Deploy button, so all the tested
+             confirm/pending/success logic is reused rather than duplicated. -->
+        <button type="button" class="header-deploy" id="hdrDeploy"
+            title="Pull the latest code from GitHub. Page/script changes take effect on reload; server.js changes need Restart (bottom-right widget)."
+            onclick="var b=document.getElementById('dwDeploy'); if(b) b.click();">🚀 Deploy</button>
     </div>
 </header>
 
@@ -692,5 +704,8 @@ function openEnrollModal(id) {
 
 load();
 </script>
+<!-- Floating Deploy/Restart widget. The header 🚀 Deploy button delegates to this
+     widget's #dwDeploy, so it must be loaded for that button to work. -->
+<script src="deploy-widget.js"></script>
 </body>
 </html>
