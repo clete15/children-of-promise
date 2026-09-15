@@ -573,6 +573,11 @@
     .cls-card { border:1px solid var(--sp-border);border-radius:10px;padding:13px 15px;background:var(--sp-surface); }
     .cls-card-head { display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px; }
     .cls-name { font-size:0.88rem;font-weight:700;color:var(--sp-text); }
+    /* Program tag beside a child's name. PI is the ISBE-required one, so it takes the
+       attention colour; PFA is the quieter grant tag. */
+    .cls-prog { font-size:0.6rem;font-weight:800;letter-spacing:0.03em;padding:1px 6px;border-radius:8px;vertical-align:middle;margin-left:5px; }
+    .cls-prog-pi { color:var(--sp-warn-fg);background:var(--sp-warn-bg); }
+    .cls-prog-pfa { color:var(--sp-quiet);background:var(--sp-surface-2);border:1px solid var(--sp-border); }
     .cls-meta { font-size:0.69rem;color:var(--sp-quiet);margin-top:2px; }
     .cls-out { font-size:0.66rem;font-weight:700;color:var(--sp-warn-fg);background:var(--sp-warn-bg);padding:3px 9px;border-radius:11px;white-space:nowrap;flex-shrink:0; }
     .cls-ok { font-size:0.66rem;font-weight:700;color:var(--sp-good-fg);background:var(--sp-good-bg);padding:3px 9px;border-radius:11px;white-space:nowrap;flex-shrink:0; }
@@ -1835,11 +1840,21 @@ function classroomChecklistHtml(rooms) {
             ? '<span class="cls-out">' + outstanding + ' outstanding</span>'
             : '<span class="cls-ok">complete</span>';
 
+        // Mark the program right beside the name so PI (and PFA) children stand out;
+        // 'na' or blank means the child is not in a tracked program, and gets no tag.
+        const prog = String(s.PFA_PI_na || '').trim().toUpperCase();
+        const progTag = (prog === 'PI' || prog === 'PFA')
+            ? ' <span class="cls-prog cls-prog-' + prog.toLowerCase() + '">' + prog + '</span>'
+            : '';
+        // The meta line no longer repeats the program (it is now a tag on the name).
+        const meta = [
+            s.Birth_date ? 'born ' + esc(s.Birth_date) : '',
+            s.Start_Date ? 'enrolled ' + esc(s.Start_Date) : ''
+        ].filter(Boolean).join(' \u00b7 ');
+
         return '<div class="cls-card"><div class="cls-card-head">'
-            + '<div><div class="cls-name">' + esc(s.Last_Name + ', ' + s.First_Name) + '</div>'
-            + '<div class="cls-meta">' + esc(s.PFA_PI_na || '')
-            + (s.Birth_date ? ' \u00b7 born ' + esc(s.Birth_date) : '')
-            + (s.Start_Date ? ' \u00b7 enrolled ' + esc(s.Start_Date) : '') + '</div></div>'
+            + '<div><div class="cls-name">' + esc(s.Last_Name + ', ' + s.First_Name) + progTag + '</div>'
+            + (meta ? '<div class="cls-meta">' + meta + '</div>' : '') + '</div>'
             + status + '</div>'
             + '<div class="cls-chips">' + chips + '</div></div>';
     }).join('');
@@ -2646,14 +2661,16 @@ async function loadClassroomData() {
     renderClassroomPanel();
 }
 
-/* Active PFA/PI children in a room, most-relevant program only, sorted by name.
-   Same rule as isbe.html's classroomRoster: only children in a tracked program
-   have a checklist. */
+/* Every active child in a room, sorted by name.
+
+   All children get the same forms; only the children in the PI program are the ones
+   ISBE requires them for. So the roster is the whole room — the card marks who is PI
+   (or PFA) rather than hiding everyone else. This is deliberately broader than
+   isbe.html's roster, which is the grant compliance view and stays PFA/PI-only. */
 function classroomRoster(roomNumber) {
     return CLS_STUDENTS
         .filter(s => (s.Active === 'Yes' || s.Active === 'YES')
-            && String(s.RoomNumber) === String(roomNumber)
-            && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI'))
+            && String(s.RoomNumber) === String(roomNumber))
         .sort(CofpForms.sortByName);
 }
 
