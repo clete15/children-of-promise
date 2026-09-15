@@ -1067,9 +1067,15 @@ function selfEditCard(s) {
    shown under the header rather than behind a tab. */
 const SP_TABS = [
     { key: 'credentials', label: 'Gateways Credentials' },
-    { key: 'classroom',   label: 'My Classroom' },
-    { key: 'files',       label: 'My files' },
-    { key: 'forms',       label: 'Forms' }
+    { key: 'classroom',   label: 'My Classroom' }
+    /* "My files" and "Forms" are hidden for now — the portal is being rolled out one
+       section at a time. The tab entries below are commented out so both the tab and
+       its panel disappear; the sections themselves (filesCard, formsSection) and
+       everything that supports them are left intact, so re-enabling is just a matter
+       of restoring these two lines.
+    , { key: 'files',       label: 'My files' }
+    , { key: 'forms',       label: 'Forms' }
+    */
 ];
 
 /* "Where you stand" (the old Overview) is no longer a tab — it sits under the name
