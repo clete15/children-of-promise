@@ -3166,7 +3166,16 @@ function sqlIdRows(raw, columns) {
 }
 
 function sendJSON(res, status, body) {
-    res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    /* no-store on every API response. Without it the browser is free to cache a GET like
+       /api/reports, which produced a page showing fresh HTML but stale data — e.g. the
+       attendance sidebar kept showing the old room names/capacities after the database was
+       already updated, because the JSON came from the browser cache, not the server. API
+       data is live and cheap on a local network, so it should never be reused blindly. */
+    res.writeHead(status, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+    });
     res.end(JSON.stringify(body));
 }
 
