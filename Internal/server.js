@@ -3039,6 +3039,16 @@ const PROJ_LADDER_ROOMS = [1, 2, 3, 4, 5, 7, 6];
 const PROJ_PRESCHOOL_ROOM = 6;          // the last ladder room, and the PFA room
 const PROJ_STANDALONE_ROOMS = [8];
 
+/* The display order of rooms, youngest-first — the SAME age ladder as PROJ_LADDER_ROOMS
+   (plus Before & After last). RoomNumber alone sorts 6 (Pre-School) before 7 (2 & 3 Year
+   Olds), which is the wrong age order, so every room-ordered query sorts by this CASE
+   instead. `col` is the RoomNumber column reference (e.g. 'r.RoomNumber' where the table is
+   aliased r, or plain 'RoomNumber' where it isn't). One definition, used by the attendance
+   sidebars, the projection, AND the room roster, so they can never disagree. */
+function roomAgeOrderSql(col) {
+    return `CASE ${col} WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 7 THEN 6 WHEN 6 THEN 7 WHEN 8 THEN 8 ELSE 99 END`;
+}
+
 // Parse a free-text "days requested" string into a 5-element [Mon..Fri] presence array.
 // Handles "Monday, Wednesday", "M/W/F", "Full time", "5 days", blanks, etc. Anything that
 // names no recognisable weekday (including "full time" and empties) is treated as all five
@@ -3488,7 +3498,9 @@ function handleRequest(req, res) {
     // GET classrooms (internal - protected)
     if (req.method === 'GET' && url === '/api/classrooms') {
         if (!checkAuth(req, res)) return;
-        const r = runSQL(`SELECT ${ROOM_COLS.join(',')} FROM dimClassrooms ORDER BY RoomNumber`);
+        // Youngest-first age order (2 & 3 Year Olds before Pre-School), so the room roster
+        // sidebar matches the attendance sidebars and the projection.
+        const r = runSQL(`SELECT ${ROOM_COLS.join(',')} FROM dimClassrooms ORDER BY ${roomAgeOrderSql('RoomNumber')}`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = sqlRows(r.data, ['RoomNumber','Building','Room','TeacherDescription','Type','RequiredSlots','AgeRange','DCFSCapacity']);
         return sendJSON(res, 200, rows);
@@ -6953,12 +6965,12 @@ ELSE
         if (!checkAuth(req, res)) return;
         /* Rooms display youngest→oldest, which is NOT RoomNumber order: the
            "2 & 3 Year Olds" room (RoomNumber 7) is younger than "Pre-School"
-           (RoomNumber 6), so it must sort BEFORE it. This CASE gives an explicit
-           age-ladder position (1,2,3,4,5,7,6 then 8), used by every room-ordered
-           query so the attendance sidebars and the projection agree. Renumbering
-           the rooms was avoided because RoomNumber is the join key used across
+           (RoomNumber 6), so it must sort BEFORE it. roomAgeOrderSql() gives an explicit
+           age-ladder position (1,2,3,4,5,7,6 then 8), shared with the room roster and the
+           projection so every room-ordered view agrees. Here the table is aliased r.
+           Renumbering the rooms was avoided because RoomNumber is the join key used across
            enrollment/benefits/projection. */
-        const ROOM_AGE_ORDER = `CASE r.RoomNumber WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 7 THEN 6 WHEN 6 THEN 7 WHEN 8 THEN 8 ELSE 99 END`;
+        const ROOM_AGE_ORDER = roomAgeOrderSql('r.RoomNumber');
         const queries = {
             byRoom:        `SELECT r.Room, COUNT(*) AS Total, SUM(CASE WHEN e.Active='Yes' OR e.Active='YES' THEN 1 ELSE 0 END) AS Active FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber GROUP BY r.Room ORDER BY r.Room`,
             byRoomDaily:   `SELECT r.Room, r.DCFSCapacity, SUM(CASE WHEN e.Monday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Mon, SUM(CASE WHEN e.Tuesday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Tue, SUM(CASE WHEN e.Wednesday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Wed, SUM(CASE WHEN e.Thursday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Thu, SUM(CASE WHEN e.Friday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Fri FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber WHERE e.Active='Yes' OR e.Active='YES' GROUP BY r.Room, r.DCFSCapacity, r.RoomNumber ORDER BY ${ROOM_AGE_ORDER}`,
