@@ -12,6 +12,29 @@ This file tracks all significant changes to the Children of Promise daycare mana
 - **Deploy:** Push to GitHub → `git pull` + `Launch.bat` on server
 - **Pages:** Staff portal (`index.html`), EMS (`ems.html`), ISBE (`isbe.html`), Food Program (`foodreport.html`), Menus (`menus.html`), Parent Portal (`parent.html`)
 
+## ⚠️ CRITICAL: Laptop ≠ Server — Code vs Data (read before any DB change)
+Kiro's tools (terminal, file edits, `sqlcmd`) run on the **laptop**, NOT the live
+server. The laptop has its own local `localhost\SQLEXPRESS\CofPMillstadt` copy. The
+**live site reads the database on the server at `160.153.187.39`** (SQL Server 2022,
+login `cofpadmin`). These are two different databases.
+
+- **Code changes** (server.js, HTML, JS) travel through git:
+  commit → push → **Deploy** button (pulls on server) → **Restart** if server.js changed.
+  This is the correct, working path — the Deploy/Restart buttons are built into the site.
+- **Data changes** (any table row: `dimClassrooms` room names/capacities, enrollment
+  records, etc.) do **NOT** travel through git or Deploy. They must be applied to the
+  **server's** database directly:
+  - Run in **SSMS connected to `160.153.187.39`** (DB `CofPMillstadt`), **or**
+  - via `POST /api/sql` which runs on the server — BUT note `/api/sql` returns
+    `{success:true}` even when a statement fails inside the batch (sqlcmd exits 0 and
+    prints errors to stdout). Always include a trailing `SELECT` and verify the row
+    actually changed; don't trust "executed successfully."
+- **Do not verify a data change by querying from the laptop** — that hits the local
+  copy and looks correct while the live site is unchanged. Verify on `160.153.187.39`.
+- Lesson from the 2 & 3 Year Olds room rename (Sept 2026): every laptop-side
+  `dimClassrooms` UPDATE looked correct locally but never touched the live site.
+  It was only fixed by running the UPDATE in SSMS against `160.153.187.39`.
+
 ## Recent Changes (June 2026 Session)
 
 ### Food Program Management System (`foodreport.html`)
