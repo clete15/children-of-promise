@@ -320,12 +320,13 @@
                     <th style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);">Income</th>
                     <th title="Looks eligible for CCAP by income and household size (225% FPL). Families are not on CCAP until they opt in, enroll, and are approved by the state.">CCAP Eligible?</th>
                     <th>Submitted</th>
+                    <th>Requested Start</th>
                     <th>Status</th>
                     <th>Notes</th>
                 </tr>
             </thead>
             <tbody id="wlBody">
-                <tr><td colspan="11" class="wl-empty">Loading…</td></tr>
+                <tr><td colspan="12" class="wl-empty">Loading…</td></tr>
             </tbody>
         </table>
     </div>
@@ -363,7 +364,7 @@ async function load() {
         updateTabCounts();
         renderTable();
     } catch (e) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">Failed to load waiting list.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="12" class="wl-empty">Failed to load waiting list.</td></tr>`;
     }
 }
 
@@ -471,7 +472,7 @@ function renderTable() {
     document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
 
     if (!rows.length) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">No records found.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="12" class="wl-empty">No records found.</td></tr>`;
         syncScrollbar();
         return;
     }
@@ -489,6 +490,9 @@ function renderTable() {
         const scoreClass = score >= 50 ? 'score-high' : score >= 10 ? 'score-medium' : 'score-low';
         const flags = buildFlags(r);
         const date = r.SubmittedAt ? r.SubmittedAt.split(' ')[0] : '—';
+        // The family's requested start date from the pre-enrollment form (ChildStartDate).
+        const reqStart = (r.ChildStartDate && r.ChildStartDate !== 'NULL')
+            ? r.ChildStartDate.split(' ')[0] : '—';
         const status = (!r.WaitlistStatus || r.WaitlistStatus === 'NULL') ? 'Pending' : r.WaitlistStatus;
         const notes = (!r.Notes || r.Notes === 'NULL') ? '' : r.Notes;
         const isPending = status === 'Pending';
@@ -508,6 +512,7 @@ function renderTable() {
             <td style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);font-weight:700;font-size:0.86rem;">${r.HouseholdIncome ? fmtMoney(r.HouseholdIncome) : '—'}</td>
             <td>${ccapEligibleCell(r)}</td>
             <td><span class="submitted-date">${date}</span></td>
+            <td><span class="submitted-date">${reqStart}</span></td>
             <td>
                 <select class="status-select" id="status-${r.Id}" onchange="handleStatusChange(${parseInt(r.Id)}, this)">
                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
