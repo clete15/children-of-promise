@@ -184,6 +184,21 @@
     .sp-pdrtoggle:hover { border-color: var(--sp-accent); }
     .sp-pdrtoggle.on { background: var(--sp-accent); color: #fff; border-color: var(--sp-accent); }
     .sp-pdrtoggle:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+    /* Work History link, sitting just left of the PDR button at the right end of the
+       strip. Same pill look; it carries the margin-left:auto so the two push right as a
+       pair, and PDR then only needs a small gap from it. */
+    .sp-histbtn {
+        margin-left: auto; align-self: center; text-decoration: none;
+        font-family: inherit; font-size: 0.78rem; font-weight: 800;
+        letter-spacing: 0.05em; color: var(--sp-accent); background: var(--sp-accent-soft);
+        border: 1.5px solid var(--sp-border); border-radius: 8px; padding: 6px 13px;
+        white-space: nowrap; transition: border-color 0.12s, background 0.12s;
+    }
+    .sp-histbtn:hover { border-color: var(--sp-accent); }
+    .sp-histbtn:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+    /* When the Work History button is present it owns the auto-margin, so PDR just
+       needs a gap beside it rather than its own push-right. */
+    .sp-histbtn + .sp-pdrtoggle { margin-left: 6px; }
     /* Close (×) on the PDR panel. */
     .sp-pdrup { position: relative; }
     .sp-pdrclose {
@@ -1097,11 +1112,15 @@ function tabBar(s, tabs) {
                 + (n ? '<span class="sp-count" aria-label="' + n + ' needing attention">' + n + '</span>' : '')
                 + '</button>';
         }).join('')
-        // A PDR button at the right end of the strip opens the "Update from PDR" panel
-        // on the credentials tab. Shown on a real record; the server allows only your
+        // At the right end of the strip: My Work History (opens the PD75a form) and,
+        // beside it, the PDR button that opens the "Update from PDR" panel on the
+        // credentials tab. Both shown on a real record; the server scopes edits to your
         // own record (an admin, anyone's).
         + (s && s.Id
-            ? '<button type="button" id="pdrToggle" class="sp-pdrtoggle' + (pdrOpen ? ' on' : '')
+            ? '<a class="sp-histbtn" href="/pas/staff-work-history.html" target="_blank" '
+              + 'rel="noopener" title="Everywhere you have worked with children (Gateways form '
+              + 'PD75a) \u2014 used to verify experience toward a credential level">My Work History</a>'
+              + '<button type="button" id="pdrToggle" class="sp-pdrtoggle' + (pdrOpen ? ' on' : '')
               + '" aria-pressed="' + (pdrOpen ? 'true' : 'false') + '" '
               + 'title="Update this record from a Gateways PDR">PDR</button>'
             : '')
