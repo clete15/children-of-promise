@@ -72,7 +72,8 @@ var ECE_LEVELS = [
     },
     {
         level: 5,
-        education: 'A Bachelor\u2019s degree',
+        education: 'A Bachelor\u2019s degree is required, including 30 semester hours of '
+                 + 'ECE/CD content.',
         rank: 5,
         experience: { supervised: 200, documented: 1200 },
         // The source prints "HDG6" here; it is HGD6.
