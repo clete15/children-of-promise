@@ -3140,7 +3140,9 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     seat(PROJ_LADDER_ROOMS, ladderKids).forEach(r => { roomsOut[r.roomNumber] = r; });
     seat(PROJ_STANDALONE_ROOMS, standaloneKids).forEach(r => { roomsOut[r.roomNumber] = r; });
 
-    // One row per room, in RoomNumber order — mirrors byRoomDaily's per-room layout.
+    // One row per room, in the same order roomRows (projRooms) arrived — now the
+    // youngest-first age ladder, so 2 & 3 Year Olds sits before Pre-School — mirroring
+    // byRoomDaily's per-room layout.
     return roomRows
         .map(r => parseInt(r[0], 10))
         .filter(num => roomsOut[num])
@@ -6889,9 +6891,17 @@ ELSE
     // GET management reports (internal - protected)
     if (req.method === 'GET' && url === '/api/reports') {
         if (!checkAuth(req, res)) return;
+        /* Rooms display youngest→oldest, which is NOT RoomNumber order: the
+           "2 & 3 Year Olds" room (RoomNumber 7) is younger than "Pre-School"
+           (RoomNumber 6), so it must sort BEFORE it. This CASE gives an explicit
+           age-ladder position (1,2,3,4,5,7,6 then 8), used by every room-ordered
+           query so the attendance sidebars and the projection agree. Renumbering
+           the rooms was avoided because RoomNumber is the join key used across
+           enrollment/benefits/projection. */
+        const ROOM_AGE_ORDER = `CASE r.RoomNumber WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 3 WHEN 4 THEN 4 WHEN 5 THEN 5 WHEN 7 THEN 6 WHEN 6 THEN 7 WHEN 8 THEN 8 ELSE 99 END`;
         const queries = {
             byRoom:        `SELECT r.Room, COUNT(*) AS Total, SUM(CASE WHEN e.Active='Yes' OR e.Active='YES' THEN 1 ELSE 0 END) AS Active FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber GROUP BY r.Room ORDER BY r.Room`,
-            byRoomDaily:   `SELECT r.Room, r.DCFSCapacity, SUM(CASE WHEN e.Monday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Mon, SUM(CASE WHEN e.Tuesday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Tue, SUM(CASE WHEN e.Wednesday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Wed, SUM(CASE WHEN e.Thursday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Thu, SUM(CASE WHEN e.Friday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Fri FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber WHERE e.Active='Yes' OR e.Active='YES' GROUP BY r.Room, r.DCFSCapacity, r.RoomNumber ORDER BY r.RoomNumber`,
+            byRoomDaily:   `SELECT r.Room, r.DCFSCapacity, SUM(CASE WHEN e.Monday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Mon, SUM(CASE WHEN e.Tuesday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Tue, SUM(CASE WHEN e.Wednesday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Wed, SUM(CASE WHEN e.Thursday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Thu, SUM(CASE WHEN e.Friday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Fri FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber WHERE e.Active='Yes' OR e.Active='YES' GROUP BY r.Room, r.DCFSCapacity, r.RoomNumber ORDER BY ${ROOM_AGE_ORDER}`,
             byProgram:     `SELECT ISNULL(PFA_PI_na,'Unknown') AS ProgramType, COUNT(*) AS Total FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' GROUP BY PFA_PI_na`,
             byFood:        `SELECT ISNULL(F_R_P_Food,'Unknown') AS FoodProgram, COUNT(*) AS Total FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' GROUP BY F_R_P_Food`,
             byPayType:     `SELECT ISNULL(Category,'Unknown') AS PayType, COUNT(*) AS Total FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' GROUP BY Category`,
@@ -6906,7 +6916,7 @@ ELSE
             // The rooms themselves (number, name, capacity), in youngest-first order.
             // The projection fills these seats by age, so it needs every room — including
             // empty ones — and their DCFS capacity.
-            projRooms:     `SELECT r.RoomNumber, r.Room, r.DCFSCapacity FROM dimClassrooms r ORDER BY r.RoomNumber`,
+            projRooms:     `SELECT r.RoomNumber, r.Room, r.DCFSCapacity FROM dimClassrooms r ORDER BY ${ROOM_AGE_ORDER}`,
             // One row per ACTIVE enrolled child: age (birth date), current room, and the
             // days they attend. The projection sorts these youngest-first and seats them.
             enrolledChildren: `SELECT e.Id, e.First_Name, e.Last_Name, ISNULL(CONVERT(NVARCHAR(10),e.Birth_date,120),'') AS BirthDate, ISNULL(e.Days_Old,0) AS DaysOld, ISNULL(e.RoomNumber,0) AS RoomNumber, ISNULL(e.Monday,0) AS Mon, ISNULL(e.Tuesday,0) AS Tue, ISNULL(e.Wednesday,0) AS Wed, ISNULL(e.Thursday,0) AS Thu, ISNULL(e.Friday,0) AS Fri FROM rptMasterEnrollment e WHERE e.Active='Yes' OR e.Active='YES'`,
