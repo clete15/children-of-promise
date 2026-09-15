@@ -3009,21 +3009,34 @@ function sqlCells(raw) {
 }
 
 /* ── Projected attendance ────────────────────────────────────────────────────
-   All the regular rooms form ONE continuous age ladder, youngest room first. Every child —
-   currently enrolled or on the waiting list — is pooled, treated as enrolled, sorted
-   youngest-first, and seated room by room down this ladder. When a room reaches DCFS
-   capacity the older children spill into the next room down; "over capacity" only appears
-   once the LAST room in the ladder (Pre-School) is full. The room's age range is only a
-   guide, not a hard stop — the fill is purely youngest-to-oldest.
+   The regular rooms form ONE continuous age ladder, youngest room first, with ONE exception:
+   PFA children go to Pre-School regardless of age. PFA is a program (the grant-funded
+   preschool), not an age band, so a PFA child who is age-wise a two- or three-year-old still
+   sits in Pre-School. So the seating runs in two passes:
+
+     1. PFA-first pass — every PFA child is seated directly into Pre-School (room 6), up to
+        its DCFS capacity, per day. PFA past capacity is Pre-School overflow.
+     2. Age-ladder pass — everyone else (non-PFA) is pooled, sorted youngest-first, and
+        seated up the ladder 1 → 2 → 3 → 4 → 5 → 7, spilling older children into Pre-School's
+        REMAINING seats (the ones PFA did not take), then into overflow once Pre-School fills.
+
+   The visible consequence, and the point of the rule: because the PFA "2s and 3s" are pulled
+   up into Pre-School, the "2 & 3 Year Olds" room (7) shows the empty seats they would
+   otherwise have filled.
+
+   Who counts as PFA:
+     · enrolled child  — PFA_PI_na = 'PFA'
+     · waiting-list child — AgeGroup = '3-5' (the Pre-School program on the pre-enrollment form)
 
    Ladder order (RoomNumbers) from dimClassrooms (setup_classrooms.sql):
      1 Infant → 2 Infants/Toddlers → 3 Toddlers → 4 Toddlers/2yr → 5 2 Year Olds
-       → 7 2 & 3 Year Olds → 6 Pre-School
+       → 7 2 & 3 Year Olds → 6 Pre-School (also the PFA room)
 
    Before & Afterschool (room 8) is an ENTIRELY SEPARATE program: the ladder never spills
    into it and it never spills out. It simply shows its own children, filled youngest-first
    within itself. */
 const PROJ_LADDER_ROOMS = [1, 2, 3, 4, 5, 7, 6];
+const PROJ_PRESCHOOL_ROOM = 6;          // the last ladder room, and the PFA room
 const PROJ_STANDALONE_ROOMS = [8];
 
 // Parse a free-text "days requested" string into a 5-element [Mon..Fri] presence array.
@@ -3063,15 +3076,20 @@ function ageInDays(birthDate, daysOldFallback) {
 /* Build the projected-attendance ROOM ALLOCATION the /api/reports endpoint returns.
 
    roomRows     : [[RoomNumber, Room, DCFSCapacity], ...]              (every room)
-   enrolledRows : [[Id,First,Last,BirthDate,DaysOld,RoomNumber,Mon..Fri], ...] (active)
+   enrolledRows : [[Id,First,Last,BirthDate,DaysOld,RoomNumber,Mon..Fri,Program], ...] (active)
    waitlistRows : [[Id,ChildName,BirthDate,AgeGroup,DaysRequested,Score], ...] (pending)
 
-   Mock model: pool EVERY child (currently enrolled + waiting list), treat them all as
-   enrolled, sort youngest-first, and seat them down ONE continuous age ladder of rooms
-   (PROJ_LADDER_ROOMS) up to each room's DCFS capacity, PER DAY. When a room fills, the older
-   children spill into the next room down; "over capacity" only shows once the last room
-   (Pre-School) is full. Before & Afterschool (PROJ_STANDALONE_ROOMS) is a separate program,
-   filled youngest-first within itself and never connected to the ladder.
+   Mock model: pool EVERY child (currently enrolled + waiting list) and treat them all as
+   enrolled, then seat in TWO passes:
+     1. PFA children (enrolled PFA_PI_na='PFA', or waitlist AgeGroup='3-5') go straight into
+        Pre-School regardless of age, up to its DCFS capacity; the rest are Pre-School overflow.
+     2. Everyone else is sorted youngest-first and seated down the age ladder
+        (PROJ_LADDER_ROOMS) up to each room's DCFS capacity, PER DAY, using only the Pre-School
+        seats PFA left free. When a room fills, older children spill into the next room down;
+        "over capacity" only shows once Pre-School is full.
+   Because PFA "2s and 3s" are pulled up into Pre-School, the 2 & 3 Year Olds room shows the
+   empty seats they would otherwise have filled. Before & Afterschool (PROJ_STANDALONE_ROOMS)
+   is a separate program, filled youngest-first within itself and never connected to the ladder.
 
    Returns ONE row PER ROOM (RoomNumber order), so the Projected Attendance page renders the
    same per-room sidebar + single chart as Actual Attendance:
@@ -3093,10 +3111,13 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     const inScope = new Set([].concat(PROJ_LADDER_ROOMS, PROJ_STANDALONE_ROOMS));
 
     // Pool EVERY child — enrolled and waiting-list — into one list, all treated as enrolled.
-    // Each child: { age, days:[5], standalone:bool }. standalone === true means Before &
-    // After (kept out of the ladder); everything else feeds the ladder.
-    const ladderKids = [];
-    const standaloneKids = [];
+    // Each child: { age, days:[5], pfa:bool }. A PFA child (enrolled PFA_PI_na='PFA', or
+    // waiting-list AgeGroup='3-5') is seated in Pre-School regardless of age; everyone else
+    // (except Before & After) feeds the youngest-first age ladder. Before & After is a
+    // separate standalone program kept out of the ladder entirely.
+    const ladderKids = [];      // non-PFA children who climb the age ladder
+    const pfaKids = [];         // PFA children who go straight to Pre-School
+    const standaloneKids = [];  // Before & After — its own program
 
     (Array.isArray(enrolledRows) ? enrolledRows : []).forEach(e => {
         const roomNum = parseInt(e[5], 10);
@@ -3105,19 +3126,24 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             age: ageInDays(e[3], e[4]),
             days: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
         };
-        (PROJ_STANDALONE_ROOMS.indexOf(roomNum) !== -1 ? standaloneKids : ladderKids).push(kid);
+        if (PROJ_STANDALONE_ROOMS.indexOf(roomNum) !== -1) { standaloneKids.push(kid); return; }
+        const isPFA = String(e[11] || '').trim().toUpperCase() === 'PFA';
+        (isPFA ? pfaKids : ladderKids).push(kid);
     });
     (Array.isArray(waitlistRows) ? waitlistRows : []).forEach(w => {
-        // Only the Before & After program (AgeGroup 'ba') is standalone; every other
-        // waiting-list child feeds the age ladder.
-        const isStandalone = String(w[3] || '').trim() === 'ba';
+        const group = String(w[3] || '').trim();
+        // Before & After (AgeGroup 'ba') is standalone; the Pre-School program ('3-5') is PFA
+        // and goes straight to Pre-School; everything else feeds the age ladder.
         const kid = { age: ageInDays(w[2], 0), days: parseRequestedDays(w[4]) };
-        (isStandalone ? standaloneKids : ladderKids).push(kid);
+        if (group === 'ba') { standaloneKids.push(kid); return; }
+        (group === '3-5' ? pfaKids : ladderKids).push(kid);
     });
 
     // Seat one pool of children into an ordered list of rooms, youngest-first, per weekday.
-    // Overflow past the last room is charged to that last room's overflow[].
-    function seat(roomNums, kids) {
+    // Overflow past the last room is charged to that last room's overflow[]. `preFilled`, when
+    // supplied, is a per-room [5]-day count of seats already taken (by the PFA pass) so the
+    // ladder only uses the seats that remain.
+    function seat(roomNums, kids, preFilled) {
         const chain = roomNums.filter(n => roomByNum[n]).map(n => ({
             roomNumber: n, room: roomByNum[n].room, capacity: roomByNum[n].capacity,
             occupancy: [0, 0, 0, 0, 0], overflow: [0, 0, 0, 0, 0],
@@ -3125,7 +3151,16 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         if (!chain.length) return chain;
         kids.sort((a, b) => a.age - b.age); // youngest first
         for (let d = 0; d < 5; d++) {
-            const free = chain.map(r => r.capacity);
+            // Free seats this day = capacity minus anything the PFA pass already placed here.
+            const free = chain.map(r => {
+                const taken = (preFilled && preFilled[r.roomNumber]) ? preFilled[r.roomNumber][d] : 0;
+                return Math.max(r.capacity - taken, 0);
+            });
+            // Reflect the pre-filled PFA children in this room's shown occupancy.
+            chain.forEach(r => {
+                const taken = (preFilled && preFilled[r.roomNumber]) ? preFilled[r.roomNumber][d] : 0;
+                r.occupancy[d] += taken;
+            });
             kids.forEach(k => {
                 if (!k.days[d]) return; // not present this day
                 const idx = free.findIndex(f => f > 0);
@@ -3136,8 +3171,33 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         return chain;
     }
 
+    // Pass 1 — PFA children fill Pre-School regardless of age. Anything past Pre-School's
+    // capacity is Pre-School overflow. Record how many PFA seats each day consumes so the
+    // ladder pass only sees the remainder.
+    const preschool = roomByNum[PROJ_PRESCHOOL_ROOM];
+    const pfaFilled = { [PROJ_PRESCHOOL_ROOM]: [0, 0, 0, 0, 0] };
+    let pfaOverflow = [0, 0, 0, 0, 0];
+    if (preschool) {
+        for (let d = 0; d < 5; d++) {
+            let seated = 0;
+            pfaKids.forEach(k => {
+                if (!k.days[d]) return;
+                if (seated < preschool.capacity) { seated++; } else { pfaOverflow[d]++; }
+            });
+            pfaFilled[PROJ_PRESCHOOL_ROOM][d] = seated;
+        }
+    } else {
+        // No Pre-School room defined — fall back to letting PFA kids climb the ladder.
+        pfaKids.forEach(k => ladderKids.push(k));
+    }
+
     const roomsOut = {};
-    seat(PROJ_LADDER_ROOMS, ladderKids).forEach(r => { roomsOut[r.roomNumber] = r; });
+    // Pass 2 — the age ladder fills every room, using only the Pre-School seats PFA left free.
+    seat(PROJ_LADDER_ROOMS, ladderKids, pfaFilled).forEach(r => { roomsOut[r.roomNumber] = r; });
+    // Fold PFA overflow into Pre-School's overflow (both are "couldn't be seated in Pre-School").
+    if (roomsOut[PROJ_PRESCHOOL_ROOM]) {
+        for (let d = 0; d < 5; d++) roomsOut[PROJ_PRESCHOOL_ROOM].overflow[d] += pfaOverflow[d];
+    }
     seat(PROJ_STANDALONE_ROOMS, standaloneKids).forEach(r => { roomsOut[r.roomNumber] = r; });
 
     // One row per room, in the same order roomRows (projRooms) arrived — now the
@@ -6919,7 +6979,7 @@ ELSE
             projRooms:     `SELECT r.RoomNumber, r.Room, r.DCFSCapacity FROM dimClassrooms r ORDER BY ${ROOM_AGE_ORDER}`,
             // One row per ACTIVE enrolled child: age (birth date), current room, and the
             // days they attend. The projection sorts these youngest-first and seats them.
-            enrolledChildren: `SELECT e.Id, e.First_Name, e.Last_Name, ISNULL(CONVERT(NVARCHAR(10),e.Birth_date,120),'') AS BirthDate, ISNULL(e.Days_Old,0) AS DaysOld, ISNULL(e.RoomNumber,0) AS RoomNumber, ISNULL(e.Monday,0) AS Mon, ISNULL(e.Tuesday,0) AS Tue, ISNULL(e.Wednesday,0) AS Wed, ISNULL(e.Thursday,0) AS Thu, ISNULL(e.Friday,0) AS Fri FROM rptMasterEnrollment e WHERE e.Active='Yes' OR e.Active='YES'`,
+            enrolledChildren: `SELECT e.Id, e.First_Name, e.Last_Name, ISNULL(CONVERT(NVARCHAR(10),e.Birth_date,120),'') AS BirthDate, ISNULL(e.Days_Old,0) AS DaysOld, ISNULL(e.RoomNumber,0) AS RoomNumber, ISNULL(e.Monday,0) AS Mon, ISNULL(e.Tuesday,0) AS Tue, ISNULL(e.Wednesday,0) AS Wed, ISNULL(e.Thursday,0) AS Thu, ISNULL(e.Friday,0) AS Fri, ISNULL(e.PFA_PI_na,'') AS Program FROM rptMasterEnrollment e WHERE e.Active='Yes' OR e.Active='YES'`,
             // One row per PENDING waiting-list child: age, the program applied for, and the
             // days requested. The projection seats these alongside the enrolled children.
             waitlistChildren: `SELECT p.Id, ISNULL(p.ChildName,'') AS ChildName, ISNULL(CONVERT(NVARCHAR(10),p.ChildBirthDate,120),'') AS BirthDate, ISNULL(p.AgeGroup,'') AS AgeGroup, ISNULL(p.DaysRequested,'') AS DaysRequested, ISNULL(CAST(p.Score AS NVARCHAR),'') AS Score FROM PreEnrollment p WHERE ISNULL(p.WaitlistStatus,'Pending') NOT IN ('Enrolled','Declined')`,

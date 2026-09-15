@@ -97,7 +97,7 @@
         <div class="at-sidebar" id="atSidebar"></div>
         <div class="at-card">
             <div class="at-head">
-                <div class="at-title">Projected Attendance by Room</div>
+                <div class="at-title">Projected Attendance by Room - if all children on waiting list enroll today</div>
             </div>
             <div class="at-body" id="atBody">
                 <div class="at-empty">Loading…</div>
@@ -113,12 +113,15 @@
    showing the rooms AFTER the waiting list is folded in and everyone is re-seated by age.
 
    The server (/api/reports -> projectedAttendance) takes every child — enrolled plus the
-   whole waiting list — and re-seats them youngest-first up an age ladder of rooms: the
+   whole waiting list — and re-seats them in two passes. First, PFA children go straight into
+   Pre-School regardless of age (PFA is the grant preschool program, not an age band), up to
+   its capacity. Then everyone else is re-seated youngest-first up an age ladder of rooms: the
    youngest fill the first room (Infant), and as they age up they shift into the next room,
-   older children moving up to fill any open slots. Every regular room forms one continuous
-   age ladder; each room fills only to its DCFS capacity and the older children spill down.
-   "Over capacity" only appears once the last room in the ladder (Pre-School) is full. Before
-   & Afterschool is a separate program and never connected to the ladder.
+   older children moving up to fill any open slots, finally spilling into whatever Pre-School
+   seats PFA did not take. Each room fills only to its DCFS capacity. "Over capacity" only
+   appears once the last room in the ladder (Pre-School) is full. Because the PFA 2s and 3s
+   are pulled up into Pre-School, the 2 & 3 Year Olds room shows the empty seats they would
+   otherwise have filled. Before & Afterschool is a separate program, never on the ladder.
 
    The server returns one row PER ROOM (same per-room shape as Actual Attendance):
      { roomNumber, room, capacity, occupancy:[Mon..Fri], overflow:[5] }
