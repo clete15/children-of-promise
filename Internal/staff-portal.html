@@ -1933,7 +1933,10 @@ function adminSection(s) {
 
     let html = '<div class="sp-card"><h2>Outstanding with Gateways</h2>'
         + '<div class="sp-sub">Everyone whose record shows a pending or awaited Gateways item. '
-        + 'This is the whole centre, not just your own room.</div>';
+        + 'This is the whole centre, not just your own room. The line under each name is quoted '
+        + 'straight from that person\u2019s record. \u201cthe report shows none of them\u201d means the record '
+        + 'claims pending applications that the last uploaded Gateways report did not list \u2014 reconcile '
+        + 'the two (the note is usually stale, or predates the applications).</div>';
     if (!waiting.length) {
         html += '<div class="sp-step done"><div class="t">\u2713 Nothing outstanding</div>'
             + '<div class="d">No staff record currently shows a pending or awaited item.</div></div>';
