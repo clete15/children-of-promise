@@ -279,7 +279,7 @@ function reqPill(met, text) {
        of nine people is three people, not 2.7.
    ──────────────────────────────────────────────────────────────────────────── */
 
-const IT_ROOMS = ['Infant', 'Infants / Toddlers', '2 Year Olds / Toddlers'];
+const IT_ROOMS = ['Infant', 'Infants / Toddlers', 'Toddlers / 2 Year Olds'];
 const PD_HOURS_REQUIRED = 20;
 const PD_YEAR = String(new Date().getFullYear());
 

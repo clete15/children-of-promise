@@ -217,7 +217,7 @@ function eceLevelTwoAlert(staff) {
 }
 
 function infantToddlerCredentialAlert(staff) {
-    const IT_ROOMS = ['Infant', 'Infants / Toddlers', '2 Year Olds / Toddlers'];
+    const IT_ROOMS = ['Infant', 'Infants / Toddlers', 'Toddlers / 2 Year Olds'];
     const norm = s => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
         .map(w => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).join('/');
     const serves = (p, room) => norm(p.Classroom) === norm(room) || norm(p.SecondaryClassroom) === norm(room);
