@@ -1160,9 +1160,9 @@ function tabBar(s, tabs) {
         // credentials tab. Both shown on a real record; the server scopes edits to your
         // own record (an admin, anyone's).
         + (s && s.Id
-            ? '<a class="sp-histbtn" href="/pas/staff-work-history.html" target="_blank" '
-              + 'rel="noopener" title="Everywhere you have worked with children (Gateways form '
-              + 'PD75a) \u2014 used to verify experience toward a credential level">My Work History</a>'
+            ? '<a class="sp-histbtn" href="/pas/staff-work-history.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" '
+              + 'rel="noopener" title="Everywhere ' + esc(s.Name || 'this person') + ' has worked with children (Gateways form '
+              + 'PD75a) \u2014 used to verify experience toward a credential level">Work History</a>'
               + '<button type="button" id="pdrToggle" class="sp-pdrtoggle' + (pdrOpen ? ' on' : '')
               + '" aria-pressed="' + (pdrOpen ? 'true' : 'false') + '" '
               + 'title="Update this record from a Gateways PDR">PDR</button>'

@@ -298,8 +298,82 @@ PasForm.init({
     onLoad: function () {
         wireCalc();
         GROUPS.forEach(recalc);
+        // After the saved copy (if any) is on the page, try to fill the still-blank
+        // spaces from a Work History form already on file, for the person to review.
+        maybeExtractFromFile();
     }
 });
+
+/* Pull whatever can be read from this person's uploaded Work History form and drop
+   it into the blanks that are still empty — never over anything already typed or
+   saved, since that has been reviewed and this has not. Best-effort and silent on
+   failure: if there is no form on file, or the server cannot read it, the page is
+   simply left as it was.
+
+   Runs on every load, but only fills empties, so re-opening a form that has been
+   corrected does not undo the corrections. */
+let WH_EXTRACT_DONE_FOR = null;
+async function maybeExtractFromFile() {
+    const staff = PasForm.current;
+    if (!staff || !staff.Id) return;
+    // Once per person per page visit is enough; loadCurrent can fire more than once.
+    if (WH_EXTRACT_DONE_FOR === String(staff.Id)) return;
+    WH_EXTRACT_DONE_FOR = String(staff.Id);
+
+    let data = null;
+    try {
+        const headers = Object.assign({},
+            (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {});
+        const res = await fetch('/api/staff-work-history-extract?staffId='
+            + encodeURIComponent(staff.Id), { headers: headers });
+        if (!res.ok) return;
+        data = await res.json();
+    } catch (e) { return; }
+    if (!data || !data.found || !data.fields) return;
+
+    const fields = data.fields;
+    let filled = 0;
+    Object.keys(fields).forEach(k => {
+        const el = document.querySelector('[data-k="' + k + '"]');
+        if (!el) return;
+        // Only fill a blank. Anything with text is either saved or freshly typed.
+        if (String(el.innerText).replace(/\u00a0/g, ' ').trim() !== '') return;
+        const v = fields[k];
+        if (v == null || String(v).trim() === '') return;
+        el.textContent = String(v).trim();
+        filled++;
+    });
+
+    if (filled) {
+        // Totals may now be derivable from filled hrs/wks/yrs.
+        GROUPS.forEach(recalc);
+        showExtractNote(filled, data.sourceFile);
+    }
+}
+
+/* A one-line banner so it is obvious the page was pre-filled from a scan and needs
+   checking, not that it was already reviewed. Sits under the toolbar, hidden on
+   print. */
+function showExtractNote(count, source) {
+    if (document.getElementById('whExtractNote')) return;
+    const note = document.createElement('div');
+    note.id = 'whExtractNote';
+    note.className = 'no-print';
+    note.style.cssText = 'background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;'
+        + 'padding:8px 12px;margin:0 0 12px;font-size:9pt;color:#1e3a8a;';
+    note.innerHTML = '<strong>Draft pre-filled from the Work History form on file'
+        + (source ? ' (' + esc(source) + ')' : '') + '.</strong> ' + count
+        + ' field' + (count === 1 ? '' : 's') + ' were read automatically and may contain '
+        + 'mistakes \u2014 please check every line, correct anything wrong, then Save.';
+    const toolbar = document.getElementById('pfToolbar');
+    if (toolbar && toolbar.parentNode) toolbar.parentNode.insertBefore(note, toolbar.nextSibling);
+    else document.body.insertBefore(note, document.body.firstChild);
+}
+
+function esc(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
 </script>
 </body>
 </html>

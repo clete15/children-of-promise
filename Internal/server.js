@@ -2065,6 +2065,156 @@ function applyPendingToNotes(notes, pendingNote) {
     return n;
 }
 
+/* ── Work & Practical Experience Verification (PD75a) parse ──────────────────
+   Best-effort read of a staff member's completed Work History / Work Experience
+   form so the electronic version (PAS staff-work-history.html) can be pre-filled
+   for the person to review. It is never authoritative: the director and the
+   employee check every field before it counts toward a credential.
+
+   PD75a is organised by AGE GROUP — Infant/Toddler, Preschool, School-Age — each
+   with the same shape: a position line, Start/End dates, and an
+   hrs/wk x wks/yr x years = total row. This reads pdftotext -layout output, which
+   keeps a label and its written value on the same visual line, so the strategy is
+   to find each label and take the text that trails it (or, when the value wraps to
+   the next line, the next non-empty line).
+
+   Everything returned maps onto the data-k names the electronic form already uses,
+   so the client can drop the values straight in. A field that cannot be read with
+   any confidence is simply left out rather than guessed. */
+function parseWorkHistory(text) {
+    const raw = String(text || '');
+    // Collapse runs of spaces the -layout option inserts, keep line breaks.
+    const lines = raw.split(/\r?\n/).map(l => l.replace(/\u00a0/g, ' ').replace(/[ \t]{2,}/g, ' ').trim());
+    const joined = lines.join('\n');
+    const out = {};
+
+    const esc = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Every label that can appear on the form, as plain text. Used to cut a captured
+    // value where the NEXT label begins on the same visual line — pdftotext -layout
+    // keeps a label and the value written on its rule together on one line.
+    const ALL_LABELS = [
+        'Registry Member ID', 'Registry ID', 'Registry',
+        'Start Date (MO/YR)', 'Start Date', 'End Date (MO/YR)', 'End Date',
+        'Hours per week', 'x Weeks per year', 'Weeks per year', 'x # of years', '# of years',
+        'of years', '= Total Hours', 'Total Hours',
+        'Contact Name and Title', 'Contact Name', 'Company Name', 'Company Address', 'Company Phone',
+        'Name'
+    ];
+    // Trim a captured value at the first following label, drop a stray "(MO/YR)"
+    // fragment that a date rule carries, and tidy leading/trailing ruling characters.
+    const cut = (val) => {
+        let v = String(val == null ? '' : val);
+        let best = v.length;
+        for (const lab of ALL_LABELS) {
+            const m = v.match(new RegExp('\\s*' + esc(lab) + '\\s*[:\\-]', 'i'));
+            if (m && m.index < best) best = m.index;
+        }
+        v = v.slice(0, best);
+        v = v.replace(/^\s*\(MO\/YR\)\s*[:\-]?\s*/i, '');
+        return v.replace(/^[\s._·—–:-]+/, '').replace(/[\s._·]+$/, '').trim();
+    };
+
+    // The value written after a label, cut at the next label. `within` limits the
+    // search to a block of lines (defaults to the whole document). Labels are plain
+    // text; escaping happens here, once.
+    const after = (label, within) => {
+        const src = within || lines;
+        const re = new RegExp(esc(label) + '\\s*[:\\-]?\\s*(.*)', 'i');
+        for (const l of src) {
+            const m = l.match(re);
+            if (m) { const v = cut(m[1]); if (v !== '') return v; }
+        }
+        return null;
+    };
+    const set = (k, v) => { if (v != null && String(v).trim() !== '') out[k] = String(v).trim(); };
+
+    set('name', after('Name'));
+    // "Registry Member ID" is the form's label; "Registry ID" is the common variant.
+    // A bare "Registry" is deliberately NOT a fallback — it captures the tail of the
+    // very label it is trying to read on a blank form.
+    let regId = after('Registry Member ID') || after('Registry ID');
+    // Only keep something that looks like a Registry number (N followed by digits, or
+    // a run of digits), so a stray label fragment never lands in the field.
+    if (regId && /(?:^|\b)(N?\d{5,})\b/i.test(regId)) regId = regId.match(/(N?\d{5,})/i)[1];
+    else if (regId && !/\d/.test(regId)) regId = null;
+    set('registryId', regId);
+
+    /* Each age group is a block that starts at its heading and runs until the next
+       heading (or the Contact section). Within a block the labels repeat, so scoping
+       the search to the block is what keeps infant/toddler hours out of the preschool
+       row. */
+    const groups = [
+        { prefix: 'it', heads: ['Infant/Toddler Teaching Position', 'Infant / Toddler', 'Infant/Toddler'] },
+        { prefix: 'ps', heads: ['Preschool Teaching Position', 'Preschool'] },
+        { prefix: 'sa', heads: ['School-Age Teaching Position', 'School Age', 'School-Age'] }
+    ];
+    // Where each heading first appears, so a block can be bounded by the next one.
+    const headIndex = (heads) => {
+        for (const h of heads) {
+            const i = lines.findIndex(l => new RegExp('^' + esc(h), 'i').test(l));
+            if (i >= 0) return i;
+        }
+        return -1;
+    };
+    const starts = groups.map(g => ({ g, at: headIndex(g.heads) }));
+    const contactAt = lines.findIndex(l => /^Contact (Name|Information)/i.test(l));
+
+    starts.forEach((s, gi) => {
+        if (s.at < 0) return;
+        // The block ends at the next found heading, or the contact section, or the end.
+        const laterStarts = starts.map(x => x.at).filter(a => a > s.at);
+        let end = laterStarts.length ? Math.min(...laterStarts) : lines.length;
+        if (contactAt > s.at && contactAt < end) end = contactAt;
+        const block = lines.slice(s.at, end);
+        const p = s.g.prefix;
+
+        // Same after() logic, confined to this block's lines.
+        const blockAfter = (label) => after(label, block);
+
+        // Position: the heading line may carry the role after the colon; otherwise the
+        // first non-empty, non-label line under it is the written position.
+        let pos = blockAfter(s.g.heads[0]);
+        if (!pos) {
+            const labelish = /(Start Date|End Date|Hours per week|Weeks per year|of years|Total Hours|Teaching Position)/i;
+            const cand = block.slice(1).find(l => l && !labelish.test(l));
+            if (cand) pos = cand;
+        }
+        set(p + 'Position', pos);
+
+        set(p + 'Start', blockAfter('Start Date (MO/YR)') || blockAfter('Start Date'));
+        set(p + 'End', blockAfter('End Date (MO/YR)') || blockAfter('End Date'));
+
+        // The hours/weeks/years line often reads "40 x 52 x 3 = 6240" on one line, so
+        // pull it as a group first, then fall back to per-label reads.
+        const eq = block.map(l => l.match(/(\d[\d,.]*)\s*[xX*]\s*(\d[\d,.]*)\s*[xX*]\s*(\d[\d,.]*)\s*=\s*([\d,]+)/))
+            .find(Boolean);
+        if (eq) {
+            set(p + 'Hrs', eq[1]); set(p + 'Wks', eq[2]); set(p + 'Yrs', eq[3]); set(p + 'Total', eq[4]);
+        } else {
+            const numAfter = (label) => {
+                const v = blockAfter(label);
+                if (v == null) return null;
+                const m = v.match(/[\d,.]+/);
+                return m ? m[0] : null;
+            };
+            set(p + 'Hrs', numAfter('Hours per week'));
+            set(p + 'Wks', numAfter('Weeks per year') || numAfter('x Weeks per year'));
+            set(p + 'Yrs', numAfter('of years') || numAfter('# of years'));
+            set(p + 'Total', numAfter('Total Hours') || numAfter('= Total Hours'));
+        }
+    });
+
+    // Contact / company block, read from the whole document (single occurrence).
+    set('contactName', after('Contact Name and Title') || after('Contact Name'));
+    set('companyName', after('Company Name'));
+    set('companyAddress', after('Company Address'));
+    set('companyPhone', after('Company Phone'));
+
+    // A rough confidence signal for the caller: did we get anything beyond a name?
+    const fieldCount = Object.keys(out).length;
+    return { fields: out, fieldCount: fieldCount, sawForm: /Work\s*&?\s*Practical Experience|Work Experience|PD75a/i.test(joined) };
+}
+
 /* ── Professional Development Record (PDR) parse ─────────────────────────────
    One person per PDR. From pdftotext output we read the Section One summary tables
    (they are unambiguous) and the dated training rows:
@@ -4786,6 +4936,74 @@ ELSE
             return sendJSON(res, 200, { success: true });
         });
         return;
+    }
+
+    /* ── Work History extract (best-effort prefill) ─────────────────────────
+       Reads a staff member's completed Work History / Work Experience form from the
+       document library and returns the fields it can recognise, so the electronic
+       PD75a form can be pre-filled for review. Read-only: nothing is written here,
+       and the client only fills blanks the person has not already answered.
+
+       Scope matches the download rule: a director may read anyone's; a staff member
+       only their own. */
+    if (req.method === 'GET' && url.startsWith('/api/staff-work-history-extract')) {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        const asked = parseInt(new URLSearchParams(req.url.split('?')[1] || '').get('staffId') || 0, 10);
+        const staffId = (actor.director || actor.admin) ? asked : parseInt(actor.staffId, 10);
+        if (!staffId) return sendJSON(res, 400, { error: 'staffId required' });
+        if (!actorMayTouch(actor, staffId)) {
+            return sendJSON(res, 403, { error: 'You can only read your own work history.' });
+        }
+
+        // Find that person's confirmed Work-history-form files in the library.
+        const listed = listStaffFolderFiles();
+        if (!listed.ok) {
+            return sendJSON(res, 200, { found: false, reason: listed.error });
+        }
+        const links = staffFileLinkMap();
+        if (!links.ok) return sendJSON(res, 500, { error: links.error });
+
+        const wanted = String(staffId);
+        const candidates = listed.files
+            .filter(f => /work history/i.test(f.folder) || /work history/i.test(f.category))
+            .map(f => ({ f, link: staffFileLinkFor(links, f.rel) }))
+            // Confirmed as this person's, and a PDF we can read.
+            .filter(x => x.link && x.link.staffId === wanted
+                && path.extname(x.f.name).toLowerCase() === '.pdf')
+            // Newest first, so the most recent form wins if there is more than one.
+            .sort((a, b) => String(b.link.uploadedDate || '').localeCompare(String(a.link.uploadedDate || '')));
+
+        if (!candidates.length) {
+            return sendJSON(res, 200, {
+                found: false,
+                reason: 'No Work History form is on file for this person yet.'
+            });
+        }
+
+        const chosen = candidates[0];
+        const full = resolveDocPath(chosen.f.rel);
+        if (!full || !fs.existsSync(full)) {
+            return sendJSON(res, 200, { found: false, reason: 'The file on record could not be located.' });
+        }
+
+        const ex = pdfToText(full);
+        if (!ex.ok) {
+            return sendJSON(res, 200, {
+                found: false,
+                reason: 'Could not read the PDF. The server needs pdftotext (Poppler). ' + ex.error
+            });
+        }
+
+        const parsed = parseWorkHistory(ex.text);
+        console.log('[WORK HISTORY] extracted ' + parsed.fieldCount + ' fields for staff '
+            + staffId + ' from "' + chosen.f.name + '"');
+        return sendJSON(res, 200, {
+            found: parsed.fieldCount > 0,
+            sourceFile: chosen.f.name,
+            fieldCount: parsed.fieldCount,
+            fields: parsed.fields
+        });
     }
 
     /* ── A staff member hands in their own transcript / Gateways report ──────
