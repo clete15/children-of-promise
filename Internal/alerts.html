@@ -321,6 +321,25 @@ function workHistorySignReminder() {
         + '</div>';
 }
 
+/* Manual reminder: confirm with Gateways whether ECE-Related coursework counts toward
+   the ECE/CD credential hours. Paige's PDR lists ECE 112 (Growth &amp; Development of
+   Children) under "ECE-Related" rather than "ECE/CD", so her official ECE/CD total is
+   12 while all listed coursework is 17. The credential card's hours figure depends on
+   the answer. No auto-expiry — a to-do that is done when it is done. DELETE this
+   function and its call in renderAlerts once Gateways confirms how these count. */
+function eceRelatedHoursQuestion() {
+    return '<div class="alert-item info">'
+        + '<div class="alert-title">\u2753 Confirm with Gateways: do ECE-Related hours count toward ECE/CD?</div>'
+        + '<div class="alert-detail">Paige Holliday\u2019s PDR files <strong>ECE 112 (Growth &amp; Development '
+        + 'of Children)</strong> under <em>ECE-Related</em>, not <em>ECE/CD</em>, so her official ECE/CD total '
+        + 'reads <strong>12</strong> while all of her listed coursework totals <strong>17</strong>. ECE 112 '
+        + 'looks like early-childhood content and may belong in ECE/CD. Ask Gateways / INCCRRA (and possibly '
+        + 'SWIC, whose transcript they read) whether ECE 112 should be reclassified as ECE/CD \u2014 that '
+        + 'determines whether the credential card should show 12 or 17. Until then the card is left as is.</div>'
+        + '<a class="alert-action" href="mailto:credentials@ilgateways.com">Email credentials@ilgateways.com \u2192</a>'
+        + '</div>';
+}
+
 function renderAlerts(students, waitlist, staff) {
     const body = document.getElementById('alertsBody');
     let html = '';
@@ -329,6 +348,12 @@ function renderAlerts(students, waitlist, staff) {
     /* Manual reminder to sign Lindsey's work history once the tablet arrives. */
     const whSign = workHistorySignReminder();
     if (whSign) { count++; html += whSign; }
+
+    /* Open question for Gateways: whether ECE-Related coursework (e.g. Paige's ECE 112)
+       counts toward the ECE/CD credential hours. Parks the 12-vs-17 decision here until
+       we hear back. */
+    const eceHoursQ = eceRelatedHoursQuestion();
+    if (eceHoursQ) { count++; html += eceHoursQ; }
 
     /* Gateways training report is down. A dated, self-expiring system note (not tied
        to any one person's record), so it lives here on the shared alerts page rather
