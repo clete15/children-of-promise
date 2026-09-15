@@ -2324,7 +2324,8 @@ function parsePdr(text) {
         registryId: '', name: '',
         totalCreditHours: null, eceCdHours: null, eceRelatedHours: null,
         transcriptReviewed: false, pdHoursThisYear: 0, trainingRowsCounted: 0,
-        contentAreas: null, contentAreasTotal: null, courses: []
+        contentAreas: null, contentAreasTotal: null, courses: [],
+        eceCdCourseTotal: null, eceRelatedCourseTotal: null
     };
 
     // "Record for: Paige Holliday (N452129)"
@@ -2458,13 +2459,28 @@ function parsePdr(text) {
        Listing) and "Section Three", so training rows are never mistaken for courses. */
     (function parseCourses() {
         let inSection = false;
+        /* Which sub-list we are in. The PDR splits the courses under two headings —
+           "ECE/CD Coursework" and "ECE-Related Coursework" — and only the ECE/CD
+           hours count toward the credential's college gate. Tagging each course with
+           its list is what lets the card explain why (e.g.) six courses total 12
+           ECE/CD hours: the other two are ECE-Related. */
+        let section = 'ececd';   // ececd | ecerelated
         for (const raw of lines) {
             const l = raw.trim();
             if (/^Section Two/i.test(l) || /Detailed Course Listing/i.test(l)) { inSection = true; continue; }
             if (/^Section Three/i.test(l)) break;
             if (!inSection) continue;
-            // Skip headers, institution names, and total lines.
-            if (/^(Semester|Total|ECE\/CD Coursework|ECE-Related Coursework|Note:)/i.test(l)) continue;
+            // The two sub-list headings flip which section the rows below belong to.
+            if (/^ECE-Related Coursework/i.test(l)) { section = 'ecerelated'; continue; }
+            if (/^ECE\/CD Coursework/i.test(l)) { section = 'ececd'; continue; }
+            /* The PDR prints an authoritative per-section total; capture it so the card
+               can show a figure that reconciles with the transcript exactly. */
+            const tot = l.match(/^Total\s+ECE\/CD\s+Hours:?\s*(\d+(?:\.\d+)?)/i);
+            if (tot) { out.eceCdCourseTotal = parseFloat(tot[1]); continue; }
+            const totR = l.match(/^Total\s+ECE-Related\s+Hours:?\s*(\d+(?:\.\d+)?)/i);
+            if (totR) { out.eceRelatedCourseTotal = parseFloat(totR[1]); continue; }
+            // Skip the remaining headers, institution names, and grand-total lines.
+            if (/^(Semester|Total|Note:)/i.test(l)) continue;
             /* A course row: a term word, a year, then PREFIX NBR, a name, and hours.
                Match a 2-4 letter prefix + number anywhere in the line, the trailing
                credit-hours number, and take the text between them as the name. */
@@ -2475,7 +2491,8 @@ function parsePdr(text) {
             const hours = parseFloat(cm[4]);
             // Guard against picking up a term/year prefix as the course name.
             if (!name || /^\d/.test(name)) continue;
-            out.courses.push({ nbr: nbr, name: name, hours: isFinite(hours) ? hours : null });
+            out.courses.push({ nbr: nbr, name: name, hours: isFinite(hours) ? hours : null,
+                section: section });
         }
     })();
 

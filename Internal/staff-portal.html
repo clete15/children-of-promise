@@ -174,8 +174,12 @@
     }
     .sp-panel[hidden] { display: none; }
     /* PDR button at the right end of the tab strip — opens the Update-from-PDR panel. */
+    /* The document/action buttons live in this group at the right end of the tab
+       strip. The group owns the push-right, so it does not matter which buttons
+       inside it are hidden — the visible ones still sit flush right, together. */
+    .sp-tabactions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
     .sp-pdrtoggle {
-        margin-left: auto; align-self: center; appearance: none; -webkit-appearance: none;
+        align-self: center; appearance: none; -webkit-appearance: none;
         cursor: pointer; font-family: inherit; font-size: 0.78rem; font-weight: 800;
         letter-spacing: 0.05em; color: var(--sp-accent); background: var(--sp-accent-soft);
         border: 1.5px solid var(--sp-border); border-radius: 8px; padding: 6px 13px;
@@ -184,21 +188,18 @@
     .sp-pdrtoggle:hover { border-color: var(--sp-accent); }
     .sp-pdrtoggle.on { background: var(--sp-accent); color: #fff; border-color: var(--sp-accent); }
     .sp-pdrtoggle:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
-    /* Work History link, sitting just left of the PDR button at the right end of the
-       strip. Same pill look; it carries the margin-left:auto so the two push right as a
-       pair, and PDR then only needs a small gap from it. */
-    .sp-histbtn {
-        margin-left: auto; align-self: center; text-decoration: none;
+    /* Work History link and the two "open a document" buttons — same pill look as the
+       Update PDR button so the group reads as one row of related actions. */
+    .sp-histbtn, .sp-docbtn {
+        align-self: center; text-decoration: none; cursor: pointer;
+        appearance: none; -webkit-appearance: none;
         font-family: inherit; font-size: 0.78rem; font-weight: 800;
         letter-spacing: 0.05em; color: var(--sp-accent); background: var(--sp-accent-soft);
         border: 1.5px solid var(--sp-border); border-radius: 8px; padding: 6px 13px;
         white-space: nowrap; transition: border-color 0.12s, background 0.12s;
     }
-    .sp-histbtn:hover { border-color: var(--sp-accent); }
-    .sp-histbtn:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
-    /* When the Work History button is present it owns the auto-margin, so PDR just
-       needs a gap beside it rather than its own push-right. */
-    .sp-histbtn + .sp-pdrtoggle { margin-left: 6px; }
+    .sp-histbtn:hover, .sp-docbtn:hover { border-color: var(--sp-accent); }
+    .sp-histbtn:focus-visible, .sp-docbtn:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
     /* Close (×) on the PDR panel. */
     .sp-pdrup { position: relative; }
     .sp-pdrclose {
@@ -1164,16 +1165,29 @@ function tabBar(s, tabs) {
                 + '</button>';
         }).join('')
         // At the right end of the strip: My Work History (opens the PD75a form) and,
-        // beside it, the PDR button that opens the "Update from PDR" panel on the
-        // credentials tab. Both shown on a real record; the server scopes edits to your
-        // own record (an admin, anyone's).
+        // beside it, a row of document/action buttons at the right end of the strip:
+        //   Transcript   — opens this person's most recent transcript (view only)
+        //   PDR          — opens this person's most recent PDR (view only)
+        //   Work History — opens the PD75a form
+        //   Update PDR   — opens the "Update from PDR" panel on the credentials tab
+        // The two "open a file" buttons start hidden and reveal themselves once we
+        // confirm a document is on file (wireDocButtons). All shown on a real record;
+        // the server scopes edits and downloads to the person (an admin, anyone's).
         + (s && s.Id
-            ? '<a class="sp-histbtn" href="/pas/staff-work-history.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" '
+            ? '<div class="sp-tabactions">'
+              + '<button type="button" id="openTranscript" class="sp-docbtn" style="display:none;" '
+              + 'title="Open ' + esc(s.Name || 'this person') + '\u2019s most recent college transcript (view only)">'
+              + '\u2197 Transcript</button>'
+              + '<button type="button" id="openPdr" class="sp-docbtn" style="display:none;" '
+              + 'title="Open ' + esc(s.Name || 'this person') + '\u2019s most recent Gateways PDR (view only)">'
+              + '\u2197 PDR</button>'
+              + '<a class="sp-histbtn" href="/pas/staff-work-history.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" '
               + 'rel="noopener" title="Everywhere ' + esc(s.Name || 'this person') + ' has worked with children (Gateways form '
               + 'PD75a) \u2014 used to verify experience toward a credential level">Work History</a>'
               + '<button type="button" id="pdrToggle" class="sp-pdrtoggle' + (pdrOpen ? ' on' : '')
               + '" aria-pressed="' + (pdrOpen ? 'true' : 'false') + '" '
-              + 'title="Update this record from a Gateways PDR">PDR</button>'
+              + 'title="Update this record from a Gateways PDR">Update PDR</button>'
+              + '</div>'
             : '')
         + '</div>';
 }
@@ -1252,6 +1266,38 @@ function render() {
     wirePdr();
     // The ECE/ITC credential picker on the credentials tab (everyone).
     wireCredPick();
+    // The Transcript / PDR "open document" buttons in the tab strip.
+    wireDocButtons(s);
+}
+
+/* The Transcript and PDR buttons at the right of the tab strip. Each opens the most
+   recent such document on file for this person, view-only, through the same
+   authenticated blob route the admin card and "my files" links use. One fetch lists
+   the person's files; each button reveals itself only if a matching document exists,
+   so a button never dead-ends. */
+async function wireDocButtons(s) {
+    if (!s || !s.Id) return;
+    const tBtn = $('openTranscript');
+    const pBtn = $('openPdr');
+    if (!tBtn && !pBtn) return;
+    let mine = [];
+    try {
+        const res = await myFetch('/api/staff-files?staffId=' + encodeURIComponent(s.Id));
+        if (res.ok) { const data = await res.json(); mine = Array.isArray(data.mine) ? data.mine : []; }
+    } catch (e) { return; }
+    // Newest file whose category matches, or null.
+    const newest = (re) => mine
+        .filter(f => re.test(f.category || ''))
+        .sort((a, b) => String(b.uploadedDate || '').localeCompare(String(a.uploadedDate || '')))[0] || null;
+
+    const wire = (btn, rec, label) => {
+        if (!btn || !rec) return;
+        btn.dataset.rel = rec.rel;
+        btn.style.display = '';
+        btn.addEventListener('click', () => fetchStaffFile(btn.dataset.rel, btn));
+    };
+    wire(tBtn, newest(/transcript/i), 'transcript');
+    wire(pBtn, newest(/professional development record/i), 'PDR');
 }
 
 /* Above the tabs, so the name and room stay visible whichever tab is open. The
@@ -2309,11 +2355,13 @@ async function runPdrPreview() {
         PDR_PREVIEW = data;
         if (msg) { msg.className = 'sp-savemsg good'; msg.textContent = 'Read the PDR. Review below.'; }
         // The server filed this PDR (unless it was someone else's), so the newest one
-        // is now this upload — reveal the open button and point it at the filed copy.
-        const openLatest = $('pdrOpenLatest');
-        if (openLatest && data.filedPdr && data.filedPdr.rel) {
-            openLatest.dataset.rel = data.filedPdr.rel;
-            openLatest.style.display = '';
+        // is now this upload — reveal the in-panel and tab-strip open buttons and point
+        // them at the filed copy.
+        if (data.filedPdr && data.filedPdr.rel) {
+            ['pdrOpenLatest', 'openPdr'].forEach(id => {
+                const b = $(id);
+                if (b) { b.dataset.rel = data.filedPdr.rel; b.style.display = ''; }
+            });
         }
         renderPdrResult();
     } catch (e) {
