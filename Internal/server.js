@@ -3007,6 +3007,105 @@ function sqlDataLines(raw) {
 function sqlCells(raw) {
     return sqlDataLines(raw).map(l => l.split('|').map(x => x.trim()));
 }
+
+/* ── Projected attendance ────────────────────────────────────────────────────
+   Maps each waiting-list program (AgeGroup) to the rooms that serve it, so pending
+   demand can be added onto the actual enrolled counts. Room numbers come from
+   dimClassrooms (setup_classrooms.sql):
+     1 Infant · 2 Infants/Toddlers · 3 Toddlers   → program 0-2 (Infant & Toddler)
+     4 Toddlers/2yr · 5 2-Year-Olds · 7 2&3yr      → program 2-3 (2-Year-Olds)
+     6 Pre-School                                  → program 3-5 (Pre-School)
+     8 Before & Afterschool                        → program ba  (Before & After)
+   A waiting-list child applies to a program, not a room, so we roll rooms up to the
+   program level and never guess a specific room. */
+const WAITLIST_PROGRAM_ROOMS = {
+    '0-2': [1, 2, 3],
+    '2-3': [4, 5, 7],
+    '3-5': [6],
+    'ba':  [8],
+};
+const WAITLIST_PROGRAM_LABELS = {
+    '0-2': 'Infant & Toddler',
+    '2-3': '2-Year-Olds',
+    '3-5': 'Pre-School',
+    'ba':  'Before & After',
+};
+
+// Parse a free-text "days requested" string into a 5-element [Mon..Fri] presence array.
+// Handles "Monday, Wednesday", "M/W/F", "Full time", "5 days", blanks, etc. Anything that
+// names no recognisable weekday (including "full time" and empties) is treated as all five
+// days — the conservative capacity-planning assumption that a child needs every day.
+function parseRequestedDays(text) {
+    const s = String(text || '').toLowerCase();
+    const days = [
+        /\bmon(day)?\b|\bm\b|(^|[^a-z])m([^a-z]|$)/.test(s),
+        /\btue(s|sday)?\b|\bt\b|(^|[^a-z])t([^a-z]|$)/.test(s),
+        /\bwed(nesday)?\b|\bw\b|(^|[^a-z])w([^a-z]|$)/.test(s),
+        /\bthu(r|rs|rsday)?\b|\bth\b/.test(s),
+        /\bfri(day)?\b|\bf\b|(^|[^a-z])f([^a-z]|$)/.test(s),
+    ];
+    if (days.some(Boolean)) return days.map(d => d ? 1 : 0);
+    return [1, 1, 1, 1, 1]; // full time / unspecified → every day
+}
+
+/* Build the projected-attendance rows the /api/reports endpoint returns.
+   roomDailyNum : [[RoomNumber, Room, DCFSCapacity, Mon..Fri], ...] (actual enrolled)
+   waitlistRows : [[AgeGroup, DaysRequested], ...]  (one pending child per row)
+   Returns one row per program:
+     { program, label, capacity, actual:[5], waitlist:[5], projected:[5], rooms:[names] } */
+function buildProjectedAttendance(roomDailyNum, waitlistRows) {
+    if (!Array.isArray(roomDailyNum)) return [];
+    // Which program does a room belong to?
+    const roomToProgram = {};
+    for (const [program, nums] of Object.entries(WAITLIST_PROGRAM_ROOMS)) {
+        nums.forEach(n => { roomToProgram[n] = program; });
+    }
+    const programs = {};
+    const ensure = (program) => {
+        if (!programs[program]) {
+            programs[program] = {
+                program,
+                label: WAITLIST_PROGRAM_LABELS[program] || program || 'Other',
+                capacity: 0,
+                actual: [0, 0, 0, 0, 0],
+                waitlist: [0, 0, 0, 0, 0],
+                projected: [0, 0, 0, 0, 0],
+                rooms: [],
+            };
+        }
+        return programs[program];
+    };
+
+    // Roll up actual enrolled counts + capacity, room by room, into their program.
+    roomDailyNum.forEach(r => {
+        const num = parseInt(r[0], 10);
+        const program = roomToProgram[num];
+        if (!program) return; // room not mapped to any waiting-list program
+        const p = ensure(program);
+        p.capacity += parseInt(r[2], 10) || 0;
+        p.rooms.push(r[1] || ('Room ' + num));
+        for (let i = 0; i < 5; i++) p.actual[i] += parseInt(r[3 + i], 10) || 0;
+    });
+
+    // Add pending waiting-list demand on top, per requested day.
+    (Array.isArray(waitlistRows) ? waitlistRows : []).forEach(w => {
+        const program = String(w[0] || '').trim();
+        if (!WAITLIST_PROGRAM_ROOMS[program]) return; // unknown/blank program: not projected
+        const p = ensure(program);
+        const days = parseRequestedDays(w[1]);
+        for (let i = 0; i < 5; i++) p.waitlist[i] += days[i];
+    });
+
+    // projected = actual + waitlist, and keep a stable program order.
+    const order = ['0-2', '2-3', '3-5', 'ba'];
+    return order
+        .filter(pr => programs[pr])
+        .map(pr => {
+            const p = programs[pr];
+            for (let i = 0; i < 5; i++) p.projected[i] = p.actual[i] + p.waitlist[i];
+            return p;
+        });
+}
 function sqlRows(raw, columns) {
     return sqlCells(raw).map(v => {
         const o = {};
@@ -6755,6 +6854,13 @@ ELSE
             ccapEligible:  `SELECT e.First_Name,e.Last_Name,r.Room,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(p.FirstName+' '+p.LastName,'') AS ParentName,ISNULL(p.Phone,'') AS ParentPhone FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber LEFT JOIN (SELECT ChildName,FirstName,LastName,Phone,ROW_NUMBER() OVER (PARTITION BY ChildName ORDER BY Id DESC) AS rn FROM PreEnrollment) p ON p.ChildName LIKE '%'+e.First_Name+'%' AND p.rn=1 WHERE (e.Active='Yes' OR e.Active='YES') AND e.Category<>'CCAP' AND e.Category<>'Foster' AND ISNULL(e.HouseholdIncome,0)>0 AND ISNULL(e.HouseholdSize,0)>0 AND ${ccapSqlPredicate('e.HouseholdIncome','e.HouseholdSize')} ORDER BY e.Last_Name`,
             foodDetail:    `SELECT r.Room,e.Last_Name,e.First_Name,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.F_R_P_Food,'') AS FRP,ISNULL(e.PublicBenefits,'') AS Benefits FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber WHERE e.Active='Yes' OR e.Active='YES' ORDER BY r.Room,e.Last_Name`,
             summerProgram: `IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='SummerProgram') SELECT s.ChildLastName,s.ChildFirstName,s.ChildAge,ISNULL(e.F_R_P_Food,'Unknown') AS FRP,s.Days,s.ParentLastName,s.ParentFirstName,s.ParentPhone FROM SummerProgram s LEFT JOIN rptMasterEnrollment e ON s.ChildFirstName=e.First_Name AND s.ChildLastName=e.Last_Name ORDER BY s.ChildLastName`,
+            // For projected attendance we need each room's number (to map it to an age-group
+            // program) alongside the same actual daily counts byRoomDaily reports.
+            roomDailyNum:  `SELECT r.RoomNumber, r.Room, r.DCFSCapacity, SUM(CASE WHEN e.Monday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Mon, SUM(CASE WHEN e.Tuesday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Tue, SUM(CASE WHEN e.Wednesday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Wed, SUM(CASE WHEN e.Thursday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Thu, SUM(CASE WHEN e.Friday=1 AND (e.Active='Yes' OR e.Active='YES') THEN 1 ELSE 0 END) AS Fri FROM dimClassrooms r LEFT JOIN rptMasterEnrollment e ON e.RoomNumber=r.RoomNumber AND (e.Active='Yes' OR e.Active='YES') GROUP BY r.RoomNumber, r.Room, r.DCFSCapacity ORDER BY r.RoomNumber`,
+            // One row per pending waiting-list child: which program they applied for and the
+            // days they asked for. JS parses the free-text days and spreads the demand across
+            // the rooms that serve that program (see projectedAttendance below).
+            waitlistDemand: `SELECT ISNULL(AgeGroup,'') AS AgeGroup, ISNULL(DaysRequested,'') AS DaysRequested FROM PreEnrollment WHERE ISNULL(WaitlistStatus,'Pending') NOT IN ('Enrolled','Declined')`,
         };
         const results = {};
         for (const [key, sql] of Object.entries(queries)) {
@@ -6762,6 +6868,17 @@ ELSE
             if (!r.ok) { results[key] = { error: r.error }; continue; }
             results[key] = sqlCells(r.data);
         }
+
+        /* Projected attendance = actual enrolled + the waiting list, grouped by age-group
+           program rather than by room. A waiting-list child applies for a program (AgeGroup),
+           not a specific room, and several rooms can serve the same program, so projecting
+           onto one room would invent precision we do not have. Instead we sum each program's
+           rooms into one capacity and one actual daily count, then add the program's pending
+           waiting-list demand on top. The result is "how full would each program be, by day,
+           if we enrolled everyone waiting." */
+        results.projectedAttendance = buildProjectedAttendance(
+            results.roomDailyNum, results.waitlistDemand);
+
         return sendJSON(res, 200, results);
     }
 

@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Actual Attendance – Children Of Promise</title>
+    <title>Projected Attendance – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
         .at-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
-        .at-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:960px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
-        .at-sidebar { width:200px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .at-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:980px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        .at-sidebar { width:210px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
         .at-sidebar button {
             display:block;width:100%;text-align:left;padding:11px 16px;border:none;cursor:pointer;
             background:transparent;font-size:0.86rem;font-weight:700;color:var(--sp-text);
@@ -21,21 +21,29 @@
         .at-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;max-height:calc(100vh - 130px); }
         .at-head { padding:12px 20px;border-bottom:1px solid var(--sp-border); }
         .at-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
+        .at-room-name { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-bottom:4px;text-align:center; }
+        .at-room-sub { font-size:0.78rem;color:var(--sp-muted);text-align:center;margin-bottom:16px; }
         .at-body { overflow-y:auto;flex:1;padding:20px 24px; }
-        .at-room-name { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-bottom:16px;text-align:center; }
         .at-chart { display:flex;align-items:flex-end;gap:14px;padding:0 8px; }
         .at-col { display:flex;flex-direction:column;align-items:center;gap:8px;flex:1; }
-        .at-count { font-size:0.9rem;font-weight:800;color:var(--sp-text); }
+        .at-count { font-size:0.84rem;font-weight:800;color:var(--sp-text);text-align:center;line-height:1.25; }
+        .at-count .at-wl { color:var(--sp-accent);font-weight:800; }
         .at-bar-track {
             position:relative;width:100%;background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);
-            border-radius:6px 6px 0 0;display:flex;align-items:flex-end;overflow:hidden;
+            border-radius:6px 6px 0 0;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;
         }
-        .at-bar-fill { width:100%;background:var(--sp-accent);border-radius:6px 6px 0 0;transition:height 0.4s; }
-        .at-over .at-bar-fill { background:var(--sp-bad-fg); }
+        /* Stacked bar: enrolled (solid accent) on the bottom, waiting list (striped) on top. */
+        .at-fill-actual { width:100%;background:var(--sp-accent);transition:height 0.4s; }
+        .at-fill-wait { width:100%;transition:height 0.4s;
+            background:repeating-linear-gradient(45deg,var(--sp-accent) 0 6px,var(--sp-accent-soft) 6px 12px); }
+        .at-over .at-bar-track { box-shadow:inset 0 0 0 2px var(--sp-bad-fg); }
         .at-day { font-size:0.84rem;font-weight:700;color:var(--sp-muted); }
         .at-legend { display:flex;gap:18px;margin-top:16px;justify-content:center;flex-wrap:wrap; }
         .at-legend > div { display:flex;align-items:center;gap:7px;font-size:0.8rem;color:var(--sp-text-2); }
         .at-swatch { width:15px;height:15px;border-radius:3px; }
+        .at-swatch-wait { background:repeating-linear-gradient(45deg,var(--sp-accent) 0 4px,var(--sp-accent-soft) 4px 8px); }
+        .at-note { margin-top:14px;font-size:0.76rem;color:var(--sp-muted);text-align:center;line-height:1.5; }
+        .at-over-flag { color:var(--sp-bad-fg);font-weight:800; }
         .at-empty { padding:40px;text-align:center;color:var(--sp-muted);font-size:0.9rem; }
     </style>
 </head>
@@ -46,7 +54,7 @@
         <img src="logo-sm.png" alt="Children Of Promise">
         <div class="brand-text">
             <h1>Children Of Promise</h1>
-            <p>Actual Attendance &nbsp;·&nbsp; Millstadt, IL</p>
+            <p>Projected Attendance &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
     <div class="header-actions">
@@ -79,8 +87,8 @@
         <a href="/staff/waitinglist.html">Waiting List</a>
         <a href="/staff/ems.html">Enrolled Students</a>
         <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
-        <a href="/staff/attendance.html" class="on" aria-current="page">Actual Attendance</a>
-        <a href="/staff/attendance-projected.html">Projected Attendance</a>
+        <a href="/staff/attendance.html">Actual Attendance</a>
+        <a href="/staff/attendance-projected.html" class="on" aria-current="page">Projected Attendance</a>
     </nav>
 </div>
 
@@ -89,7 +97,7 @@
         <div class="at-sidebar" id="atSidebar"></div>
         <div class="at-card">
             <div class="at-head">
-                <div class="at-title">Actual Attendance by Room</div>
+                <div class="at-title">Projected Attendance by Program</div>
             </div>
             <div class="at-body" id="atBody">
                 <div class="at-empty">Loading…</div>
@@ -101,16 +109,22 @@
 <script src="app.js"></script>
 <script src="/staff/auth.js"></script>
 <script>
-/* Actual attendance by room — the enrolled children only. Same data source
-   (/api/reports -> byRoomDaily): each row is [roomName, capacity, Mon, Tue, Wed, Thu, Fri]
-   of daily counts, derived from each enrolled child's attending days. The Projected
-   Attendance page (attendance-projected.html) layers the waiting list on top of these
-   numbers. This view only reads and charts the actual counts. */
+/* Projected attendance = actual enrolled + the waiting list, by age-group PROGRAM.
+
+   A waiting-list child applies to a program (Infant & Toddler, 2-Year-Olds, Pre-School,
+   Before & After), not a specific room, and several rooms can serve one program. So this
+   view rolls each program's rooms into one combined capacity and one actual daily count,
+   then stacks the program's pending waiting-list demand on top. It answers "how full would
+   each program be, by day, if we enrolled everyone on the waiting list?"
+
+   All of that math is done server-side in /api/reports -> projectedAttendance. Each row is
+   { program, label, capacity, actual:[Mon..Fri], waitlist:[Mon..Fri], projected:[Mon..Fri],
+   rooms:[names] }. This page only charts it. */
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const CHART_H = 220;
-let dailyData = [];
-let activeRoom = 0;
+let programs = [];
+let active = 0;
 
 function esc(v) {
     return String(v == null ? '' : v)
@@ -119,46 +133,59 @@ function esc(v) {
 
 function renderSidebar() {
     const box = document.getElementById('atSidebar');
-    box.innerHTML = dailyData.map((r, i) => {
-        const cap = parseInt(r[1] || 0);
-        return `<button id="atRoom${i}" onclick="showRoom(${i})">
-            <div>${esc(r[0] || 'Unknown')}</div>
-            <div class="at-room-cap">Capacity ${cap}</div>
+    box.innerHTML = programs.map((p, i) => {
+        const waiting = Math.max(...p.waitlist);
+        return `<button id="atP${i}" onclick="showProgram(${i})">
+            <div>${esc(p.label)}</div>
+            <div class="at-room-cap">Capacity ${p.capacity}${waiting ? ' · ' + waiting + ' waiting' : ''}</div>
         </button>`;
     }).join('');
 }
 
-function showRoom(idx) {
-    activeRoom = idx;
-    dailyData.forEach((_, i) => {
-        const btn = document.getElementById('atRoom' + i);
+function showProgram(idx) {
+    active = idx;
+    programs.forEach((_, i) => {
+        const btn = document.getElementById('atP' + i);
         if (btn) btn.classList.toggle('on', i === idx);
     });
 
-    const r = dailyData[idx];
-    const room = r[0] || 'Unknown';
-    const capacity = Math.max(parseInt(r[1] || 1), 1);
-    const counts = [2, 3, 4, 5, 6].map(c => parseInt(r[c] || 0));
+    const p = programs[idx];
+    const capacity = Math.max(parseInt(p.capacity, 10) || 1, 1);
+    let anyOver = false;
 
     const cols = DAYS.map((day, i) => {
-        const count = counts[i];
-        const over = count > capacity;
-        const fillH = Math.round(Math.min(count / capacity, 1) * CHART_H);
+        const actual = parseInt(p.actual[i], 10) || 0;
+        const wait = parseInt(p.waitlist[i], 10) || 0;
+        const projected = actual + wait;
+        const over = projected > capacity;
+        if (over) anyOver = true;
+        // Bars scale to capacity; a projected total over capacity clamps at full height
+        // and the track is outlined red so the overflow is obvious.
+        const actualH = Math.round(Math.min(actual / capacity, 1) * CHART_H);
+        const waitH = Math.round(Math.min(projected / capacity, 1) * CHART_H) - actualH;
         return `<div class="at-col${over ? ' at-over' : ''}">
-            <div class="at-count">${count}/${capacity}</div>
+            <div class="at-count">${projected}/${capacity}${wait ? `<br><span class="at-wl">+${wait} waiting</span>` : ''}</div>
             <div class="at-bar-track" style="height:${CHART_H}px;">
-                <div class="at-bar-fill" style="height:${fillH}px;"></div>
+                <div class="at-fill-wait" style="height:${Math.max(waitH, 0)}px;"></div>
+                <div class="at-fill-actual" style="height:${actualH}px;"></div>
             </div>
             <div class="at-day">${day}</div>
         </div>`;
     }).join('');
 
     document.getElementById('atBody').innerHTML = `
-        <div class="at-room-name">${esc(room)}</div>
-        <div class="at-chart" style="height:${CHART_H + 56}px;">${cols}</div>
+        <div class="at-room-name">${esc(p.label)}</div>
+        <div class="at-room-sub">${esc((p.rooms || []).join(' · '))}</div>
+        <div class="at-chart" style="height:${CHART_H + 72}px;">${cols}</div>
         <div class="at-legend">
             <div><span class="at-swatch" style="background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);"></span> Capacity (${capacity})</div>
             <div><span class="at-swatch" style="background:var(--sp-accent);"></span> Enrolled (actual)</div>
+            <div><span class="at-swatch at-swatch-wait"></span> Waiting list</div>
+        </div>
+        <div class="at-note">
+            Projected = enrolled today + everyone on the waiting list for this program.
+            ${anyOver ? '<span class="at-over-flag">Projected demand exceeds capacity on the flagged days.</span>' : 'Projected demand fits within capacity every day.'}
+            <br>Waiting-list children are counted on the days they requested (all five when unspecified).
         </div>`;
 }
 
@@ -166,20 +193,23 @@ async function load() {
     try {
         const res = await apiFetch('/api/reports');
         const data = await res.json();
-        dailyData = (data && data.byRoomDaily) || [];
-        if (!dailyData.length) {
-            document.getElementById('atBody').innerHTML = '<div class="at-empty">No attendance data yet.</div>';
+        programs = (data && data.projectedAttendance) || [];
+        if (!Array.isArray(programs) || !programs.length) {
+            document.getElementById('atBody').innerHTML =
+                '<div class="at-empty">No projection data yet. Add rooms and waiting-list entries first.</div>';
             return;
         }
         renderSidebar();
-        showRoom(0);
+        showProgram(0);
     } catch (e) {
         document.getElementById('atBody').innerHTML =
-            '<div class="at-empty">Could not load attendance: ' + esc(e.message) + '</div>';
+            '<div class="at-empty">Could not load projected attendance: ' + esc(e.message) + '</div>';
     }
 }
 
 load();
 </script>
+<!-- Floating Deploy/Restart widget while this area is under active development. -->
+<script src="deploy-widget.js"></script>
 </body>
 </html>
