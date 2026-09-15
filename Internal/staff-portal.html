@@ -1396,7 +1396,7 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
     // ITC gated behind a higher ECE level: say only that, and stop.
     if (model.reachable === false) {
         body = '<div class="sp-step caution"><div class="t">Next: reach ECE Credential first</div>'
-            + '<div class="d">' + esc(model.gate) + ' See the Preschool (ECE) column for what that '
+            + '<div class="d">' + esc(model.gate) + ' See the ECE column for what that '
             + 'takes.</div></div>';
         return ladderShell(title, heldLevel, heldWord, body);
     }
@@ -1429,7 +1429,7 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
             // Nothing to verify against — the form has no hours yet.
             body += '<div class="sp-step alert" style="margin-bottom:12px;">'
                 + '<div class="t">\u26a0 Fill in your Work History to check ' + esc(model.levelWord) + '</div>'
-                + '<div class="d">Your Preschool (ECE) credential already reaches past Infant Toddler '
+                + '<div class="d">Your ECE credential already reaches past Infant Toddler '
                 + esc(heldWord) + ', so you may qualify to apply for ' + esc(model.levelWord) + ' now \u2014 '
                 + 'but your ' + whLink + ' (Gateways PD75a) is blank, so your infant/toddler experience '
                 + 'hours cannot be confirmed. Fill it in, then this will tell you whether you can apply.</div></div>';
@@ -1643,7 +1643,7 @@ function credentialsSection(s) {
         html += '<div class="sp-credpick" role="tablist" aria-label="Which credential">'
             + '<button type="button" class="sp-credpick-btn' + (credView === 'ece' ? ' on' : '') + '" '
             + 'data-cred="ece" role="tab" aria-selected="' + (credView === 'ece') + '">'
-            + 'Preschool (ECE)<span class="sp-credpick-lvl">' + (heldEce ? 'Level ' + heldEce : 'none held') + '</span>'
+            + 'ECE<span class="sp-credpick-lvl">' + (heldEce ? 'Level ' + heldEce : 'none held') + '</span>'
             + '</button>'
             + '<button type="button" class="sp-credpick-btn' + (credView === 'itc' ? ' on' : '') + '" '
             + 'data-cred="itc" role="tab" aria-selected="' + (credView === 'itc') + '">'
@@ -1653,7 +1653,7 @@ function credentialsSection(s) {
 
         const kind = credView === 'itc' ? 'itc' : 'ece';
         const model = F.nextLevelModel(kind, s, heldEce, heldItc, s.PdContentAreas, s.PdCourses);
-        const title = kind === 'itc' ? 'Infant Toddler Credential' : 'Preschool (ECE) Credential';
+        const title = kind === 'itc' ? 'Infant Toddler Credential' : 'ECE Credential';
         const held = kind === 'itc' ? heldItc : heldEce;
         // One full-width card for the chosen credential (sp-cred-solo drops the column grid).
         html += '<div class="sp-cred-solo">'

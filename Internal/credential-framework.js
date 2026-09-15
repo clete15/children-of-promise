@@ -683,7 +683,7 @@ function itcSteps(s, heldItc, heldEce) {
             d: 'Infant Toddler ' + levelWord(nextRung) + ' requires ECE Credential '
              + levelWord(rungRow.ece) + (nextRung < 5 ? ' or higher' : '')
              + (heldEce ? ', and you hold ECE ' + levelWord(heldEce) + '.' : '.')
-             + ' See the Preschool (ECE) column for what that takes.'
+             + ' See the ECE column for what that takes.'
              + (rungRow.gradDegree ? ' Level 6 also requires a graduate degree.' : '')
         });
         return steps;
@@ -912,7 +912,7 @@ function nextLevelModel(kind, s, heldEce, heldItc, pdContentAreas, pdCourses, th
         if (!row) { model.topped = true; return model; }
         model.level = row.level;
         model.education = 'Set by the ECE Credential level \u2014 the Infant Toddler credential has no '
-            + 'separate college requirement. See the Preschool (ECE) column.';
+            + 'separate college requirement. See the ECE column.';
     }
 
     model.levelWord = levelWord(model.level);
