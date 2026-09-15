@@ -10,13 +10,12 @@
 
         /* ── TOOLBAR ── */
         .wl-toolbar {
-            /* Left-aligned (not centred) so the toolbar and the table below open at the
-               SAME left edge as the sub-nav links and the other tabs' tables — every tab
-               opens its table in the same spot. */
+            /* Left-aligned (not centred), inset 15% from the left so the toolbar and the
+               table below open at the SAME spot as the sub-nav links and the other tabs. */
             max-width: 1300px;
             width: 100%;
             margin: 12px 0 0;
-            padding: 0 20px;
+            padding: 0 20px 0 15%;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -48,12 +47,12 @@
 
         /* ── TABLE CONTAINER ── */
         .wl-container {
-            /* Capped but LEFT-aligned (not centred), so the table opens at the same left
-               edge as the sub-nav links above it and as the other tabs' tables. On narrower
+            /* Capped, LEFT-aligned, inset 15% from the left so the table opens at the same
+               spot as the sub-nav links above it and as the other tabs' tables. On narrower
                screens it still fills the width and scrolls horizontally. */
             max-width: 1300px;
             margin: 10px 0 30px;
-            padding: 0 20px;
+            padding: 0 20px 0 15%;
             width: 100%;
             display: flex;
             flex-direction: column;
@@ -281,7 +280,9 @@
 <style>
     .em-subnav {
         display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
-        max-width: 1400px; margin: 0; padding: 10px 20px 0;
+        /* Inset from the left by 15% of the page so the links (and the content below,
+           which uses the same 15% inset) don't hug the left edge. */
+        max-width: 1400px; margin: 0; padding: 10px 20px 0 15%;
     }
     .em-subnav .em-subnav-label {
         font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
