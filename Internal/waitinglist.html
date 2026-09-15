@@ -181,6 +181,9 @@
             white-space: nowrap;
         }
         .flag.high { background: var(--sp-bad-bg); color: var(--sp-bad-fg); }
+        /* CCAP-eligible hint, moved into the risk-factor column. Green like the old
+           "Eligible" badge so it reads as a positive/opportunity flag, not a risk. */
+        .flag.flag-ccap { background: var(--sp-good-bg); color: var(--sp-good-fg); }
 
         .status-select {
             padding: 6px 8px;
@@ -318,7 +321,6 @@
                     <th>Score</th>
                     <th>Risk Factors</th>
                     <th style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);">Income</th>
-                    <th title="Looks eligible for CCAP by income and household size (225% FPL). Families are not on CCAP until they opt in, enroll, and are approved by the state.">CCAP Eligible?</th>
                     <th>Submitted</th>
                     <th>Requested Start</th>
                     <th>Status</th>
@@ -326,7 +328,7 @@
                 </tr>
             </thead>
             <tbody id="wlBody">
-                <tr><td colspan="12" class="wl-empty">Loading…</td></tr>
+                <tr><td colspan="11" class="wl-empty">Loading…</td></tr>
             </tbody>
         </table>
     </div>
@@ -364,7 +366,7 @@ async function load() {
         updateTabCounts();
         renderTable();
     } catch (e) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="12" class="wl-empty">Failed to load waiting list.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">Failed to load waiting list.</td></tr>`;
     }
 }
 
@@ -472,7 +474,7 @@ function renderTable() {
     document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
 
     if (!rows.length) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="12" class="wl-empty">No records found.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">No records found.</td></tr>`;
         syncScrollbar();
         return;
     }
@@ -510,7 +512,6 @@ function renderTable() {
             <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
             <td><div class="flag-list">${flags}</div></td>
             <td style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);font-weight:700;font-size:0.86rem;">${r.HouseholdIncome ? fmtMoney(r.HouseholdIncome) : '—'}</td>
-            <td>${ccapEligibleCell(r)}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td><span class="submitted-date">${reqStart}</span></td>
             <td>
@@ -532,31 +533,29 @@ function renderTable() {
     syncScrollbar();
 }
 
-/* Looks-eligible-for-CCAP by income and household size (225% FPL). This is a hint,
-   not a status: a family is only ON CCAP once they opt in, enroll, and are approved by
-   the state — hence the wording and the tooltip on the header. Uses the server-loaded
-   CCAP_THRESHOLDS (app.js), indexed by household size (capped at 8). */
-function ccapEligibleCell(r) {
-    const income = parseInt(r.HouseholdIncome) || 0;
-    const hh = parseInt(r.HouseholdSize) || 0;
-    if (!income || !hh) {
-        return '<span style="color:var(--sp-quiet);font-size:0.8rem;">—</span>';
-    }
-    const threshold = CCAP_THRESHOLDS[Math.max(0, Math.min(hh - 1, 7))];
-    if (income <= threshold) {
-        return '<span class="score-badge score-low" title="Income '
-            + fmtMoney(income) + ' for a household of ' + hh + ' is at or below the CCAP limit ('
-            + fmtMoney(threshold) + ').">Eligible</span>';
-    }
-    return '<span style="color:var(--sp-muted);font-size:0.8rem;" title="Income '
-        + fmtMoney(income) + ' for a household of ' + hh + ' is above the CCAP limit ('
-        + fmtMoney(threshold) + ').">Not eligible</span>';
-}
-
+/* CCAP eligibility (a hint, not a status: a family is only ON CCAP once they opt in,
+   enroll, and are approved by the state) is now shown as a chip inside the Risk
+   Factors column by buildFlags(), to save the horizontal space the old standalone
+   "CCAP Eligible?" column took. Uses the 225% FPL CCAP_THRESHOLDS from app.js. */
 function buildFlags(r) {
     const flags = [];
     const hi = l => `<span class="flag high">${l}</span>`;
     const lo = l => `<span class="flag">${l}</span>`;
+    // CCAP-eligible chip, shown here (in place of the old standalone column) purely
+    // to save horizontal space. Display only — a hint by income + household size at
+    // 225% FPL, not a status; a family is on CCAP only once they opt in, enroll and
+    // are approved by the state.
+    const income = parseInt(r.HouseholdIncome) || 0;
+    const hh = parseInt(r.HouseholdSize) || 0;
+    if (income && hh) {
+        const threshold = CCAP_THRESHOLDS[Math.max(0, Math.min(hh - 1, 7))];
+        if (income <= threshold) {
+            flags.push('<span class="flag flag-ccap" title="Looks eligible for CCAP: income '
+                + fmtMoney(income) + ' for a household of ' + hh + ' is at or below the 225% FPL limit ('
+                + fmtMoney(threshold) + '). A hint, not a status \u2014 the family must opt in, enroll '
+                + 'and be approved by the state.">CCAP eligible</span>');
+        }
+    }
     if (r.Homeless === 'Yes')           flags.push(hi('Homeless'));
     if (r.FosterAdopted === 'Yes')      flags.push(hi('Foster/Adopted'));
     if (r.IEP === 'Yes')                flags.push(lo('IEP'));
