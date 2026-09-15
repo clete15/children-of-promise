@@ -1352,6 +1352,23 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
 
     body += '<div class="sp-need-head">Working toward <b>' + esc(model.levelWord) + '</b></div>';
 
+    /* Apply-now nudge (ITC only). When the target level is more than one rung above
+       the level held, the held ECE has ALREADY unlocked a higher ITC than the person
+       holds — you apply for the level you qualify for rather than climbing rung by
+       rung. The system cannot see whether the experience HOURS are met (the work
+       history form is not wired into this calc), so this says "you look eligible —
+       confirm your experience and apply", and links straight to the Work History
+       form (PD75a) to do that confirmation. */
+    if (kind === 'itc' && model.level > (Number(heldLevel) || 0) + 1) {
+        body += '<div class="sp-step caution" style="margin-bottom:12px;">'
+            + '<div class="t">\u2691 You may be able to apply now for ' + esc(model.levelWord) + '</div>'
+            + '<div class="d">Your Preschool (ECE) credential already reaches past Infant Toddler '
+            + esc(heldWord) + ', so you can apply for the level you qualify for rather than climbing '
+            + 'one rung at a time. Gateways still checks your experience hours \u2014 confirm them on '
+            + 'your <a href="/pas/staff-work-history.html" target="_blank" rel="noopener">Work History '
+            + 'form</a>, then apply through the Gateways Registry.</div></div>';
+    }
+
     // ── College / education gate ──
     const collegeVal = model.education
         ? esc(model.education.replace(/\.\s*$/, '')) + '.'
