@@ -1604,6 +1604,11 @@ function credentialsSection(s) {
             + '<div class="sp-attn-row">'
             + '<input type="file" id="pdrFile" accept=".pdf">'
             + '<button type="button" id="pdrUpload" class="sp-save">Read &amp; preview</button>'
+            /* Opens the newest PDR already on file for this person, view-only, so you
+               can check the current one without re-uploading. Hidden by wirePdr when
+               there is none on file yet. */
+            + '<button type="button" id="pdrOpenLatest" class="sp-pdr-link" style="display:none;">'
+            + '\u2197 Open most recent PDR</button>'
             /* Straight to the Registry to fetch the PDR, sitting right beside the upload
                so the two steps — get it, upload it — are together. Styled as an outline
                button so it reads as "go get the file" rather than the primary action. */
@@ -2213,6 +2218,58 @@ function wirePdr() {
     });
     const close = $('pdrClose');
     if (close) close.addEventListener('click', () => { pdrOpen = false; PDR_PREVIEW = null; render(); });
+
+    // "Open most recent PDR" — shown only once we confirm one is on file for this
+    // person. The check is async, so the button starts hidden and reveals itself.
+    const openLatest = $('pdrOpenLatest');
+    if (openLatest && current && current.Id) {
+        openLatest.addEventListener('click', () => openLatestPdr(current.Id, current.Name, openLatest));
+        refreshLatestPdrButton(current.Id, openLatest);
+    }
+}
+
+/* Show the "Open most recent PDR" button only if this person has a PDR on file,
+   and remember the newest one's path on the button so the click can open it without
+   asking the server twice. */
+async function refreshLatestPdrButton(staffId, btn) {
+    try {
+        const res = await myFetch('/api/staff-files?staffId=' + encodeURIComponent(staffId));
+        if (!res.ok) return;
+        const data = await res.json();
+        const mine = Array.isArray(data.mine) ? data.mine : [];
+        const pdrs = mine
+            .filter(f => /professional development record/i.test(f.category || ''))
+            .sort((a, b) => String(b.uploadedDate || '').localeCompare(String(a.uploadedDate || '')));
+        if (pdrs.length) {
+            btn.dataset.rel = pdrs[0].rel;
+            btn.style.display = '';
+        }
+    } catch (e) { /* leave the button hidden on any error */ }
+}
+
+/* Open the newest PDR on file for a person, view-only, through the same authenticated
+   blob route the admin card and "my files" links use. */
+async function openLatestPdr(staffId, name, btn) {
+    let rel = btn && btn.dataset ? btn.dataset.rel : '';
+    // If the click beat the availability check, look it up now.
+    if (!rel) {
+        try {
+            const res = await myFetch('/api/staff-files?staffId=' + encodeURIComponent(staffId));
+            if (res.ok) {
+                const data = await res.json();
+                const pdrs = (Array.isArray(data.mine) ? data.mine : [])
+                    .filter(f => /professional development record/i.test(f.category || ''))
+                    .sort((a, b) => String(b.uploadedDate || '').localeCompare(String(a.uploadedDate || '')));
+                if (pdrs.length) rel = pdrs[0].rel;
+            }
+        } catch (e) { /* fall through to the message below */ }
+    }
+    if (!rel) {
+        alert('No PDR is on file for ' + (name || 'this person') + ' yet. Upload one with '
+            + '\u201cRead & preview\u201d and it will be filed automatically.');
+        return;
+    }
+    await fetchStaffFile(rel, btn);
 }
 
 /* The ECE / ITC picker on the credentials tab. Clicking one switches which
@@ -2251,6 +2308,13 @@ async function runPdrPreview() {
         if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
         PDR_PREVIEW = data;
         if (msg) { msg.className = 'sp-savemsg good'; msg.textContent = 'Read the PDR. Review below.'; }
+        // The server filed this PDR (unless it was someone else's), so the newest one
+        // is now this upload — reveal the open button and point it at the filed copy.
+        const openLatest = $('pdrOpenLatest');
+        if (openLatest && data.filedPdr && data.filedPdr.rel) {
+            openLatest.dataset.rel = data.filedPdr.rel;
+            openLatest.style.display = '';
+        }
         renderPdrResult();
     } catch (e) {
         if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Could not read it: ' + (e.message || e); }

@@ -1157,6 +1157,7 @@ const STAFF_DOC_ROOT_FOLDER = 'Staff';
 const STAFF_DOC_CATEGORIES = [
     ['Staff Transcripts', 'Transcript'],
     ['Staff Gateways Education Reports', 'Gateways education report'],
+    ['Staff PDRs', 'Professional Development Record'],
     ['Staff Applications', 'Application'],
     ['Staff Work History Forms', 'Work history form'],
     ['Staff Goal Plans', 'Goal plan'],
@@ -1190,6 +1191,47 @@ function listStaffFolderFiles() {
         });
     });
     return { ok: true, files: files };
+}
+
+/* File a PDR into the person's "Staff PDRs" folder and link it as theirs, so the
+   most recent one can be opened later. Called from the PDR preview: the PDR is the
+   person's own document whether or not the record update is applied, and this is the
+   same file-on-upload rule transcripts and Gateways reports follow. Never overwrites
+   — a newer PDR is a new dated file, so every version pulled stays on disk. Returns
+   { ok, rel, name } or { ok:false, error }. Failure here must not fail the preview,
+   so the caller treats it as best-effort. */
+function fileStaffPdr(staffId, personName, fileData) {
+    const DOC_ROOT = findDocRoot();
+    if (!DOC_ROOT) return { ok: false, error: 'library not reachable' };
+    const folder = 'Staff PDRs';
+    const destDir = path.join(DOC_ROOT, STAFF_DOC_ROOT_FOLDER, folder);
+    try {
+        if (!fs.existsSync(destDir)) fs.mkdirSync(destDir, { recursive: true });
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+    const safePerson = String(personName || ('Staff ' + staffId)).replace(/[^A-Za-z0-9 ]/g, '').trim()
+        || ('Staff ' + staffId);
+    const stamp = new Date().toISOString().slice(0, 10);
+    const base = safePerson + ' - PDR pulled ' + stamp;
+    let fileName = base + '.pdf';
+    let n = 2;
+    while (fs.existsSync(path.join(destDir, fileName))) { fileName = base + ' (' + n + ').pdf'; n++; }
+    try {
+        fs.writeFileSync(path.join(destDir, fileName), fileData);
+    } catch (e) {
+        return { ok: false, error: e.message };
+    }
+    const rel = STAFF_DOC_ROOT_FOLDER + '/' + folder + '/' + fileName;
+    // Confirmed, not Pending: an admin or the person themselves uploaded it here on
+    // purpose, unlike a staff hand-in that the office still has to check.
+    const w = runSQL(staffFileLinksEnsureSQL() + 'GO\n'
+        + `DELETE FROM StaffFileLinks WHERE RelPath=${esc(rel)};\n`
+        + `INSERT INTO StaffFileLinks (StaffId, RelPath, Status, UploadedBy, UploadedDate)`
+        + ` VALUES (${parseInt(staffId, 10)}, ${esc(rel)}, ${esc('Confirmed')}, ${esc(personName || '')},`
+        + ` ${esc(new Date().toISOString())})`);
+    if (!w.ok) return { ok: false, error: w.error };
+    return { ok: true, rel: rel, name: fileName };
 }
 
 /* Levenshtein distance, capped: anything past the cap is simply "too different"
@@ -5034,6 +5076,21 @@ ELSE
             const idMismatch = pdr.registryId && row.RegistryId
                 && pdr.registryId.toUpperCase() !== row.RegistryId.toUpperCase();
 
+            /* File a persistent copy in the person's PDR folder so the newest can be
+               opened later, unless the Registry number says it is someone else's — a
+               mismatched PDR must never be filed against this record. Best-effort: a
+               filing problem is reported but does not fail the preview. */
+            let filedPdr = null;
+            if (!idMismatch) {
+                const filed = fileStaffPdr(askedId, row.Name, fileData);
+                if (filed.ok) {
+                    filedPdr = { rel: filed.rel, name: filed.name };
+                    console.log('[PDR] filed ' + filed.rel);
+                } else {
+                    console.error('[PDR] could not file:', filed.error);
+                }
+            }
+
             const thisYear = String(new Date().getFullYear());
             // The per-area breakdown is stored as a compact JSON string, e.g.
             // {"HGD":23,"HSW":12,...}. Only propose it when the parse reconciled.
@@ -5070,6 +5127,7 @@ ELSE
                 parsedName: pdr.name,
                 parsedRegistry: pdr.registryId,
                 idMismatch: idMismatch,
+                filedPdr: filedPdr,
                 current: current,
                 proposed: proposed,
                 extracted: {
