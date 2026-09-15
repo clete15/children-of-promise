@@ -3073,15 +3073,16 @@ function ageInDays(birthDate, daysOldFallback) {
    program's rooms + waiting-list children whose AgeGroup feeds the program), sort them
    youngest-first, then seat them into the program's rooms in chain order (youngest room
    first) up to each room's DCFS capacity, PER DAY. When a room is full for a day the older
-   children spill into the next room; children who fit nowhere are "squeezed out" that day.
+   children spill into the next room; children who fit nowhere are counted as overflow on the
+   chain's last (oldest) room.
 
-   Returns one object per program:
-     { key, label, capacity,
-       rooms: [ { roomNumber, room, capacity,
-                  occupancy:[5],            // seated count per weekday
-                  enrolledSeated:[5], waitSeated:[5] } ... ],   // split for the chart
-       squeezedOut:[5],                     // children with no seat, per weekday
-       childCount, enrolledCount, waitCount } */
+   Returns ONE row PER ROOM (RoomNumber order), so the Projected Attendance page renders the
+   same per-room sidebar + single chart as Actual Attendance:
+     { roomNumber, room, capacity,
+       occupancy:[5],       // total projected children seated per weekday
+       enrolledSeated:[5],  // of which already enrolled
+       waitSeated:[5],      // of which pulled from the waiting list
+       overflow:[5] }       // children who could not be seated (last room in a chain only) */
 function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     if (!Array.isArray(roomRows)) return [];
 
@@ -3123,8 +3124,12 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         });
     });
 
-    // Seat each program's children youngest-first into its room chain, per weekday.
-    return PROJ_PROGRAMS.map(pdef => {
+    // Seat each program's children youngest-first into its room chain, per weekday, then
+    // flatten to ONE row per room so the Projected Attendance page can render exactly like
+    // Actual Attendance (per-room sidebar + a single chart per room). Overflow past the last
+    // room in a chain is added to that last room's overflow[] so the chart can flag it.
+    const roomsOut = {}; // roomNumber -> output row
+    PROJ_PROGRAMS.forEach(pdef => {
         const kids = byProgram[pdef.key] || [];
         // Youngest first. Stable tiebreak: enrolled before waiting (an enrolled child
         // already holds the seat), then by label.
@@ -3132,45 +3137,41 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             || (a.kind === b.kind ? 0 : (a.kind === 'enrolled' ? -1 : 1))
             || String(a.label).localeCompare(String(b.label)));
 
-        const rooms = pdef.rooms
-            .filter(n => roomByNum[n])
-            .map(n => ({
-                roomNumber: n,
-                room: roomByNum[n].room,
-                capacity: roomByNum[n].capacity,
-                occupancy: [0, 0, 0, 0, 0],
-                enrolledSeated: [0, 0, 0, 0, 0],
-                waitSeated: [0, 0, 0, 0, 0],
-            }));
-        const squeezedOut = [0, 0, 0, 0, 0];
-        const totalCapacity = rooms.reduce((s, r) => s + r.capacity, 0);
+        const chain = pdef.rooms.filter(n => roomByNum[n]).map(n => ({
+            roomNumber: n,
+            room: roomByNum[n].room,
+            capacity: roomByNum[n].capacity,
+            occupancy: [0, 0, 0, 0, 0],
+            enrolledSeated: [0, 0, 0, 0, 0],
+            waitSeated: [0, 0, 0, 0, 0],
+            overflow: [0, 0, 0, 0, 0], // children who could not be seated anywhere in the chain
+        }));
+        if (!chain.length) return;
 
         // Independently per weekday: walk the youngest-first children and drop each into
-        // the first room in the chain that still has a free seat that day.
+        // the first room in the chain that still has a free seat that day. Anyone who fits
+        // nowhere is charged to the LAST room's overflow (the oldest room, where the
+        // squeeze shows up), so the per-room replica can flag over-capacity.
         for (let d = 0; d < 5; d++) {
-            const freeInRoom = rooms.map(r => r.capacity);
+            const freeInRoom = chain.map(r => r.capacity);
             kids.forEach(k => {
                 if (!k._daysSrc[d]) return; // not present this day
                 const roomIdx = freeInRoom.findIndex(f => f > 0);
-                if (roomIdx === -1) { squeezedOut[d]++; return; }
+                if (roomIdx === -1) { chain[chain.length - 1].overflow[d]++; return; }
                 freeInRoom[roomIdx]--;
-                rooms[roomIdx].occupancy[d]++;
-                if (k.kind === 'enrolled') rooms[roomIdx].enrolledSeated[d]++;
-                else rooms[roomIdx].waitSeated[d]++;
+                chain[roomIdx].occupancy[d]++;
+                if (k.kind === 'enrolled') chain[roomIdx].enrolledSeated[d]++;
+                else chain[roomIdx].waitSeated[d]++;
             });
         }
+        chain.forEach(r => { roomsOut[r.roomNumber] = r; });
+    });
 
-        return {
-            key: pdef.key,
-            label: pdef.label,
-            capacity: totalCapacity,
-            rooms,
-            squeezedOut,
-            childCount: kids.length,
-            enrolledCount: kids.filter(k => k.kind === 'enrolled').length,
-            waitCount: kids.filter(k => k.kind === 'wait').length,
-        };
-    }).filter(p => p.rooms.length); // drop programs whose rooms do not exist
+    // One row per room, in RoomNumber order — mirrors byRoomDaily's per-room layout.
+    return roomRows
+        .map(r => parseInt(r[0], 10))
+        .filter(num => roomsOut[num])
+        .map(num => roomsOut[num]);
 }
 function sqlRows(raw, columns) {
     return sqlCells(raw).map(v => {
