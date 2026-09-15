@@ -271,6 +271,10 @@
     }
     .sp-link:hover { border-color: var(--sp-accent); background: var(--sp-accent-soft); }
     .sp-link.waiting { border-color: var(--sp-warn-br); background: var(--sp-warn-bg); }
+    /* Outstanding-Gateways rows are clickable: they open the source report. */
+    .sp-outstanding { cursor: pointer; }
+    .sp-outstanding:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+    .sp-outstanding .n::after { content: " \2197"; font-weight: 400; color: var(--sp-muted); }
     .sp-link .n { font-size: 0.98rem; font-weight: 700; color: var(--sp-text); }
     .sp-link .s { font-size: 0.86rem; color: var(--sp-muted); margin-top: 3px; }
     .sp-src { font-size: 0.84rem; color: var(--sp-muted); margin-top: 10px; line-height: 1.6; }
@@ -1928,21 +1932,24 @@ function adminSection(s) {
     // 1. Outstanding Gateways across all staff, read from the already-loaded roster.
     const waiting = STAFF
         .filter(x => String(x.Name || '').trim() && !/^new teacher$/i.test(x.Name))
-        .map(x => ({ name: x.Name, reason: pendingText(x), registry: x.RegistryId }))
+        .map(x => ({ id: x.Id, name: x.Name, reason: pendingText(x), registry: x.RegistryId }))
         .filter(x => x.reason);
 
     let html = '<div class="sp-card"><h2>Outstanding with Gateways</h2>'
         + '<div class="sp-sub">Everyone whose record shows a pending or awaited Gateways item. '
-        + 'This is the whole centre, not just your own room. The line under each name is quoted '
-        + 'straight from that person\u2019s record. \u201cthe report shows none of them\u201d means the record '
-        + 'claims pending applications that the last uploaded Gateways report did not list \u2014 reconcile '
-        + 'the two (the note is usually stale, or predates the applications).</div>';
+        + 'This is the whole centre, not just your own room. '
+        + 'Click a name to open that person\u2019s Gateways education report (view only).</div>';
     if (!waiting.length) {
         html += '<div class="sp-step done"><div class="t">\u2713 Nothing outstanding</div>'
             + '<div class="d">No staff record currently shows a pending or awaited item.</div></div>';
     } else {
+        // Each row is a button: it opens the source Gateways report for that person,
+        // read-only, so an admin can check the record against the document it came from.
         html += '<div class="sp-links">' + waiting.map(w =>
-            '<div class="sp-link"><div class="n">' + esc(w.name)
+            '<div class="sp-link sp-outstanding" role="button" tabindex="0" '
+            + 'data-staffid="' + esc(String(w.id || '')) + '" data-name="' + esc(w.name) + '" '
+            + 'title="Open ' + esc(w.name) + '\u2019s Gateways education report (view only)">'
+            + '<div class="n">' + esc(w.name)
             + (w.registry ? ' <span class="sp-pill">' + esc(w.registry) + '</span>' : '') + '</div>'
             + '<div class="s">' + esc(w.reason) + '</div></div>').join('') + '</div>';
     }
@@ -1972,6 +1979,58 @@ function wireAdmin() {
     const btn = $('attnUpload');
     if (btn) btn.addEventListener('click', runAttainmentsPreview);
     // Apply buttons are wired when the preview is rendered (renderAttnResults).
+
+    // Each "Outstanding with Gateways" row opens that person's source report.
+    document.querySelectorAll('.sp-outstanding').forEach(el => {
+        const open = () => openStaffGatewaysReport(el.getAttribute('data-staffid'),
+            el.getAttribute('data-name'), el);
+        el.addEventListener('click', open);
+        el.addEventListener('keydown', e => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
+        });
+    });
+}
+
+/* Open the Gateways education report for one staff member, read only.
+
+   The pending line on the card is quoted from that person's record, which the office
+   built from their Gateways "Staff Education and Credentials" report. This opens that
+   report so the two can be checked against each other without leaving the page.
+
+   Directors may pull any personnel file (the download endpoint allows it), so this
+   asks the server for that person's files, finds their Gateways report, and opens it
+   through the same authenticated blob route the "my files" links use. */
+async function openStaffGatewaysReport(staffId, name, el) {
+    if (!staffId) { alert('No staff record is linked to this row.'); return; }
+    const orig = el ? el.getAttribute('title') : null;
+    if (el) el.setAttribute('title', 'Opening\u2026');
+    try {
+        const res = await myFetch('/api/staff-files?staffId=' + encodeURIComponent(staffId));
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        if (data.libraryReachable === false) {
+            alert('The document library is not reachable from the server right now, so the '
+                + 'report cannot be opened.\n\n' + (data.reason || ''));
+            return;
+        }
+        const mine = Array.isArray(data.mine) ? data.mine : [];
+        // Prefer the Gateways education report; if there is more than one, the newest.
+        const reports = mine
+            .filter(f => /gateways/i.test(f.category || ''))
+            .sort((a, b) => String(b.uploadedDate || '').localeCompare(String(a.uploadedDate || '')));
+        if (!reports.length) {
+            alert('No Gateways education report is on file for ' + (name || 'this person') + '.\n\n'
+                + 'The pending note comes from the centre-wide Gateways report. You can upload the '
+                + 'current report in the "Refresh from Gateways report" card below, or file this '
+                + 'person\u2019s own report in the document library.');
+            return;
+        }
+        await fetchStaffFile(reports[0].rel, el);
+    } catch (e) {
+        alert('Could not open the report: ' + (e.message || e));
+    } finally {
+        if (el && orig != null) el.setAttribute('title', orig);
+    }
 }
 
 async function runAttainmentsPreview() {
