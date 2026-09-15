@@ -7,7 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
-        .at-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
+        /* Left-aligned under the Waiting List tab (was centered). */
+        .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px; }
         .at-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:980px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
         .at-sidebar { width:210px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
         .at-sidebar button {
@@ -45,6 +46,19 @@
         .at-note { margin-top:14px;font-size:0.76rem;color:var(--sp-muted);text-align:center;line-height:1.5; }
         .at-over-flag { color:var(--sp-bad-fg);font-weight:800; }
         .at-empty { padding:40px;text-align:center;color:var(--sp-muted);font-size:0.9rem; }
+        /* One room, stacked top-to-bottom in program (youngest room first). */
+        .at-roomblock { margin-bottom:22px;padding-bottom:14px;border-bottom:1px dashed var(--sp-border); }
+        .at-roomblock:last-of-type { border-bottom:none; }
+        .at-roomhead { display:flex;align-items:baseline;justify-content:space-between;margin-bottom:10px;gap:10px; }
+        .at-roomname { font-size:0.95rem;font-weight:800;color:var(--sp-text); }
+        .at-roomcap { font-size:0.72rem;font-weight:700;color:var(--sp-muted);white-space:nowrap; }
+        .at-full .at-bar-track { box-shadow:inset 0 0 0 2px var(--sp-accent); }
+        /* Squeezed-out row: children with no seat that day. */
+        .at-squeezed { border:1px solid var(--sp-bad-br);background:var(--sp-bad-bg);border-radius:8px;padding:12px 14px;margin-top:4px; }
+        .at-squeeze-days { display:flex;gap:14px;padding:0 8px; }
+        .at-squeeze-day { flex:1;display:flex;flex-direction:column;align-items:center;gap:6px; }
+        .at-squeeze-n { font-size:1.1rem;font-weight:800;color:var(--sp-muted); }
+        .at-squeeze-day.has .at-squeeze-n { color:var(--sp-bad-fg); }
     </style>
 </head>
 <body>
@@ -67,7 +81,7 @@
 <style>
     .em-subnav {
         display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
-        max-width: 1400px; margin: 0 auto; padding: 10px 20px 0;
+        max-width: 1400px; margin: 0; padding: 10px 20px 0;
     }
     .em-subnav .em-subnav-label {
         font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
@@ -97,7 +111,7 @@
         <div class="at-sidebar" id="atSidebar"></div>
         <div class="at-card">
             <div class="at-head">
-                <div class="at-title">Projected Attendance by Program</div>
+                <div class="at-title">Projected Room Fill — youngest to oldest</div>
             </div>
             <div class="at-body" id="atBody">
                 <div class="at-empty">Loading…</div>
@@ -109,20 +123,24 @@
 <script src="app.js"></script>
 <script src="/staff/auth.js"></script>
 <script>
-/* Projected attendance = actual enrolled + the waiting list, by age-group PROGRAM.
+/* Projected attendance as a youngest-to-oldest ROOM ALLOCATION.
 
-   A waiting-list child applies to a program (Infant & Toddler, 2-Year-Olds, Pre-School,
-   Before & After), not a specific room, and several rooms can serve one program. So this
-   view rolls each program's rooms into one combined capacity and one actual daily count,
-   then stacks the program's pending waiting-list demand on top. It answers "how full would
-   each program be, by day, if we enrolled everyone on the waiting list?"
+   The server (/api/reports -> projectedAttendance) seats every child — those already
+   enrolled plus everyone on the waiting list — into an actual room. Within a program the
+   children are ordered youngest-first and the program's rooms are filled youngest-room-first
+   up to each room's DCFS capacity; when a room fills, the older children spill into the next
+   room down the chain. Children who fit nowhere are "squeezed out". For Pre-School the chain
+   is the 2 & 3 Year Olds room first (the 2s) then the Pre-School room (the 3s), so the panel
+   reads 2s-then-3s top to bottom.
 
-   All of that math is done server-side in /api/reports -> projectedAttendance. Each row is
-   { program, label, capacity, actual:[Mon..Fri], waitlist:[Mon..Fri], projected:[Mon..Fri],
-   rooms:[names] }. This page only charts it. */
+   Each program from the server is:
+     { key, label, capacity,
+       rooms: [ { roomNumber, room, capacity, occupancy:[5], enrolledSeated:[5], waitSeated:[5] } ],
+       squeezedOut:[5], childCount, enrolledCount, waitCount }
+   This page seats the numbers into a stacked room-by-room chart; it does no allocation itself. */
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
-const CHART_H = 220;
+const ROOM_H = 132;   // pixel height of each room's bar track
 let programs = [];
 let active = 0;
 
@@ -131,15 +149,48 @@ function esc(v) {
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function n(v) { return parseInt(v, 10) || 0; }
+
 function renderSidebar() {
     const box = document.getElementById('atSidebar');
     box.innerHTML = programs.map((p, i) => {
-        const waiting = Math.max(...p.waitlist);
+        const wait = n(p.waitCount);
+        const squeezed = Math.max.apply(null, (p.squeezedOut || [0]).map(n));
+        const tag = squeezed ? ' · ' + squeezed + ' over' : (wait ? ' · ' + wait + ' waiting' : '');
         return `<button id="atP${i}" onclick="showProgram(${i})">
             <div>${esc(p.label)}</div>
-            <div class="at-room-cap">Capacity ${p.capacity}${waiting ? ' · ' + waiting + ' waiting' : ''}</div>
+            <div class="at-room-cap">Capacity ${n(p.capacity)}${tag}</div>
         </button>`;
     }).join('');
+}
+
+// One room's row: the room name + capacity on the left, then a per-weekday stacked bar
+// (enrolled seated on the bottom, waiting-list seated striped on top) scaled to the room's
+// own DCFS capacity. Over-capacity is impossible here (the allocator never overfills a
+// room), so a full bar means the room is exactly full.
+function roomRow(r) {
+    const cap = Math.max(n(r.capacity), 1);
+    const cols = DAYS.map((day, i) => {
+        const enr = n(r.enrolledSeated[i]);
+        const wl = n(r.waitSeated[i]);
+        const occ = enr + wl;
+        const full = occ >= cap;
+        const enrH = Math.round(Math.min(enr / cap, 1) * ROOM_H);
+        const wlH = Math.round(Math.min(occ / cap, 1) * ROOM_H) - enrH;
+        return `<div class="at-col${full ? ' at-full' : ''}">
+            <div class="at-count">${occ}/${cap}${wl ? `<br><span class="at-wl">${wl} waiting</span>` : ''}</div>
+            <div class="at-bar-track" style="height:${ROOM_H}px;">
+                <div class="at-fill-wait" style="height:${Math.max(wlH, 0)}px;"></div>
+                <div class="at-fill-actual" style="height:${enrH}px;"></div>
+            </div>
+            <div class="at-day">${day}</div>
+        </div>`;
+    }).join('');
+    return `<div class="at-roomblock">
+        <div class="at-roomhead"><span class="at-roomname">${esc(r.room)}</span>
+            <span class="at-roomcap">DCFS capacity ${n(r.capacity)}</span></div>
+        <div class="at-chart" style="height:${ROOM_H + 56}px;">${cols}</div>
+    </div>`;
 }
 
 function showProgram(idx) {
@@ -150,41 +201,41 @@ function showProgram(idx) {
     });
 
     const p = programs[idx];
-    const capacity = Math.max(parseInt(p.capacity, 10) || 1, 1);
-    let anyOver = false;
+    const rooms = (p.rooms || []);
+    const squeezed = (p.squeezedOut || [0, 0, 0, 0, 0]).map(n);
+    const anySqueezed = squeezed.some(x => x > 0);
 
-    const cols = DAYS.map((day, i) => {
-        const actual = parseInt(p.actual[i], 10) || 0;
-        const wait = parseInt(p.waitlist[i], 10) || 0;
-        const projected = actual + wait;
-        const over = projected > capacity;
-        if (over) anyOver = true;
-        // Bars scale to capacity; a projected total over capacity clamps at full height
-        // and the track is outlined red so the overflow is obvious.
-        const actualH = Math.round(Math.min(actual / capacity, 1) * CHART_H);
-        const waitH = Math.round(Math.min(projected / capacity, 1) * CHART_H) - actualH;
-        return `<div class="at-col${over ? ' at-over' : ''}">
-            <div class="at-count">${projected}/${capacity}${wait ? `<br><span class="at-wl">+${wait} waiting</span>` : ''}</div>
-            <div class="at-bar-track" style="height:${CHART_H}px;">
-                <div class="at-fill-wait" style="height:${Math.max(waitH, 0)}px;"></div>
-                <div class="at-fill-actual" style="height:${actualH}px;"></div>
-            </div>
-            <div class="at-day">${day}</div>
-        </div>`;
-    }).join('');
+    const roomsHtml = rooms.map(roomRow).join('');
+
+    // If anyone is squeezed out, show it as a final red row so the capacity pressure is
+    // impossible to miss — these are children the rooms cannot seat that day.
+    const squeezedHtml = anySqueezed ? `<div class="at-roomblock at-squeezed">
+        <div class="at-roomhead"><span class="at-roomname">Squeezed out — no seat</span>
+            <span class="at-roomcap">older children first</span></div>
+        <div class="at-squeeze-days">
+            ${DAYS.map((day, i) => `<div class="at-squeeze-day${squeezed[i] ? ' has' : ''}">
+                <div class="at-squeeze-n">${squeezed[i] || 0}</div><div class="at-day">${day}</div>
+            </div>`).join('')}
+        </div>
+    </div>` : '';
 
     document.getElementById('atBody').innerHTML = `
         <div class="at-room-name">${esc(p.label)}</div>
-        <div class="at-room-sub">${esc((p.rooms || []).join(' · '))}</div>
-        <div class="at-chart" style="height:${CHART_H + 72}px;">${cols}</div>
+        <div class="at-room-sub">
+            ${n(p.childCount)} children projected — ${n(p.enrolledCount)} enrolled, ${n(p.waitCount)} waiting ·
+            fills youngest first, top to bottom
+        </div>
+        ${roomsHtml || '<div class="at-empty">No rooms in this program.</div>'}
+        ${squeezedHtml}
         <div class="at-legend">
-            <div><span class="at-swatch" style="background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);"></span> Capacity (${capacity})</div>
-            <div><span class="at-swatch" style="background:var(--sp-accent);"></span> Enrolled (actual)</div>
-            <div><span class="at-swatch at-swatch-wait"></span> Waiting list</div>
+            <div><span class="at-swatch" style="background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);"></span> Room capacity</div>
+            <div><span class="at-swatch" style="background:var(--sp-accent);"></span> Enrolled (seated)</div>
+            <div><span class="at-swatch at-swatch-wait"></span> Waiting list (seated)</div>
         </div>
         <div class="at-note">
-            Projected = enrolled today + everyone on the waiting list for this program.
-            ${anyOver ? '<span class="at-over-flag">Projected demand exceeds capacity on the flagged days.</span>' : 'Projected demand fits within capacity every day.'}
+            Every child, enrolled and waiting, is seated youngest-first into these rooms up to
+            each room's DCFS capacity; older children spill into the next room down.
+            ${anySqueezed ? '<span class="at-over-flag">Some children cannot be seated — capacity is exceeded on the flagged days.</span>' : 'Everyone fits within capacity every day.'}
             <br>Waiting-list children are counted on the days they requested (all five when unspecified).
         </div>`;
 }

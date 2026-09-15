@@ -7,7 +7,8 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
-        .at-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
+        /* Left-aligned under the Waiting List tab (was centered). */
+        .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px; }
         .at-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:960px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
         .at-sidebar { width:200px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
         .at-sidebar button {
@@ -59,7 +60,7 @@
 <style>
     .em-subnav {
         display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
-        max-width: 1400px; margin: 0 auto; padding: 10px 20px 0;
+        max-width: 1400px; margin: 0; padding: 10px 20px 0;
     }
     .em-subnav .em-subnav-label {
         font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
