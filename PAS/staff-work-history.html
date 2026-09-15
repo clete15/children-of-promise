@@ -127,6 +127,23 @@
     <span class="lbl">= Total Hours:</span><div class="fill tot" data-k="saTotal"></div>
 </div>
 
+<!-- ── Director / Administrator ──
+     For staff who have run the centre rather than taught a single age group. Gateways
+     reads this toward the Illinois Director Credential; it is separate from the three
+     teaching lines because directing all ages is one role, not three. -->
+<div class="grp-title">Director / Administrator Position:</div>
+<div class="row"><div class="fill" data-k="dirPosition"></div></div>
+<div class="row">
+    <span class="lbl">Start Date (MO/YR):</span><div class="fill" data-k="dirStart"></div>
+    <span class="lbl">End Date (MO/YR):</span><div class="fill" data-k="dirEnd"></div>
+</div>
+<div class="row">
+    <span class="lbl">Hours per week:</span><div class="fill sm" data-k="dirHrs"></div>
+    <span class="lbl">x Weeks per year:</span><div class="fill sm" data-k="dirWks"></div>
+    <span class="lbl">x # of years:</span><div class="fill sm" data-k="dirYrs"></div>
+    <span class="lbl">= Total Hours:</span><div class="fill tot" data-k="dirTotal"></div>
+</div>
+
 <div class="sec-title">Contact Information</div>
 <div class="row">
     <span class="lbl">Contact Name and Title:</span><div class="fill" data-k="contactName"></div>
@@ -216,7 +233,7 @@
    remains editable: the computed value is a convenience, not an assertion, and a
    person who worked irregular hours should overwrite it. */
 
-const GROUPS = ['it', 'ps', 'sa'];
+const GROUPS = ['it', 'ps', 'sa', 'dir'];
 
 // Recompute a row's total from its three inputs, unless somebody has typed over it.
 function recalc(prefix) {

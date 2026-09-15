@@ -2099,8 +2099,9 @@ function applyPendingToNotes(notes, pendingNote) {
    for the person to review. It is never authoritative: the director and the
    employee check every field before it counts toward a credential.
 
-   PD75a is organised by AGE GROUP — Infant/Toddler, Preschool, School-Age — each
-   with the same shape: a position line, Start/End dates, and an
+   PD75a is organised by AGE GROUP — Infant/Toddler, Preschool, School-Age — plus a
+   Director/Administrator section for staff who have run the centre rather than taught
+   one age group. Each has the same shape: a position line, Start/End dates, and an
    hrs/wk x wks/yr x years = total row. This reads pdftotext -layout output, which
    keeps a label and its written value on the same visual line, so the strategy is
    to find each label and take the text that trails it (or, when the value wraps to
@@ -2174,7 +2175,8 @@ function parseWorkHistory(text) {
     const groups = [
         { prefix: 'it', heads: ['Infant/Toddler Teaching Position', 'Infant / Toddler', 'Infant/Toddler'] },
         { prefix: 'ps', heads: ['Preschool Teaching Position', 'Preschool'] },
-        { prefix: 'sa', heads: ['School-Age Teaching Position', 'School Age', 'School-Age'] }
+        { prefix: 'sa', heads: ['School-Age Teaching Position', 'School Age', 'School-Age'] },
+        { prefix: 'dir', heads: ['Director / Administrator Position', 'Director/Administrator', 'Director'] }
     ];
     // Where each heading first appears, so a block can be bounded by the next one.
     const headIndex = (heads) => {
