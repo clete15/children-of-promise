@@ -143,6 +143,15 @@
             transition: background 0.15s;
         }
         .btn-save-notes:hover { background: var(--primary-dark); }
+        /* Remove (hard delete) — quiet by default, red on hover, so it does not read
+           as a primary action next to Save. For test/junk entries only. */
+        .btn-delete-wl {
+            margin-top: 3px; margin-left: 4px; padding: 3px 10px;
+            background: transparent; color: var(--sp-muted);
+            border: 1px solid var(--sp-border); border-radius: 4px;
+            font-size: 0.68rem; font-weight: 700; cursor: pointer; transition: all 0.15s;
+        }
+        .btn-delete-wl:hover { background: var(--danger); color: white; border-color: var(--danger); }
         /* Highlight rows whose program was never set, so they stand out as needing triage */
         .program-unassigned { border-color: var(--sp-warn-br) !important; background: var(--sp-warn-bg) !important; }
 
@@ -304,7 +313,6 @@
                 <tr>
                     <th>#</th>
                     <th>Name &amp; Contact</th>
-                    <th>City</th>
                     <th>Children</th>
                     <th class="col-program">Program</th>
                     <th>Score</th>
@@ -317,7 +325,7 @@
                 </tr>
             </thead>
             <tbody id="wlBody">
-                <tr><td colspan="12" class="wl-empty">Loading…</td></tr>
+                <tr><td colspan="11" class="wl-empty">Loading…</td></tr>
             </tbody>
         </table>
     </div>
@@ -355,7 +363,7 @@ async function load() {
         updateTabCounts();
         renderTable();
     } catch (e) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="12" class="wl-empty">Failed to load waiting list.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">Failed to load waiting list.</td></tr>`;
     }
 }
 
@@ -463,7 +471,7 @@ function renderTable() {
     document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
 
     if (!rows.length) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="12" class="wl-empty">No records found.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">No records found.</td></tr>`;
         syncScrollbar();
         return;
     }
@@ -491,8 +499,8 @@ function renderTable() {
                 <strong style="font-size:0.9rem;">${r.LastName}, ${r.FirstName}</strong>
                 <div style="font-size:0.82rem;margin-top:3px;">${fmtPhone(r.Phone) || '—'}</div>
                 <div style="color:var(--text-muted);font-size:0.82rem;">${r.Email || ''}</div>
+                ${r.City ? `<div style="color:var(--text-muted);font-size:0.82rem;">${r.City}</div>` : ''}
             </td>
-            <td style="font-size:0.82rem;white-space:nowrap;">${r.City || '—'}</td>
             <td style="font-size:0.82rem;max-width:140px;">${r.ChildrenInfo || '—'}</td>
             <td>${programSelect(r)}</td>
             <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
@@ -511,6 +519,7 @@ function renderTable() {
             <td class="notes-cell">
                 <textarea class="notes-input" id="notes-${r.Id}" placeholder="Add notes…">${notes}</textarea>
                 <button class="btn-save-notes" onclick="saveNotes(${r.Id})">Save</button>
+                <button class="btn-delete-wl" onclick="deleteRecord(${parseInt(r.Id)}, '${(r.LastName + ', ' + r.FirstName).replace(/'/g, "\\'")}')" title="Delete this pre-enrollment record (for test/junk entries — real families are marked Declined instead)">Remove</button>
             </td>
         </tr>`;
     }).join('');
@@ -634,6 +643,25 @@ async function saveNotes(id) {
             if (btn) { btn.textContent = 'Saved ✓'; setTimeout(() => btn.textContent = 'Save', 2000); }
         }
     } catch (e) { alert('Failed to save notes'); }
+}
+
+/* Hard-delete a pre-enrollment record — for test submissions and junk. A real family
+   that decides against a spot is marked Declined (a status), so this asks for explicit
+   confirmation naming the record, to keep the two apart. */
+async function deleteRecord(id, label) {
+    if (!confirm('Permanently delete this pre-enrollment record?\n\n' + (label || '')
+        + '\n\nThis is for test or junk entries. A real family who declined a spot should '
+        + 'be set to "Declined" instead. This cannot be undone.')) return;
+    try {
+        const res = await apiFetch(`/api/waitinglist/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+        // Drop it from the loaded set and re-render rather than reload the page.
+        allRows = allRows.filter(x => String(x.Id) !== String(id));
+        renderTable();
+    } catch (e) {
+        alert('Could not delete that record: ' + (e.message || e));
+    }
 }
 
 // ── ENROLL ──

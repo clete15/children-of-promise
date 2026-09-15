@@ -6812,6 +6812,24 @@ ELSE
         return;
     }
 
+    /* DELETE a waiting-list entry (internal - protected).
+
+       A hard delete, for removing test submissions and junk from the pre-enrollment
+       list. Real families that decide against a spot are marked Declined (a status)
+       rather than deleted, so this is deliberately a separate, explicit action. Keyed
+       on the numeric Id and scoped to a single row, so it cannot delete more than the
+       one asked for. A row already promoted to enrollment keeps its own
+       rptMasterEnrollment record — this only removes the pre-enrollment intake row. */
+    if (req.method === 'DELETE' && url.startsWith('/api/waitinglist/')) {
+        if (!checkAuth(req, res)) return;
+        const id = parseInt(url.split('/')[3], 10);
+        if (!id) return sendJSON(res, 400, { error: 'Which record? (no id)' });
+        const r = runSQL(`DELETE FROM PreEnrollment WHERE Id=${id}`);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        console.log('[WAITLIST] deleted pre-enrollment record ' + id);
+        return sendJSON(res, 200, { success: true });
+    }
+
     // External public site static files
     if (url.startsWith('/public')) {
         let subPath = decodeURIComponent(url.slice('/public'.length) || '/');
