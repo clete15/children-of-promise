@@ -29,15 +29,13 @@
         .at-col { display:flex;flex-direction:column;align-items:center;gap:8px;flex:1; }
         .at-count { font-size:0.84rem;font-weight:800;color:var(--sp-text);text-align:center;line-height:1.25; }
         .at-count .at-wl { color:var(--sp-accent);font-weight:800; }
+        /* Single solid fill, bottom-aligned — identical to Actual Attendance. */
         .at-bar-track {
             position:relative;width:100%;background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);
-            border-radius:6px 6px 0 0;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;
+            border-radius:6px 6px 0 0;display:flex;align-items:flex-end;overflow:hidden;
         }
-        /* Stacked bar: enrolled (solid accent) on the bottom, waiting list (striped) on top. */
-        .at-fill-actual { width:100%;background:var(--sp-accent);transition:height 0.4s; }
-        .at-fill-wait { width:100%;transition:height 0.4s;
-            background:repeating-linear-gradient(45deg,var(--sp-accent) 0 6px,var(--sp-accent-soft) 6px 12px); }
-        .at-over .at-bar-track { box-shadow:inset 0 0 0 2px var(--sp-bad-fg); }
+        .at-bar-fill { width:100%;background:var(--sp-accent);border-radius:6px 6px 0 0;transition:height 0.4s; }
+        .at-over .at-bar-fill { background:var(--sp-bad-fg); }
         .at-day { font-size:0.84rem;font-weight:700;color:var(--sp-muted); }
         .at-legend { display:flex;gap:18px;margin-top:16px;justify-content:center;flex-wrap:wrap; }
         .at-legend > div { display:flex;align-items:center;gap:7px;font-size:0.8rem;color:var(--sp-text-2); }
@@ -116,16 +114,17 @@
 
    The server (/api/reports -> projectedAttendance) takes every child — enrolled plus the
    whole waiting list — and re-seats them youngest-first up an age ladder of rooms: the
-   youngest fill the first room (e.g. Infant), and as they age up they shift into the next
-   room, older children moving up to fill any open slots. Each room fills only to its DCFS
-   capacity; anyone past the last room in the ladder is flagged as over capacity.
+   youngest fill the first room (Infant), and as they age up they shift into the next room,
+   older children moving up to fill any open slots. Every regular room forms one continuous
+   age ladder; each room fills only to its DCFS capacity and the older children spill down.
+   "Over capacity" only appears once the last room in the ladder (Pre-School) is full. Before
+   & Afterschool is a separate program and never connected to the ladder.
 
    The server returns one row PER ROOM (same per-room shape as Actual Attendance):
-     { roomNumber, room, capacity, occupancy:[Mon..Fri], enrolledSeated:[5],
-       waitSeated:[5], overflow:[5] }
-   This page renders it with the same sidebar + single chart as attendance.html. The only
-   visible difference is that the portion of each bar drawn from the waiting list is striped,
-   and a room the ladder overflows is flagged red. */
+     { roomNumber, room, capacity, occupancy:[Mon..Fri], overflow:[5] }
+   This page renders it with the same sidebar + single chart as attendance.html — a plain
+   solid fill (everyone is treated as enrolled in this projection). A room the ladder
+   overflows is flagged red. */
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const CHART_H = 220;
@@ -141,9 +140,8 @@ function n(v) { return parseInt(v, 10) || 0; }
 function renderSidebar() {
     const box = document.getElementById('atSidebar');
     box.innerHTML = rooms.map((r, i) => {
-        const wait = Math.max.apply(null, (r.waitSeated || [0]).map(n));
         const over = Math.max.apply(null, (r.overflow || [0]).map(n));
-        const tag = over ? ' · ' + over + ' over' : (wait ? ' · +' + wait + ' waiting' : '');
+        const tag = over ? ' · ' + over + ' over' : '';
         return `<button id="atRoom${i}" onclick="showRoom(${i})">
             <div>${esc(r.room || 'Unknown')}</div>
             <div class="at-room-cap">Capacity ${n(r.capacity)}${tag}</div>
@@ -161,24 +159,18 @@ function showRoom(idx) {
     const r = rooms[idx];
     const room = r.room || 'Unknown';
     const capacity = Math.max(n(r.capacity), 1);
-    let anyWait = false, anyOver = false;
+    let anyOver = false;
 
     const cols = DAYS.map((day, i) => {
-        const enr = n(r.enrolledSeated[i]);
-        const wl = n(r.waitSeated[i]);
+        const occ = n(r.occupancy[i]);
         const over = n((r.overflow || [])[i]);
-        const occ = enr + wl;
-        if (wl) anyWait = true;
         if (over) anyOver = true;
-        // Bars scale to the room's own DCFS capacity (same as Actual Attendance). The
-        // enrolled portion is solid; the waiting-list portion is striped on top.
-        const enrH = Math.round(Math.min(enr / capacity, 1) * CHART_H);
-        const wlH = Math.round(Math.min(occ / capacity, 1) * CHART_H) - enrH;
+        // Solid fill scaled to the room's own DCFS capacity — identical to Actual Attendance.
+        const fillH = Math.round(Math.min(occ / capacity, 1) * CHART_H);
         return `<div class="at-col${over ? ' at-over' : ''}">
-            <div class="at-count">${occ}/${capacity}${over ? `<br><span class="at-over-n">+${over} over</span>` : (wl ? `<br><span class="at-wl">+${wl} waiting</span>` : '')}</div>
+            <div class="at-count">${occ}/${capacity}${over ? `<br><span class="at-over-n">+${over} over</span>` : ''}</div>
             <div class="at-bar-track" style="height:${CHART_H}px;">
-                <div class="at-fill-wait" style="height:${Math.max(wlH, 0)}px;"></div>
-                <div class="at-fill-actual" style="height:${enrH}px;"></div>
+                <div class="at-bar-fill" style="height:${fillH}px;"></div>
             </div>
             <div class="at-day">${day}</div>
         </div>`;
@@ -186,12 +178,11 @@ function showRoom(idx) {
 
     const legend = `<div class="at-legend">
         <div><span class="at-swatch" style="background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);"></span> Capacity (${capacity})</div>
-        <div><span class="at-swatch" style="background:var(--sp-accent);"></span> Enrolled</div>
-        ${anyWait || rooms.some(rr => (rr.waitSeated || []).some(n)) ? '<div><span class="at-swatch at-swatch-wait"></span> From waiting list</div>' : ''}
+        <div><span class="at-swatch" style="background:var(--sp-accent);"></span> Projected (youngest-first fill)</div>
     </div>`;
 
     const note = anyOver
-        ? '<div class="at-note"><span class="at-over-flag">Over capacity — more children want this room than it can seat on the flagged days. The overflow are the oldest, who would move up to the next room.</span></div>'
+        ? '<div class="at-note"><span class="at-over-flag">Over capacity — the age ladder cannot seat everyone on the flagged days. This only shows on Pre-School, the last room; the overflow are the oldest children.</span></div>'
         : '';
 
     document.getElementById('atBody').innerHTML = `

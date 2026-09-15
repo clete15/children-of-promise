@@ -3009,25 +3009,22 @@ function sqlCells(raw) {
 }
 
 /* ── Projected attendance ────────────────────────────────────────────────────
-   A waiting-list child applies to a PROGRAM (their AgeGroup), which maps to an ordered
-   chain of rooms. The chain is YOUNGEST ROOM FIRST — that is the fill order: children are
-   seated youngest-first into the first room, and when it reaches DCFS capacity the older
-   ones spill into the next room down the chain. Room numbers come from dimClassrooms
-   (setup_classrooms.sql):
-     1 Infant · 2 Infants/Toddlers · 3 Toddlers              → program 0-2 (Infant & Toddler)
-     4 Toddlers/2yr · 5 2-Year-Olds                          → program 2-3 (2-Year-Olds)
-     7 2 & 3 Year Olds → 6 Pre-School                        → program 3-5 (Pre-School: 2s then 3s)
-     8 Before & Afterschool                                  → program ba  (Before & After)
-   The 2 & 3 Year Olds room (7) is the youngest room in the Pre-School chain, so its 2s fill
-   first and the 3s follow in the Pre-School room (6) — "2s and 3s, top to bottom". */
-const PROJ_PROGRAMS = [
-    { key: '0-2', label: 'Infant & Toddler', rooms: [1, 2, 3] },
-    { key: '2-3', label: '2-Year-Olds',      rooms: [4, 5] },
-    { key: '3-5', label: 'Pre-School',       rooms: [7, 6] },
-    { key: 'ba',  label: 'Before & After',   rooms: [8] },
-];
-// Which program-chain a waiting-list AgeGroup feeds into. Matches PROJ_PROGRAMS keys.
-const WAITLIST_AGEGROUP_TO_PROGRAM = { '0-2': '0-2', '2-3': '2-3', '3-5': '3-5', 'ba': 'ba' };
+   All the regular rooms form ONE continuous age ladder, youngest room first. Every child —
+   currently enrolled or on the waiting list — is pooled, treated as enrolled, sorted
+   youngest-first, and seated room by room down this ladder. When a room reaches DCFS
+   capacity the older children spill into the next room down; "over capacity" only appears
+   once the LAST room in the ladder (Pre-School) is full. The room's age range is only a
+   guide, not a hard stop — the fill is purely youngest-to-oldest.
+
+   Ladder order (RoomNumbers) from dimClassrooms (setup_classrooms.sql):
+     1 Infant → 2 Infants/Toddlers → 3 Toddlers → 4 Toddlers/2yr → 5 2 Year Olds
+       → 7 2 & 3 Year Olds → 6 Pre-School
+
+   Before & Afterschool (room 8) is an ENTIRELY SEPARATE program: the ladder never spills
+   into it and it never spills out. It simply shows its own children, filled youngest-first
+   within itself. */
+const PROJ_LADDER_ROOMS = [1, 2, 3, 4, 5, 7, 6];
+const PROJ_STANDALONE_ROOMS = [8];
 
 // Parse a free-text "days requested" string into a 5-element [Mon..Fri] presence array.
 // Handles "Monday, Wednesday", "M/W/F", "Full time", "5 days", blanks, etc. Anything that
@@ -3069,20 +3066,18 @@ function ageInDays(birthDate, daysOldFallback) {
    enrolledRows : [[Id,First,Last,BirthDate,DaysOld,RoomNumber,Mon..Fri], ...] (active)
    waitlistRows : [[Id,ChildName,BirthDate,AgeGroup,DaysRequested,Score], ...] (pending)
 
-   Model: for each program, gather its children (enrolled currently in any of the
-   program's rooms + waiting-list children whose AgeGroup feeds the program), sort them
-   youngest-first, then seat them into the program's rooms in chain order (youngest room
-   first) up to each room's DCFS capacity, PER DAY. When a room is full for a day the older
-   children spill into the next room; children who fit nowhere are counted as overflow on the
-   chain's last (oldest) room.
+   Mock model: pool EVERY child (currently enrolled + waiting list), treat them all as
+   enrolled, sort youngest-first, and seat them down ONE continuous age ladder of rooms
+   (PROJ_LADDER_ROOMS) up to each room's DCFS capacity, PER DAY. When a room fills, the older
+   children spill into the next room down; "over capacity" only shows once the last room
+   (Pre-School) is full. Before & Afterschool (PROJ_STANDALONE_ROOMS) is a separate program,
+   filled youngest-first within itself and never connected to the ladder.
 
    Returns ONE row PER ROOM (RoomNumber order), so the Projected Attendance page renders the
    same per-room sidebar + single chart as Actual Attendance:
      { roomNumber, room, capacity,
-       occupancy:[5],       // total projected children seated per weekday
-       enrolledSeated:[5],  // of which already enrolled
-       waitSeated:[5],      // of which pulled from the waiting list
-       overflow:[5] }       // children who could not be seated (last room in a chain only) */
+       occupancy:[5],   // projected children seated per weekday
+       overflow:[5] }   // children the ladder cannot seat (last ladder room only) */
 function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     if (!Array.isArray(roomRows)) return [];
 
@@ -3094,78 +3089,56 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         roomByNum[num] = { roomNumber: num, room: r[1] || ('Room ' + num), capacity: parseInt(r[2], 10) || 0 };
     });
 
-    // Which program does a room currently belong to (for placing enrolled children)?
-    const roomToProgram = {};
-    PROJ_PROGRAMS.forEach(p => p.rooms.forEach(n => { roomToProgram[n] = p.key; }));
+    // Which rooms are "in scope" for the projection at all (the ladder + the standalones).
+    const inScope = new Set([].concat(PROJ_LADDER_ROOMS, PROJ_STANDALONE_ROOMS));
 
-    // Bucket children by program. Each child: { age, days:[5], kind:'enrolled'|'wait', label }.
-    const byProgram = {};
-    PROJ_PROGRAMS.forEach(p => { byProgram[p.key] = []; });
+    // Pool EVERY child — enrolled and waiting-list — into one list, all treated as enrolled.
+    // Each child: { age, days:[5], standalone:bool }. standalone === true means Before &
+    // After (kept out of the ladder); everything else feeds the ladder.
+    const ladderKids = [];
+    const standaloneKids = [];
 
     (Array.isArray(enrolledRows) ? enrolledRows : []).forEach(e => {
         const roomNum = parseInt(e[5], 10);
-        const program = roomToProgram[roomNum];
-        if (!program) return; // in a room not part of any projected program chain
-        byProgram[program].push({
+        if (!inScope.has(roomNum)) return; // in a room the projection does not cover
+        const kid = {
             age: ageInDays(e[3], e[4]),
-            _daysSrc: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
-            kind: 'enrolled',
-            label: ((e[1] || '') + ' ' + (e[2] || '')).trim(),
-        });
+            days: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
+        };
+        (PROJ_STANDALONE_ROOMS.indexOf(roomNum) !== -1 ? standaloneKids : ladderKids).push(kid);
     });
     (Array.isArray(waitlistRows) ? waitlistRows : []).forEach(w => {
-        const program = WAITLIST_AGEGROUP_TO_PROGRAM[String(w[3] || '').trim()];
-        if (!program) return; // unknown/blank program
-        byProgram[program].push({
-            age: ageInDays(w[2], 0),
-            _daysSrc: parseRequestedDays(w[4]),
-            kind: 'wait',
-            label: (w[1] || 'Waiting-list child'),
-        });
+        // Only the Before & After program (AgeGroup 'ba') is standalone; every other
+        // waiting-list child feeds the age ladder.
+        const isStandalone = String(w[3] || '').trim() === 'ba';
+        const kid = { age: ageInDays(w[2], 0), days: parseRequestedDays(w[4]) };
+        (isStandalone ? standaloneKids : ladderKids).push(kid);
     });
 
-    // Seat each program's children youngest-first into its room chain, per weekday, then
-    // flatten to ONE row per room so the Projected Attendance page can render exactly like
-    // Actual Attendance (per-room sidebar + a single chart per room). Overflow past the last
-    // room in a chain is added to that last room's overflow[] so the chart can flag it.
-    const roomsOut = {}; // roomNumber -> output row
-    PROJ_PROGRAMS.forEach(pdef => {
-        const kids = byProgram[pdef.key] || [];
-        // Youngest first. Stable tiebreak: enrolled before waiting (an enrolled child
-        // already holds the seat), then by label.
-        kids.sort((a, b) => (a.age - b.age)
-            || (a.kind === b.kind ? 0 : (a.kind === 'enrolled' ? -1 : 1))
-            || String(a.label).localeCompare(String(b.label)));
-
-        const chain = pdef.rooms.filter(n => roomByNum[n]).map(n => ({
-            roomNumber: n,
-            room: roomByNum[n].room,
-            capacity: roomByNum[n].capacity,
-            occupancy: [0, 0, 0, 0, 0],
-            enrolledSeated: [0, 0, 0, 0, 0],
-            waitSeated: [0, 0, 0, 0, 0],
-            overflow: [0, 0, 0, 0, 0], // children who could not be seated anywhere in the chain
+    // Seat one pool of children into an ordered list of rooms, youngest-first, per weekday.
+    // Overflow past the last room is charged to that last room's overflow[].
+    function seat(roomNums, kids) {
+        const chain = roomNums.filter(n => roomByNum[n]).map(n => ({
+            roomNumber: n, room: roomByNum[n].room, capacity: roomByNum[n].capacity,
+            occupancy: [0, 0, 0, 0, 0], overflow: [0, 0, 0, 0, 0],
         }));
-        if (!chain.length) return;
-
-        // Independently per weekday: walk the youngest-first children and drop each into
-        // the first room in the chain that still has a free seat that day. Anyone who fits
-        // nowhere is charged to the LAST room's overflow (the oldest room, where the
-        // squeeze shows up), so the per-room replica can flag over-capacity.
+        if (!chain.length) return chain;
+        kids.sort((a, b) => a.age - b.age); // youngest first
         for (let d = 0; d < 5; d++) {
-            const freeInRoom = chain.map(r => r.capacity);
+            const free = chain.map(r => r.capacity);
             kids.forEach(k => {
-                if (!k._daysSrc[d]) return; // not present this day
-                const roomIdx = freeInRoom.findIndex(f => f > 0);
-                if (roomIdx === -1) { chain[chain.length - 1].overflow[d]++; return; }
-                freeInRoom[roomIdx]--;
-                chain[roomIdx].occupancy[d]++;
-                if (k.kind === 'enrolled') chain[roomIdx].enrolledSeated[d]++;
-                else chain[roomIdx].waitSeated[d]++;
+                if (!k.days[d]) return; // not present this day
+                const idx = free.findIndex(f => f > 0);
+                if (idx === -1) { chain[chain.length - 1].overflow[d]++; return; }
+                free[idx]--; chain[idx].occupancy[d]++;
             });
         }
-        chain.forEach(r => { roomsOut[r.roomNumber] = r; });
-    });
+        return chain;
+    }
+
+    const roomsOut = {};
+    seat(PROJ_LADDER_ROOMS, ladderKids).forEach(r => { roomsOut[r.roomNumber] = r; });
+    seat(PROJ_STANDALONE_ROOMS, standaloneKids).forEach(r => { roomsOut[r.roomNumber] = r; });
 
     // One row per room, in RoomNumber order — mirrors byRoomDaily's per-room layout.
     return roomRows
