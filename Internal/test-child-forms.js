@@ -57,6 +57,40 @@ check('fetch failed: unknown still counts as done, so nothing turns red wrongly'
 check('fetch failed: no tick is still none',
     CF.state(1, 'ParentInterview', false), 'none');
 
+// ── screenings need TWO artefacts, report cards need an upload ────────────
+// A screening (ASQ/ASE) is only 'form' when the teacher's scored summary AND the
+// parent's questionnaire upload are both present. One alone is 'partial' (not done).
+CF._set({
+    '10': { BegASQ: { on: true, date: '2026-09-01' } },   // scored, no questionnaire
+    '11': {},                                              // questionnaire only (set below)
+    '12': { BegASQ: { on: true, date: '2026-09-01' } }     // both (file set below)
+}, 'ready');
+CF._setFiles({
+    '11': { BegASQ: { questionnaire: { relPath: 'x', name: 'q.pdf', date: '2026-09-01' } } },
+    '12': { BegASQ: { questionnaire: { relPath: 'y', name: 'q.pdf', date: '2026-09-01' } } },
+    '20': { MidYearReport: { report: { relPath: 'r', name: 'card.pdf', date: '2026-12-01' } } }
+});
+check('screening with scored summary only is partial', CF.state(10, 'BegASQ', true), 'partial');
+check('screening with questionnaire only is partial', CF.state(11, 'BegASQ', true), 'partial');
+check('screening with both artefacts is form', CF.state(12, 'BegASQ', true), 'form');
+check('a partial screening is NOT done', CF.isDone(10, 'BegASQ', true), false);
+check('a complete screening IS done', CF.isDone(12, 'BegASQ', true), true);
+check('screening with nothing but a tick is tick-only', CF.state(99, 'EndASE', true), 'tick-only');
+check('screening with nothing at all is none', CF.state(99, 'EndASE', false), 'none');
+
+// A report card is complete once its scan is uploaded.
+check('MidYearReport is a backed field now', CF.isBacked('MidYearReport'), true);
+check('report card with an upload is form', CF.state(20, 'MidYearReport', true), 'form');
+check('report card upload counts as done', CF.isDone(20, 'MidYearReport', true), true);
+check('report card ticked with no upload is tick-only', CF.state(99, 'EndYearReport', true), 'tick-only');
+check('report card partial rolls up as missing', (function () {
+    var rr = CF.rollup(['BegASQ'], [{ Id: 10 }, { Id: 12 }], { 10: { BegASQ: true }, 12: { BegASQ: true } });
+    return rr.missing.map(function (s) { return s.Id; });
+})(), [10]);
+
+// Reset the file index so later tests see the same world they always did.
+CF._setFiles({});
+
 // ── rollup(), what the compliance panel reports ──────────────────────────
 const roster = [{ Id: 1 }, { Id: 2 }, { Id: 3 }];
 CF._set({

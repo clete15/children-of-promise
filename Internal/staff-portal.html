@@ -588,6 +588,9 @@
     a.cls-chip-done:hover { background:var(--sp-good-bg);border-color:var(--sp-good-br);color:var(--sp-good-fg); }
     .cls-dl { font-size:0.62rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px; }
     .cls-paper { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--sp-warn-bg);color:var(--sp-warn-fg);cursor:help; }
+    /* A screening with only one of its two required items: real progress, not done. */
+    .cls-chip-partial { border-style:dashed; }
+    .cls-partial { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--sp-warn-bg);color:var(--sp-warn-fg);cursor:help; }
     .cls-dl-overdue { background:var(--sp-bad-bg);color:var(--sp-bad-fg); }
     .cls-dl-due { background:var(--sp-warn-bg);color:var(--sp-warn-fg); }
 </style>
@@ -1810,6 +1813,15 @@ function classroomChecklistHtml(rooms) {
                 ? '<span class="cls-paper" title="Ticked, but nothing is saved here. '
                   + 'If it was done on paper that is fine; otherwise open the form.">on paper?</span>'
                 : '';
+            // A screening needs two things — the parent questionnaire upload and the
+            // scored, signed summary. When only one is in, say which is still missing.
+            if (st === 'partial' && ChildForms.isScreening(col.field)) {
+                const haveQ = ChildForms.hasFile(s.Id, col.field, 'questionnaire');
+                const haveScored = ChildForms.hasForm(s.Id, col.field);
+                const need = !haveQ ? 'needs questionnaire' : !haveScored ? 'needs scoring' : 'in progress';
+                extra += '<span class="cls-partial" title="One of the two required items is still '
+                    + 'missing for this screening.">' + need + '</span>';
+            }
             let action = '';
             if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
                 const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';
@@ -1826,8 +1838,12 @@ function classroomChecklistHtml(rooms) {
                 action = 'permission|' + s.Id;
             } else if (col.field === 'ParentInterview') {
                 action = 'interview|' + s.Id;
+            } else if (col.field === 'MidYearReport' || col.field === 'EndYearReport') {
+                // Report cards are produced elsewhere and uploaded here.
+                action = 'upload|' + s.Id + '|' + col.field;
             }
-            const cls = 'cls-chip' + (done ? ' cls-chip-done' : '');
+            const cls = 'cls-chip' + (done ? ' cls-chip-done' : '')
+                + (st === 'partial' ? ' cls-chip-partial' : '');
             const inner = (done ? '\u2713 ' : '') + label + extra;
             return action
                 ? '<a href="#" class="' + cls + '" data-act="' + esc(action) + '">' + inner + '</a>'
@@ -1883,6 +1899,7 @@ function wireClassroom() {
             if (parts[0] === 'interview') CofpForms.openInterview(parseInt(parts[1], 10));
             else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
             else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
+            else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
         });
     });
     document.querySelectorAll('#sppanel_classroom [data-print]').forEach(a => {
@@ -2632,6 +2649,9 @@ async function loadClassroomData() {
             // Which forms actually exist behind a tick, so "on paper?" shows from the
             // first render. Optional; ChildForms falls back to tick-only if absent.
             (window.ChildForms && ChildForms.load) ? ChildForms.load(CLS_YEAR, myFetch).catch(() => null) : Promise.resolve(),
+            // Uploaded evidence (parent ASQ/ASE questionnaires, report-card scans), so a
+            // screening's two halves and a filed report card show from the first render.
+            (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(CLS_YEAR, myFetch).catch(() => null) : Promise.resolve(),
             (window.CofpForms) ? CofpForms.loadSignatures(CLS_YEAR).then(s => { CLS_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve()
         ]);
         if (!sRes || !sRes.ok) throw new Error('students: HTTP ' + (sRes ? sRes.status : '—'));

@@ -891,6 +891,7 @@ async function setSchoolYear(year) {
             // Which forms exist for this year. Never rejects; a failure leaves the
             // ticks showing as they always did rather than emptying the roster.
             ChildForms.load(year, apiFetch),
+            ChildForms.loadFiles(year, apiFetch),
             loadSignatures(year)
         ]);
         const tRows = await tRes.json();
@@ -1062,6 +1063,9 @@ async function init() {
             // Which forms exist, so a tick with nothing behind it is visible as
             // such from the first render rather than after an interaction.
             ChildForms.load(activeSchoolYear, apiFetch),
+            // Uploaded evidence (parent questionnaires, report-card scans) — required
+            // for a screening's two-part completion and for the report-card columns.
+            ChildForms.loadFiles(activeSchoolYear, apiFetch),
             loadSignatures(activeSchoolYear)
         ]);
         students = await sRes.json();

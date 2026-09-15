@@ -121,6 +121,61 @@
         return { state: 'ok', text: left + 'd left' };
     }
 
+    /* The checklist column a screening type+period maps to. One place, so
+       openScreening, saveScreening and the questionnaire upload all agree. */
+    function screeningField(type, period) {
+        var beg = period === 'Beginning';
+        if (type === 'ASQ-3') return beg ? 'BegASQ' : 'EndASQ';
+        return beg ? 'BegASE' : 'EndASE';   // ASQ:SE-2
+    }
+
+    /* Draw the state of an upload slot: a green "on file" line with a view link, or
+       a grey prompt when nothing is filed yet. rec is { on, name, relPath } or null. */
+    function setUploadStatus(elId, rec, emptyText) {
+        var el = document.getElementById(elId);
+        if (!el) return;
+        if (rec && rec.on) {
+            var link = rec.relPath
+                ? ' \u2014 <a href="/api/doc-file?path=' + encodeURIComponent(rec.relPath)
+                  + '" target="_blank" rel="noopener">view</a>'
+                : '';
+            el.innerHTML = '\u2713 On file: ' + escapeHtml(rec.name || 'uploaded') + link;
+            el.style.color = '#166534';
+        } else {
+            el.textContent = emptyText || 'Nothing uploaded yet.';
+            el.style.color = '#64748b';
+        }
+    }
+
+    function escapeHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    /* Upload one child evidence file (a parent questionnaire or a report card) to the
+       child's folder via /api/child-file-upload. Multipart, so the credentials are
+       attached by hand and Content-Type is left for the browser to set with its own
+       boundary — the same shape as the staff-file upload. Returns the server's JSON,
+       or throws. */
+    async function uploadChildFile(studentId, field, kind, file) {
+        var form = new FormData();
+        form.append('file', file, file.name);
+        var headers = (global.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {};
+        // Some hosts sign requests with a plain object; strip any JSON content type.
+        var h = {};
+        Object.keys(headers).forEach(function (k) {
+            if (k.toLowerCase() !== 'content-type') h[k] = headers[k];
+        });
+        var url = '/api/child-file-upload?studentId=' + encodeURIComponent(studentId)
+            + '&field=' + encodeURIComponent(field) + '&kind=' + encodeURIComponent(kind)
+            + '&year=' + encodeURIComponent(year());
+        var res = await fetch(url, { method: 'POST', headers: h, body: form });
+        var d = await res.json();
+        if (!res.ok || !d.success) throw new Error((d && d.error) || ('HTTP ' + res.status));
+        return d;
+    }
+
     function computeScreeningFlag(type, body) {
         if (type === 'ASQ-3') {
             var st = [body.commStatus, body.grossStatus, body.fineStatus, body.problemStatus, body.personalStatus];
@@ -655,6 +710,24 @@
         document.getElementById('scrNotes').value = '';
         document.getElementById('scrSavedBadge').style.display = 'none';
 
+        // The checklist column this screening belongs to (BegASQ / EndASE / …).
+        var scrField = screeningField(type, period);
+
+        // Signature pads for the scored summary, same pattern as the other forms.
+        sigPads = {};
+        mountSigPad('scrParentSigPad', studentId, scrField, 'parent',
+            { label: 'Parent/Guardian signature', printedName: 'scrParentSig', dateField: 'scrDate' });
+        mountSigPad('scrStaffSigPad', studentId, scrField, 'staff',
+            { label: 'Staff signature', printedName: 'scrStaffSig', dateField: 'scrDate' });
+
+        // Reset and reflect the parent-questionnaire upload slot.
+        var qFile = document.getElementById('scrQuestFile');
+        if (qFile) qFile.value = '';
+        var existingQ = ChildForms().fileFor(studentId, scrField, 'questionnaire');
+        setUploadStatus('scrQuestStatus', existingQ
+            ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
+            : null, 'No questionnaire on file yet.');
+
         try {
             var res = await apiFetch(yearQS('/api/screening/' + studentId + '?type=' + encodeURIComponent(type) + '&period=' + encodeURIComponent(period)));
             var data = await res.json();
@@ -749,6 +822,17 @@
                     ReferralMade: body.referralMade,
                     Flag: computeScreeningFlag(currentScrType, body)
                 };
+
+                /* If anything was signed, file the scored summary as a PDF into the
+                   child's folder — the same route the other forms use. Re-signing
+                   later files a fresh copy, so the scores stay editable in the app. */
+                var sigProblems = await fileSignedForm(currentScrStudentId, fieldName,
+                    buildScreeningContent(body));
+                if (sigProblems.length) {
+                    alert('The scores were saved, but the signed copy was not filed:\n\n'
+                        + sigProblems.join('\n'));
+                }
+
                 refreshActiveView();
                 document.getElementById('scrSavedBadge').style.display = 'inline-flex';
                 setTimeout(function () { document.getElementById('scrSavedBadge').style.display = 'none'; }, 3000);
@@ -763,10 +847,134 @@
         }
     }
 
+    /* The scored summary, as label/value rows for the filed PDF. Reads the live
+       fields so it matches exactly what the teacher entered and signed. */
+    function buildScreeningContent(body) {
+        var student = students().find(function (s) { return String(s.Id) === String(currentScrStudentId); });
+        var rows = [
+            { label: 'Child', value: student ? student.First_Name + ' ' + student.Last_Name : '' },
+            { label: 'Screening', value: currentScrType + ' \u2014 ' + currentScrPeriod + ' of year' },
+            { label: 'Date administered', value: body.screeningDate || '' },
+            { label: 'Completed by', value: body.completedBy || '' },
+            { label: 'Questionnaire interval', value: body.interval || '' }
+        ];
+        if (currentScrType === 'ASQ-3') {
+            rows.push({ label: 'Communication', value: (body.commScore || '\u2014') + '  (' + body.commStatus + ')' });
+            rows.push({ label: 'Gross motor', value: (body.grossScore || '\u2014') + '  (' + body.grossStatus + ')' });
+            rows.push({ label: 'Fine motor', value: (body.fineScore || '\u2014') + '  (' + body.fineStatus + ')' });
+            rows.push({ label: 'Problem solving', value: (body.problemScore || '\u2014') + '  (' + body.problemStatus + ')' });
+            rows.push({ label: 'Personal-social', value: (body.personalScore || '\u2014') + '  (' + body.personalStatus + ')' });
+        } else {
+            rows.push({ label: 'Total score', value: body.seTotal || '\u2014' });
+            rows.push({ label: 'Cutoff', value: body.seCutoff || '\u2014' });
+            rows.push({ label: 'Result', value: body.seResult || '' });
+        }
+        rows.push({ label: 'Referral made', value: body.referralMade || 'No' });
+        var blocks = body.notes ? [{ heading: 'Notes / Follow-up', text: body.notes }] : [];
+        return {
+            formTitle: currentScrType + ' ' + currentScrPeriod + '-of-Year Scored Summary',
+            rows: rows, blocks: blocks
+        };
+    }
+
+    /* Attach the parent's completed questionnaire for the screening currently open.
+       Files into the child's folder and marks the cell so it turns green without a
+       reload. This is one of the two artefacts a screening needs; the other is the
+       scored, signed summary above. */
+    async function uploadScreeningQuestionnaire() {
+        if (!currentScrStudentId) return;
+        var field = screeningField(currentScrType, currentScrPeriod);
+        var input = document.getElementById('scrQuestFile');
+        var statusEl = document.getElementById('scrQuestStatus');
+        if (!input || !input.files || !input.files.length) {
+            if (statusEl) { statusEl.textContent = 'Choose a file first.'; statusEl.style.color = '#b91c1c'; }
+            return;
+        }
+        var file = input.files[0];
+        if (file.size > 15 * 1024 * 1024) {
+            if (statusEl) { statusEl.textContent = 'That is over 15 MB. A PDF scan is usually much smaller.'; statusEl.style.color = '#b91c1c'; }
+            return;
+        }
+        var btn = document.getElementById('scrQuestBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Uploading\u2026'; }
+        if (statusEl) { statusEl.textContent = 'Uploading\u2026'; statusEl.style.color = '#64748b'; }
+        try {
+            var d = await uploadChildFile(currentScrStudentId, field, 'questionnaire', file);
+            ChildForms().markFile(currentScrStudentId, field, 'questionnaire', d.relPath, d.name);
+            setUploadStatus('scrQuestStatus', { on: true, name: d.name, relPath: d.relPath }, '');
+            refreshActiveView();
+        } catch (e) {
+            if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Upload questionnaire'; }
+        }
+    }
+
     function printScreening() {
         document.getElementById('scrOverlay').setAttribute('data-printing', '1');
         window.print();
         document.getElementById('scrOverlay').removeAttribute('data-printing');
+    }
+
+    // ── Report card uploads (Mid-Year / End-Year) ─────────────────────────────
+    var currentRCStudentId = null;
+    var currentRCField = null;
+    var RC_LABELS = { MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card' };
+
+    function openReportUpload(studentId, field) {
+        currentRCStudentId = studentId;
+        currentRCField = field;
+        var student = students().find(function (s) { return String(s.Id) === String(studentId); });
+        var label = RC_LABELS[field] || 'Report Card';
+        document.getElementById('rcModalTitle').textContent = label;
+        document.getElementById('rcWhich').textContent = label;
+        document.getElementById('rcChildName').textContent =
+            student ? student.First_Name + ' ' + student.Last_Name : '';
+        var f = document.getElementById('rcFile');
+        if (f) f.value = '';
+        var existing = ChildForms().fileFor(studentId, field, 'report');
+        setUploadStatus('rcStatus', existing
+            ? { on: true, name: existing.name, relPath: existing.relPath }
+            : null, 'No report card on file yet.');
+        document.getElementById('rcOverlay').classList.add('open');
+    }
+
+    function closeReportUpload() {
+        document.getElementById('rcOverlay').classList.remove('open');
+        currentRCStudentId = null;
+        currentRCField = null;
+    }
+
+    async function uploadReportCard() {
+        if (!currentRCStudentId || !currentRCField) return;
+        var input = document.getElementById('rcFile');
+        var statusEl = document.getElementById('rcStatus');
+        if (!input || !input.files || !input.files.length) {
+            if (statusEl) { statusEl.textContent = 'Choose a file first.'; statusEl.style.color = '#b91c1c'; }
+            return;
+        }
+        var file = input.files[0];
+        if (file.size > 15 * 1024 * 1024) {
+            if (statusEl) { statusEl.textContent = 'That is over 15 MB. A PDF is usually much smaller.'; statusEl.style.color = '#b91c1c'; }
+            return;
+        }
+        var btn = document.getElementById('rcBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Uploading\u2026'; }
+        if (statusEl) { statusEl.textContent = 'Uploading\u2026'; statusEl.style.color = '#64748b'; }
+        try {
+            var d = await uploadChildFile(currentRCStudentId, currentRCField, 'report', file);
+            ChildForms().markFile(currentRCStudentId, currentRCField, 'report', d.relPath, d.name);
+            // A report-card upload ticks the column server-side; mirror that locally.
+            var t = tracking();
+            if (!t[currentRCStudentId]) t[currentRCStudentId] = {};
+            t[currentRCStudentId][currentRCField] = 1;
+            setUploadStatus('rcStatus', { on: true, name: d.name, relPath: d.relPath }, '');
+            refreshActiveView();
+        } catch (e) {
+            if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Upload report card'; }
+        }
     }
 
     // ── Print All (one job, one form per page) ────────────────────────────────
@@ -950,10 +1158,41 @@
         '<div class="pi-field"><label>Questionnaire Interval</label><input type="text" id="scrInterval" placeholder="e.g. 36 month, 48 month"></div>',
         '<div class="pi-field"><label>Referral Made?</label><select id="scrReferral"><option value="No">No</option><option value="Yes">Yes</option></select></div>',
         '<div class="pi-field pi-full"><label>Notes / Follow-up</label><textarea id="scrNotes" placeholder="Any concerns, referral details, follow-up actions..."></textarea></div></div></div>',
+        // The parent fills the paper questionnaire; the teacher scores it above. Both
+        // are required evidence, so the completed questionnaire is scanned/photographed
+        // and attached here. It files straight into the child\u2019s folder.
+        '<div class="pi-section"><h4>Parent\u2019s Completed Questionnaire</h4>',
+        '<div class="doc-note">The parent\u2019s filled-in Ages &amp; Stages questionnaire is required alongside the scores. Attach a scan or a clear photo (PDF or image). It is filed in the child\u2019s folder.</div>',
+        '<div class="cls-upload-row"><input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">',
+        '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload questionnaire</button>',
+        '<span id="scrQuestStatus" class="cls-upload-status"></span></div></div>',
+        '<div class="pi-section"><h4>Signatures</h4>',
+        '<div class="doc-note">Sign the scored summary here. Signing files a PDF of the scores into the child\u2019s folder; re-signing files a fresh copy and keeps the old one.</div>',
+        '<div class="pi-grid">',
+        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="scrParentSigPad"></div><input type="text" id="scrParentSig" placeholder="Printed name" style="margin-top:7px;"></div>',
+        '<div class="pi-field pi-full"><label>Staff Signature</label><div id="scrStaffSigPad"></div><input type="text" id="scrStaffSig" placeholder="Printed name" style="margin-top:7px;"></div></div></div>',
         '</div>',
         '<div class="pi-modal-footer"><span class="pi-saved-badge" id="scrSavedBadge" style="display:none;">&#10003; Saved</span>',
         '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printScreening()">&#x1F5A8;&#xFE0F; Print</button>',
         '<button class="pi-btn pi-btn-primary" id="scrSaveBtn" onclick="CofpForms.saveScreening()">Save Screening</button></div>',
+        '</div></div>',
+
+        // Report cards are not filled in the app — they are produced elsewhere
+        // (Teaching Strategies) and uploaded. A small modal keeps that consistent
+        // with the other columns rather than a bare file dialog.
+        '<div class="pi-overlay" id="rcOverlay"><div class="pi-modal">',
+        '<div class="pi-modal-header"><h3 id="rcModalTitle">Report Card</h3>',
+        '<button class="pi-close" onclick="CofpForms.closeReportUpload()" aria-label="Close">&times;</button></div>',
+        '<div class="pi-modal-body">',
+        '<div class="pi-section"><h4>Child</h4><div class="pi-value" id="rcChildName"></div></div>',
+        '<div class="pi-section"><h4 id="rcWhich">Report Card</h4>',
+        '<div class="doc-note">Upload the child\u2019s report card (PDF or a clear photo). It is filed in the child\u2019s folder and marks this column complete.</div>',
+        '<div class="cls-upload-row"><input type="file" id="rcFile" accept=".pdf,.jpg,.jpeg,.png">',
+        '<button type="button" class="pi-btn pi-btn-primary" id="rcBtn" onclick="CofpForms.uploadReportCard()">Upload report card</button>',
+        '<span id="rcStatus" class="cls-upload-status"></span></div></div>',
+        '</div>',
+        '<div class="pi-modal-footer">',
+        '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.closeReportUpload()">Close</button></div>',
         '</div></div>',
 
         '<div id="printAllContainer"></div>'
@@ -992,6 +1231,10 @@
         '.pi-flags { display:flex;flex-wrap:wrap;gap:6px;padding:4px 0; }',
         '.pi-flag { padding:3px 9px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:0.7rem;font-weight:700;white-space:nowrap; }',
         '.doc-note { font-size:0.72rem;color:#6b7280;margin:-4px 0 10px 0;line-height:1.5; }',
+        '.cls-upload-row { display:flex;align-items:center;gap:10px;flex-wrap:wrap; }',
+        '.cls-upload-row input[type=file] { font-size:0.8rem; }',
+        '.cls-upload-status { font-size:0.75rem;font-weight:600; }',
+        '@media print { .cls-upload-row { display:none !important; } }',
         '#printAllContainer { display:none; }',
         '.print-value { display:inline-block;min-height:1em; }',
         '@media print {',
@@ -1049,6 +1292,10 @@
         saveScreening: saveScreening,
         closeScreening: closeScreening,
         printScreening: printScreening,
+        uploadScreeningQuestionnaire: uploadScreeningQuestionnaire,
+        openReportUpload: openReportUpload,
+        closeReportUpload: closeReportUpload,
+        uploadReportCard: uploadReportCard,
         printAllForColumn: printAllForColumn,
         loadSignatures: loadSignatures,
         // shared helpers the classroom view needs

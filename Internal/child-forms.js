@@ -47,17 +47,29 @@
     var BACKED_FIELDS = [
         'ParentInterview', 'PermissionSlip',
         'BegASQ', 'BegASE', 'EndASQ', 'EndASE',
+        'MidYearReport', 'EndYearReport',
         'WeightedEligibility', 'ScreeningResultsShared',
         'FamilyCenteredAssessment', 'FamilyGoalPlan', 'TransitionPlan', 'Referral'
     ];
 
-    var forms = {};          // { studentId: { Field: { on, date } } }
+    /* The four screening columns need TWO artefacts to be complete: the parent's
+       filled-in questionnaire (uploaded scan) AND the teacher's scored, signed
+       summary (an in-app form). One without the other is not a file a monitor would
+       pass, so both are required here. */
+    var SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
+    // The two report-card columns are complete on an uploaded scan alone.
+    var REPORT_FIELDS = ['MidYearReport', 'EndYearReport'];
+
+    var forms = {};          // { studentId: { Field: { on, date } } }  in-app forms
+    var files = {};          // { studentId: { Field: { Kind: { relPath, name, date } } } }  uploads
     var loadedYear = null;
     var loadState = 'idle';  // idle | loading | ready | failed
 
     function isBacked(field) {
         return BACKED_FIELDS.indexOf(field) !== -1;
     }
+    function isScreening(field) { return SCREENING_FIELDS.indexOf(field) !== -1; }
+    function isReport(field) { return REPORT_FIELDS.indexOf(field) !== -1; }
 
     /* Reads the year's form records. The caller supplies its own fetch wrapper so
        this file carries no opinion about authentication. Failure is recorded, not
@@ -105,15 +117,72 @@
         return (rec && rec[field] && rec[field].date) || '';
     }
 
+    /* Uploaded scans (parent questionnaires, report cards), keyed the same way as
+       forms. Loaded from /api/child-files. Failure is again swallowed: an upload
+       index that will not load should not blank the roster. */
+    function loadFiles(year, fetcher) {
+        return fetcher('/api/child-files?year=' + encodeURIComponent(year))
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (d) {
+                files = {};
+                (d && d.files || []).forEach(function (f) {
+                    var id = String(f.StudentId);
+                    if (!files[id]) files[id] = {};
+                    if (!files[id][f.FormField]) files[id][f.FormField] = {};
+                    files[id][f.FormField][f.Kind] = {
+                        relPath: f.RelPath, name: f.FileName, date: f.UploadedAt || ''
+                    };
+                });
+                return files;
+            })
+            .catch(function () { files = {}; return null; });
+    }
+
+    // Records an upload that just happened, so the cell updates without a reload.
+    function markFile(studentId, field, kind, relPath, name) {
+        var id = String(studentId);
+        if (!files[id]) files[id] = {};
+        if (!files[id][field]) files[id][field] = {};
+        files[id][field][kind] = { relPath: relPath || '', name: name || '',
+            date: new Date().toISOString().slice(0, 10) };
+    }
+
+    function fileFor(studentId, field, kind) {
+        var rec = files[String(studentId)];
+        return (rec && rec[field] && rec[field][kind]) || null;
+    }
+    function hasFile(studentId, field, kind) {
+        return !!fileFor(studentId, field, kind);
+    }
+
     /* The one question every view asks. `ticked` is the ISBETracking bit the
        caller already holds, passed in rather than fetched again here.
 
        'unknown' when the form index could not be read: showing a tick as
        unbacked because the network failed would be a lie in the other
-       direction. */
+       direction.
+
+       Two columns are special:
+         - A screening (ASQ/ASE) is 'form' only when BOTH the scored summary and the
+           parent questionnaire upload are present. With one of the two it is
+           'partial' — real progress, but not a file that would pass review, so it is
+           not done. Nothing there but a tick is 'tick-only'.
+         - A report card is 'form' when its scan is uploaded, else tick-only/none. */
     function state(studentId, field, ticked) {
         if (!isBacked(field)) return ticked ? 'tick' : 'none';
         if (loadState !== 'ready') return ticked ? 'unknown' : 'none';
+
+        if (isScreening(field)) {
+            var scored = hasForm(studentId, field);
+            var quest = hasFile(studentId, field, 'questionnaire');
+            if (scored && quest) return 'form';
+            if (scored || quest) return 'partial';
+            return ticked ? 'tick-only' : 'none';
+        }
+        if (isReport(field)) {
+            if (hasFile(studentId, field, 'report')) return 'form';
+            return ticked ? 'tick-only' : 'none';
+        }
         if (hasForm(studentId, field)) return 'form';
         return ticked ? 'tick-only' : 'none';
     }
@@ -148,6 +217,9 @@
                 var st = state(s.Id, f, !!t[f]);
                 if (st === 'tick-only') { anyUnbacked = true; anyMissing = true; }
                 else if (st === 'none') anyMissing = true;
+                // A screening with only one of its two artefacts, or any other
+                // half-done backed field: real progress, but not a passing file.
+                else if (st === 'partial') anyMissing = true;
             });
             if (anyUnbacked) out.unbacked.push(s);
             if (anyMissing) out.missing.push(s); else out.complete++;
@@ -175,11 +247,19 @@
 
     window.ChildForms = {
         load: load,
+        loadFiles: loadFiles,
         BACKED_FIELDS: BACKED_FIELDS,
+        SCREENING_FIELDS: SCREENING_FIELDS,
+        REPORT_FIELDS: REPORT_FIELDS,
         isBacked: isBacked,
+        isScreening: isScreening,
+        isReport: isReport,
         hasForm: hasForm,
         formDate: formDate,
         mark: mark,
+        markFile: markFile,
+        hasFile: hasFile,
+        fileFor: fileFor,
         state: state,
         isDone: isDone,
         rollup: rollup,
@@ -188,6 +268,8 @@
         get year() { return loadedYear; },
         // Exposed for tests and for a page that wants the raw index.
         get all() { return forms; },
-        _set: function (f, st) { forms = f || {}; loadState = st || 'ready'; }
+        _set: function (f, st) { forms = f || {}; loadState = st || 'ready'; },
+        // Tests set the upload index directly, same as _set does for forms.
+        _setFiles: function (f) { files = f || {}; }
     };
 })();

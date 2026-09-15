@@ -1618,6 +1618,34 @@ GO
 `;
 }
 
+/* Uploaded child evidence that is a scan or photo rather than something signed in
+   the app: the parent's completed ASQ/ASE questionnaire, and the mid-year and
+   end-year report cards. The file itself lives in the child's folder, exactly where
+   a signed PDF would; this table points at it so the roster can tell a real upload
+   from a hand-tick.
+
+   Kind separates the two ASQ/ASE artefacts a monitor expects to find together — the
+   parent's questionnaire ('questionnaire') and the teacher's scored summary (filed
+   through ChildSignatures, not here) — from a report card ('report'). One row per
+   child, year, form field and kind; re-uploading re-points the row and leaves the
+   previous file on disk, the same never-destroy rule the signed forms follow. */
+function childFileEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ChildFiles')
+    CREATE TABLE ChildFiles (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StudentId INT NOT NULL,
+        SchoolYear NVARCHAR(20),
+        FormField NVARCHAR(60),
+        Kind NVARCHAR(30),
+        FileName NVARCHAR(300),
+        RelPath NVARCHAR(500),
+        UploadedBy NVARCHAR(120),
+        UploadedAt DATETIME
+    );
+GO
+`;
+}
+
 /* Where superseded evidence goes. Archiving MOVES a file here rather than deleting
    it: this is compliance evidence, and a monitor may still ask for the version that
    was current last year. The leading underscore keeps it sorted away from the item
@@ -3840,6 +3868,163 @@ ELSE
             childSignatureEnsureSQL());
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         return sendJSON(res, 200, { year: year, signatures: r.rows });
+    }
+
+    /* ── Uploading a child's scanned evidence ─────────────────────────────
+       POST /api/child-file-upload?studentId=&field=&kind=
+
+       For the artefacts that are scanned or photographed rather than signed in the
+       app: the parent's completed ASQ/ASE questionnaire (kind 'questionnaire'), and
+       the mid-year and end-year report cards (kind 'report'). The file lands in the
+       child's folder next to any signed PDFs, and a ChildFiles row points at it so
+       the roster counts it as real evidence.
+
+       Report cards are the whole requirement, so an upload ticks their checklist
+       column. An ASQ/ASE questionnaire is only half of the requirement — the other
+       half is the teacher's scored, signed summary — so it does NOT tick the column
+       on its own; /api/child-forms reports the two halves and the roster requires
+       both. Modelled on the staff-file-upload multipart handling, kept deliberately
+       consistent with it rather than introducing a second way. */
+    if (req.method === 'POST' && url.startsWith('/api/child-file-upload')) {
+        if (!checkAuth(req, res)) return;
+        const qs = new URLSearchParams(req.url.split('?')[1] || '');
+        const studentId = parseInt(qs.get('studentId') || 0, 10);
+        const field = String(qs.get('field') || '').trim();
+        const kind = String(qs.get('kind') || '').trim().toLowerCase();
+        if (!studentId) return sendJSON(res, 400, { error: 'Which child?' });
+        if (!ISBE_TRACKING_COLUMNS.includes(field)) {
+            return sendJSON(res, 400, { error: 'Unknown form: ' + field });
+        }
+        // A questionnaire belongs to a screening column; a report to a report column.
+        const SCREENING = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
+        const REPORTS = ['MidYearReport', 'EndYearReport'];
+        if (kind === 'questionnaire' && SCREENING.indexOf(field) === -1) {
+            return sendJSON(res, 400, { error: 'A questionnaire attaches to an ASQ or ASE column.' });
+        }
+        if (kind === 'report' && REPORTS.indexOf(field) === -1) {
+            return sendJSON(res, 400, { error: 'A report card attaches to a report-card column.' });
+        }
+        if (kind !== 'questionnaire' && kind !== 'report') {
+            return sendJSON(res, 400, { error: 'Unknown upload kind.' });
+        }
+
+        // Program, name and (for the folder) the year come from the child's record,
+        // not the request, so the file cannot be filed against the wrong program.
+        const who = runSQLRows(
+            `SELECT ISNULL(First_Name,'') AS First_Name, ISNULL(Last_Name,'') AS Last_Name,
+                    ISNULL(PFA_PI_na,'') AS PFA_PI_na
+             FROM rptMasterEnrollment WHERE Id=${studentId}`);
+        if (!who.ok) return sendJSON(res, 500, { error: who.error });
+        if (!who.rows.length) return sendJSON(res, 404, { error: 'Child record not found.' });
+        const child = who.rows[0];
+        const program = String(child.PFA_PI_na).toUpperCase() === 'PFA' ? 'PFA' : 'PI';
+        const childName = (child.Last_Name + ', ' + child.First_Name).trim();
+        const year = resolveSchoolYear(qs.get('year'));
+
+        const folder = childFilesFolder(program, year);
+        if (folder.error) return sendJSON(res, 400, { error: folder.error });
+
+        let chunks = [];
+        let total = 0;
+        let tooBig = false;
+        req.on('data', chunk => {
+            total += chunk.length;
+            if (total > STAFF_UPLOAD_MAX_BYTES) { tooBig = true; return; }
+            chunks.push(chunk);
+        });
+        req.on('end', () => {
+            if (tooBig) {
+                return sendJSON(res, 413, {
+                    error: 'That file is over 15 MB. A scan saved as a PDF is usually well under.'
+                });
+            }
+            const buf = Buffer.concat(chunks);
+            const boundary = (req.headers['content-type'] || '').split('boundary=')[1];
+            if (!boundary) return sendJSON(res, 400, { error: 'No file was received.' });
+
+            const parts = buf.toString('binary').split('--' + boundary);
+            for (const part of parts) {
+                if (!part.includes('filename=')) continue;
+                const nameMatch = part.match(/filename="([^"]+)"/);
+                if (!nameMatch || !nameMatch[1]) continue;
+                const ext = path.extname(nameMatch[1]).toLowerCase();
+                if (!STAFF_UPLOAD_EXTS.includes(ext)) {
+                    return sendJSON(res, 400, {
+                        error: 'Please send a PDF or a photo (' + STAFF_UPLOAD_EXTS.join(', ') + ').'
+                    });
+                }
+                const headerEnd = part.indexOf('\r\n\r\n');
+                if (headerEnd < 0) continue;
+                const fileData = Buffer.from(part.slice(headerEnd + 4, part.lastIndexOf('\r\n')), 'binary');
+                if (!fileData.length) return sendJSON(res, 400, { error: 'That file was empty.' });
+
+                // A readable label for the file, so the folder is legible without the app.
+                const LABELS = {
+                    BegASQ: 'Beginning ASQ-3 questionnaire', EndASQ: 'End ASQ-3 questionnaire',
+                    BegASE: 'Beginning ASQ SE-2 questionnaire', EndASE: 'End ASQ SE-2 questionnaire',
+                    MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card'
+                };
+                const label = LABELS[field] || field;
+                const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
+                const stamp = new Date().toISOString().slice(0, 10);
+                let base = [safe(childName) || ('Student ' + studentId), safe(label), year, 'uploaded ' + stamp]
+                    .join(' - ');
+                let fileName = base + ext;
+                let target = path.join(folder.path, fileName);
+                let n = 2;
+                while (fs.existsSync(target) && n < 50) {
+                    fileName = base + ' (' + n + ')' + ext;
+                    target = path.join(folder.path, fileName);
+                    n++;
+                }
+                try {
+                    fs.writeFileSync(target, fileData);
+                } catch (e) {
+                    console.error('[CHILD FILE]', e.message);
+                    return sendJSON(res, 500, { error: 'Could not save it: ' + e.message });
+                }
+                const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
+
+                // The classroom checklist runs under the shared internal password, so
+                // there is no individual staff identity to record here.
+                const uploader = 'staff';
+                const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} `
+                    + `AND FormField=${esc(field)} AND Kind=${esc(kind)}`;
+                let sql = childFileEnsureSQL()
+                    + `IF EXISTS (SELECT 1 FROM ChildFiles WHERE ${where})
+    UPDATE ChildFiles SET FileName=${esc(fileName)},RelPath=${esc(rel)},UploadedBy=${esc(uploader)},UploadedAt=GETDATE() WHERE ${where}
+ELSE
+    INSERT INTO ChildFiles (StudentId,SchoolYear,FormField,Kind,FileName,RelPath,UploadedBy,UploadedAt)
+    VALUES (${studentId},${esc(year)},${esc(field)},${esc(kind)},${esc(fileName)},${esc(rel)},${esc(uploader)},GETDATE());
+`;
+                // A report card is the whole requirement, so filing it ticks the box.
+                if (kind === 'report') sql += trackingTickSQL(studentId, year, field);
+                const w = runSQL(sql);
+                if (!w.ok) {
+                    return sendJSON(res, 500, {
+                        error: 'The file was saved as "' + fileName + '" but could not be recorded: ' + w.error
+                    });
+                }
+                console.log('[CHILD FILE] ' + childName + ' ' + field + '/' + kind + ' -> ' + rel);
+                return sendJSON(res, 200, { success: true, name: fileName, relPath: rel, kind: kind, field: field });
+            }
+            return sendJSON(res, 400, { error: 'No file found in that upload.' });
+        });
+        return;
+    }
+
+    /* Every uploaded child file for a year, without the bytes: the roster needs to
+       know which questionnaires and report cards are on file, and where. */
+    if (req.method === 'GET' && url === '/api/child-files') {
+        if (!checkAuth(req, res)) return;
+        const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
+        const r = runSQLRows(
+            `SELECT StudentId, FormField, Kind, FileName, RelPath,
+                    CONVERT(NVARCHAR(20), UploadedAt, 120) AS UploadedAt
+             FROM ChildFiles WHERE SchoolYear=${esc(year)}`,
+            childFileEnsureSQL());
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        return sendJSON(res, 200, { year: year, files: r.rows });
     }
 
     // GET parent interview for a student (internal - protected)
