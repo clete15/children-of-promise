@@ -784,6 +784,39 @@ function formState(f, staffId) {
     return !!PasStore.storage.getItem(key);
 }
 
+/* Reads a person's Work & Practical Experience form (PD75a, key pas_work_history)
+   from the worksheet store and returns the documented hours it records by age group.
+
+   PD75a is organised by age group (infant/toddler, preschool, school-age) with a
+   "= Total Hours" per section. Gateways reads the infant/toddler line for an Infant
+   Toddler credential and the preschool line for an ECE credential — so the itHours
+   and psHours below map straight onto those. Totals are stored as display strings
+   ("13,312"), so commas are stripped before parsing.
+
+   Returns { exists, blank, itHours, psHours, saHours }:
+     exists  a saved form is present at all
+     blank   no age-group total has any hours (nothing to verify against)
+   Used to turn the ITC apply-nudge into a real check, and to warn when the form has
+   not been filled in. */
+function readWorkHistory(staffId) {
+    const out = { exists: false, blank: true, itHours: 0, psHours: 0, saHours: 0 };
+    let raw = null;
+    try { raw = PasStore.storage.getItem('pas_work_history__staff' + staffId); } catch (e) { return out; }
+    if (!raw) return out;
+    out.exists = true;
+    let d = {};
+    try { d = JSON.parse(raw) || {}; } catch (e) { return out; }
+    const hrs = k => {
+        const n = parseFloat(String(d[k] == null ? '' : d[k]).replace(/[^0-9.]/g, ''));
+        return isFinite(n) ? n : 0;
+    };
+    out.itHours = hrs('itTotal');
+    out.psHours = hrs('psTotal');
+    out.saHours = hrs('saTotal');
+    out.blank = (out.itHours + out.psHours + out.saHours) <= 0;
+    return out;
+}
+
 // ── my files ──────────────────────────────────────────────────────────────
 /* The personnel documents held for this person: transcript, Gateways report,
    application, work history, goal plan, W4, background check authorisation.
@@ -1333,7 +1366,7 @@ function standingTiles(s) {
    Honest split: the requirement is competencies + the training allowance (the real
    rule); training hours by area are the actionable signal. No per-area hour target is
    claimed. College hours are a total only (the PDR does not tag courses to areas). */
-function ladderColumn(title, heldLevel, heldWord, model, kind) {
+function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
     let body = '';
 
     if (!model || model.topped) {
@@ -1352,21 +1385,61 @@ function ladderColumn(title, heldLevel, heldWord, model, kind) {
 
     body += '<div class="sp-need-head">Working toward <b>' + esc(model.levelWord) + '</b></div>';
 
-    /* Apply-now nudge (ITC only). When the target level is more than one rung above
-       the level held, the held ECE has ALREADY unlocked a higher ITC than the person
-       holds — you apply for the level you qualify for rather than climbing rung by
-       rung. The system cannot see whether the experience HOURS are met (the work
-       history form is not wired into this calc), so this says "you look eligible —
-       confirm your experience and apply", and links straight to the Work History
-       form (PD75a) to do that confirmation. */
+    /* Apply-now check (ITC only). When the held ECE has already unlocked a higher ITC
+       level than the person holds, they can apply for the level they qualify for rather
+       than climbing rung by rung. The Infant Toddler experience requirement is verified
+       against the person's Work & Practical Experience form (PD75a): the itTotal hours,
+       which is the age-group line Gateways reads for an ITC credential.
+
+       Three states:
+         - form blank / not filled  -> warn, link to fill it in (cannot verify)
+         - hours meet the requirement -> "you qualify, apply"
+         - hours short               -> show how many more are needed
+       Uses the documented-hours route (the supervised route is a separate, small
+       in-room path Gateways verifies directly). */
     if (kind === 'itc' && model.level > (Number(heldLevel) || 0) + 1) {
-        body += '<div class="sp-step caution" style="margin-bottom:12px;">'
-            + '<div class="t">\u2691 You may be able to apply now for ' + esc(model.levelWord) + '</div>'
-            + '<div class="d">Your Preschool (ECE) credential already reaches past Infant Toddler '
-            + esc(heldWord) + ', so you can apply for the level you qualify for rather than climbing '
-            + 'one rung at a time. Gateways still checks your experience hours \u2014 confirm them on '
-            + 'your <a href="/pas/staff-work-history.html" target="_blank" rel="noopener">Work History '
-            + 'form</a>, then apply through the Gateways Registry.</div></div>';
+        const wfe = staff ? readWorkHistory(staff.Id) : { exists: false, blank: true, itHours: 0 };
+        const F = window.CredentialFramework;
+        let need = 0;
+        if (F && F.ITC_LEVELS) {
+            const row = F.ITC_LEVELS.find(r => r.level === model.level);
+            if (row && row.experience && row.experience.documented) need = row.experience.documented;
+        }
+        const whLink = '<a href="/pas/staff-work-history.html" target="_blank" rel="noopener">Work History form</a>';
+
+        if (wfe.blank) {
+            // Nothing to verify against — the form has no hours yet.
+            body += '<div class="sp-step alert" style="margin-bottom:12px;">'
+                + '<div class="t">\u26a0 Fill in your Work History to check ' + esc(model.levelWord) + '</div>'
+                + '<div class="d">Your Preschool (ECE) credential already reaches past Infant Toddler '
+                + esc(heldWord) + ', so you may qualify to apply for ' + esc(model.levelWord) + ' now \u2014 '
+                + 'but your ' + whLink + ' (Gateways PD75a) is blank, so your infant/toddler experience '
+                + 'hours cannot be confirmed. Fill it in, then this will tell you whether you can apply.</div></div>';
+        } else if (need && wfe.itHours >= need) {
+            body += '<div class="sp-step caution" style="margin-bottom:12px;">'
+                + '<div class="t">\u2691 You look eligible to apply now for ' + esc(model.levelWord) + '</div>'
+                + '<div class="d">Your ECE credential reaches past Infant Toddler ' + esc(heldWord)
+                + ', and your ' + whLink + ' records <b>' + wfe.itHours.toLocaleString('en-US')
+                + '</b> infant/toddler hours \u2014 at or above the <b>' + need.toLocaleString('en-US')
+                + '</b> this level needs. Apply for the level you qualify for through the Gateways Registry '
+                + '(Gateways still confirms the competencies).</div></div>';
+        } else if (need) {
+            const short = need - wfe.itHours;
+            body += '<div class="sp-step caution" style="margin-bottom:12px;">'
+                + '<div class="t">\u2691 Close to ' + esc(model.levelWord) + ' \u2014 more infant/toddler hours needed</div>'
+                + '<div class="d">Your ECE credential reaches past Infant Toddler ' + esc(heldWord)
+                + '. Your ' + whLink + ' records <b>' + wfe.itHours.toLocaleString('en-US') + '</b> of the <b>'
+                + need.toLocaleString('en-US') + '</b> documented infant/toddler hours this level needs \u2014 '
+                + '<b>' + short.toLocaleString('en-US') + '</b> more, or the shorter supervised route. Update '
+                + 'the form as you log more, then apply.</div></div>';
+        } else {
+            // Requirement figure unavailable; keep the honest, form-pointing nudge.
+            body += '<div class="sp-step caution" style="margin-bottom:12px;">'
+                + '<div class="t">\u2691 You may be able to apply now for ' + esc(model.levelWord) + '</div>'
+                + '<div class="d">Your ECE credential reaches past Infant Toddler ' + esc(heldWord)
+                + '. Confirm your infant/toddler hours on your ' + whLink + ', then apply through the '
+                + 'Gateways Registry.</div></div>';
+        }
     }
 
     // ── College / education gate ──
@@ -1566,7 +1639,7 @@ function credentialsSection(s) {
         const held = kind === 'itc' ? heldItc : heldEce;
         // One full-width card for the chosen credential (sp-cred-solo drops the column grid).
         html += '<div class="sp-cred-solo">'
-            + ladderColumn(title, held, 'Level ' + held, model, kind) + '</div>';
+            + ladderColumn(title, held, 'Level ' + held, model, kind, s) + '</div>';
     } else {
         html += '<div class="sp-card"><div class="sp-sub">Credential requirements did not load.</div></div>';
     }
