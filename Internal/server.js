@@ -6824,10 +6824,20 @@ ELSE
         if (!checkAuth(req, res)) return;
         const id = parseInt(url.split('/')[3], 10);
         if (!id) return sendJSON(res, 400, { error: 'Which record? (no id)' });
-        const r = runSQL(`DELETE FROM PreEnrollment WHERE Id=${id}`);
+        /* Report how many rows were actually removed, not just that the SQL ran.
+           DELETE ... WHERE Id=<missing> succeeds with zero rows affected, which would
+           otherwise read as a successful delete and leave the record on the list. */
+        const r = runSQL(`DELETE FROM PreEnrollment WHERE Id=${id};SELECT @@ROWCOUNT AS Deleted;`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        console.log('[WAITLIST] deleted pre-enrollment record ' + id);
-        return sendJSON(res, 200, { success: true });
+        const m = String(r.data || '').match(/(\d+)/);
+        const deleted = m ? parseInt(m[1], 10) : 0;
+        console.log('[WAITLIST] delete request for record ' + id + ' -> ' + deleted + ' row(s) removed');
+        if (!deleted) {
+            return sendJSON(res, 404, { error: 'No pre-enrollment record with id ' + id
+                + ' was found to delete. It may already be gone, or the list is showing a '
+                + 'stale id — reload the waiting list and try again.' });
+        }
+        return sendJSON(res, 200, { success: true, deleted: deleted });
     }
 
     // External public site static files
