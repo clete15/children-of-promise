@@ -55,7 +55,13 @@
         tbody tr:hover td.cf-teacher { background:#f0fbf4; }
         .cf-pill { display:inline-block;font-size:0.6rem;font-weight:800;letter-spacing:0.02em;
                    color:#166534;background:#dcfce7;border:1px solid #bbf7d0;border-radius:999px;
-                   padding:1px 8px;white-space:nowrap; }
+                   padding:1px 8px;white-space:nowrap;text-decoration:none;font-family:inherit;
+                   line-height:1.4;cursor:pointer; }
+        a.cf-pill:hover { filter:brightness(0.97); }
+        /* The "upload" state — blue, so an empty proof-of-income reads as an action to
+           take rather than a done state. */
+        .cf-pill-upload { color:#1d4ed8;background:#dbeafe;border-color:#bfdbfe; }
+        .cf-pill-upload:hover { filter:brightness(0.97); }
         td { padding:5px 6px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:14px; }
         tr:hover { background:#f8fafc; }
@@ -1335,7 +1341,9 @@ const COLUMNS = [
     { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan', docForm: 'familyGoalPlan', programs: ['PI'], title: 'PICC PI6.B - Individual Family Goal Plan developed within 6 months of enrollment and updated annually thereafter.' },
     { field: 'TransitionPlan', label: 'Transition<br>Plan', docForm: 'transitionPlan', programs: ['PI'], title: 'PICC PI7.A - written individualized Transition Plan so children and families experience a seamless transition of services.' },
     { field: 'Referral', label: 'Referral', docForm: 'referral', programs: ['PI'], title: 'PICC PI7.B and PI10.I - referral to community resources when needed, and referral for further evaluation when a screening flags a concern.' },
-    { field: 'RemoveFromSIS', label: 'Remove<br>from SIS', title: 'Remove student from ISBE Student Information System (SIS) after completing end-of-year reporting.' },
+    /* "Remove from SIS" was dropped from the roster on request — it is an end-of-year
+       housekeeping step, not something this checklist tracks. The ISBETracking column
+       still exists server-side; it just no longer shows here. */
     { field: 'GrantPerfReport', label: 'Grant Perf<br>Report', title: 'Grant Periodic Performance Report \u2013 open and complete the report document for PFA/PI compliance.' }
 ];
 
@@ -1617,6 +1625,64 @@ function teacherPill(student, field, extra) {
         + (extra || '');
 }
 
+/* Proof of Income is a document, not a tick: it is uploaded (pay stub, tax return,
+   benefits letter) and lives on the enrollment record (ProofOfIncomeUploaded /
+   ProofOfIncomeFile). So instead of a checkbox the roster shows ONE pill:
+     • nothing on file  -> a blue "upload" pill that opens a file picker
+     • on file          -> a green "on file" pill that opens the stored document
+   Both go through the existing /api/upload/income and /api/download/income routes,
+   which key on the child's First|Last name. */
+function proofOfIncomeCell(student) {
+    const uploaded = String(student.ProofOfIncomeUploaded) === '1'
+        || student.ProofOfIncomeUploaded === 1 || student.ProofOfIncomeUploaded === true;
+    if (uploaded && student.ProofOfIncomeFile) {
+        return '<a class="cf-pill" href="/api/download/income/'
+            + encodeURIComponent(student.ProofOfIncomeFile) + '" target="_blank" rel="noopener" '
+            + 'title="Proof of income is on file — click to open it. Upload a newer one to replace it.">'
+            + '\u2713 on file</a>';
+    }
+    // Not uploaded yet — a pill that triggers a hidden file input scoped to this child.
+    return '<button type="button" class="cf-pill cf-pill-upload" '
+        + 'onclick="uploadIncome(' + student.Id + ')" '
+        + 'title="No proof of income on file yet — click to upload a pay stub, tax return, or benefits letter.">'
+        + '\u2b06 upload</button>';
+}
+
+/* Upload a proof-of-income document for one child. Opens a file picker, POSTs the
+   file as multipart to /api/upload/income/First|Last (the key that endpoint expects),
+   then refreshes the roster so the cell flips to the green "on file" pill. */
+function uploadIncome(studentId) {
+    const student = students.find(s => String(s.Id) === String(studentId));
+    if (!student) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png';
+    input.onchange = async () => {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        if (file.size > 15 * 1024 * 1024) { alert('That file is over 15 MB. A PDF scan is usually much smaller.'); return; }
+        const key = (student.First_Name || '') + '|' + (student.Last_Name || '');
+        const form = new FormData();
+        form.append('file', file, file.name);
+        // Multipart: attach only the auth header and let the browser set the boundary.
+        const headers = (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {};
+        try {
+            const res = await fetch('/api/upload/income/' + encodeURIComponent(key), {
+                method: 'POST', headers: headers, body: form
+            });
+            const d = await res.json();
+            if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+            // Reflect it immediately, then re-render so the pill turns green.
+            student.ProofOfIncomeUploaded = 1;
+            student.ProofOfIncomeFile = d.file || student.ProofOfIncomeFile;
+            renderRoster();
+        } catch (e) {
+            alert('Could not upload the file: ' + (e.message || e));
+        }
+    };
+    input.click();
+}
+
 function checkBox(student, field) {
     const ticked = !!(trackingData[student.Id] || {})[field];
     const st = ChildForms.state(student.Id, field, ticked);
@@ -1701,7 +1767,14 @@ function renderRoster() {
                 return '<td class="' + tdClass + '">' + teacherPill(s, f, extra) + '</td>';
             }
 
-            /* ── ADMIN columns: editable checkboxes / document links (unchanged) ── */
+            /* ── ADMIN columns ── */
+            // Proof of Income is a document, not a tick: one pill, upload or on file.
+            if (f === 'ProofOfIncome') {
+                return '<td class="' + ('cf-doc' + divide).trim() + '">'
+                    + proofOfIncomeCell(s) + '</td>';
+            }
+
+            // The rest are editable checkboxes / document links (unchanged).
             const box = checkBox(s, f);
             // Green, amber or plain, depending on whether a form is actually behind
             // the tick. Applied to the cell so the whole box reads at a glance. The
