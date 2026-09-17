@@ -48,6 +48,14 @@
         /* A faint tint so each group reads as a band even mid-scroll. */
         th.col-teacher { background:#f4fdf7; }
         th.col-admin   { background:#f6f7ff; }
+
+        /* Teacher cells are read-only on the roster (entered in the classroom card).
+           The band tint carries down the body; the pill shows only when on file. */
+        td.cf-teacher { background:#f9fefb; }
+        tbody tr:hover td.cf-teacher { background:#f0fbf4; }
+        .cf-pill { display:inline-block;font-size:0.6rem;font-weight:800;letter-spacing:0.02em;
+                   color:#166534;background:#dcfce7;border:1px solid #bbf7d0;border-radius:999px;
+                   padding:1px 8px;white-space:nowrap; }
         td { padding:5px 6px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:14px; }
         tr:hover { background:#f8fafc; }
@@ -1595,6 +1603,20 @@ function cellClass(student, field) {
     return st === 'form' ? 'cf-form' : st === 'tick-only' ? 'cf-tick-only' : '';
 }
 
+/* Teacher columns are now completed entirely in the staff portal's My Classroom card,
+   so the roster shows them read-only: a green "on file" pill ONLY when the child has
+   real evidence for that item (state 'form'), and nothing otherwise. No checkbox, no
+   [form] link, no deadline hint — those all live in the classroom card now. `extra` is
+   optional trailing markup (a screening's date/flag line) shown only alongside a pill. */
+function teacherPill(student, field, extra) {
+    const st = ChildForms.state(student.Id, field, !!(trackingData[student.Id] || {})[field]);
+    if (st !== 'form') return '';   // nothing on file yet — empty cell
+    const d = ChildForms.formDate(student.Id, field);
+    const tip = 'On file' + (d ? ', dated ' + d : '') + '. Entered by the teacher in the classroom card.';
+    return '<span class="cf-pill" title="' + tip.replace(/"/g, '&quot;') + '">\u2713 on file</span>'
+        + (extra || '');
+}
+
 function checkBox(student, field) {
     const ticked = !!(trackingData[student.Id] || {})[field];
     const st = ChildForms.state(student.Id, field, ticked);
@@ -1661,31 +1683,32 @@ function renderRoster() {
         const t = trackingData[s.Id] || {};
         const cells = cols.map(c => {
             const f = c.field;
+            const divide = f === firstAdminField ? ' col-divide' : '';
+
+            /* ── TEACHER columns: read-only on the roster ──
+               Completed in the staff portal's My Classroom card. Here we only show a
+               green "on file" pill when the child actually has that item filed — no
+               checkbox, no [form] link, no deadline hint. Screenings still show their
+               date/flag line, but only next to a pill (i.e. once on file). */
+            if (c.teacher) {
+                const tdClass = ('cf-teacher' + divide).trim();
+                let extra = '';
+                if (f === 'BegASQ' || f === 'EndASQ') {
+                    extra = screeningMeta(s, 'ASQ-3', f === 'BegASQ' ? 'Beginning' : 'End', false);
+                } else if (f === 'BegASE' || f === 'EndASE') {
+                    extra = screeningMeta(s, 'ASQ:SE-2', f === 'BegASE' ? 'Beginning' : 'End', false);
+                }
+                return '<td class="' + tdClass + '">' + teacherPill(s, f, extra) + '</td>';
+            }
+
+            /* ── ADMIN columns: editable checkboxes / document links (unchanged) ── */
             const box = checkBox(s, f);
             // Green, amber or plain, depending on whether a form is actually behind
             // the tick. Applied to the cell so the whole box reads at a glance. The
             // first admin column also gets the divider so the group boundary is visible.
-            const cc = [cellClass(s, f), f === firstAdminField ? 'col-divide' : ''].filter(Boolean).join(' ');
+            const cc = [cellClass(s, f), divide.trim()].filter(Boolean).join(' ');
             const td = '<td' + (cc ? ' class="' + cc + '"' : '') + '>';
 
-            if (f === 'ParentInterview') {
-                return td + box + formLink('openInterview(' + s.Id + ')', 'Open Parent Interview Form') + '</td>';
-            }
-            if (f === 'PermissionSlip') {
-                return td + box + formLink('openPermissionSlip(' + s.Id + ')', 'Open Permission Slip Form') + '</td>';
-            }
-            if (f === 'BegASQ' || f === 'EndASQ') {
-                const period = f === 'BegASQ' ? 'Beginning' : 'End';
-                return td + box
-                    + formLink('openScreening(' + s.Id + ',\'ASQ-3\',\'' + period + '\')', 'Open ASQ-3 Score Entry')
-                    + screeningMeta(s, 'ASQ-3', period, f === 'BegASQ') + '</td>';
-            }
-            if (f === 'BegASE' || f === 'EndASE') {
-                const period = f === 'BegASE' ? 'Beginning' : 'End';
-                return td + box
-                    + formLink('openScreening(' + s.Id + ',\'ASQ:SE-2\',\'' + period + '\')', 'Open ASQ:SE-2 Score Entry')
-                    + screeningMeta(s, 'ASQ:SE-2', period, f === 'BegASE') + '</td>';
-            }
             // PICC document forms are all rendered by the same engine.
             if (c.docForm) {
                 const spec = window.DOC_FORM_SPECS[c.docForm];
@@ -1704,11 +1727,6 @@ function renderRoster() {
                     + '" title="Open the Grant Periodic Performance Report in the document library">'
                     + '[doc]</a></td>';
             }
-            // Report cards are produced elsewhere (Teaching Strategies) and uploaded.
-            if (f === 'MidYearReport' || f === 'EndYearReport') {
-                return td + box + formLink('openReportUpload(' + s.Id + ',\'' + f + '\')',
-                    'Upload the report card') + '</td>';
-            }
             return td + box + '</td>';
         }).join('');
         return '<tr><td class="left pin-1" style="font-weight:600;font-size:0.73rem;">'
@@ -1719,9 +1737,11 @@ function renderRoster() {
 
     // "Print All" footer row, one cell per column that can produce a form. Same
     // partitioned order and same divider on the first admin cell as the rows above.
+    // Teacher columns are handled in the classroom card now, so Print All here is
+    // offered only for admin document columns.
     const printAllCells = cols.map(c => {
         const dv = c.field === firstAdminField ? ' class="col-divide"' : '';
-        if (!columnHasForm(c)) return '<td' + dv + '></td>';
+        if (c.teacher || !columnHasForm(c)) return '<td' + dv + '></td>';
         /* Counts children who still need this form, which now includes a child whose
            box is ticked with nothing saved: they have no form in the system, so a
            blank one to work from is exactly what they need. */
