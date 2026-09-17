@@ -26,9 +26,28 @@
            forms a stacking context, so the header cells' own z-index is resolved
            inside this row: leaving the row at 1 let the frozen Student and Room cells
            scroll up over the header. */
-        thead tr { background:#f8fafc;border-bottom:2px solid var(--border);position:sticky;top:0;z-index:3; }
+        thead tr { background:#f8fafc;position:sticky;z-index:3; }
+        /* Two-tier header: the group banners on top, the column labels below them.
+           The label row sticks just under the group row rather than both at 0. */
+        thead tr.isbe-grouprow { top:0; }
+        thead tr.isbe-colrow { top:26px; }
+        thead tr.isbe-colrow { border-bottom:2px solid var(--border); }
         th { padding:7px 6px;text-align:center;font-size:0.6rem;font-weight:700;letter-spacing:0.04em;color:var(--text-muted);white-space:nowrap;cursor:help; }
         th.left { text-align:left;padding-left:14px; }
+
+        /* ── Teacher / Admin group banners ── */
+        th.grp { font-size:0.64rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
+                 padding:5px 6px;border-bottom:1px solid var(--border); }
+        th.grp-teacher { color:#166534;background:#ecfdf3; }
+        th.grp-admin   { color:#3730a3;background:#eef2ff; }
+        th.grp-note { display:block;font-size:0.52rem;font-weight:600;letter-spacing:0.02em;
+                      text-transform:none;color:#15803d;opacity:0.85;margin-top:1px; }
+        th.grp-blank { background:#f8fafc; }
+        /* The line dividing the two groups, carried down every row by .col-divide. */
+        th.grp-divide, th.col-divide, td.col-divide { border-left:2px solid #c7d2fe; }
+        /* A faint tint so each group reads as a band even mid-scroll. */
+        th.col-teacher { background:#f4fdf7; }
+        th.col-admin   { background:#f6f7ff; }
         td { padding:5px 6px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:14px; }
         tr:hover { background:#f8fafc; }
@@ -1317,6 +1336,22 @@ function visibleColumns() {
     return COLUMNS.filter(c => !c.programs || c.programs.indexOf(activeProgram) !== -1);
 }
 
+/* The roster is split into two groups so it reads as two jobs, not one long strip:
+     TEACHER — the columns a classroom teacher completes (permission slip, parent
+               interview, the ASQ/ASE screenings, the report cards). These carry
+               c.teacher and auto-fill here the moment the teacher finishes them in
+               their My Classroom card — same ISBETracking bits, same forms.
+     ADMIN   — everything a teacher never touches: proof of income, SIS entry/removal,
+               the grant report, and the PICC document forms.
+   Every render (header, body, Print All) walks `ordered` so header and body cannot
+   drift, and the group boundary (teacher.length) is where the divider is drawn. */
+function partitionedColumns() {
+    const vis = visibleColumns();
+    const teacher = vis.filter(c => c.teacher);
+    const admin = vis.filter(c => !c.teacher);
+    return { teacher: teacher, admin: admin, ordered: teacher.concat(admin) };
+}
+
 // Columns wired to a form, so Print All knows which cells to offer.
 const SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
 function columnHasForm(c) {
@@ -1402,11 +1437,35 @@ const GRANT_REPORT_ITEMS = {
 function renderRosterHead() {
     const head = document.getElementById('isbeHead');
     if (!head) return;
-    head.innerHTML = '<tr><th class="left pin-1" style="min-width:120px;">Student</th>'
-        + '<th class="pin-2" style="width:80px;">Room</th>'
-        + visibleColumns().map(c =>
-            '<th title="' + c.title.replace(/"/g, '&quot;') + '">' + c.label + '</th>').join('')
-        + '</tr>';
+    const parts = partitionedColumns();
+    const t = parts.teacher, a = parts.admin;
+
+    // Top tier: two group banners spanning their columns. The Student/Room pins carry
+    // an empty banner cell each so the two rows line up over the frozen columns.
+    let group = '<tr class="isbe-grouprow">'
+        + '<th class="left pin-1 grp-blank" rowspan="2" style="min-width:120px;">Student</th>'
+        + '<th class="pin-2 grp-blank" rowspan="2" style="width:80px;">Room</th>';
+    if (t.length) {
+        group += '<th class="grp grp-teacher" colspan="' + t.length + '" '
+            + 'title="Completed by the classroom teacher. These fill in automatically as the '
+            + 'teacher finishes each one in their My Classroom card.">'
+            + 'Teacher <span class="grp-note">auto-fills from the classroom card</span></th>';
+    }
+    if (a.length) {
+        group += '<th class="grp grp-admin' + (t.length ? ' grp-divide' : '') + '" colspan="' + a.length + '" '
+            + 'title="Completed by the office. Teachers do not touch these.">Admin</th>';
+    }
+    group += '</tr>';
+
+    // Second tier: the individual column labels, teacher group then admin group, with a
+    // divider on the first admin column so the boundary is visible down the whole table.
+    const label = (c, isFirstAdmin) =>
+        '<th class="' + (c.teacher ? 'col-teacher' : 'col-admin') + (isFirstAdmin ? ' col-divide' : '') + '" '
+        + 'title="' + c.title.replace(/"/g, '&quot;') + '">' + c.label + '</th>';
+    const cols = t.map(c => label(c, false)).join('')
+        + a.map((c, i) => label(c, i === 0 && t.length > 0)).join('');
+
+    head.innerHTML = group + '<tr class="isbe-colrow">' + cols + '</tr>';
 }
 
 // Collapses the mixed truthy representations in the DB to a clean Yes/No for display.
@@ -1585,7 +1644,12 @@ function renderRoster() {
        visit the compliance page first for their children's files to appear. It is
        cached and re-renders the active view when it lands. */
     loadDocIndex(activeProgram === 'PI' ? 'PI' : 'PFA');
-    const cols = visibleColumns();
+    // Teacher columns first, then Admin — the same order the two-tier header uses, so
+    // the body lines up under the group banners. firstAdminField marks where the
+    // divider falls, so the boundary shows down every row.
+    const parts = partitionedColumns();
+    const cols = parts.ordered;
+    const firstAdminField = parts.admin.length && parts.teacher.length ? parts.admin[0].field : null;
     const span = cols.length + 2;  // + Student and Room
 
     const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByRoomThenName);
@@ -1599,8 +1663,10 @@ function renderRoster() {
             const f = c.field;
             const box = checkBox(s, f);
             // Green, amber or plain, depending on whether a form is actually behind
-            // the tick. Applied to the cell so the whole box reads at a glance.
-            const td = '<td' + (cellClass(s, f) ? ' class="' + cellClass(s, f) + '"' : '') + '>';
+            // the tick. Applied to the cell so the whole box reads at a glance. The
+            // first admin column also gets the divider so the group boundary is visible.
+            const cc = [cellClass(s, f), f === firstAdminField ? 'col-divide' : ''].filter(Boolean).join(' ');
+            const td = '<td' + (cc ? ' class="' + cc + '"' : '') + '>';
 
             if (f === 'ParentInterview') {
                 return td + box + formLink('openInterview(' + s.Id + ')', 'Open Parent Interview Form') + '</td>';
@@ -1651,18 +1717,20 @@ function renderRoster() {
             + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
     }).join('');
 
-    // "Print All" footer row, one cell per column that can produce a form.
+    // "Print All" footer row, one cell per column that can produce a form. Same
+    // partitioned order and same divider on the first admin cell as the rows above.
     const printAllCells = cols.map(c => {
-        if (!columnHasForm(c)) return '<td></td>';
+        const dv = c.field === firstAdminField ? ' class="col-divide"' : '';
+        if (!columnHasForm(c)) return '<td' + dv + '></td>';
         /* Counts children who still need this form, which now includes a child whose
            box is ticked with nothing saved: they have no form in the system, so a
            blank one to work from is exactly what they need. */
         const uncheckedCount = roster.filter(s =>
             !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field])).length;
         if (uncheckedCount > 0) {
-            return '<td><a href="#" onclick="event.preventDefault();printAllForColumn(\'' + c.field + '\')" style="font-size:0.6rem;color:#2563eb;text-decoration:none;font-weight:700;white-space:nowrap;" title="Print all unchecked forms for this column">🖨️ All (' + uncheckedCount + ')</a></td>';
+            return '<td' + dv + '><a href="#" onclick="event.preventDefault();printAllForColumn(\'' + c.field + '\')" style="font-size:0.6rem;color:#2563eb;text-decoration:none;font-weight:700;white-space:nowrap;" title="Print all unchecked forms for this column">🖨️ All (' + uncheckedCount + ')</a></td>';
         }
-        return '<td style="font-size:0.58rem;color:#9ca3af;">✓ Done</td>';
+        return '<td' + dv + ' style="font-size:0.58rem;color:#9ca3af;">✓ Done</td>';
     }).join('');
     // Uses the existing .print-all-row class rather than an inline background, so the
     // frozen cells in this row can be repainted to match it.
