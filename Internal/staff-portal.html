@@ -1184,19 +1184,16 @@ function tabBar(s, tabs) {
         // the server scopes edits and downloads to the person (an admin, anyone's).
         + (s && s.Id
             ? '<div class="sp-tabactions">'
-              + '<button type="button" id="openTranscript" class="sp-docbtn" style="display:none;" '
-              + 'title="Open ' + esc(s.Name || 'this person') + '\u2019s most recent college transcript (view only)">'
-              + '\u2197 Transcript</button>'
+              /* ONE Transcript button. It opens the panel below, which both shows the
+                 transcript already on file (view-only, if any) and lets a new hire upload
+                 one. It replaces the old view-only "\u2197 Transcript" button so there is
+                 no longer a duplicate. */
+              + '<button type="button" id="transcriptToggle" class="sp-pdrtoggle' + (transcriptOpen ? ' on' : '')
+              + '" aria-pressed="' + (transcriptOpen ? 'true' : 'false') + '" '
+              + 'title="View or upload ' + esc(s.Name || 'this person') + '\u2019s college transcript">Transcript</button>'
               + '<button type="button" id="openPdr" class="sp-docbtn" style="display:none;" '
               + 'title="Open ' + esc(s.Name || 'this person') + '\u2019s most recent Gateways PDR (view only)">'
               + '\u2197 PDR</button>'
-              /* Upload a college transcript, right next to Work History, so a new hire
-                 like Molly Ellis can hand one in before anything is on file. Toggles the
-                 panel below; reuses the same /api/staff-file-upload plumbing as the (now
-                 hidden) My Files tab, so the file still goes to Megan to check. */
-              + '<button type="button" id="uploadTranscript" class="sp-pdrtoggle' + (transcriptOpen ? ' on' : '')
-              + '" aria-pressed="' + (transcriptOpen ? 'true' : 'false') + '" '
-              + 'title="Upload ' + esc(s.Name || 'this person') + '\u2019s college transcript">Transcript</button>'
               + '<a class="sp-histbtn" href="/pas/staff-work-history.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" '
               + 'rel="noopener" title="Everywhere ' + esc(s.Name || 'this person') + ' has worked with children (Gateways form '
               + 'PD75a) \u2014 used to verify experience toward a credential level">Work History</a>'
@@ -1206,12 +1203,16 @@ function tabBar(s, tabs) {
               + '</div>'
             : '')
         + '</div>'
-        /* The transcript upload panel, hidden until the Transcript button is pressed.
-           It provides exactly the DOM ids handIn('transcript', ...) expects
-           (up_transcript / upmsg_transcript), so it reuses that function unchanged. */
+        /* The transcript panel, hidden until the Transcript button is pressed. It shows
+           the file already on file (the "open current" link, revealed by wireDocButtons
+           only when one exists) and an upload box. The upload provides exactly the DOM
+           ids handIn('transcript', ...) expects (up_transcript / upmsg_transcript). */
         + (s && s.Id
             ? '<div id="transcriptPanel" class="sp-attn-card" style="' + (transcriptOpen ? '' : 'display:none;') + 'margin-top:10px;">'
-              + '<h2 style="margin-top:0;">Upload a college transcript</h2>'
+              + '<h2 style="margin-top:0;">College transcript</h2>'
+              + '<button type="button" id="openTranscript" class="sp-pdr-link" style="display:none;margin-bottom:10px;" '
+              + 'title="Open ' + esc(s.Name || 'this person') + '\u2019s most recent college transcript (view only)">'
+              + '\u2197 Open the transcript on file</button>'
               + '<div class="sp-sub">Send ' + esc(s.Name || 'this person') + '\u2019s college transcript '
               + '(PDF or a clear photo). It goes to Megan to check rather than straight onto the record, '
               + 'and a new copy never replaces the old one.</div>'
@@ -1308,7 +1309,7 @@ function render() {
    sends the chosen file through handIn('transcript', ...) — the same route the (now
    hidden) My Files hand-in used, so the file lands with Megan to check. */
 function wireTranscriptUpload() {
-    const toggle = $('uploadTranscript');
+    const toggle = $('transcriptToggle');
     const panel = $('transcriptPanel');
     if (!toggle || !panel) return;
     toggle.addEventListener('click', () => {
