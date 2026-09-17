@@ -866,12 +866,26 @@ function nextLevelModel(kind, s, heldEce, heldItc, pdContentAreas, pdCourses, th
     // rows. Unknown courses (not in the map) still list, with an empty area set.
     var courseList = parseCourses(pdCourses).map(function (c) {
         var nbr = String((c && c.nbr) || '').toUpperCase().replace(/\s+/g, ' ').trim();
+        // section is 'ececd' or 'ecerelated' as tagged from the PDR's two coursework
+        // sub-lists; older records parsed before tagging have no section.
+        var section = (c && c.section) ? String(c.section) : '';
         return {
             nbr: nbr,
             name: (c && c.name) ? String(c.name) : '',
             hours: (c && isFinite(c.hours)) ? Number(c.hours) : null,
+            section: section,
             areas: COURSE_AREA_MAP[nbr] || []
         };
+    });
+    // Hours summed from the tagged courses, so the card can show the ECE/CD figure and
+    // the ECE-Related figure separately — and they reconcile with the course list a
+    // reader sees. Only meaningful once courses carry a section (newer PDRs).
+    var eceCdFromCourses = 0, eceRelatedFromCourses = 0, anyTagged = false;
+    courseList.forEach(function (c) {
+        if (!c.section || !isFinite(c.hours)) return;
+        anyTagged = true;
+        if (c.section === 'ecerelated') eceRelatedFromCourses += c.hours;
+        else eceCdFromCourses += c.hours;
     });
 
     var model = {
@@ -879,7 +893,12 @@ function nextLevelModel(kind, s, heldEce, heldItc, pdContentAreas, pdCourses, th
         education: '', collegeHours: (s && s.SemesterHoursEce) ? String(s.SemesterHoursEce) : '',
         competencyCount: 0, trainingAllowance: 0,
         areas: [], focus: [], hasHours: !!hours,
-        hasCourses: courseList.length > 0, courses: courseList, classroom: '', topped: false
+        hasCourses: courseList.length > 0, courses: courseList, classroom: '', topped: false,
+        // ECE/CD vs ECE-Related hours summed from the tagged course list. null when no
+        // course carries a section (an older PDR), so the card can fall back to the
+        // stored total rather than show a wrong 0.
+        eceCdCourseHours: anyTagged ? Math.round(eceCdFromCourses * 100) / 100 : null,
+        eceRelatedCourseHours: anyTagged ? Math.round(eceRelatedFromCourses * 100) / 100 : null
     };
 
     var row = null;

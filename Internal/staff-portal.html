@@ -432,6 +432,11 @@
         padding: 2px 7px; white-space: nowrap;
     }
     .sp-course-area.none { color: var(--sp-muted); background: transparent; font-weight: 600; }
+    /* Which PDR coursework sub-list a course was filed under. */
+    .sp-course-sec { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.03em; border-radius: 4px;
+        padding: 2px 7px; white-space: nowrap; }
+    .sp-course-sec.ececd { color: var(--sp-good-fg); background: var(--sp-good-bg); }
+    .sp-course-sec.related { color: var(--sp-muted); background: var(--sp-surface-2); border: 1px solid var(--sp-border); }
 
     /* ── Credential routes, two columns ──────────────────────────────────────
        ECE on the left, Infant Toddler on the right, because the director asked to
@@ -1512,10 +1517,29 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
         : 'Set by the credential.';
     let collegeExtra = '';
     if (kind === 'ece') {
-        collegeExtra = model.collegeHours
-            ? '<div class="sp-need-sub">On file: <b>' + esc(model.collegeHours)
-              + ' ECE/CD semester hours</b>.</div>'
-            : '<div class="sp-need-sub">No ECE college hours are recorded yet.</div>';
+        /* We count ALL coursework on the PDR (ECE/CD + ECE-Related) as the person's
+           ECE college hours — if it is on the PDR, it counts. The headline is that
+           total; the split below shows how Gateways files it, since the credential's
+           college gate is technically defined on the ECE/CD portion. Falls back to the
+           stored ECE/CD figure for older PDRs parsed before courses were tagged. */
+        const eceCd = model.eceCdCourseHours;
+        const related = model.eceRelatedCourseHours;
+        const haveSplit = (eceCd != null) || (related != null);
+        if (haveSplit) {
+            const total = (eceCd || 0) + (related || 0);
+            let line = 'On file: <b>' + esc(String(total)) + ' ECE semester hours</b> on the PDR';
+            if (related) {
+                line += ' \u2014 ' + esc(String(eceCd || 0)) + ' ECE/CD + '
+                    + esc(String(related)) + ' ECE-Related '
+                    + '(Gateways counts the ECE/CD portion toward the credential)';
+            }
+            collegeExtra = '<div class="sp-need-sub">' + line + '.</div>';
+        } else if (model.collegeHours) {
+            collegeExtra = '<div class="sp-need-sub">On file: <b>' + esc(model.collegeHours)
+                + ' ECE/CD semester hours</b>.</div>';
+        } else {
+            collegeExtra = '<div class="sp-need-sub">No ECE college hours are recorded yet.</div>';
+        }
     }
     body += '<div class="sp-need">'
         + '<div class="sp-need-k">College</div>'
@@ -1523,11 +1547,10 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
 
     // ── Competencies + training-by-area ──
     let comp = '<div class="sp-need-v">'
-        + '<b>' + model.competencyCount + ' skill areas</b> (competencies) across the content '
-        + 'areas below. Up to <b>' + model.trainingAllowance + '</b> may be met with approved '
-        + 'Gateways training instead of college coursework; the rest come from your courses. '
-        + 'Gateways decides this against your transcript and record \u2014 the hours below are a '
-        + 'guide to where your training already is.</div>';
+        + 'The skill areas below are covered by your college coursework and approved training, '
+        + 'with training filling any gaps. Gateways confirms this against your transcript and '
+        + 'record. Check the coverage by content area below to see where you may still be short.'
+        + '</div>';
 
     /* College coursework on file, with the content areas each course covers. This is
        the LEFT panel of the split below; the per-area coverage is the RIGHT panel, so
@@ -1539,9 +1562,20 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
                 const tags = c.areas.length
                     ? c.areas.map(a => '<span class="sp-course-area">' + esc(a) + '</span>').join('')
                     : '<span class="sp-course-area none">not mapped</span>';
+                // Which coursework sub-list the PDR filed this course under. ECE/CD
+                // counts toward the credential; ECE-Related does not, even when the
+                // course looks like ECE (e.g. ECE 112 filed as ECE-Related). Showing
+                // it makes the 12-vs-total split legible rather than a mystery.
+                let sectionTag = '';
+                if (c.section === 'ececd') {
+                    sectionTag = '<span class="sp-course-sec ececd" title="Counts toward the ECE credential">ECE/CD</span>';
+                } else if (c.section === 'ecerelated') {
+                    sectionTag = '<span class="sp-course-sec related" title="Gateways files this as ECE-Related, so it does not count toward the ECE/CD hours">ECE-Related</span>';
+                }
                 return '<div class="sp-course">'
                     + '<span class="sp-course-nbr">' + esc(c.nbr) + '</span>'
                     + '<span class="sp-course-name">' + esc(c.name || '') + '</span>'
+                    + sectionTag
                     + '<span class="sp-course-areas">' + tags + '</span>'
                     + '</div>';
             }).join('') + '</div>';
