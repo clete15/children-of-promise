@@ -1101,9 +1101,11 @@
         '<button class="pi-close" onclick="CofpForms.closePermissionSlip()" aria-label="Close">&times;</button></div>',
         '<div class="pi-modal-body">',
         '<div class="pi-section" style="text-align:center;padding:10px 0 20px;"><h4 style="font-size:1.1rem;font-weight:800;color:#1e3a8a;text-transform:none;letter-spacing:0;border:none;padding:0;margin:0 0 4px;">Children of Promise PFA</h4><div style="font-size:0.95rem;font-weight:700;color:#374151;">Permission to perform screenings</div></div>',
-        '<div class="pi-section"><div style="font-size:0.88rem;line-height:2.4;color:#374151;">I, <input type="text" id="psParentName" class="pi-inline" placeholder="parent name"> consent to <input type="text" id="psTeacher" class="pi-inline pi-inline-italic" placeholder="teacher"> conducting screenings on my child for the <input type="text" id="psSchoolYear" class="pi-inline pi-inline-sm" placeholder="year"> school year using Ages and Stages ASQ and ASE screening instruments.</div></div>',
-        '<p style="font-size:0.88rem;line-height:1.8;color:#374151;margin-top:16px;">Screenings will be performed at the beginning, middle, and end of the school year.</p>',
-        '<p style="font-size:0.88rem;line-height:1.8;color:#374151;margin-top:16px;">Results of the screenings will be shared with the parents along with Teaching Strategies report cards at the middle and end of the school year.</p></div>',
+        '<div class="pi-section"><div class="pi-consent">',
+        '<div style="font-size:0.92rem;color:#374151;">I, <input type="text" id="psParentName" class="pi-inline" placeholder="parent name"> consent to <input type="text" id="psTeacher" class="pi-inline pi-inline-italic" placeholder="teacher"> conducting screenings on my child for the <input type="text" id="psSchoolYear" class="pi-inline pi-inline-sm" placeholder="year"> school year using Ages and Stages ASQ and ASE screening instruments.</div>',
+        '<p style="font-size:0.86rem;line-height:1.7;color:#4b5563;margin:16px 0 0;">Screenings will be performed at the beginning, middle, and end of the school year.</p>',
+        '<p style="font-size:0.86rem;line-height:1.7;color:#4b5563;margin:10px 0 0;">Results of the screenings will be shared with the parents along with Teaching Strategies report cards at the middle and end of the school year.</p>',
+        '</div></div>',
         '<div class="pi-section" style="margin-top:24px;"><h4>Form Details</h4><div class="pi-grid">',
         '<div class="pi-field"><label>Date Signed</label><input type="date" id="psDate"></div></div></div>',
         '<div class="pi-section" style="margin-top:20px;"><h4>Signatures</h4><div class="pi-grid">',
@@ -1210,17 +1212,21 @@
         '.pi-field textarea:focus, .pi-field input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
         '.pi-field select { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:white; }',
         '.pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
-        /* Inline fill-in-the-blank inputs that sit in the consent sentence. They read as
-           blanks (underline, no box) until focused, so the sentence stays a sentence. */
-        /* Inline blanks that flow WITHIN the sentence rather than each dropping to its
-           own line. Modest widths and vertical-align:baseline keep them on the line. */
-        '.pi-inline { display:inline-block;width:150px;max-width:60%;font-size:0.88rem;font-family:inherit;color:#111;'
+        /* The consent statement sits in its own soft panel so it reads as the formal
+           declaration it is, with comfortable padding rather than hugging the edge. */
+        '.pi-consent { background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;'
+            + 'padding:20px 24px;line-height:2.6; }',
+        /* Inline fill-in-the-blank inputs that flow WITHIN the sentence. Underlined
+           blanks that widen to fit their content (esp. two teacher names). */
+        '.pi-inline { display:inline-block;width:170px;max-width:100%;font-size:0.9rem;font-family:inherit;color:#111;'
             + 'text-align:center;border:none;border-bottom:1.5px solid #9ca3af;background:transparent;'
-            + 'padding:0 4px;margin:0 3px;vertical-align:baseline; }',
+            + 'padding:1px 6px;margin:0 3px;vertical-align:baseline; }',
         '.pi-inline::placeholder { color:#c4c9d2;font-style:normal; }',
         '.pi-inline:focus { outline:none;border-bottom-color:#2563eb;background:#eff6ff; }',
-        '.pi-inline-italic { font-style:italic;width:150px; }',
-        '.pi-inline-sm { width:90px; }',
+        '.pi-inline:hover { border-bottom-color:#2563eb; }',
+        /* Teacher blank is widest — it can hold two full names. */
+        '.pi-inline-italic { font-style:italic;width:250px; }',
+        '.pi-inline-sm { width:100px; }',
         '.pi-full { grid-column:1/-1; }',
         '.pi-modal-footer { padding:16px 24px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:white;border-radius:0 0 12px 12px; }',
         '.pi-btn { padding:8px 18px;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.15s; }',
