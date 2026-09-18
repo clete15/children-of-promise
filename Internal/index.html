@@ -280,6 +280,14 @@
             Remember me on this device
         </label>
         <button type="submit">Sign In</button>
+        <!-- This overlay is the ADMIN door (the shared password). Staff who are not
+             administrators do not have this password and should never be typing it here
+             — that is how someone ends up seeing the whole roster. Send them to /me,
+             where they sign in as themselves and see only their own record. -->
+        <div style="text-align:center;border-top:1px solid var(--border);margin-top:4px;padding-top:14px;">
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">Staff member?</div>
+            <a href="/me" style="display:inline-block;font-size:0.85rem;font-weight:700;color:var(--primary);text-decoration:none;padding:8px 16px;border:1.5px solid var(--primary);border-radius:8px;">Sign in with your own name →</a>
+        </div>
     </form>
 </div>
 
@@ -500,7 +508,17 @@
 // this file, so the page believed itself authenticated while API calls had no
 // credentials at all.
 function checkAuth() {
-    if (window.CofpAuth && CofpAuth.signedIn()) showPortal();
+    if (!window.CofpAuth) return;
+    /* A staff member signed in as THEMSELVES (a personal token, and no shared
+       admin password on this browser) does not belong on the admin dashboard — it
+       is the whole-centre view. Send them to /me, which lands them on their own
+       record. Only the shared admin password unlocks this page. */
+    if (CofpAuth.isStaffSession && CofpAuth.isStaffSession()) {
+        location.replace('/me');
+        return;
+    }
+    // Shared admin password already held — straight into the dashboard.
+    if (CofpAuth.stored && CofpAuth.stored()) showPortal();
 }
 
 function showPortal() {
