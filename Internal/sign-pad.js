@@ -43,6 +43,8 @@
 
     var INK = '#1a1a2e';
     var LINE_WIDTH = 2.2;
+    // Opt-in on-screen diagnostics for the signature pad: append ?sigdebug to the URL.
+    var SIG_DEBUG = /[?&]sigdebug\b/i.test(location.search);
 
     function create(host, opts) {
         opts = opts || {};
@@ -117,16 +119,40 @@
             return { x: e.clientX - r.left, y: e.clientY - r.top };
         }
 
+        /* True when the backing store no longer matches what is on screen — the
+           canvas was sized while hidden, the modal has since opened, or the device
+           pixel ratio changed. Checked on the first touch so the very first stroke
+           is mapped correctly even if no refresh() reached us in time. */
+        function needsFit() {
+            var r = canvas.getBoundingClientRect();
+            if (!r.width || !r.height) return false;   // still hidden; nothing to do
+            var want = window.devicePixelRatio || 1;
+            return Math.abs(canvas.width - Math.round(r.width * want)) > 1
+                || Math.abs(canvas.height - Math.round(r.height * want)) > 1;
+        }
+
         canvas.addEventListener('pointerdown', function (e) {
             // Ignore a second finger: a palm resting on a tablet would otherwise
             // draw its own stroke across the signature.
             if (currentStroke) return;
+            // Self-heal: if the backing store is stale (sized while hidden), fit now
+            // so this stroke lands under the pen instead of being drawn off-canvas.
+            if (needsFit()) fit();
             canvas.setPointerCapture(e.pointerId);
             currentStroke = [pointFrom(e)];
             strokes.push(currentStroke);
             drawn = true;
             hint.style.display = 'none';
             setStatus('');
+            /* Add ?sigdebug to the URL to see, on the tablet itself, whether touches
+               land and whether the backing store matches the display. Silent otherwise. */
+            if (SIG_DEBUG) {
+                var rr = canvas.getBoundingClientRect();
+                setStatus('debug: touch ' + Math.round(currentStroke[0].x) + ',' + Math.round(currentStroke[0].y)
+                    + ' | canvas ' + canvas.width + 'x' + canvas.height
+                    + ' | rect ' + Math.round(rr.width) + 'x' + Math.round(rr.height)
+                    + ' | dpr ' + (window.devicePixelRatio || 1) + ' | type ' + e.pointerType, '#b45309');
+            }
             if (opts.onChange) opts.onChange();
             replay();
             e.preventDefault();
