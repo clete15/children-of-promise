@@ -1425,21 +1425,12 @@ const VERIFIED_LINKS = {
 };
 
 // Grant Periodic Performance Report lives in SharePoint, one per program.
-/* ── Monitoring visit years ────────────────────────────────────────────────────
-   Visit folders are named by the CALENDAR year of the visit and hold the PRECEDING school
-   year's evidence. The two programmes are not on the same cycle:
-
-     PI   2026 visit  \u2192  2025-26 evidence   (FY27 window, Sep 2026 \u2013 May 2027)
-     PFA  2025 visit  \u2192  2024-25 evidence
-
-   THERE WAS NO PFA MONITORING VISIT IN 2026. A "PFA Monitoring Visit 2026" folder does
-   exist in the library, but it is a copy: byte for byte the same twenty files as the 2025
-   folder, every one naming 2024-25. Anything that pointed PFA at the current calendar year
-   was therefore showing the previous cycle's paperwork as though it were current, which is
-   the sort of thing a monitor notices before we do.
-
-   Confirmed against the library on 10 Sep 2026 by listing both folders and comparing them. */
-const LATEST_VISIT_YEAR = { PI: '2026', PFA: '2025' };
+/* ── Monitoring evidence: one living folder per programme ───────────────────────
+   Each programme keeps a single living folder ("PFA Monitoring Visit" / "PI Monitoring
+   Visit", no year) maintained in place. The old copy-forward-per-year scheme is gone, so
+   there is no visit year to pin — the library link carries only the programme, and the
+   server resolves the living folder (or the newest year-named one until the on-disk
+   rename is made). Item numbers on the files map to the compliance sections. */
 
 /* One place that builds a link into the library, so no caller can forget the programme.
    A link without one opens whichever the library defaults to, which is PI, and a PFA row
@@ -1447,16 +1438,11 @@ const LATEST_VISIT_YEAR = { PI: '2026', PFA: '2025' };
    `item` is optional: with no item the library simply opens on the right programme. */
 function libraryHref(item, program) {
     var prog = program || (activeProgram === 'PFA' ? 'PFA' : 'PI');
-    // PFA now lives in one unversioned folder, "PFA Monitoring Visit", kept current
-    // by hand. Point the library there explicitly rather than at a visit year, so the
-    // button opens the living folder and not the frozen 2025 archive. PI still opens
-    // on its latest visit year.
-    if (prog === 'PFA') {
-        return 'documents.html?program=PFA&folder=' + encodeURIComponent('PFA Monitoring Visit')
-            + (item ? '#' + encodeURIComponent(item) : '');
-    }
+    // Both programmes now keep ONE living folder, maintained in place — no visit year.
+    // Pass only the programme; the server resolves its living folder ("PFA Monitoring
+    // Visit" / "PI Monitoring Visit"), or the newest year-named one until the on-disk
+    // rename is made. No folder/year is pinned, so a link always opens the current set.
     return 'documents.html?program=' + encodeURIComponent(prog)
-        + '&year=' + encodeURIComponent(LATEST_VISIT_YEAR[prog] || '')
         + (item ? '#' + encodeURIComponent(item) : '');
 }
 
@@ -3881,17 +3867,9 @@ function loadDocIndex(program) {
     if (docIndexState === 'loading' || docIndexState === 'ready') return;
     docIndexProgram = program;
     docIndexState = 'loading';
-    /* The programme's real latest visit, not the current calendar year. Both used to ask for
-       2026, which for PFA is the duplicate folder rather than the 2025 visit that actually
-       happened. Two consequences, both live until now: a document checked in against a PFA
-       item landed in the copy nobody reads, and the same file was judged current in one
-       folder and out of date in the other, because staleness is measured against the
-       folder's year. */
-    var visitYear = LATEST_VISIT_YEAR[program] || String(new Date().getFullYear());
-    // PFA reads from the single living folder, not a visit year (see libraryHref).
-    var indexQS = program === 'PFA'
-        ? 'program=PFA&folder=' + encodeURIComponent('PFA Monitoring Visit')
-        : 'program=' + program + '&year=' + encodeURIComponent(visitYear);
+    // Both programmes read from their single living folder now; the server resolves it
+    // from the programme alone (no visit year), so item numbers still line up per section.
+    var indexQS = 'program=' + encodeURIComponent(program);
     fetch('/api/doc-index?' + indexQS)
         .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
         .then(function (d) {
@@ -4510,15 +4488,10 @@ function renderInstrumentSection(items, prefix, data) {
        so the newest PFA evidence is 2024-25 and reads as out of date unless the reason is
        on screen next to it. */
     var prog = prefix.indexOf('pfa') === 0 || activeProgram === 'PFA' ? 'PFA' : 'PI';
-    var yearNote = prog === 'PFA'
-        ? '<div class="picc-head-sub" style="margin-top:6px;">'
-          + '<strong>Library opens the 2025 PFA visit, which holds 2024-25 evidence.</strong> '
-          + 'There was no PFA monitoring visit in 2026. A 2026 PFA folder exists in the '
-          + 'library but it is a copy of the 2025 one \u2014 the same twenty files, all naming '
-          + '2024-25 \u2014 so nothing in it is newer. Documents checked in here go to the 2025 '
-          + 'visit folder.</div>'
-        : '<div class="picc-head-sub" style="margin-top:6px;">'
-          + 'Library opens the 2026 PI visit, which holds 2025-26 evidence.</div>';
+    // One living folder per programme now, maintained in place. No visit-year caveats.
+    var yearNote = '<div class="picc-head-sub" style="margin-top:6px;">'
+        + 'Library opens the single ' + prog + ' monitoring folder, kept current in place. '
+        + 'Each item is maintained as one living document rather than copied forward each year.</div>';
 
     return '<div class="picc-head" style="margin-top:22px;">'
         + '<div>'

@@ -129,30 +129,12 @@ async function probeOffice() {
 
 
 
-/* Which visit folder each programme's evidence is actually in.
-
-   Folders are named by the CALENDAR year of the monitoring visit and hold the preceding
-   school year's evidence: "2026 PI Monitoring Visit" holds 2025-26 files, and "PFA
-   Monitoring Visit 2025" holds 2024-25 files.
-
-   PFA and PI are on different cycles, which the single year picker used to hide. There was
-   no PFA monitoring visit in 2026 — the 2026 PFA folder is a copy of the 2025 one and
-   contains the same twenty 2024-25 files — so defaulting PFA to the current calendar year
-   presented the last cycle's paperwork as though it were current. Each programme now opens
-   on its own latest real visit. */
-const PROGRAM_YEARS = {
-    PI:  { years: [2026, 2025], covers: { 2026: '2025-26', 2025: '2024-25' } },
-    PFA: { years: [2025], covers: { 2025: '2024-25' } }
-};
-
-function fillYears(program, wantYear) {
-    const conf = PROGRAM_YEARS[program] || PROGRAM_YEARS.PI;
-    const sel = document.getElementById('yearPick');
-    sel.innerHTML = conf.years.map(v =>
-        '<option value="' + v + '">' + v + ' visit'
-        + (conf.covers[v] ? ' \u00b7 ' + conf.covers[v] + ' evidence' : '') + '</option>').join('');
-    if (wantYear && conf.years.indexOf(parseInt(wantYear, 10)) !== -1) sel.value = String(wantYear);
-}
+/* Each programme keeps ONE living monitoring-evidence folder now, maintained in place:
+   "PFA Monitoring Visit" and "PI Monitoring Visit" (no year). Previously the office copied
+   the whole folder forward each year and re-edited it file by file; that produced stale
+   copies that named the prior school year. The visit-year picker is gone — the server
+   resolves each programme to its living folder (or the newest year-named one until the
+   on-disk rename is made). Item numbers on the files map to the compliance sections. */
 
 function fileRow(f, item) {
     const out = (INDEX.meta || {})[f.rel];
@@ -458,13 +440,12 @@ async function load() {
     msg('Loading…');
     try {
         const p = document.getElementById('progPick').value;
-        const y = document.getElementById('yearPick').value;
-        // A forced folder (PFA's single living "PFA Monitoring Visit") overrides the
-        // year picker: PFA is no longer one-folder-per-year, so the visit year is not
-        // what selects its evidence anymore.
+        // Both programmes use one living folder now, so the visit year no longer selects
+        // evidence. Send only the programme (the server resolves its living folder), unless
+        // a link pinned an explicit folder, which still wins.
         const qs = forcedFolder
             ? 'program=' + p + '&folder=' + encodeURIComponent(forcedFolder)
-            : 'program=' + p + '&year=' + y;
+            : 'program=' + p;
         const res = await apiFetch('/api/doc-index?' + qs);
         INDEX = await res.json();
         render();
@@ -484,33 +465,25 @@ const params = new URLSearchParams(location.search);
 const askedProgram = (params.get('program') || '').toUpperCase() === 'PFA' ? 'PFA' : '';
 if (askedProgram) document.getElementById('progPick').value = askedProgram;
 
-/* PFA keeps one living folder ("PFA Monitoring Visit", no year) that the office keeps
-   current, so its year picker is meaningless — hide it and force that folder. A link may
-   still pass an explicit ?folder=, which wins. PI is unchanged: it lists by visit year. */
-const PFA_LIVING_FOLDER = 'PFA Monitoring Visit';
-let forcedFolder = params.get('folder')
-    || (document.getElementById('progPick').value === 'PFA' ? PFA_LIVING_FOLDER : '');
+/* BOTH programmes now keep ONE living folder, no year — "PFA Monitoring Visit" and
+   "PI Monitoring Visit" — that the office maintains in place rather than copying forward
+   each year. The visit-year picker is therefore meaningless for both: hide it and let the
+   server resolve each programme to its living folder (falling back to the newest year-named
+   one until the on-disk rename is made). An explicit ?folder= on a link still wins. The
+   server no longer needs a year; leaving forcedFolder empty means "the living folder for
+   the selected programme". */
+const LIVING_FOLDER = { PFA: 'PFA Monitoring Visit', PI: 'PI Monitoring Visit' };
+let forcedFolder = params.get('folder') || '';
 
 function syncYearPickerForProgram() {
-    const prog = document.getElementById('progPick').value;
     const yearPick = document.getElementById('yearPick');
-    if (prog === 'PFA') {
-        forcedFolder = PFA_LIVING_FOLDER;
-        // Show the living folder as a single, non-year label rather than a visit year.
-        yearPick.innerHTML = '<option value="">Current \u00b7 kept up to date</option>';
-        yearPick.disabled = true;
-    } else {
-        forcedFolder = '';
-        yearPick.disabled = false;
-        fillYears(prog);
-    }
+    // A link may pin a specific folder; otherwise the server picks the living folder.
+    forcedFolder = params.get('folder') || '';
+    yearPick.innerHTML = '<option value="">Current \u00b7 kept up to date</option>';
+    yearPick.disabled = true;
 }
 
-if (forcedFolder && document.getElementById('progPick').value === 'PFA') {
-    syncYearPickerForProgram();
-} else {
-    fillYears(document.getElementById('progPick').value, params.get('year'));
-}
+syncYearPickerForProgram();
 
 // Changing programme changes which visit years exist, so the year list is rebuilt first.
 document.getElementById('progPick').addEventListener('change', () => {
