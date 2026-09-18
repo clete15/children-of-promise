@@ -138,7 +138,6 @@ async function probeOffice() {
 
 function fileRow(f, item) {
     const out = (INDEX.meta || {})[f.rel];
-    const href = '/api/doc-file?path=' + encodeURIComponent(f.rel);
     const ext = extOf(f.name);
     const canEdit = officeEnabled && officeEditable.indexOf(ext) !== -1;
 
@@ -150,8 +149,11 @@ function fileRow(f, item) {
     const preview = PREVIEWABLE.indexOf(ext) !== -1;
 
     return '<div class="dl-file">'
-        + '<a href="' + href + '"'
-        + (preview ? ' target="_blank" rel="noopener"' : ' download="' + esc(f.name) + '"')
+        // Opening in a new tab as a plain link sends NO Authorization header (a top-level
+        // navigation cannot carry one), so /api/doc-file answered 401 "Unauthorized".
+        // Fetch it with credentials, then open the bytes as a blob URL instead.
+        + '<a href="#" onclick="event.preventDefault();openDoc(\'' + esc(f.rel).replace(/'/g, "\\'") + '\',\''
+        + esc(f.name).replace(/'/g, "\\'") + '\',' + (preview ? 'true' : 'false') + ')"'
         + ' title="' + (preview ? 'Opens in a new tab' : 'Downloads a copy') + '">'
         + esc(f.name) + '</a>'
         + (f.stale ? '<span class="dl-badge stale" title="The filename names a different year, so this may be carried over">older year</span>' : '')
@@ -174,6 +176,38 @@ function fileRow(f, item) {
               + 'Archive</button>'
             : '')
         + '</div>';
+}
+
+/* Open (or download) a library file WITH credentials.
+
+   /api/doc-file requires the staff Authorization header, which a plain <a> opening in
+   a new tab cannot send — the browser strips it from a top-level navigation, so the
+   server returned "Unauthorized". So fetch the file through apiFetch (header attached),
+   turn the response into a blob URL, and open or download that. The blob URL is revoked
+   shortly after so it does not leak. */
+async function openDoc(rel, name, preview) {
+    msg('Opening ' + name + '\u2026');
+    try {
+        const res = await apiFetch('/api/doc-file?path=' + encodeURIComponent(rel));
+        if (!res.ok) throw new Error(res.status === 401 ? 'Not signed in' : ('HTTP ' + res.status));
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        if (preview) {
+            // PDFs and images: open in a new tab to view.
+            window.open(url, '_blank', 'noopener');
+        } else {
+            // Word/Excel: trigger a download with the real filename.
+            const a = document.createElement('a');
+            a.href = url; a.download = name;
+            document.body.appendChild(a); a.click(); a.remove();
+        }
+        // Give the tab/download time to grab the bytes before releasing the URL.
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        msg(INDEX && !INDEX.missing ? INDEX.folder : '');
+    } catch (e) {
+        msg('');
+        alert('Could not open "' + name + '": ' + e.message);
+    }
 }
 
 /* Moves one superseded file into the archive.
