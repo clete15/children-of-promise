@@ -32,6 +32,7 @@
         .rr-settings table { width:100%;border-collapse:collapse;font-size:0.8rem; }
         .rr-settings th { padding:6px 8px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted); }
         .rr-settings input { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem; }
+        .rr-settings select { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;font-family:inherit;background:white; }
 
         /* Roster table */
         .rr-grid table { border-collapse:collapse;font-size:0.78rem; }
@@ -92,7 +93,8 @@
                     <thead><tr style="border-bottom:1px solid var(--border);">
                         <th style="width:40px;">#</th>
                         <th>Room Name</th>
-                        <th>Teacher</th>
+                        <th>Teacher 1</th>
+                        <th>Teacher 2</th>
                         <th style="width:70px;">Capacity</th>
                         <th style="width:90px;">Age Range</th>
                         <th style="width:50px;text-align:center;">Save</th>
@@ -111,9 +113,23 @@
 <script>
 let rosterStudents = [];
 let activeRosterRoomNum = null;
+// Staff list, for the Room Settings teacher pickers. Loaded alongside the rest.
+let rosterStaff = [];
+
+async function loadRosterStaff() {
+    try {
+        const res = await apiFetch('/api/staff');
+        if (res.ok) {
+            const data = await res.json();
+            rosterStaff = Array.isArray(data)
+                ? data.filter(s => String(s.Name || '').trim() && !/^new teacher$/i.test(s.Name))
+                : [];
+        }
+    } catch (e) { rosterStaff = []; }   // pickers fall back to a plain text field
+}
 
 async function init() {
-    await Promise.all([loadClassrooms(), loadStudents()]);
+    await Promise.all([loadClassrooms(), loadStudents(), loadRosterStaff()]);
     buildRoster();
     // Deep link: ?settings=1 opens the room settings panel (used by the portal Settings card).
     if (new URLSearchParams(window.location.search).get('settings') === '1') {
@@ -323,23 +339,56 @@ function toggleRoomSettings() {
     }
 }
 
+// Escapes a value for use inside an HTML attribute.
+function attr(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+/* Split a stored TeacherDescription into up to two names for the two pickers. Existing
+   values use "/" or "&" or "," as separators (e.g. "Sue / Paige", "Tara & Sue"), and
+   may carry a "(pt)" note — kept as part of the name so nothing is silently dropped. */
+function splitTeachers(desc) {
+    const parts = String(desc || '').split(/\s*[\/&,]\s*/).map(s => s.trim()).filter(Boolean);
+    return [parts[0] || '', parts[1] || ''];
+}
+
+/* A dropdown of staff names, with `selected` pre-chosen. Falls back to a plain text
+   input if the staff list could not be loaded, so the field is never unusable. If the
+   stored name is not in the staff list (a legacy label like "Tara"), it is added as its
+   own option so it stays selected rather than vanishing. */
+function teacherSelect(id, selected, i) {
+    if (!rosterStaff.length) {
+        return `<input type="text" id="${id}" value="${attr(selected)}" placeholder="Teacher name" oninput="markSettingsChanged(${i})">`;
+    }
+    const names = rosterStaff.map(s => s.Name);
+    if (selected && !names.includes(selected)) names.unshift(selected);   // keep an unknown legacy value
+    const opts = ['<option value="">— none —</option>'].concat(
+        names.map(n => `<option value="${attr(n)}"${n === selected ? ' selected' : ''}>${attr(n)}</option>`)
+    ).join('');
+    return `<select id="${id}" onchange="markSettingsChanged(${i})">${opts}</select>`;
+}
+
 function renderSettings() {
     const tbody = document.getElementById('rosterSettingsBody');
     if (!classrooms.length) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-muted);">No classrooms loaded.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No classrooms loaded.</td></tr>';
         return;
     }
-    tbody.innerHTML = classrooms.map((r, i) => `
+    tbody.innerHTML = classrooms.map((r, i) => {
+        const [t1, t2] = splitTeachers(r.TeacherDescription);
+        return `
         <tr style="border-bottom:1px solid var(--border);">
             <td style="padding:6px 8px;font-weight:700;color:var(--text-muted);">${r.RoomNumber}</td>
-            <td style="padding:6px 8px;"><input type="text" id="setRoom${i}" value="${r.Room || ''}" oninput="markSettingsChanged(${i})"></td>
-            <td style="padding:6px 8px;"><input type="text" id="setTeacher${i}" value="${r.TeacherDescription || ''}" oninput="markSettingsChanged(${i})"></td>
+            <td style="padding:6px 8px;"><input type="text" id="setRoom${i}" value="${attr(r.Room)}" oninput="markSettingsChanged(${i})"></td>
+            <td style="padding:6px 8px;">${teacherSelect('setTeacher1_' + i, t1, i)}</td>
+            <td style="padding:6px 8px;">${teacherSelect('setTeacher2_' + i, t2, i)}</td>
             <td style="padding:6px 8px;"><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" oninput="markSettingsChanged(${i})"></td>
-            <td style="padding:6px 8px;"><input type="text" id="setAge${i}" value="${r.AgeRange || ''}" oninput="markSettingsChanged(${i})"></td>
+            <td style="padding:6px 8px;"><input type="text" id="setAge${i}" value="${attr(r.AgeRange)}" oninput="markSettingsChanged(${i})"></td>
             <td style="padding:6px 8px;text-align:center;">
                 <button class="btn-row-save" id="setSave${i}" onclick="saveRoom(${i})" disabled>Save</button>
             </td>
-        </tr>`).join('');
+        </tr>`;
+    }).join('');
 }
 
 function markSettingsChanged(i) {
@@ -372,7 +421,11 @@ async function addNewRoom() {
 async function saveRoom(i) {
     const r = classrooms[i];
     const room     = document.getElementById(`setRoom${i}`).value.trim();
-    const teacher  = document.getElementById(`setTeacher${i}`).value.trim();
+    // Two teacher pickers combine into the single TeacherDescription, joined by " / "
+    // (the format the permission-slip autofill and the rest of the app already read).
+    const t1 = (document.getElementById(`setTeacher1_${i}`).value || '').trim();
+    const t2 = (document.getElementById(`setTeacher2_${i}`).value || '').trim();
+    const teacher  = [t1, t2].filter(Boolean).join(' / ');
     const capacity = document.getElementById(`setCap${i}`).value;
     const ageRange = document.getElementById(`setAge${i}`).value.trim();
     try {

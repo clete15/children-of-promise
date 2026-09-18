@@ -1212,13 +1212,15 @@
         '.pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
         /* Inline fill-in-the-blank inputs that sit in the consent sentence. They read as
            blanks (underline, no box) until focused, so the sentence stays a sentence. */
-        '.pi-inline { display:inline-block;min-width:170px;font-size:0.88rem;font-family:inherit;color:#111;'
+        /* Inline blanks that flow WITHIN the sentence rather than each dropping to its
+           own line. Modest widths and vertical-align:baseline keep them on the line. */
+        '.pi-inline { display:inline-block;width:150px;max-width:60%;font-size:0.88rem;font-family:inherit;color:#111;'
             + 'text-align:center;border:none;border-bottom:1.5px solid #9ca3af;background:transparent;'
-            + 'padding:1px 6px;margin:0 2px; }',
+            + 'padding:0 4px;margin:0 3px;vertical-align:baseline; }',
         '.pi-inline::placeholder { color:#c4c9d2;font-style:normal; }',
         '.pi-inline:focus { outline:none;border-bottom-color:#2563eb;background:#eff6ff; }',
-        '.pi-inline-italic { font-style:italic;min-width:160px; }',
-        '.pi-inline-sm { min-width:90px; }',
+        '.pi-inline-italic { font-style:italic;width:150px; }',
+        '.pi-inline-sm { width:90px; }',
         '.pi-full { grid-column:1/-1; }',
         '.pi-modal-footer { padding:16px 24px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:white;border-radius:0 0 12px 12px; }',
         '.pi-btn { padding:8px 18px;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.15s; }',
