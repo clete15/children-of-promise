@@ -3106,7 +3106,11 @@ const PFA_CHECKLIST_ITEMS = [
                'Screening indicated a developmental delay without a current special education referral'],
         evidence: 'Scoring criteria, weighted eligibility checklist in each child file, family income documentation where used.',
         guidance: 'Eligibility criteria may not exclude children who are not toilet trained.',
-        waitlistLink: true
+        waitlistLink: true,
+        /* An in-app form for this item: fill it, sign with a stylus, and it files a
+           signed PDF straight into the PFA monitoring folder as this year's Item 6
+           evidence. Rendered as an "Open form" button on the row. */
+        formHref: 'pfa-item6-eligibility.html'
     },
     {
         num: 'Item7', n: '7', title: 'Minimum hours and days of instruction',
@@ -4224,6 +4228,13 @@ function renderPfaChecklistSection(data) {
            PI evidence, which reads as the PFA folder having emptied itself. */
         var actions = '<a class="picc-btn" href="' + libraryHref(item.num, 'PFA')
             + '" target="_blank" rel="noopener">Library</a>';
+        // An in-app HTML form for this item (filled + signed with a stylus, filed to the
+        // PFA monitoring folder as this item's evidence). Opens in a new tab.
+        if (item.formHref) {
+            actions += '<a class="picc-btn picc-btn-primary" href="' + item.formHref.replace(/"/g, '&quot;')
+                + '" target="_blank" rel="noopener" title="Fill and sign this item\u2019s form in the app">'
+                + 'Open form</a>';
+        }
         // The current form for this item, if one has been linked. The link is editable
         // in the controls row below (saved as PFA_<item>Link), so a form can be pointed
         // at its newest version without a code change.

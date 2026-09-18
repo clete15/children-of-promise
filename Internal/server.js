@@ -4231,6 +4231,101 @@ ELSE
         return;
     }
 
+    /* ── Filing a signed PROGRAM-LEVEL monitoring form ────────────────────
+       POST /api/monitoring-signed-form
+
+       The sibling of /api/child-signed-form, but for the program's own monitoring
+       documents rather than a child's. Where a permission slip is one PDF per child
+       in the "Child or Family Files" folder, a monitoring form (e.g. the weighted
+       eligibility form, an exit-interview template) is ONE document per program that
+       lives loose in the living "PFA Monitoring Visit" / "PI Monitoring Visit" folder
+       and is attributed to a checklist item purely by its filename beginning
+       "Item N - ...". So this generates the same signed PDF via buildFormPdf, but
+       files it into the visit folder with an "Item N - <title>" name — which means
+       the next doc-index picks it up as evidence for that item automatically, with no
+       new table. Re-filing writes a fresh dated copy; nothing is overwritten. */
+    if (req.method === 'POST' && url === '/api/monitoring-signed-form') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+
+            const program = d.program === 'PI' ? 'PI' : 'PFA';
+            const programFolder = program === 'PFA' ? 'Preschool for All' : 'Birth to Three';
+            // The item number the document evidences, normalised to a bare integer so
+            // the filename "Item N - ..." parses cleanly back to ItemN on the next index.
+            const itemNum = String(d.item || '').replace(/[^0-9]/g, '');
+            if (!itemNum) return sendJSON(res, 400, { error: 'An item number is required' });
+            const title = String(d.formTitle || ('Item ' + itemNum)).trim();
+            const year = resolveSchoolYear(d.year);
+
+            // Same signature contract as the child form: JPEG data URLs, capped.
+            const incoming = Array.isArray(d.signatures) ? d.signatures : [];
+            const signatures = [];
+            for (const s of incoming) {
+                const m = String(s.dataUrl || '').match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
+                if (!m) return sendJSON(res, 400, { error: 'Expected a JPEG signature' });
+                const bytes = Buffer.from(m[1], 'base64');
+                if (!bytes.length) return sendJSON(res, 400, { error: 'A signature was empty' });
+                if (bytes.length > 2 * 1024 * 1024) {
+                    return sendJSON(res, 413, { error: 'A signature image is unreasonably large' });
+                }
+                signatures.push({ role: String(s.role || 'staff'), label: String(s.label || ''),
+                                  name: String(s.name || ''), date: String(s.date || ''), jpeg: bytes });
+            }
+
+            // Resolve the living visit folder (or the newest year-named one) on disk.
+            const DR = findDocRoot();
+            if (!DR) return sendJSON(res, 400, { error: 'The document library is not reachable from the server.' });
+            const folderName = newestVisitFolder(DR, programFolder);
+            if (!folderName) {
+                return sendJSON(res, 400, { error: 'No monitoring visit folder found for ' + program + '.' });
+            }
+            const folderPath = path.join(DR, programFolder, folderName);
+
+            let pdf;
+            try {
+                pdf = buildFormPdf({
+                    title: title,
+                    subtitle: 'Children of Promise LLC \u2014 '
+                        + (program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative')
+                        + ' \u2014 ' + year,
+                    rows: Array.isArray(d.rows) ? d.rows : [],
+                    blocks: Array.isArray(d.blocks) ? d.blocks : [],
+                    signatures: signatures,
+                    footer: 'Completed and signed electronically in the Children of Promise staff portal on '
+                        + new Date().toLocaleString('en-US')
+                });
+            } catch (e) {
+                return sendJSON(res, 400, { error: 'Could not build the document: ' + e.message });
+            }
+
+            // "Item N - <title> - signed <date>.pdf" so docItemNumberFromFile attributes
+            // it to the item. Sanitised because the title reaches the filesystem.
+            const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
+            const stamp = new Date().toISOString().slice(0, 10);
+            const titleNoItem = safe(title).replace(/^Item\s*\d+\s*[-\u2013]\s*/i, '');
+            const base = 'Item ' + itemNum + ' - ' + (titleNoItem || 'Form') + ' - signed ' + stamp;
+            let target = path.join(folderPath, base + '.pdf');
+            let n = 2;
+            while (fs.existsSync(target) && n < 50) {
+                target = path.join(folderPath, base + ' (' + n + ').pdf');
+                n++;
+            }
+            try {
+                fs.writeFileSync(target, pdf);
+            } catch (e) {
+                console.error('[MONITORING FORM]', e.message);
+                return sendJSON(res, 500, { error: 'Could not write the signed document' });
+            }
+            const rel = path.relative(DR, target).replace(/\\/g, '/');
+            console.log('[MONITORING FORM] ' + pdf.length + ' bytes -> ' + rel);
+            return sendJSON(res, 200, {
+                success: true, relPath: rel, name: path.basename(target), bytes: pdf.length
+            });
+        });
+        return;
+    }
+
     /* Every captured signature for a year, without the images: the roster needs to
        know which forms are signed, not what the signatures look like. */
     if (req.method === 'GET' && url === '/api/child-signatures') {
