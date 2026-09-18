@@ -6088,8 +6088,25 @@ ELSE
            digits are the right ones: 2025-2026 is the 2026 visit. */
         const digits = (qs.get('year') || '').replace(/[^0-9]/g, '');
         const year = (digits.length > 4 ? digits.slice(-4) : digits) || '2026';
-        const folder = qs.get('folder') || (program === 'Birth to Three'
-            ? year + ' PI Monitoring Visit' : 'PFA Monitoring Visit ' + year);
+        /* PFA no longer keeps a folder per visit year. There is one living folder,
+           "PFA Monitoring Visit" (no year), kept current by hand — the office updates
+           each item's form in place and files new evidence there year to year. The
+           old "PFA Monitoring Visit 2025" stays as last cycle's archive. So for PFA we
+           resolve to the unversioned folder when it exists, falling back to the
+           year-named one only if the rename has not happened on this machine. PI is
+           unchanged: it still keeps a folder per calendar-year visit. */
+        let folder = qs.get('folder');
+        if (!folder) {
+            if (program === 'Birth to Three') {
+                folder = year + ' PI Monitoring Visit';
+            } else {
+                const DR = findDocRoot();
+                const living = 'PFA Monitoring Visit';
+                folder = (DR && fs.existsSync(path.join(DR, program, living)))
+                    ? living
+                    : 'PFA Monitoring Visit ' + year;
+            }
+        }
         const idx = indexYearFolder(program, folder);
 
         // Checked-out state, so the list can show what has left the cabinet.

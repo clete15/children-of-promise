@@ -450,7 +450,13 @@ async function load() {
     try {
         const p = document.getElementById('progPick').value;
         const y = document.getElementById('yearPick').value;
-        const res = await apiFetch('/api/doc-index?program=' + p + '&year=' + y);
+        // A forced folder (PFA's single living "PFA Monitoring Visit") overrides the
+        // year picker: PFA is no longer one-folder-per-year, so the visit year is not
+        // what selects its evidence anymore.
+        const qs = forcedFolder
+            ? 'program=' + p + '&folder=' + encodeURIComponent(forcedFolder)
+            : 'program=' + p + '&year=' + y;
+        const res = await apiFetch('/api/doc-index?' + qs);
         INDEX = await res.json();
         render();
         msg(INDEX.missing ? '' : INDEX.folder);
@@ -468,11 +474,38 @@ async function load() {
 const params = new URLSearchParams(location.search);
 const askedProgram = (params.get('program') || '').toUpperCase() === 'PFA' ? 'PFA' : '';
 if (askedProgram) document.getElementById('progPick').value = askedProgram;
-fillYears(document.getElementById('progPick').value, params.get('year'));
+
+/* PFA keeps one living folder ("PFA Monitoring Visit", no year) that the office keeps
+   current, so its year picker is meaningless — hide it and force that folder. A link may
+   still pass an explicit ?folder=, which wins. PI is unchanged: it lists by visit year. */
+const PFA_LIVING_FOLDER = 'PFA Monitoring Visit';
+let forcedFolder = params.get('folder')
+    || (document.getElementById('progPick').value === 'PFA' ? PFA_LIVING_FOLDER : '');
+
+function syncYearPickerForProgram() {
+    const prog = document.getElementById('progPick').value;
+    const yearPick = document.getElementById('yearPick');
+    if (prog === 'PFA') {
+        forcedFolder = PFA_LIVING_FOLDER;
+        // Show the living folder as a single, non-year label rather than a visit year.
+        yearPick.innerHTML = '<option value="">Current \u00b7 kept up to date</option>';
+        yearPick.disabled = true;
+    } else {
+        forcedFolder = '';
+        yearPick.disabled = false;
+        fillYears(prog);
+    }
+}
+
+if (forcedFolder && document.getElementById('progPick').value === 'PFA') {
+    syncYearPickerForProgram();
+} else {
+    fillYears(document.getElementById('progPick').value, params.get('year'));
+}
 
 // Changing programme changes which visit years exist, so the year list is rebuilt first.
 document.getElementById('progPick').addEventListener('change', () => {
-    fillYears(document.getElementById('progPick').value);
+    syncYearPickerForProgram();
     load();
 });
 document.getElementById('yearPick').addEventListener('change', load);

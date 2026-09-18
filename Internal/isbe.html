@@ -1447,6 +1447,14 @@ const LATEST_VISIT_YEAR = { PI: '2026', PFA: '2025' };
    `item` is optional: with no item the library simply opens on the right programme. */
 function libraryHref(item, program) {
     var prog = program || (activeProgram === 'PFA' ? 'PFA' : 'PI');
+    // PFA now lives in one unversioned folder, "PFA Monitoring Visit", kept current
+    // by hand. Point the library there explicitly rather than at a visit year, so the
+    // button opens the living folder and not the frozen 2025 archive. PI still opens
+    // on its latest visit year.
+    if (prog === 'PFA') {
+        return 'documents.html?program=PFA&folder=' + encodeURIComponent('PFA Monitoring Visit')
+            + (item ? '#' + encodeURIComponent(item) : '');
+    }
     return 'documents.html?program=' + encodeURIComponent(prog)
         + '&year=' + encodeURIComponent(LATEST_VISIT_YEAR[prog] || '')
         + (item ? '#' + encodeURIComponent(item) : '');
@@ -3880,7 +3888,11 @@ function loadDocIndex(program) {
        folder and out of date in the other, because staleness is measured against the
        folder's year. */
     var visitYear = LATEST_VISIT_YEAR[program] || String(new Date().getFullYear());
-    fetch('/api/doc-index?program=' + program + '&year=' + encodeURIComponent(visitYear))
+    // PFA reads from the single living folder, not a visit year (see libraryHref).
+    var indexQS = program === 'PFA'
+        ? 'program=PFA&folder=' + encodeURIComponent('PFA Monitoring Visit')
+        : 'program=' + program + '&year=' + encodeURIComponent(visitYear);
+    fetch('/api/doc-index?' + indexQS)
         .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
         .then(function (d) {
             docIndex = d;
