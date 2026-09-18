@@ -39,6 +39,10 @@
             font-size: 7.4pt; line-height: 1.3; color: #333; margin-top: 5px; text-align: justify;
         }
         .sig-label { font-weight: 800; font-size: 10.5pt; margin-top: 12px; }
+        /* Signature blocks: a stylus/finger pad on screen (via the PasForm signature
+           helper), and only the ink on paper. The pad host (.pf-sign) and its hidden
+           carrier are styled by pas-form.js; this only aligns the row to the date. */
+        .sig-row { align-items: flex-end; }
         .footer {
             margin-top: 16px; padding-top: 6px; border-top: 1px solid #bbb;
             display: flex; justify-content: space-between; font-size: 8pt; color: #666;
@@ -161,8 +165,11 @@
 <div class="sig-label">
     Signature of contact who can verify your work experience (other than yourself):
 </div>
-<div class="row">
-    <div class="fill" data-k="contactSignature"></div>
+<div class="row sig-row">
+    <!-- PasForm turns a [data-sign] host into a stylus pad and persists the drawn
+         signature through the worksheet store; the hidden data-k carrier is created
+         automatically. See PAS/pas-form.js signature helper. -->
+    <div class="pf-sign" data-sign="contactSignature"></div>
     <span class="lbl"><strong>Date:</strong></span><div class="fill md" data-k="contactDate"></div>
 </div>
 
@@ -186,8 +193,8 @@
 </p>
 
 <div class="sig-label">Participant Signature:</div>
-<div class="row">
-    <div class="fill" data-k="participantSignature"></div>
+<div class="row sig-row">
+    <div class="pf-sign" data-sign="participantSignature"></div>
     <span class="lbl"><strong>Date:</strong></span><div class="fill md" data-k="participantDate"></div>
 </div>
 
@@ -209,6 +216,7 @@
 </div>
 
 <script src="/staff/auth.js"></script>
+<script src="/staff/sign-pad.js"></script>
 <script src="pas-store.js"></script>
 <script src="pas-form.js"></script>
 <script>
@@ -315,6 +323,8 @@ PasForm.init({
     onLoad: function () {
         wireCalc();
         GROUPS.forEach(recalc);
+        // Signature pads are mounted and restored by the PasForm signature helper
+        // (the [data-sign] hosts). Nothing to do here for signing.
         // After the saved copy (if any) is on the page, try to fill the still-blank
         // spaces from a Work History form already on file, for the person to review.
         maybeExtractFromFile();
@@ -349,8 +359,11 @@ async function maybeExtractFromFile() {
     if (!data || !data.found || !data.fields) return;
 
     const fields = data.fields;
+    // Signatures are drawn, never OCR'd — a scan must not drop text into a sig field.
+    const SIG_FIELDS = PasForm.signatureFields();
     let filled = 0;
     Object.keys(fields).forEach(k => {
+        if (SIG_FIELDS.indexOf(k) !== -1) return;
         const el = document.querySelector('[data-k="' + k + '"]');
         if (!el) return;
         // Only fill a blank. Anything with text is either saved or freshly typed.

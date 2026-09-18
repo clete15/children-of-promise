@@ -155,8 +155,8 @@
                 </div>
             </div>
             <div class="sig-box">
-                <div style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;">Sign below by typing your full name:</div>
-                <input type="text" id="ppSignature" placeholder="Your full name">
+                <div style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;">Sign below with your finger or a stylus:</div>
+                <div id="ppSigPad"></div>
                 <div class="sig-label">Parent/Guardian Signature</div>
             </div>
         </div>
@@ -454,8 +454,8 @@
             <div class="p-section">
                 <p style="font-size:0.82rem;color:#374151;font-weight:500;margin-bottom:12px;">The information provided is true and accurate to the best of my (our) knowledge.</p>
                 <div class="sig-box">
-                    <div style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;">Sign below by typing your full name:</div>
-                    <input type="text" id="piSignatureP" placeholder="Your full name">
+                    <div style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;">Sign below with your finger or a stylus:</div>
+                    <div id="piSigPad"></div>
                     <div class="sig-label">Parent/Guardian Signature</div>
                 </div>
                 <div class="p-field" style="margin-top:10px;"><label>Date</label><input type="date" id="pi_signDate"></div>
@@ -470,6 +470,7 @@
 </div>
 
 <script src="/staff/auth.js"></script>
+<script src="/staff/sign-pad.js"></script>
 <script>
 let parentStudent = null;
 let parentCode = '';
@@ -562,6 +563,30 @@ function renderFormList() {
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
+/* ── Stylus signatures ──────────────────────────────────────────────────────
+   The parent signs with a finger or stylus rather than typing a name. Each pad is
+   created once in its host and re-fit whenever its modal opens (a canvas sized while
+   the modal is display:none has a zero backing store). The drawn image travels as a
+   JPEG data URL in the same `parentSignature` field the typed name used to. */
+var parentSigPads = {};
+function parentSigPad(hostId) {
+    if (!window.SignPad) return null;
+    if (!parentSigPads[hostId]) {
+        var host = document.getElementById(hostId);
+        if (!host) return null;
+        parentSigPads[hostId] = SignPad.create(host);
+    }
+    return parentSigPads[hostId];
+}
+// Fresh pad for a form open: clear any prior signature and re-fit now the modal is shown.
+function resetParentSigPad(hostId) {
+    var pad = parentSigPad(hostId);
+    if (!pad) return;
+    pad.clear();
+    // Two frames so the modal's layout has settled before the canvas is sized.
+    requestAnimationFrame(function () { requestAnimationFrame(function () { pad.refresh(); }); });
+}
+
 // ── Permission Slip ──
 function prefillPermSlip() {
     document.getElementById('ppTeacherInline').textContent = parentStudent.TeacherDescription || '_______________';
@@ -570,14 +595,16 @@ function prefillPermSlip() {
     document.getElementById('ppYearInline').textContent = year + '-' + (year + 1);
     document.getElementById('ppDate').value = new Date().toISOString().split('T')[0];
     document.getElementById('ppParentName').value = '';
-    document.getElementById('ppSignature').value = '';
     document.getElementById('ppParentNameInline').textContent = '_______________';
+    resetParentSigPad('ppSigPad');
 }
 
 async function submitPermissionSlip() {
-    var sig = document.getElementById('ppSignature').value.trim();
     var name = document.getElementById('ppParentName').value.trim();
-    if (!sig || !name) { alert('Please enter your name and signature.'); return; }
+    var pad = parentSigPad('ppSigPad');
+    var sig = pad ? pad.toDataUrl() : null;
+    if (!name) { alert('Please enter your name.'); return; }
+    if (!sig) { alert('Please sign in the box before submitting.'); return; }
 
     var btn = document.getElementById('ppSubmitBtn');
     btn.disabled = true; btn.textContent = 'Submitting...';
@@ -647,11 +674,14 @@ function prefillInterview() {
     // Pre-fill from enrollment data
     if (parentStudent.City_Town) document.getElementById('pi_p1City').value = parentStudent.City_Town;
     if (parentStudent.IEP === 'Yes') document.getElementById('pi_disability').value = 'IEP on file';
+
+    resetParentSigPad('piSigPad');
 }
 
 async function submitInterview() {
-    var sig = document.getElementById('piSignatureP').value.trim();
-    if (!sig) { alert('Please type your name as a signature to submit.'); return; }
+    var pad = parentSigPad('piSigPad');
+    var sig = pad ? pad.toDataUrl() : null;
+    if (!sig) { alert('Please sign in the box before submitting.'); return; }
 
     var btn = document.getElementById('piSubmitBtn');
     btn.disabled = true; btn.textContent = 'Submitting...';

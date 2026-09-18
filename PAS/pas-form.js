@@ -286,6 +286,8 @@
         if (saved) apply(saved);
 
         dirty = false;
+        // Mount the signature pads (once) and show whatever was just loaded into them.
+        try { mountSignatures(); } catch (e) { /* never block loading */ }
         // Lets a page refresh anything it derives from the page, such as a count.
         if (cfg.onLoad) { try { cfg.onLoad(); } catch (e) { /* never block loading */ } }
         if (!key) {
@@ -351,6 +353,90 @@
             [contenteditable="true"] { background: none !important; box-shadow: none !important; }
         }`;
 
+    /* ── Signatures ───────────────────────────────────────────────────────
+       A form marks a signature spot with <div data-sign="fieldName">. This turns it
+       into a stylus/finger SignPad and persists the drawn signature THROUGH THE
+       EXISTING WORKSHEET STORE: the pad writes its trimmed JPEG data URL into a
+       hidden [data-k] carrier, so collect()/apply() save and restore it with no
+       server or store change — exactly the pattern proved on the work-history form.
+
+       The carrier is clip-hidden rather than display:none on purpose: collect() reads
+       fields with innerText, which returns empty for a display:none node, so a
+       signature stored there would silently fail to save. */
+    let sigPads = {};                 // field -> SignPad api, mounted once
+    const SIG_CSS = `
+        .pf-sign { flex: 1 1 300px; min-width: 240px; max-width: 460px; }
+        .pf-sign-store {
+            position: absolute; width: 1px; height: 1px; overflow: hidden;
+            clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+            color: transparent; user-select: none; pointer-events: none;
+        }
+        @media print { .pf-sign-store { display: none !important; } }`;
+
+    function sigCarrier(field) {
+        return document.querySelector('.pf-sign-store[data-k="' + field + '"]');
+    }
+
+    /* Give every [data-sign] host a hidden [data-k] carrier for its data URL. Runs
+       once during init, before the auto-contenteditable pass so the carrier is not
+       made editable. Idempotent: an existing carrier is left alone. */
+    function prepareSignatureHosts() {
+        const hosts = document.querySelectorAll('[data-sign]');
+        if (!hosts.length) return;
+        const style = document.createElement('style');
+        style.textContent = SIG_CSS;
+        document.head.appendChild(style);
+        hosts.forEach(host => {
+            const field = host.getAttribute('data-sign');
+            if (!field || sigCarrier(field)) return;
+            const store = document.createElement('div');
+            store.className = 'pf-sign-store';
+            store.setAttribute('data-k', field);
+            // Sits next to the host so it travels with the same section on print.
+            host.parentNode.insertBefore(store, host.nextSibling);
+        });
+    }
+
+    /* Mount a pad in each host once (loadCurrent fires repeatedly), then push
+       whatever is stored into it. A data URL already on file is shown read-only via
+       showExisting until Clear is pressed, so reopening never invites a re-sign. */
+    function mountSignatures() {
+        if (!window.SignPad) return;          // pad script missing: leave the blank
+        document.querySelectorAll('[data-sign]').forEach(host => {
+            const field = host.getAttribute('data-sign');
+            if (!field) return;
+            if (!sigPads[field]) {
+                sigPads[field] = SignPad.create(host, {
+                    onChange: function () {
+                        const store = sigCarrier(field);
+                        if (!store) return;
+                        const url = sigPads[field].toDataUrl();
+                        store.textContent = url || '';
+                        // Fire input so the page is marked dirty exactly like a typed field.
+                        store.dispatchEvent(new Event('input', { bubbles: true }));
+                    }
+                });
+            }
+        });
+        syncSignatures();
+    }
+
+    function syncSignatures() {
+        Object.keys(sigPads).forEach(field => {
+            const pad = sigPads[field];
+            const store = sigCarrier(field);
+            const val = store ? String(store.textContent || '').trim() : '';
+            if (val.indexOf('data:image') === 0) pad.showExisting(val);
+            else { pad.clear(); pad.refresh(); }
+        });
+    }
+
+    // Field names that hold a drawn signature, so callers (e.g. OCR prefill) can skip them.
+    function signatureFields() {
+        return [...document.querySelectorAll('[data-sign]')]
+            .map(h => h.getAttribute('data-sign')).filter(Boolean);
+    }
+
     async function init(options) {
         cfg = options || {};
         if (!cfg.key) throw new Error('PasForm.init needs a key');
@@ -359,10 +445,16 @@
         style.textContent = TOOLBAR_CSS;
         document.head.appendChild(style);
 
+        // Prepare signature carriers BEFORE the auto-contenteditable pass below, so the
+        // hidden data-k carriers exist for collect()/apply() but are not made editable.
+        prepareSignatureHosts();
+
         document.body.insertAdjacentHTML('afterbegin', toolbarHtml());
 
         // Every named blank becomes editable without each form repeating the attribute.
+        // Signature carriers are excluded: they hold an image data URL, not typed text.
         document.querySelectorAll('[data-k]').forEach(el => {
+            if (el.classList.contains('pf-sign-store')) return;
             if (!el.hasAttribute('contenteditable')) el.setAttribute('contenteditable', 'true');
         });
 
@@ -477,6 +569,8 @@
         hireDate: hireDate,
         fmtDate: fmtDate,
         position: position,
+        // The field names that hold a drawn signature, so a page's prefill/OCR can skip them.
+        signatureFields: signatureFields,
         // The saved records of a list-scoped form, for a page that wants to summarise them.
         get records() { return records.slice(); }
     };

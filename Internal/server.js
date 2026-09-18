@@ -1508,6 +1508,29 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StaffDe
         CreatedAt DATETIME DEFAULT GETDATE(),
         UpdatedAt DATETIME DEFAULT GETDATE()
     );
+GO
+/* Drawn signature images (JPEG data URLs), added alongside the existing signature
+   DATE columns so the plan carries the actual signature, not just when it was signed.
+   Guarded ALTERs because the table predates these columns in production. NVARCHAR(MAX)
+   holds the data URL; the txCol/txDecode transport moves it in chunks like any long
+   text, so no separate file store is needed. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffDevelopmentPlan' AND COLUMN_NAME='InitialStaffSig')
+    ALTER TABLE StaffDevelopmentPlan ADD InitialStaffSig NVARCHAR(MAX);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffDevelopmentPlan' AND COLUMN_NAME='InitialSupervisorSig')
+    ALTER TABLE StaffDevelopmentPlan ADD InitialSupervisorSig NVARCHAR(MAX);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffDevelopmentPlan' AND COLUMN_NAME='MidYearStaffSig')
+    ALTER TABLE StaffDevelopmentPlan ADD MidYearStaffSig NVARCHAR(MAX);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffDevelopmentPlan' AND COLUMN_NAME='MidYearSupervisorSig')
+    ALTER TABLE StaffDevelopmentPlan ADD MidYearSupervisorSig NVARCHAR(MAX);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffDevelopmentPlan' AND COLUMN_NAME='YearEndStaffSig')
+    ALTER TABLE StaffDevelopmentPlan ADD YearEndStaffSig NVARCHAR(MAX);
+GO
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='StaffDevelopmentPlan' AND COLUMN_NAME='YearEndSupervisorSig')
+    ALTER TABLE StaffDevelopmentPlan ADD YearEndSupervisorSig NVARCHAR(MAX);
 `;
 }
 
@@ -1519,10 +1542,13 @@ const DEVPLAN_COLUMNS = [
     ['FavoriteAspect', 'favoriteAspect'], ['Frustrations', 'frustrations'],
     ['InitialDate', 'initialDate'], ['InitialNotes', 'initialNotes'],
     ['InitialStaffSigned', 'initialStaffSigned'], ['InitialSupervisorSigned', 'initialSupervisorSigned'],
+    ['InitialStaffSig', 'initialStaffSig'], ['InitialSupervisorSig', 'initialSupervisorSig'],
     ['MidYearDate', 'midYearDate'], ['MidYearNotes', 'midYearNotes'],
     ['MidYearStaffSigned', 'midYearStaffSigned'], ['MidYearSupervisorSigned', 'midYearSupervisorSigned'],
+    ['MidYearStaffSig', 'midYearStaffSig'], ['MidYearSupervisorSig', 'midYearSupervisorSig'],
     ['YearEndDate', 'yearEndDate'], ['YearEndNotes', 'yearEndNotes'],
     ['YearEndStaffSigned', 'yearEndStaffSigned'], ['YearEndSupervisorSigned', 'yearEndSupervisorSigned'],
+    ['YearEndStaffSig', 'yearEndStaffSig'], ['YearEndSupervisorSig', 'yearEndSupervisorSig'],
     ['NeedsAssessment', 'needsAssessment'],
     ['ProgramWillProvide', 'programWillProvide'], ['LongTermGoals', 'longTermGoals'],
     ['StaffSignedDate', 'staffSignedDate'], ['SupervisorSignedDate', 'supervisorSignedDate'],
@@ -2633,6 +2659,35 @@ function docItemNumberFromFile(fileName) {
     const m = String(fileName || '').match(/^\s*Item\s*(\d+)\s*(?:([A-Za-z])\s*\))?/i);
     if (!m) return null;
     return 'Item' + m[1] + (m[2] ? '.' + m[2].toUpperCase() : '');
+}
+
+/* The newest monitoring-visit folder for a programme, so the library resolves even when
+   the unversioned living folder has not been created on this machine yet. Matches both
+   naming shapes in use — "PFA Monitoring Visit[ YYYY]" and "[YYYY ]PI Monitoring Visit".
+   Prefers the living folder (no year); otherwise picks the highest year. Returns a folder
+   name (relative to programFolder) or null when none exist. */
+function newestVisitFolder(docRoot, programFolder) {
+    const isPfa = programFolder === 'Preschool for All';
+    const match = isPfa
+        ? n => /^PFA Monitoring Visit\b/i.test(n)
+        : n => /PI Monitoring Visit\s*$/i.test(n);
+    const isLiving = isPfa
+        ? n => /^PFA Monitoring Visit\s*$/i.test(n)
+        : n => /^PI Monitoring Visit\s*$/i.test(n);
+    const parent = path.join(docRoot, programFolder);
+    let dirs = [];
+    try {
+        dirs = fs.readdirSync(parent, { withFileTypes: true })
+            .filter(d => d.isDirectory() && match(d.name))
+            .map(d => d.name);
+    } catch (e) { return null; }
+    if (!dirs.length) return null;
+    // The living folder (no year) wins outright when it is present.
+    const living = dirs.find(isLiving);
+    if (living) return living;
+    // Otherwise the highest trailing year.
+    const yearOf = n => { const m = n.match(/(20\d\d)/); return m ? parseInt(m[1], 10) : 0; };
+    return dirs.slice().sort((a, b) => yearOf(b) - yearOf(a))[0];
 }
 
 // Walks a year's evidence folder and groups the files by item number.
@@ -4710,6 +4765,11 @@ ELSE
                         TeacherSignature NVARCHAR(200),TeacherSigDate NVARCHAR(20),
                         CreatedAt DATETIME DEFAULT GETDATE(),UpdatedAt DATETIME DEFAULT GETDATE()
                     );
+                    /* The parent now signs with a stylus, so ParentSignature holds an image
+                       data URL rather than a typed name. Widen it from the original 200-char
+                       column, guarded so it runs once. */
+                    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PermissionSlips' AND COLUMN_NAME='ParentSignature' AND CHARACTER_MAXIMUM_LENGTH <> -1)
+                        ALTER TABLE PermissionSlips ALTER COLUMN ParentSignature NVARCHAR(MAX);
                     ${schoolYearColumnSQL('PermissionSlips')}
                     IF EXISTS (SELECT 1 FROM PermissionSlips WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)})
                         UPDATE PermissionSlips SET ParentName=${esc(data.parentName)},SignedDate=${esc(data.signedDate)},Teacher=${esc(data.teacher)},ParentSignature=${esc(data.parentSignature)},ParentSigDate=${esc(data.parentSigDate)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)}
@@ -4735,6 +4795,10 @@ ELSE
                         Notes NVARCHAR(MAX),CreatedAt DATETIME DEFAULT GETDATE(),UpdatedAt DATETIME DEFAULT GETDATE()
                     );
                     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='FormData') ALTER TABLE ParentInterviews ADD FormData NVARCHAR(MAX);
+                    /* Parent now signs with a stylus, so ParentSignature holds an image data
+                       URL, not a typed name — widen the original 200-char column, once. */
+                    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='ParentSignature' AND CHARACTER_MAXIMUM_LENGTH <> -1)
+                        ALTER TABLE ParentInterviews ALTER COLUMN ParentSignature NVARCHAR(MAX);
                     ${schoolYearColumnSQL('ParentInterviews')}
                     IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)})
                         UPDATE ParentInterviews SET InterviewDate=${esc(data.signDate||'')},ParentGoals=${esc(data.goals||'')},ParentConcerns=${esc(data.behaviors||'')},ChildStrengths=${esc(data.describeChild||'')},ParentSignature=${esc(data.parentSignature||'')},FormData=${esc(jsonData)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)}
@@ -6093,19 +6157,21 @@ ELSE
            each item's form in place and files new evidence there year to year. The
            old "PFA Monitoring Visit 2025" stays as last cycle's archive. So for PFA we
            resolve to the unversioned folder when it exists, falling back to the
-           year-named one only if the rename has not happened on this machine. PI is
-           unchanged: it still keeps a folder per calendar-year visit. */
-        let folder = qs.get('folder');
-        if (!folder) {
-            if (program === 'Birth to Three') {
-                folder = year + ' PI Monitoring Visit';
-            } else {
-                const DR = findDocRoot();
-                const living = 'PFA Monitoring Visit';
-                folder = (DR && fs.existsSync(path.join(DR, program, living)))
-                    ? living
-                    : 'PFA Monitoring Visit ' + year;
-            }
+           year-named one only if the rename has not happened on this machine. */
+        /* BOTH programmes now keep ONE living folder, no year — the office maintains the
+           latest version of every item in place rather than copying the whole folder
+           forward each year and re-editing file by file. The living names are
+           "PFA Monitoring Visit" and "PI Monitoring Visit". On a machine where that
+           rename has not been made yet there is only a year-named folder
+           ("PFA Monitoring Visit 2026", "2026 PI Monitoring Visit"); in that case we
+           resolve to the NEWEST matching folder so the library works either way and
+           follows the latest visit automatically. An explicit ?folder= still wins. */
+        const LIVING = { 'Preschool for All': 'PFA Monitoring Visit', 'Birth to Three': 'PI Monitoring Visit' };
+        let folder = qs.get('folder') || LIVING[program];
+        const DR = findDocRoot();
+        if (DR && !fs.existsSync(path.join(DR, program, folder))) {
+            const newest = newestVisitFolder(DR, program);
+            if (newest) folder = newest;
         }
         const idx = indexYearFolder(program, folder);
 

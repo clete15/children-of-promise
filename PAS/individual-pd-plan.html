@@ -89,6 +89,9 @@
         .sig-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .sig-cell { font-size: 9.5pt; }
         .sig-cell .sig-line { border-bottom: 1px solid #333; height: 1.5em; margin-bottom: 2px; }
+        /* Stylus signature host. The pad's own chrome/CSS comes from sign-pad.js; this
+           only reserves width so the pad sits where the ruled line used to. */
+        .sig-cell .pf-sign { min-width: 200px; margin-bottom: 2px; }
         .sig-cell .sig-label { font-size: 8.5pt; color: #718096; }
 
         .footer {
@@ -208,11 +211,11 @@
     <label style="font-size:9pt;font-weight:600;color:#4a5568;">Notes:</label>
     <div class="notes" id="fInitialNotes" contenteditable="true"></div>
     <div class="sig-row">
-        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Employee Signature</div></div>
+        <div class="sig-cell"><div class="pf-sign" id="sigInitialStaff"></div><div class="sig-label">Employee Signature</div></div>
         <div class="sig-cell"><div class="sig-line" id="fInitialStaffDate"></div><div class="sig-label">Date</div></div>
     </div>
     <div class="sig-row" style="margin-top:10px;">
-        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Director Signature</div></div>
+        <div class="sig-cell"><div class="pf-sign" id="sigInitialSup"></div><div class="sig-label">Director Signature</div></div>
         <div class="sig-cell"><div class="sig-line" id="fInitialSupDate"></div><div class="sig-label">Date</div></div>
     </div>
 </div>
@@ -223,11 +226,11 @@
     <label style="font-size:9pt;font-weight:600;color:#4a5568;">Notes:</label>
     <div class="notes" id="fMidNotes" contenteditable="true"></div>
     <div class="sig-row">
-        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Employee Signature</div></div>
+        <div class="sig-cell"><div class="pf-sign" id="sigMidStaff"></div><div class="sig-label">Employee Signature</div></div>
         <div class="sig-cell"><div class="sig-line" id="fMidStaffDate"></div><div class="sig-label">Date</div></div>
     </div>
     <div class="sig-row" style="margin-top:10px;">
-        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Director Signature</div></div>
+        <div class="sig-cell"><div class="pf-sign" id="sigMidSup"></div><div class="sig-label">Director Signature</div></div>
         <div class="sig-cell"><div class="sig-line" id="fMidSupDate"></div><div class="sig-label">Date</div></div>
     </div>
 </div>
@@ -241,11 +244,11 @@
     <label style="font-size:9pt;font-weight:600;color:#4a5568;">Notes:</label>
     <div class="notes" id="fEndNotes" contenteditable="true"></div>
     <div class="sig-row">
-        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Employee Signature</div></div>
+        <div class="sig-cell"><div class="pf-sign" id="sigEndStaff"></div><div class="sig-label">Employee Signature</div></div>
         <div class="sig-cell"><div class="sig-line" id="fEndStaffDate"></div><div class="sig-label">Date</div></div>
     </div>
     <div class="sig-row" style="margin-top:10px;">
-        <div class="sig-cell"><div class="sig-line"></div><div class="sig-label">Director Signature</div></div>
+        <div class="sig-cell"><div class="pf-sign" id="sigEndSup"></div><div class="sig-label">Director Signature</div></div>
         <div class="sig-cell"><div class="sig-line" id="fEndSupDate"></div><div class="sig-label">Date</div></div>
     </div>
 </div>
@@ -257,6 +260,7 @@
 
 <script src="pd-suggestions.js"></script>
 <script src="/staff/auth.js"></script>
+<script src="/staff/sign-pad.js"></script>
 <script>
 /* One plan per staff member per program year, with both reviews on the sheet.
 
@@ -282,6 +286,53 @@ const $ = id => document.getElementById(id);
 const msg = t => { $('msg').textContent = t || ''; };
 const esc = v => String(v == null ? '' : v)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/* ── Stylus signatures ────────────────────────────────────────────────────
+   Six sign-off spots (Employee + Director across Initial / Mid-year / Year-end).
+   Each pad's drawn image is a JPEG data URL persisted in its own StaffDevelopmentPlan
+   column (added server-side), separate from the existing signature DATE fields. The
+   pad host id maps to the plan column and the save() payload key. */
+const SIG_SPOTS = [
+    { host: 'sigInitialStaff', col: 'InitialStaffSig',      key: 'initialStaffSig' },
+    { host: 'sigInitialSup',   col: 'InitialSupervisorSig', key: 'initialSupervisorSig' },
+    { host: 'sigMidStaff',     col: 'MidYearStaffSig',      key: 'midYearStaffSig' },
+    { host: 'sigMidSup',       col: 'MidYearSupervisorSig', key: 'midYearSupervisorSig' },
+    { host: 'sigEndStaff',     col: 'YearEndStaffSig',      key: 'yearEndStaffSig' },
+    { host: 'sigEndSup',       col: 'YearEndSupervisorSig', key: 'yearEndSupervisorSig' }
+];
+let sigPads = {};
+
+// Mount each pad once (render() runs on every staff/year change) then show the
+// signature on file, if any. showExisting keeps it read-only until Clear is pressed.
+function mountSignatures(plan) {
+    if (!window.SignPad) return;
+    SIG_SPOTS.forEach(spot => {
+        const host = $(spot.host);
+        if (!host) return;
+        if (!sigPads[spot.host]) {
+            sigPads[spot.host] = SignPad.create(host, { onChange: () => msg('Unsaved signature — Save plan to keep it.') });
+        }
+        const pad = sigPads[spot.host];
+        const val = plan ? String(plan[spot.col] || '') : '';
+        if (val.indexOf('data:image') === 0) pad.showExisting(val);
+        else { pad.clear(); pad.refresh(); }
+    });
+}
+
+// The drawn signatures as payload keys, for save(). A pad with nothing drawn and
+// no prior image sends '' so a cleared signature is recorded as cleared.
+function collectSignatures(plan) {
+    const out = {};
+    SIG_SPOTS.forEach(spot => {
+        const pad = sigPads[spot.host];
+        let url = pad ? pad.toDataUrl() : null;
+        // toDataUrl returns null when a loaded (showExisting) signature was not
+        // re-drawn; keep whatever was already on the plan in that case.
+        if (url == null && plan) url = plan[spot.col] || '';
+        out[spot.key] = url || '';
+    });
+    return out;
+}
 
 function selectedYear() { return $('yearPick').value || PDSuggest.schoolYearOf(); }
 function planFor(staffId, sy) {
@@ -399,6 +450,9 @@ function render() {
     $('fEndStaffDate').textContent = plan ? (plan.YearEndStaffSigned || '') : '';
     $('fEndSupDate').textContent = plan ? (plan.YearEndSupervisorSigned || '') : '';
 
+    // Signature pads: mount once, then show whatever is on file for this plan.
+    mountSignatures(plan);
+
     goalRows = plan
         ? GOALS.filter(g => String(g.PlanId) === String(plan.Id))
             .sort((a, b) => (+a.SortOrder || 0) - (+b.SortOrder || 0))
@@ -447,7 +501,9 @@ async function save() {
     try {
         const sy = selectedYear();
         const sug = PDSuggest.suggest(current);
-        const r = await api('/api/dev-plans', { method: 'POST', body: JSON.stringify({
+        // Carry over any signatures already on file that weren't re-drawn this session.
+        const existingPlan = planFor(current.Id, sy);
+        const r = await api('/api/dev-plans', { method: 'POST', body: JSON.stringify(Object.assign({
             staffId: current.Id, schoolYear: sy, planType: 'Annual',
             planDate: $('fPlanDate').textContent.trim() || new Date().toISOString().split('T')[0],
             location: $('fLocation').textContent.trim(),
@@ -463,7 +519,7 @@ async function save() {
             needsAssessment: sug.needs.join(' '),
             programWillProvide: sug.provide.join(' '),
             reviewDate: PDSuggest.cycleDueDate('End-of-Year', sy)
-        }) });
+        }, collectSignatures(existingPlan))) });
         if (r.status !== 200) throw new Error('HTTP ' + r.status);
         const d = await r.json();
         if (!d.success) throw new Error(d.error || 'Save failed');
