@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Classroom Signing – Children Of Promise</title>
+    <link rel="stylesheet" href="/staff/styles.css">
+    <style>
+        /* A kiosk, sized for a tablet handed between a teacher and a parent. Bigger
+           touch targets and one thing on screen at a time — pick a room, work the
+           children, sign. No staff data ever reaches this page. */
+        body { background:#0f172a; color:#e2e8f0; min-height:100vh; margin:0;
+            font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; }
+
+        /* ── Password gate ── */
+        #ckGate { position:fixed; inset:0; z-index:9999; display:flex; flex-direction:column;
+            align-items:center; justify-content:center; padding:24px;
+            background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#1e40af 100%); }
+        #ckGate img { height:88px; margin-bottom:20px; filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3)); }
+        #ckGate h2 { color:#fff; font-size:1.4rem; font-weight:800; margin:0 0 4px; }
+        #ckGate p  { color:rgba(255,255,255,0.72); font-size:0.9rem; margin:0 0 26px; }
+        .ck-box { background:#fff; border-radius:14px; padding:28px 30px; width:100%; max-width:380px;
+            box-shadow:0 8px 32px rgba(0,0,0,0.28); display:flex; flex-direction:column; gap:14px; }
+        .ck-box label { font-size:0.78rem; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.06em; }
+        .ck-box input { width:100%; padding:14px 14px; border:1.5px solid #e2e8f0; border-radius:9px;
+            font-size:1.05rem; color:#1e293b; font-family:inherit; }
+        .ck-box input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
+        .ck-box button { width:100%; padding:15px; background:#2563eb; color:#fff; border:none; border-radius:9px;
+            font-size:1.05rem; font-weight:700; cursor:pointer; }
+        .ck-box button:hover { background:#1d4ed8; }
+        .ck-err { color:#dc2626; font-size:0.82rem; font-weight:600; text-align:center; display:none; }
+
+        /* ── Kiosk shell ── */
+        #ckApp { display:none; flex-direction:column; min-height:100vh; }
+        .ck-header { background:linear-gradient(135deg,#1e3a8a,#2563eb 60%,#1e40af);
+            padding:16px 22px; display:flex; align-items:center; justify-content:space-between; gap:16px;
+            border-bottom:3px solid #f59e0b; }
+        .ck-header .ck-brand { display:flex; align-items:center; gap:14px; }
+        .ck-header img { height:52px; }
+        .ck-header h1 { color:#fff; font-size:1.15rem; font-weight:800; margin:0; }
+        .ck-header p  { color:rgba(255,255,255,0.7); font-size:0.72rem; margin:2px 0 0; letter-spacing:0.04em; }
+        .ck-exit { background:rgba(255,255,255,0.14); color:#fff; border:1px solid rgba(255,255,255,0.3);
+            padding:9px 15px; border-radius:9px; font-size:0.85rem; font-weight:700; cursor:pointer; }
+
+        .ck-main { flex:1; padding:20px; max-width:900px; width:100%; margin:0 auto; box-sizing:border-box; }
+
+        .ck-roompick { background:#1e293b; border:1px solid #334155; border-radius:12px;
+            padding:16px 18px; margin-bottom:18px; }
+        .ck-roompick label { display:block; font-size:0.72rem; font-weight:800; text-transform:uppercase;
+            letter-spacing:0.06em; color:#94a3b8; margin-bottom:8px; }
+        .ck-roompick select { width:100%; padding:14px 14px; font-size:1.1rem; font-weight:700;
+            background:#0f172a; color:#e2e8f0; border:1.5px solid #334155; border-radius:9px; font-family:inherit; }
+        .ck-roompick select:focus { outline:none; border-color:#2563eb; }
+
+        .ck-empty { padding:40px; text-align:center; color:#94a3b8; font-size:0.95rem; }
+
+        /* Child cards — one per child, big signing chips. */
+        .ck-card { background:#1e293b; border:1px solid #334155; border-radius:12px;
+            padding:15px 17px; margin-bottom:14px; }
+        .ck-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+        .ck-name { font-size:1.05rem; font-weight:800; color:#f1f5f9; }
+        .ck-prog { font-size:0.62rem; font-weight:800; padding:2px 8px; border-radius:10px; margin-left:8px; vertical-align:middle; }
+        .ck-prog-pi  { background:#7c3aed33; color:#c4b5fd; }
+        .ck-prog-pfa { background:#0891b233; color:#7dd3fc; }
+        .ck-meta { font-size:0.72rem; color:#94a3b8; margin-top:2px; }
+        .ck-status-ok  { font-size:0.72rem; font-weight:700; color:#4ade80; white-space:nowrap; }
+        .ck-status-out { font-size:0.72rem; font-weight:700; color:#fbbf24; white-space:nowrap; }
+        .ck-chips { display:flex; flex-wrap:wrap; gap:9px; }
+        /* Chips are large tap targets — a parent uses these with a fingertip or the stylus. */
+        .ck-chip { display:inline-flex; align-items:center; gap:6px; padding:11px 15px; border-radius:10px;
+            font-size:0.86rem; font-weight:700; cursor:pointer; border:1.5px solid #334155;
+            background:#0f172a; color:#cbd5e1; text-decoration:none; }
+        .ck-chip:hover { border-color:#2563eb; }
+        .ck-chip-done { background:#14532d33; border-color:#166534; color:#86efac; cursor:default; }
+        .ck-chip-partial { border-color:#b45309; color:#fbbf24; }
+
+        /* Outstanding summary, collapsible. */
+        .ck-outstanding { background:#1e293b; border:1px solid #334155; border-radius:12px;
+            overflow:hidden; margin-bottom:16px; }
+        .ck-out-head { display:flex; align-items:center; gap:8px; width:100%; text-align:left;
+            padding:14px 17px; background:#0f172a; border:none; color:#e2e8f0; font-size:0.86rem;
+            font-weight:800; cursor:pointer; font-family:inherit; }
+        .ck-out-caret { transition:transform 0.15s; color:#94a3b8; font-size:0.72rem; }
+        .ck-outstanding.open .ck-out-caret { transform:rotate(90deg); }
+        .ck-out-body { display:none; }
+        .ck-outstanding.open .ck-out-body { display:block; }
+        .ck-out-row { display:flex; align-items:center; justify-content:space-between; gap:10px;
+            padding:11px 17px; border-top:1px solid #334155; font-size:0.84rem; }
+        .ck-out-label { font-weight:700; color:#cbd5e1; }
+        .ck-out-count { font-size:0.72rem; font-weight:700; color:#fbbf24; background:#78350f33;
+            padding:3px 10px; border-radius:11px; white-space:nowrap; }
+        .ck-alldone { padding:16px; border-radius:12px; background:#14532d33; border:1px solid #166534;
+            color:#86efac; font-size:0.86rem; margin-bottom:16px; }
+    </style>
+</head>
+<body>
+
+<!-- Password gate. The word does not by itself grant data access — every request
+     below is checked by the server's checkClassroomAuth, which reaches child
+     paperwork ONLY. No staff record, review, plan or admin control is reachable here. -->
+<div id="ckGate">
+    <img src="/staff/logo-sm.png" alt="Children Of Promise">
+    <h2>Classroom Signing</h2>
+    <p>Children Of Promise &nbsp;·&nbsp; Millstadt, IL</p>
+    <form class="ck-box" id="ckGateForm">
+        <label for="ckPw">Classroom password</label>
+        <input type="password" id="ckPw" autocomplete="current-password" placeholder="Enter password" autofocus>
+        <div class="ck-err" id="ckErr">That password was not accepted.</div>
+        <button type="submit">Enter</button>
+    </form>
+</div>
+
+<div id="ckApp">
+    <div class="ck-header">
+        <div class="ck-brand">
+            <img src="/staff/logo-sm.png" alt="Children Of Promise">
+            <div>
+                <h1>Classroom Signing</h1>
+                <p>Pick a room, then tap an item to sign</p>
+            </div>
+        </div>
+        <button type="button" class="ck-exit" id="ckExit">Exit</button>
+    </div>
+    <div class="ck-main">
+        <div class="ck-roompick">
+            <label for="ckRoom">Classroom</label>
+            <select id="ckRoom"></select>
+        </div>
+        <div id="ckBody"><div class="ck-empty">Loading…</div></div>
+    </div>
+</div>
+
+<!-- Shared machinery: the sign pad, the form modals, the tick/evidence logic, and
+     app.js helpers. The kiosk reuses exactly what the ISBE roster and the staff
+     portal use, so a signature captured here is filed the same way. -->
+<script src="/staff/sign-pad.js"></script>
+<script src="/staff/child-forms.js"></script>
+<script src="/staff/classroom-forms.js"></script>
+<script>
+/* ── Classroom kiosk ──────────────────────────────────────────────────────────
+   A signing station for a classroom tablet. It holds the classroom password (this
+   session only) and attaches it as Basic auth to every request. The server's
+   checkClassroomAuth lets that password reach child paperwork and nothing else, so
+   this page cannot show a staff record even if it tried. */
+
+const CK_PW_KEY = 'cofpClassroomPw';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function ckPw() { try { return sessionStorage.getItem(CK_PW_KEY) || ''; } catch (e) { return ''; } }
+
+// Every data call carries the classroom password. Nothing personal, nothing admin.
+function ckFetch(url, opts) {
+    opts = opts || {};
+    const h = Object.assign({ 'Content-Type': 'application/json' },
+        { 'Authorization': 'Basic ' + btoa(':' + ckPw()) }, opts.headers || {});
+    // Multipart uploads (a scanned questionnaire) must not carry a JSON content type.
+    if (opts.body instanceof FormData) delete h['Content-Type'];
+    opts.headers = h;
+    return fetch(url, opts);
+}
+// classroom-forms.js signs its multipart uploads through CofpAuth.headers()/header();
+// provide a minimal shim so it attaches the classroom password the same way.
+window.CofpAuth = {
+    header: function () { return 'Basic ' + btoa(':' + ckPw()); },
+    headers: function () { return { 'Authorization': 'Basic ' + btoa(':' + ckPw()) }; }
+};
+
+// State (mirrors the names classroom-forms.js expects through the context object).
+let CK_STUDENTS = [];
+let CK_ROOMS = [];
+let CK_TRACKING = {};        // by StudentId
+let CK_SCREENING = {};       // by StudentId -> "TYPE|Period"
+let CK_SIGNATURES = {};      // by "studentId|Field|role"
+let CK_YEAR = '';
+let ckActiveRoom = null;
+let ckOutstandingOpen = false;
+
+function currentSchoolYear() {
+    const now = new Date();
+    const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return y + '-' + (y + 1);
+}
+function yq(url) { return url + (url.indexOf('?') === -1 ? '?' : '&') + 'year=' + encodeURIComponent(CK_YEAR); }
+
+// ── Gate ──
+$('ckGateForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const pw = $('ckPw').value;
+    const err = $('ckErr');
+    err.style.display = 'none';
+    try {
+        // Verify by asking for the classroom list with this password. 200 = accepted.
+        const res = await fetch('/api/classrooms', {
+            headers: { 'Authorization': 'Basic ' + btoa(':' + pw) }
+        });
+        if (res.status === 200) {
+            try { sessionStorage.setItem(CK_PW_KEY, pw); } catch (e) {}
+            $('ckGate').style.display = 'none';
+            $('ckApp').style.display = 'flex';
+            start();
+        } else if (res.status === 401) {
+            err.textContent = 'That password was not accepted.';
+            err.style.display = 'block';
+            $('ckPw').value = ''; $('ckPw').focus();
+        } else {
+            throw new Error('HTTP ' + res.status);
+        }
+    } catch (ex) {
+        err.textContent = 'Could not reach the server. Try again.';
+        err.style.display = 'block';
+    }
+});
+
+$('ckExit').addEventListener('click', () => {
+    try { sessionStorage.removeItem(CK_PW_KEY); } catch (e) {}
+    location.reload();
+});
+
+// If the tablet already has the password this session, skip the gate.
+if (ckPw()) {
+    $('ckGate').style.display = 'none';
+    $('ckApp').style.display = 'flex';
+    start();
+}
+
+// ── Load + render ──
+let ckFormsReady = false;
+function initForms() {
+    if (ckFormsReady || !window.CofpForms) return;
+    CofpForms.init({
+        getStudents: () => CK_STUDENTS,
+        getClassrooms: () => CK_ROOMS,
+        getTracking: () => CK_TRACKING,
+        getScreening: () => CK_SCREENING,
+        getSignatures: () => CK_SIGNATURES,
+        setSignatures: sig => { CK_SIGNATURES = sig || {}; },
+        getYear: () => CK_YEAR || currentSchoolYear(),
+        apiFetch: (url, opts) => ckFetch(url, opts),
+        ChildForms: window.ChildForms,
+        getActiveRoom: () => ckActiveRoom,
+        // After a save, redraw the open room so the freshly signed item turns green.
+        refreshActiveView: () => renderRoom(),
+        classroomRoster: () => roster(ckActiveRoom)
+    });
+    ckFormsReady = true;
+}
+
+async function start() {
+    CK_YEAR = currentSchoolYear();
+    initForms();
+    try {
+        const [sRes, cRes, tRes, scrRes] = await Promise.all([
+            ckFetch('/api/students'),
+            ckFetch('/api/classrooms'),
+            ckFetch(yq('/api/isbe-tracking')).catch(() => null),
+            ckFetch(yq('/api/screening-summary')).catch(() => null),
+            (window.ChildForms && ChildForms.load) ? ChildForms.load(CK_YEAR, ckFetch).catch(() => null) : Promise.resolve(),
+            (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(CK_YEAR, ckFetch).catch(() => null) : Promise.resolve(),
+            (window.CofpForms) ? CofpForms.loadSignatures(CK_YEAR).then(s => { CK_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve()
+        ]);
+        if (sRes.status === 401 || cRes.status === 401) { badPassword(); return; }
+        CK_STUDENTS = await sRes.json(); if (!Array.isArray(CK_STUDENTS)) CK_STUDENTS = [];
+        CK_ROOMS = await cRes.json();    if (!Array.isArray(CK_ROOMS)) CK_ROOMS = [];
+        CK_TRACKING = {};
+        if (tRes && tRes.ok) { (await tRes.json() || []).forEach(t => { CK_TRACKING[t.StudentId] = t; }); }
+        CK_SCREENING = {};
+        if (scrRes && scrRes.ok) {
+            (await scrRes.json() || []).forEach(s => {
+                if (!CK_SCREENING[s.StudentId]) CK_SCREENING[s.StudentId] = {};
+                CK_SCREENING[s.StudentId][s.ScreeningType + '|' + s.Period] = s;
+            });
+        }
+    } catch (e) {
+        $('ckBody').innerHTML = '<div class="ck-empty">Could not load: ' + esc(e.message) + '</div>';
+        return;
+    }
+    buildRoomPicker();
+}
+
+function badPassword() {
+    try { sessionStorage.removeItem(CK_PW_KEY); } catch (e) {}
+    location.reload();
+}
+
+function buildRoomPicker() {
+    const sel = $('ckRoom');
+    // Only rooms that actually have PFA/PI children to sign for.
+    const withKids = CK_ROOMS.filter(r =>
+        CK_STUDENTS.some(s => String(s.RoomNumber) === String(r.RoomNumber)
+            && (s.Active === 'Yes' || s.Active === 'YES')
+            && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI')));
+    const rooms = withKids.length ? withKids : CK_ROOMS;
+    if (!rooms.length) { $('ckBody').innerHTML = '<div class="ck-empty">No classrooms found.</div>'; return; }
+    if (ckActiveRoom === null || !rooms.some(r => String(r.RoomNumber) === String(ckActiveRoom))) {
+        ckActiveRoom = rooms[0].RoomNumber;
+    }
+    sel.innerHTML = rooms.map(r =>
+        '<option value="' + esc(String(r.RoomNumber)) + '"' + (String(r.RoomNumber) === String(ckActiveRoom) ? ' selected' : '') + '>'
+        + esc(r.Room || ('Room ' + r.RoomNumber)) + '</option>').join('');
+    sel.onchange = () => { ckActiveRoom = sel.value; renderRoom(); };
+    renderRoom();
+}
+
+// The PFA/PI children in a room, most-outstanding first.
+function roster(roomNumber) {
+    return CK_STUDENTS
+        .filter(s => String(s.RoomNumber) === String(roomNumber)
+            && (s.Active === 'Yes' || s.Active === 'YES')
+            && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI'))
+        .sort(CofpForms.sortByName);
+}
+
+function renderRoom() {
+    const body = $('ckBody');
+    const cols = CofpForms.COLUMNS;      // the eight teacher columns
+    const list = roster(ckActiveRoom);
+    if (!list.length) { body.innerHTML = '<div class="ck-empty">No PFA or PI children in this classroom.</div>'; return; }
+
+    // Outstanding summary (collapsible), print-free.
+    const batch = cols.map(col => {
+        const missing = list.filter(s => !ChildForms.isDone(s.Id, col.field, !!(CK_TRACKING[s.Id] || {})[col.field]));
+        if (!missing.length) return '';
+        const label = col.label.replace(/<br>/g, ' ');
+        return '<div class="ck-out-row"><span class="ck-out-label">' + esc(label) + '</span>'
+            + '<span class="ck-out-count">' + missing.length + ' to do</span></div>';
+    }).filter(Boolean).join('');
+
+    const summary = batch
+        ? '<div class="ck-outstanding' + (ckOutstandingOpen ? ' open' : '') + '">'
+            + '<button type="button" class="ck-out-head" id="ckOutToggle" aria-expanded="' + (ckOutstandingOpen ? 'true' : 'false') + '">'
+            + '<span class="ck-out-caret">\u25B8</span> Outstanding for this classroom</button>'
+            + '<div class="ck-out-body">' + batch + '</div></div>'
+        : '<div class="ck-alldone">Everything for this classroom is complete for ' + esc(CK_YEAR) + '.</div>';
+
+    const cards = list.map(s => {
+        const t = CK_TRACKING[s.Id] || {};
+        const chips = cols.map(col => {
+            const st = ChildForms.state(s.Id, col.field, !!t[col.field]);
+            const done = st === 'form' || st === 'tick' || st === 'unknown';
+            const label = col.label.replace(/<br>/g, ' ');
+            let action = '';
+            if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
+                const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';
+                const period = col.field.indexOf('Beg') === 0 ? 'Beginning' : 'End';
+                action = 'screening|' + s.Id + '|' + type + '|' + period;
+            } else if (col.field === 'PermissionSlip') { action = 'permission|' + s.Id; }
+            else if (col.field === 'ParentInterview') { action = 'interview|' + s.Id; }
+            else if (col.field === 'MidYearReport' || col.field === 'EndYearReport') { action = 'upload|' + s.Id + '|' + col.field; }
+            const cls = 'ck-chip' + (done ? ' ck-chip-done' : '') + (st === 'partial' ? ' ck-chip-partial' : '');
+            const inner = (done ? '\u2713 ' : '') + esc(label);
+            return (action && !done)
+                ? '<a href="#" class="' + cls + '" data-act="' + esc(action) + '">' + inner + '</a>'
+                : '<span class="' + cls + '">' + inner + '</span>';
+        }).join('');
+
+        const out = cols.filter(col => !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
+        const status = out ? '<span class="ck-status-out">' + out + ' outstanding</span>' : '<span class="ck-status-ok">\u2713 complete</span>';
+        const prog = String(s.PFA_PI_na || '').trim().toUpperCase();
+        const progTag = (prog === 'PI' || prog === 'PFA')
+            ? '<span class="ck-prog ck-prog-' + prog.toLowerCase() + '">' + prog + '</span>' : '';
+
+        return '<div class="ck-card"><div class="ck-card-head">'
+            + '<div class="ck-name">' + esc(s.Last_Name + ', ' + s.First_Name) + progTag + '</div>'
+            + status + '</div><div class="ck-chips">' + chips + '</div></div>';
+    }).join('');
+
+    body.innerHTML = summary + cards;
+
+    const toggle = $('ckOutToggle');
+    if (toggle) toggle.addEventListener('click', () => {
+        ckOutstandingOpen = !ckOutstandingOpen;
+        const card = toggle.closest('.ck-outstanding');
+        if (card) card.classList.toggle('open', ckOutstandingOpen);
+        toggle.setAttribute('aria-expanded', ckOutstandingOpen ? 'true' : 'false');
+    });
+
+    body.querySelectorAll('[data-act]').forEach(a => {
+        a.addEventListener('click', e => {
+            e.preventDefault();
+            const parts = a.getAttribute('data-act').split('|');
+            if (parts[0] === 'interview') CofpForms.openInterview(parseInt(parts[1], 10));
+            else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
+            else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
+            else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
+        });
+    });
+}
+</script>
+</body>
+</html>

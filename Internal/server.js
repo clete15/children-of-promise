@@ -162,6 +162,43 @@ function checkAuth(req, res) {
     return true;
 }
 
+/* ── Classroom kiosk password ────────────────────────────────────────────────
+
+   A SECOND shared password for the /classrooms tablet, where a teacher hands the
+   device to a parent to sign on the stylus. It is deliberately weaker in reach than
+   the admin password: it can read the child roster and the per-child tracking, open
+   and save the child forms (permission slip, parent interview, screenings), and
+   file signatures — and NOTHING else. It cannot reach staff records, appraisals,
+   development plans, the admin dashboard, deploy, restart or SQL, because none of
+   those endpoints call checkClassroomAuth — they still call checkAuth, which only
+   accepts the admin password.
+
+   So a tablet that lives in a classroom, and could be lost or handed around, carries
+   a credential that reaches only child paperwork and signatures. If it walks off, no
+   staff record or centre control goes with it.
+
+   Defaults to 'cofpstaff' so the kiosk works in testing without setup; override in
+   production with:  setx COFP_CLASSROOM_PASSWORD "something" /M  */
+const CLASSROOM_PASSWORD = process.env.COFP_CLASSROOM_PASSWORD || 'cofpstaff';
+
+// True when the caller holds EITHER the admin password OR the classroom password.
+// Used only by the child-data + child-form endpoints the kiosk needs.
+function hasClassroomAccess(req) {
+    const pw = basicPassword(req);
+    return pw === INTERNAL_PASSWORD || pw === CLASSROOM_PASSWORD;
+}
+
+/* Guard for the endpoints the classroom kiosk is allowed to reach. Same 401 shape
+   as checkAuth (no WWW-Authenticate), so the kiosk page shows its own message. */
+function checkClassroomAuth(req, res) {
+    if (!hasClassroomAccess(req)) {
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
+        res.end('Unauthorized');
+        return false;
+    }
+    return true;
+}
+
 /* ── Per-staff sign-in ──────────────────────────────────────────────────────
 
    The shared password says someone is allowed in. It cannot say who they are, so
@@ -3477,9 +3514,9 @@ function handleRequest(req, res) {
         fs.createReadStream(filePath).pipe(res);
         return;
     }
-    // GET students (internal - protected)
+    // GET students (internal - protected; classroom kiosk may read the roster)
     if (req.method === 'GET' && url === '/api/students') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         // Ensure CCAPStartDate column exists (separate batch so metadata refreshes)
         runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='CCAPStartDate') ALTER TABLE rptMasterEnrollment ADD CCAPStartDate NVARCHAR(20)`);
         const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
@@ -3495,9 +3532,9 @@ function handleRequest(req, res) {
         return sendJSON(res, 200, rows);
     }
 
-    // GET classrooms (internal - protected)
+    // GET classrooms (internal - protected; classroom kiosk needs the room list)
     if (req.method === 'GET' && url === '/api/classrooms') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         // Youngest-first age order (2 & 3 Year Olds before Pre-School), so the room roster
         // sidebar matches the attendance sidebars and the projection.
         const r = runSQL(`SELECT ${ROOM_COLS.join(',')} FROM dimClassrooms ORDER BY ${roomAgeOrderSql('RoomNumber')}`);
@@ -3590,7 +3627,7 @@ function handleRequest(req, res) {
     // One row per student/type/period so the roster can show dates, concerns and
     // referral status without a request per child.
     if (req.method === 'GET' && url === '/api/screening-summary') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const summaryYear = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
         const summaryEnsure = schoolYearColumnSQL('ScreeningScores');
         // Concern logic differs by instrument:
@@ -3912,7 +3949,7 @@ function handleRequest(req, res) {
 
     // GET ISBE tracking data (internal - protected)
     if (req.method === 'GET' && url === '/api/isbe-tracking') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         // Column list comes from ISBE_TRACKING_COLUMNS so the SELECT can never drift
         // out of step with the schema the way EnterSIS/RemoveFromSIS previously did.
         const select = ISBE_TRACKING_COLUMNS.map(c => `ISNULL(${c},0) AS ${c}`).join(',');
@@ -3953,7 +3990,7 @@ function handleRequest(req, res) {
        dynamic call a table that predates one of these columns would fail the whole
        batch rather than just its own line. */
     if (req.method === 'GET' && url === '/api/child-forms') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
 
         // Field, table, date column, and any extra WHERE. Year is already validated
@@ -4033,7 +4070,7 @@ DROP TABLE #cf;`;
        PDF. Nothing is overwritten: re-signing writes a new PDF and re-points the
        rows, so every version that was ever signed stays on disk. */
     if (req.method === 'POST' && url === '/api/child-signed-form') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
 
@@ -4142,7 +4179,7 @@ ELSE
     /* Every captured signature for a year, without the images: the roster needs to
        know which forms are signed, not what the signatures look like. */
     if (req.method === 'GET' && url === '/api/child-signatures') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
         const r = runSQLRows(
             `SELECT StudentId, FormField, Role, SignedName, RelPath,
@@ -4169,7 +4206,7 @@ ELSE
        both. Modelled on the staff-file-upload multipart handling, kept deliberately
        consistent with it rather than introducing a second way. */
     if (req.method === 'POST' && url.startsWith('/api/child-file-upload')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const qs = new URLSearchParams(req.url.split('?')[1] || '');
         const studentId = parseInt(qs.get('studentId') || 0, 10);
         const field = String(qs.get('field') || '').trim();
@@ -4299,7 +4336,7 @@ ELSE
     /* Every uploaded child file for a year, without the bytes: the roster needs to
        know which questionnaires and report cards are on file, and where. */
     if (req.method === 'GET' && url === '/api/child-files') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
         const r = runSQLRows(
             `SELECT StudentId, FormField, Kind, FileName, RelPath,
@@ -4312,7 +4349,7 @@ ELSE
 
     // GET parent interview for a student (internal - protected)
     if (req.method === 'GET' && url.startsWith('/api/parent-interview/')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
         const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
         const sql = parentInterviewEnsureSQL()
@@ -4330,7 +4367,7 @@ ELSE
 
     // POST save parent interview (internal - protected)
     if (req.method === 'POST' && url.startsWith('/api/parent-interview/')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
@@ -4352,7 +4389,7 @@ ELSE
 
     // GET permission slip for a student (internal - protected)
     if (req.method === 'GET' && url.startsWith('/api/permission-slip/')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
         const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='PermissionSlips')
             CREATE TABLE PermissionSlips (
@@ -4384,7 +4421,7 @@ ELSE
 
     // POST save permission slip (internal - protected)
     if (req.method === 'POST' && url.startsWith('/api/permission-slip/')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
@@ -4423,7 +4460,7 @@ ELSE
     // GET a PICC document form for a student (internal - protected)
     // /api/pi-doc/<form-type>/<studentId>
     if (req.method === 'GET' && url.startsWith('/api/pi-doc/')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const parts = url.split('/');
         const cfg = PI_DOC_FORMS[parts[3]];
         if (!cfg) return sendJSON(res, 404, { error: 'Unknown form type' });
@@ -4449,7 +4486,7 @@ ELSE
     // POST save a PICC document form (internal - protected)
     // Upserts the form row and auto-checks the matching roster column.
     if (req.method === 'POST' && url.startsWith('/api/pi-doc/')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const parts = url.split('/');
         const cfg = PI_DOC_FORMS[parts[3]];
         if (!cfg) return sendJSON(res, 404, { error: 'Unknown form type' });
@@ -4479,7 +4516,7 @@ ELSE
 
     // GET screening score for a student (internal - protected)
     if (req.method === 'GET' && url.startsWith('/api/screening/')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
         const query = req.url.split('?')[1] || '';
         const params = new URLSearchParams(query);
@@ -4521,7 +4558,7 @@ ELSE
 
     // POST save screening score (internal - protected)
     if (req.method === 'POST' && url.startsWith('/api/screening/')) {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
@@ -6924,9 +6961,9 @@ ELSE
         return;
     }
 
-    // PUT ISBE tracking field (internal - protected)
+    // PUT ISBE tracking field (internal - protected; kiosk may tick a child's box)
     if (req.method === 'PUT' && url === '/api/isbe-tracking') {
-        if (!checkAuth(req, res)) return;
+        if (!checkClassroomAuth(req, res)) return;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const { studentId, field, value } = d;
@@ -7154,6 +7191,20 @@ ELSE
             if (err) { res.writeHead(404); return res.end('Not found'); }
             res.writeHead(200, Object.assign({ 'Content-Type': 'text/html' },
                 noStoreFor('my-portal.html')));
+            res.end(data);
+        });
+    }
+
+    /* The classroom signing kiosk: /classrooms. A teacher opens this on the room
+       tablet, enters the classroom password, picks a room, and hands the tablet to a
+       parent to sign. Served with no server gate of its own (like /me) — the page
+       gates itself with the classroom password and every DATA request it makes is
+       checked by checkClassroomAuth, which reaches child paperwork only. */
+    if (url === '/classrooms' || url === '/classrooms/') {
+        return fs.readFile(path.join(__dirname, 'classrooms.html'), (err, data) => {
+            if (err) { res.writeHead(404); return res.end('Not found'); }
+            res.writeHead(200, Object.assign({ 'Content-Type': 'text/html' },
+                noStoreFor('classrooms.html')));
             res.end(data);
         });
     }

@@ -565,7 +565,15 @@
     .cls-roompick select:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
     .cls-roompick #clsTeacher { font-size:0.76rem;color:var(--sp-muted); }
     .cls-batch { border:1px solid var(--sp-border);border-radius:10px;overflow:hidden;margin-bottom:18px; }
-    .cls-batch-head { padding:10px 15px;background:var(--sp-surface-2);border-bottom:1px solid var(--sp-border);font-size:0.78rem;font-weight:800;color:var(--sp-text); }
+    /* The header is a full-width toggle button now. The caret rotates when open, and the
+       bottom border only shows while expanded so a collapsed summary is a clean single bar. */
+    .cls-batch-head { display:flex;align-items:center;gap:8px;width:100%;text-align:left;
+        padding:10px 15px;background:var(--sp-surface-2);border:none;border-radius:10px;
+        font-family:inherit;font-size:0.78rem;font-weight:800;color:var(--sp-text);cursor:pointer; }
+    .cls-batch.open .cls-batch-head { border-bottom:1px solid var(--sp-border);border-radius:10px 10px 0 0; }
+    .cls-batch-head:hover { background:var(--sp-surface); }
+    .cls-batch-caret { display:inline-block;transition:transform 0.15s;color:var(--sp-muted);font-size:0.7rem; }
+    .cls-batch.open .cls-batch-caret { transform:rotate(90deg); }
     .cls-batch-row { display:flex;align-items:center;gap:10px;padding:9px 15px;border-bottom:1px solid var(--sp-border);font-size:0.78rem; }
     .cls-batch-row:last-child { border-bottom:none; }
     .cls-batch-label { font-weight:700;color:var(--sp-text-2);flex:1; }
@@ -686,6 +694,7 @@ let CLS_YEAR = '';          // active school year, from the tracking endpoint's 
 let clsState = 'idle';      // idle | loading | ready | error
 let clsError = '';
 let activeClsRoom = null;    // room number currently shown in the picker
+let clsOutstandingOpen = false;  // is the "Outstanding for this classroom" summary expanded
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s)
@@ -1920,15 +1929,22 @@ function classroomChecklistHtml(rooms) {
             !ChildForms.isDone(s.Id, col.field, !!(CLS_TRACKING[s.Id] || {})[col.field]));
         if (!missing.length) return '';
         const label = col.label.replace(/<br>/g, ' ');
-        const printBtn = CofpForms.columnHasForm(col.field)
-            ? '<a href="#" data-print="' + esc(col.field) + '">print all ' + missing.length + '</a>'
-            : '';
+        // No "print all" — everything is signed on screen (stylus) now, so a stack of
+        // blank printouts is not the helpful thing it once was.
         return '<div class="cls-batch-row"><span class="cls-batch-label">' + label + '</span>'
-            + '<span class="cls-batch-count">' + missing.length + ' to do</span>' + printBtn + '</div>';
+            + '<span class="cls-batch-count">' + missing.length + ' to do</span></div>';
     }).filter(Boolean).join('');
 
+    // "Outstanding for this classroom" is collapsible: the child cards below are the
+    // working surface, so the summary starts collapsed unless the teacher opens it.
+    // clsOutstandingOpen persists the open/closed choice across re-renders.
     const batchBlock = batch
-        ? '<div class="cls-batch"><div class="cls-batch-head">Outstanding for this classroom</div>' + batch + '</div>'
+        ? '<div class="cls-batch' + (clsOutstandingOpen ? ' open' : '') + '">'
+            + '<button type="button" class="cls-batch-head" id="clsOutstandingToggle" '
+            + 'aria-expanded="' + (clsOutstandingOpen ? 'true' : 'false') + '">'
+            + '<span class="cls-batch-caret">\u25B8</span> Outstanding for this classroom</button>'
+            + '<div class="cls-batch-body"' + (clsOutstandingOpen ? '' : ' style="display:none;"') + '>'
+            + batch + '</div></div>'
         : '<div class="cls-alldone">Everything on the classroom checklist is complete for '
             + esc(CLS_YEAR) + '. Nothing outstanding.</div>';
 
@@ -2035,12 +2051,18 @@ function wireClassroom() {
             else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
         });
     });
-    document.querySelectorAll('#sppanel_classroom [data-print]').forEach(a => {
-        a.addEventListener('click', e => {
-            e.preventDefault();
-            CofpForms.printAllForColumn(a.getAttribute('data-print'));
+    // Collapse / expand the "Outstanding for this classroom" summary.
+    const outToggle = document.getElementById('clsOutstandingToggle');
+    if (outToggle) {
+        outToggle.addEventListener('click', () => {
+            clsOutstandingOpen = !clsOutstandingOpen;
+            const card = outToggle.closest('.cls-batch');
+            const body = card && card.querySelector('.cls-batch-body');
+            if (card) card.classList.toggle('open', clsOutstandingOpen);
+            if (body) body.style.display = clsOutstandingOpen ? '' : 'none';
+            outToggle.setAttribute('aria-expanded', clsOutstandingOpen ? 'true' : 'false');
         });
-    });
+    }
 }
 
 /* ── Forms ── their plan and the forms that belong to them. */
