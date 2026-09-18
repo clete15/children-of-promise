@@ -3046,7 +3046,14 @@ const PFA_CHECKLIST_ITEMS = [
         guidance: 'The minimum of 15 applies to the inclusive model, with exceptions for Head Start and DCFS licensing. Children of Promise is DCFS-licensed, so the exception applies.',
         evidence: 'Class lists, waiting list or a written process for developing one.',
         excelerate: '3B. Group Size and Staff/Child Ratio',
-        waitlistLink: true
+        waitlistLink: true,
+        /* In-app evidence forms for this item. Each opens an HTML form you can fill,
+           sign with a stylus where needed, and file back as this item's evidence.
+           These replace opening a Word/PDF from the library for the items we own. */
+        forms: [
+            { label: 'PFA Classroom Info', href: 'pfa-item1-classroom-info.html' },
+            { label: 'Preschool Waiting List', href: 'waitinglist.html' }
+        ]
     },
     {
         num: 'Item2', n: '2', title: 'Age eligibility and complete child files',
@@ -3087,7 +3094,10 @@ const PFA_CHECKLIST_ITEMS = [
            the sub-list stays the complete picture. */
         childFields: ['PermissionSlip', 'ParentInterview', 'BegASQ', 'BegASE'],
         evidence: 'Screening results per child, copy of the parent interview, copy of the exit interview form, copy of any referral.',
-        excelerate: '1D. Child Screening'
+        excelerate: '1D. Child Screening',
+        forms: [
+            { label: 'Exit Interview Form', href: 'pfa-item4-exit-interview.html' }
+        ]
     },
     {
         num: 'Item5', n: '5', title: 'Research-based screening instrument',
@@ -3107,10 +3117,9 @@ const PFA_CHECKLIST_ITEMS = [
         evidence: 'Scoring criteria, weighted eligibility checklist in each child file, family income documentation where used.',
         guidance: 'Eligibility criteria may not exclude children who are not toilet trained.',
         waitlistLink: true,
-        /* An in-app form for this item: fill it, sign with a stylus, and it files a
-           signed PDF straight into the PFA monitoring folder as this year's Item 6
-           evidence. Rendered as an "Open form" button on the row. */
-        formHref: 'pfa-item6-eligibility.html'
+        forms: [
+            { label: 'Weighted Eligibility Form', href: 'pfa-item6-eligibility.html' }
+        ]
     },
     {
         num: 'Item7', n: '7', title: 'Minimum hours and days of instruction',
@@ -4248,33 +4257,23 @@ function renderPfaChecklistSection(data) {
             status = data[key] ? statusPill('ok', 'evidence recorded') : statusPill('open', 'not recorded');
         }
 
-        /* 'PFA' spelled out rather than left to libraryHref's default. The default
-           reads activeProgram, which is the roster's programme, not this panel's —
-           opening the PFA checklist from a PI roster sent every Library button to
-           PI evidence, which reads as the PFA folder having emptied itself. */
-        var actions = '<a class="picc-btn" href="' + libraryHref(item.num, 'PFA')
-            + '" target="_blank" rel="noopener">Library</a>';
-        // An in-app HTML form for this item (filled + signed with a stylus, filed to the
-        // PFA monitoring folder as this item's evidence). Opens in a new tab.
-        if (item.formHref) {
-            actions += '<a class="picc-btn picc-btn-primary" href="' + item.formHref.replace(/"/g, '&quot;')
-                + '" target="_blank" rel="noopener" title="Fill and sign this item\u2019s form in the app">'
-                + 'Open form</a>';
-        }
-        // The current form for this item, if one has been linked. The link is editable
-        // in the controls row below (saved as PFA_<item>Link), so a form can be pointed
-        // at its newest version without a code change.
+        /* The row's action buttons are the EVIDENCE for this item — one per in-app
+           form we own (open, edit, sign with a stylus, file back), plus any file the
+           library already holds for the item (rendered by piccDocsHtml below, which
+           opens/edits each). The per-row "Library" and "Check in a file" buttons were
+           removed: the ONE "Open document library" button in the section header is the
+           way to browse everything, and evidence is maintained through these forms. */
+        var actions = '';
+        (item.forms || []).forEach(function (f) {
+            actions += '<a class="picc-btn picc-btn-primary" href="' + String(f.href).replace(/"/g, '&quot;') + '" '
+                + 'target="_blank" rel="noopener" title="Open, edit and sign this evidence form in the app">'
+                + escapeHtml(f.label) + '</a>';
+        });
+        // A manually-linked current form, if one has been pasted into the controls below.
         if (savedLink) {
             actions += '<a class="picc-btn picc-btn-primary" href="' + savedLink.replace(/"/g, '&quot;') + '" '
                 + 'target="_blank" rel="noopener" title="Open the current form linked to this item">Open current form</a>';
         }
-        if (!item.na) {
-            actions += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
-                + 'Check in a file<input type="file" style="display:none;" '
-                + 'accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt" '
-                + 'onchange="uploadEvidence(\'' + item.num + '\',this)"></label>';
-        }
-        if (item.waitlistLink) actions += '<a class="picc-btn picc-btn-jump" href="waitinglist.html">Waiting list</a>';
         // Same jump links as the PICC side, so a PFA item backed by roster columns
         // gets you to the column rather than leaving you to find it.
         actions += childFieldJumps(item);
@@ -4302,7 +4301,7 @@ function renderPfaChecklistSection(data) {
             + (item.na ? '<div class="picc-na"><strong>Not applicable:</strong> ' + item.na + '</div>' : '')
             + (item.licensePanel ? licensePanelHtml() : '')
             + (item.na ? '' : piccDocsHtml(item.num))
-            + '<div class="picc-actions">' + actions + '</div>'
+            + (actions ? '<div class="picc-actions">' + actions + '</div>' : '')
             + (item.na ? '' : '<div class="picc-controls">'
                 // No manual tick where the children's files decide it: two sources for
                 // one answer is how the roster got into this state to begin with.

@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Item 4 — PFA Exit Interview Form · Children of Promise</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 11pt; line-height: 1.5; color: #1f2937; background: #eef2f7;
+            padding: 0.35in 0.5in;
+        }
+        .sheet {
+            max-width: 7.5in; margin: 0 auto; background: #fff; padding: 0.6in 0.7in;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.08); border-radius: 4px;
+        }
+        h1 { font-size: 15pt; font-weight: 800; color: #1e3a8a; text-align: center; }
+        .h2 { font-size: 12.5pt; font-weight: 800; color: #1e3a8a; text-align: center; margin-top: 2px; }
+        .body-text { font-size: 11pt; line-height: 1.9; color: #1f2937; margin-top: 28px; }
+        /* Inline fields flow with the sentence and print as the line they replace. */
+        .inline {
+            display: inline-block; min-width: 150px; border-bottom: 1px solid #333;
+            padding: 0 6px; font: inherit; color: #1f2937; text-align: center;
+        }
+        .inline.italic { font-style: italic; }
+        .inline.sm { min-width: 90px; }
+        .inline:focus { outline: none; background: #fffbeb; box-shadow: inset 0 -2px 0 #f59e0b; }
+        .teacher-label { font-style: italic; font-size: 9.5pt; color: #6b7280; }
+
+        .sig-block { margin-top: 34px; }
+        .sig-block label.cap { display: block; font-size: 9pt; font-weight: 700; color: #374151;
+            margin-bottom: 6px; }
+        .sig-block .name-date { display: flex; gap: 12px; margin-top: 8px; }
+        .sig-block .name-date input { flex: 1; padding: 8px 10px; border: 1px solid #cbd5e1;
+            border-radius: 6px; font-size: 10pt; font-family: inherit; }
+        .sig-block .name-date input[type=date] { flex: 0 0 170px; }
+
+        .toolbar { position: sticky; top: 0; z-index: 10; background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0; padding: 10px 14px; margin: -0.6in -0.7in 10px;
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; font-size: 10pt;
+            font-weight: 700; cursor: pointer; color: #fff; }
+        .btn:disabled { background: #94a3b8; cursor: default; }
+        .btn-file { background: #16a34a; }
+        .btn-print { background: #2c5282; }
+        .status { font-size: 9pt; font-weight: 700; }
+        .hint { font-size: 8.4pt; color: #64748b; flex-basis: 100%; }
+
+        @media print {
+            body { background: #fff; padding: 0; }
+            .sheet { box-shadow: none; max-width: none; padding: 0; }
+            .toolbar { display: none !important; }
+            .inline:focus { background: none; box-shadow: none; }
+            @page { margin: 0.7in; size: letter; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="sheet">
+    <div class="toolbar no-print">
+        <button class="btn btn-file" id="fileBtn" onclick="fileForm()">&#9998; Sign &amp; file to Item 4</button>
+        <button class="btn btn-print" onclick="window.print()">&#x1F5A8;&#xFE0F; Print</button>
+        <span class="status" id="status"></span>
+        <span class="hint">The teacher and school year fill in automatically. Hand the screen to the parent
+            to sign, then sign as the teacher and file &mdash; the signed PDF saves into the PFA monitoring
+            folder as this year's <strong>Item 4</strong> exit-interview evidence.</span>
+    </div>
+
+    <h1>Children of Promise PFA</h1>
+    <div class="h2">Exit Interview Form</div>
+
+    <p class="body-text">
+        I, <span class="inline" contenteditable="true" id="parentName" title="Parent/guardian name"></span>
+        <span class="teacher-label">confirm that</span>
+        <span class="inline italic" contenteditable="true" id="teacherName" title="Teacher name"></span>
+        has shared with me the screening results for the
+        <span class="inline sm" contenteditable="true" id="schoolYear"></span>
+        school year using Ages and Stages ASQ and ASE screening instruments. In addition, I have received a
+        final report card from Children of Promise through Teaching Strategies Gold for the
+        <span class="inline sm" contenteditable="true" id="schoolYear2"></span> school year.
+    </p>
+
+    <div class="sig-block">
+        <label class="cap">Parent Signature</label>
+        <div id="sigParent"></div>
+        <div class="name-date">
+            <input type="text" id="sigParentName" placeholder="Printed name">
+            <input type="date" id="sigParentDate" title="Date signed">
+        </div>
+    </div>
+
+    <div class="sig-block">
+        <label class="cap">Teacher Signature</label>
+        <div id="sigTeacher"></div>
+        <div class="name-date">
+            <input type="text" id="sigTeacherName" placeholder="Printed name">
+            <input type="date" id="sigTeacherDate" title="Date signed">
+        </div>
+    </div>
+</div>
+
+<script src="/staff/auth.js"></script>
+<script src="/staff/sign-pad.js"></script>
+<script>
+/* Item 4 — PFA Exit Interview Form (program-level PFA monitoring evidence).
+
+   The teacher name and school year auto-fill; the parent signs on the pad and the
+   teacher signs as well. Filing generates a signed PDF into the living "PFA Monitoring
+   Visit" folder named "Item 4 - Exit Interview Form - signed <date>.pdf", so it counts
+   as Item 4 evidence with no separate record (attributed by filename). */
+
+var $ = function (id) { return document.getElementById(id); };
+var sigPads = {};
+
+function mountPads() {
+    if (!window.SignPad) return;
+    ['sigParent', 'sigTeacher'].forEach(function (hostId) {
+        if (!sigPads[hostId]) sigPads[hostId] = SignPad.create($(hostId));
+        requestAnimationFrame(function () { requestAnimationFrame(function () { sigPads[hostId].refresh(); }); });
+    });
+}
+
+/* Auto-fill the teacher from the PFA classroom, and the school year from the date.
+   The teacher name comes from the dimClassrooms record for the PFA room; falls back
+   to blank (editable) if the room can't be resolved. */
+async function autofill() {
+    var now = new Date();
+    var y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    var sy = y + '-' + String(y + 1).slice(-2);   // e.g. 2024-25 style
+    $('schoolYear').textContent = sy;
+    $('schoolYear2').textContent = sy;
+    var today = now.toISOString().split('T')[0];
+    $('sigParentDate').value = today;
+    $('sigTeacherDate').value = today;
+
+    try {
+        var res = await CofpAuth.apiFetch('/api/classrooms');
+        if (!res.ok) return;
+        var rooms = await res.json();
+        if (!Array.isArray(rooms)) return;
+        // The PFA classroom's teacher. Match a room whose name mentions PFA/Pre-School,
+        // else the first room with a teacher — the office can correct it in place.
+        var pfaRoom = rooms.find(function (r) { return /pfa|pre.?school/i.test(r.Room || ''); })
+            || rooms.find(function (r) { return (r.TeacherDescription || '').trim(); });
+        if (pfaRoom && pfaRoom.TeacherDescription) {
+            // The lead teacher is the first name in the "A / B" description.
+            var lead = String(pfaRoom.TeacherDescription).split(/\s*[\/&,]\s*/)[0].trim();
+            $('teacherName').textContent = lead;
+            $('sigTeacherName').value = lead;
+        }
+    } catch (e) { /* leave the teacher blank for manual entry */ }
+}
+
+async function fileForm() {
+    var parentUrl = sigPads.sigParent ? sigPads.sigParent.toDataUrl() : null;
+    var teacherUrl = sigPads.sigTeacher ? sigPads.sigTeacher.toDataUrl() : null;
+    if (!parentUrl && !teacherUrl) { setStatus('Sign at least one box before filing.', '#b91c1c'); return; }
+
+    var signatures = [];
+    if (parentUrl) signatures.push({ role: 'parent', label: 'Parent',
+        name: $('sigParentName').value, date: $('sigParentDate').value, dataUrl: parentUrl });
+    if (teacherUrl) signatures.push({ role: 'staff', label: 'Teacher',
+        name: $('sigTeacherName').value, date: $('sigTeacherDate').value, dataUrl: teacherUrl });
+
+    var sy = $('schoolYear').textContent.trim();
+    var rows = [
+        { label: 'Parent/Guardian', value: $('parentName').textContent.trim() },
+        { label: 'Teacher', value: $('teacherName').textContent.trim() },
+        { label: 'School Year', value: sy }
+    ];
+    var body = {
+        program: 'PFA',
+        item: '4',
+        formTitle: 'Exit Interview Form',
+        year: sy,
+        rows: rows,
+        blocks: [{
+            heading: 'Exit Interview Confirmation',
+            text: 'The parent/guardian confirms that the teacher has shared the ASQ-3 and ASQ:SE-2 '
+                + 'screening results for the ' + (sy || 'school') + ' year, and that they have received a '
+                + 'final Teaching Strategies Gold report card from Children of Promise for that year.'
+        }],
+        signatures: signatures
+    };
+
+    var btn = $('fileBtn');
+    btn.disabled = true; btn.textContent = 'Filing\u2026';
+    setStatus('Filing to the PFA monitoring folder\u2026', '#64748b');
+    try {
+        var res = await fetch('/api/monitoring-signed-form', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' },
+                (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {}),
+            body: JSON.stringify(body)
+        });
+        var d = await res.json();
+        if (res.ok && d.success) setStatus('\u2713 Filed as ' + d.name, '#166534');
+        else setStatus('\u26a0 ' + (d.error || 'Could not file the form'), '#b91c1c');
+    } catch (e) {
+        setStatus('\u26a0 ' + e.message, '#b91c1c');
+    } finally {
+        btn.disabled = false; btn.textContent = '\u270E Sign & file to Item 4';
+    }
+}
+
+function setStatus(text, colour) {
+    var el = $('status');
+    el.textContent = text || '';
+    el.style.color = colour || '#166534';
+}
+
+// ── Init ──
+(function () {
+    mountPads();
+    autofill();
+})();
+</script>
+</body>
+</html>
