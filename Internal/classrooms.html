@@ -156,9 +156,9 @@
      A cache-buster query is appended so a tablet that cached an older kiosk (before
      these modules existed, or a broken copy) is forced to re-fetch the current ones. -->
 <script>window.__ckScriptFail = [];</script>
-<script src="/staff/sign-pad.js?v=2" onerror="window.__ckScriptFail.push('sign-pad.js')"></script>
-<script src="/staff/child-forms.js?v=2" onerror="window.__ckScriptFail.push('child-forms.js')"></script>
-<script src="/staff/classroom-forms.js?v=2" onerror="window.__ckScriptFail.push('classroom-forms.js')"></script>
+<script src="/staff/sign-pad.js?v=3" onerror="window.__ckScriptFail.push('sign-pad.js')"></script>
+<script src="/staff/child-forms.js?v=3" onerror="window.__ckScriptFail.push('child-forms.js')"></script>
+<script src="/staff/classroom-forms.js?v=3" onerror="window.__ckScriptFail.push('classroom-forms.js')"></script>
 <script>
 /* ── Classroom kiosk ──────────────────────────────────────────────────────────
    A signing station for a classroom tablet. It holds the classroom password (this
@@ -288,6 +288,45 @@ function ckShow(msg) {
         + '<br><button type="button" class="ck-exit" style="margin-top:12px;" onclick="location.reload()">Reload</button></div>';
 }
 
+/* Re-fetch any shared module whose global is still missing, with a fresh cache-buster
+   so a stale or half-cached copy on the tablet is bypassed. Resolves true if, after the
+   attempt, all three globals are present. One retry only — a genuine outage should fall
+   through to the visible warning rather than hammer the server. */
+function loadScriptFresh(src) {
+    return new Promise(function (resolve) {
+        const s = document.createElement('script');
+        s.src = src + (src.indexOf('?') === -1 ? '?' : '&') + 'r=' + Date.now();
+        s.onload = function () { resolve(true); };
+        s.onerror = function () { resolve(false); };
+        document.head.appendChild(s);
+    });
+}
+async function reloadMissingModules() {
+    const need = [];
+    if (!window.SignPad)    need.push('/staff/sign-pad.js');
+    if (!window.ChildForms) need.push('/staff/child-forms.js');
+    if (!window.CofpForms)  need.push('/staff/classroom-forms.js');
+    if (!need.length) return true;
+    console.warn('[KIOSK] retrying shared modules:', need);
+    for (const src of need) { try { await loadScriptFresh(src); } catch (e) {} }
+    return !!(window.SignPad && window.ChildForms && window.CofpForms);
+}
+
+// The Retry button in the signing-unavailable warning: try once more to pull the
+// modules, and if it works, clear the flag and redraw the open room so signing lights
+// up without a full reload. A full reload is the fallback if it still can't get them.
+async function retrySigning() {
+    const ok = await reloadMissingModules();
+    if (ok) {
+        ckModulesMissing = false;
+        ckModuleDetail = '';
+        try { initForms(); } catch (e) { console.error('[KIOSK] initForms on retry failed', e); }
+        renderRoom();
+    } else {
+        location.reload();
+    }
+}
+
 async function start() {
     /* One try/catch around EVERYTHING. Before this, initForms() ran outside the guard,
        so if the shared module threw while wiring up, start() died silently and the page
@@ -310,17 +349,26 @@ async function start() {
         CK_ROOMS = await cRes.json();    if (!Array.isArray(CK_ROOMS)) CK_ROOMS = [];
 
         if (!window.CofpForms || !window.ChildForms || !window.SignPad) {
-            const miss = [];
-            if (!window.SignPad) miss.push('sign-pad.js (SignPad)');
-            if (!window.ChildForms) miss.push('child-forms.js (ChildForms)');
-            if (!window.CofpForms) miss.push('classroom-forms.js (CofpForms)');
-            console.error('[KIOSK] shared modules missing:', miss,
-                'script load failures:', window.__ckScriptFail || []);
-            ckModuleDetail = miss.join(', ')
-                + ((window.__ckScriptFail && window.__ckScriptFail.length)
-                    ? '  |  did not load: ' + window.__ckScriptFail.join(', ')
-                    : '');
-            ckModulesMissing = true;
+            // A shared module didn't arrive — often a single dropped/stale request on
+            // a tablet, not a real outage. Try re-fetching the missing ones once with
+            // a fresh cache-busting query before giving up and showing the warning.
+            const healed = await reloadMissingModules();
+            if (!healed) {
+                const miss = [];
+                if (!window.SignPad) miss.push('sign-pad.js (SignPad)');
+                if (!window.ChildForms) miss.push('child-forms.js (ChildForms)');
+                if (!window.CofpForms) miss.push('classroom-forms.js (CofpForms)');
+                console.error('[KIOSK] shared modules missing:', miss,
+                    'script load failures:', window.__ckScriptFail || []);
+                ckModuleDetail = miss.join(', ')
+                    + ((window.__ckScriptFail && window.__ckScriptFail.length)
+                        ? '  |  did not load: ' + window.__ckScriptFail.join(', ')
+                        : '');
+                ckModulesMissing = true;
+            } else {
+                // Re-wire the form context now that the modules are present.
+                try { initForms(); } catch (e) { console.error('[KIOSK] initForms after heal failed', e); }
+            }
         }
 
         // Render immediately with what we have, then enrich in the background.
@@ -512,7 +560,8 @@ function renderRoom() {
 
     const warn = ckModulesMissing
         ? '<div class="ck-warn">Signing isn\u2019t available right now (a page file didn\u2019t load). '
-          + 'Reload the page; if it keeps happening, tell Clete.'
+          + '<button type="button" onclick="retrySigning()" style="margin-left:8px;padding:4px 12px;'
+          + 'font-weight:700;border:none;border-radius:6px;background:#b45309;color:#fff;cursor:pointer;">Retry</button>'
           + (ckModuleDetail ? '<div style="margin-top:6px;font-size:0.75rem;opacity:0.85;">Missing: '
               + esc(ckModuleDetail) + '</div>' : '')
           + '</div>'
