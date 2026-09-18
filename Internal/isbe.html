@@ -34,6 +34,11 @@
         thead tr.isbe-colrow { border-bottom:2px solid var(--border); }
         th { padding:7px 6px;text-align:center;font-size:0.6rem;font-weight:700;letter-spacing:0.04em;color:var(--text-muted);white-space:nowrap;cursor:help; }
         th.left { text-align:left;padding-left:14px; }
+        /* Give each checklist column a comfortable minimum. With table width:100%, a
+           program that fits (PFA) stretches its columns to fill the card with no dead
+           space on the right; a program that doesn't (PI, many columns) overflows and
+           the grid scrolls horizontally. Student/Room are excluded — they are fixed. */
+        th.col-teacher, th.col-admin { min-width:78px; }
 
         /* ── Teacher / Admin group banners ── */
         th.grp { font-size:0.64rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
