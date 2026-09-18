@@ -4211,6 +4211,7 @@ function renderPfaChecklistSection(data) {
         var checked = data[key] ? 'checked' : '';
         var dateVal = data[key + 'Date'] || '';
         var notes = data[key + 'Notes'] || '';
+        var savedLink = data[key + 'Link'] || '';
         var stats = item.na ? null : piccChildStats(item, 'PFA');
 
         var status;
@@ -4233,6 +4234,13 @@ function renderPfaChecklistSection(data) {
            PI evidence, which reads as the PFA folder having emptied itself. */
         var actions = '<a class="picc-btn" href="' + libraryHref(item.num, 'PFA')
             + '" target="_blank" rel="noopener">Library</a>';
+        // The current form for this item, if one has been linked. The link is editable
+        // in the controls row below (saved as PFA_<item>Link), so a form can be pointed
+        // at its newest version without a code change.
+        if (savedLink) {
+            actions += '<a class="picc-btn picc-btn-primary" href="' + savedLink.replace(/"/g, '&quot;') + '" '
+                + 'target="_blank" rel="noopener" title="Open the current form linked to this item">Open current form</a>';
+        }
         if (!item.na) {
             actions += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
                 + 'Check in a file<input type="file" style="display:none;" '
@@ -4274,6 +4282,11 @@ function renderPfaChecklistSection(data) {
                 + (stats ? '' : '<label class="picc-check"><input type="checkbox" ' + checked
                     + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>')
                 + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
+                // The link to the current form/evidence file for this item. Paste the
+                // library link (or any URL) and it becomes the "Open current form"
+                // button above; editable here so it can be pointed at a newer version.
+                + '<input type="url" class="picc-link-input" placeholder="Link to the current form for this item" value="'
+                + savedLink.replace(/"/g, '&quot;') + '" onchange="saveComplianceLink(\'' + key + '\',this.value)">'
                 + '<span id="up_' + item.num + '" style="flex-basis:100%;font-size:0.72rem;margin-top:6px;"></span>'
                 + '</div>'
                 + '<textarea class="picc-notes" placeholder="Notes for the monitor, or what is still outstanding" '
@@ -4283,12 +4296,12 @@ function renderPfaChecklistSection(data) {
 
     return '<div class="picc-head">'
         + '<div>'
-        + '<div class="picc-head-title">FY25 Preschool for All Compliance Checklist</div>'
-        + '<div class="picc-head-sub">' + PFA_CHECKLIST_ITEMS.length + ' items on the ISBE checklist. '
-        + (PFA_CHECKLIST_ITEMS.length - applicable.length) + ' apply only to programs run by a school '
+        + '<div class="picc-head-title">FY26 Preschool for All Compliance Checklist</div>'
+        + '<div class="picc-head-sub">Items 1&ndash;20 are what we are responsible for. '
+        + (PFA_CHECKLIST_ITEMS.length - applicable.length) + ' of those apply only to programs run by a school '
         + 'district (3, 17, 18), so ' + applicable.length + ' apply to a DCFS-licensed childcare centre. '
         + 'Items 21&ndash;37 are Preschool for All Expansion only and do not apply. '
-        + 'Transcribed from the ISBE Early Childhood Block Grant 3-5 Compliance Checklist, August 2024 (FY25).</div>'
+        + 'Transcribed from the ISBE Early Childhood Block Grant 3-5 Compliance Checklist, August 2025 (FY26).</div>'
         + '</div>'
         + '<div class="picc-readiness">'
         + '<div class="picc-readiness-num">' + ready + ' / ' + applicable.length + '</div>'
@@ -4558,8 +4571,15 @@ async function saveComplianceDate(key, dateValue) {
 async function saveComplianceLink(key, url) {
     var year = getComplianceYear();
     var clean = (url || '').trim();
-    if (clean && !/^https?:\/\//i.test(clean)) {
-        alert('That does not look like a link. Paste the full SharePoint URL, starting with https://');
+    // Accept a full URL, OR an in-tool link (the library/office/doc-file pages, a
+    // leading slash, or a bare documents.html?... link copied from the library).
+    var ok = !clean
+        || /^https?:\/\//i.test(clean)
+        || /^\//.test(clean)
+        || /^(documents|office)\.html/i.test(clean)
+        || /^api\//i.test(clean);
+    if (!ok) {
+        alert('That does not look like a link. Paste a full URL (https://\u2026) or a link copied from the document library.');
         return;
     }
     try {
