@@ -42,55 +42,70 @@
         .ck-exit { background:rgba(255,255,255,0.14); color:#fff; border:1px solid rgba(255,255,255,0.3);
             padding:9px 15px; border-radius:9px; font-size:0.85rem; font-weight:700; cursor:pointer; }
 
-        .ck-main { flex:1; padding:20px; max-width:900px; width:100%; margin:0 auto; box-sizing:border-box; }
+        .ck-main { flex:1; padding:18px 20px 40px; max-width:1120px; width:100%; margin:0 auto; box-sizing:border-box; }
 
-        .ck-roompick { background:#1e293b; border:1px solid #334155; border-radius:12px;
-            padding:16px 18px; margin-bottom:18px; }
-        .ck-roompick label { display:block; font-size:0.72rem; font-weight:800; text-transform:uppercase;
-            letter-spacing:0.06em; color:#94a3b8; margin-bottom:8px; }
-        .ck-roompick select { width:100%; padding:14px 14px; font-size:1.1rem; font-weight:700;
-            background:#0f172a; color:#e2e8f0; border:1.5px solid #334155; border-radius:9px; font-family:inherit; }
+        /* The room picker stays put at the top while a long roster scrolls under it. */
+        .ck-roompick { position:sticky; top:0; z-index:20; background:#0f172a;
+            padding:14px 0 12px; margin-bottom:16px; }
+        .ck-roompick label { display:block; font-size:0.7rem; font-weight:800; text-transform:uppercase;
+            letter-spacing:0.06em; color:#94a3b8; margin-bottom:7px; }
+        .ck-roompick select { width:100%; padding:15px 16px; font-size:1.1rem; font-weight:700;
+            background:#1e293b; color:#e2e8f0; border:1.5px solid #334155; border-radius:11px; font-family:inherit;
+            box-shadow:0 2px 10px rgba(0,0,0,0.25); }
         .ck-roompick select:focus { outline:none; border-color:#2563eb; }
 
-        .ck-empty { padding:40px; text-align:center; color:#94a3b8; font-size:0.95rem; }
+        /* Room title + summary bar. */
+        .ck-roomtitle { font-size:1.35rem; font-weight:800; color:#f8fafc; margin:0 0 12px; }
+        .ck-summary { background:#1e293b; border:1px solid #334155; border-radius:12px;
+            margin-bottom:18px; overflow:hidden; }
+        .ck-summary-line { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:13px 18px; }
+        .ck-summary-count { font-size:0.9rem; font-weight:700; color:#cbd5e1; }
+        .ck-summary-done { font-size:0.88rem; font-weight:800; color:#4ade80; }
+        .ck-summary-out { display:inline-flex; align-items:center; gap:7px; border:none; cursor:pointer;
+            font-family:inherit; font-size:0.86rem; font-weight:800; color:#fbbf24;
+            background:#78350f33; padding:8px 14px; border-radius:999px; }
+        .ck-summary-out:hover { background:#78350f55; }
+        .ck-out-caret { transition:transform 0.15s; font-size:0.66rem; }
+        .ck-summary-out.open .ck-out-caret { transform:rotate(90deg); }
+        .ck-out-body { border-top:1px solid #334155; padding:6px 0; }
+        .ck-out-row { display:flex; align-items:center; justify-content:space-between; gap:10px;
+            padding:8px 18px; font-size:0.82rem; }
+        .ck-out-label { font-weight:600; color:#cbd5e1; }
+        .ck-out-count { font-size:0.72rem; font-weight:800; color:#fbbf24; background:#78350f44;
+            min-width:22px; text-align:center; padding:2px 8px; border-radius:11px; }
 
-        /* Child cards — one per child, big signing chips. */
-        .ck-card { background:#1e293b; border:1px solid #334155; border-radius:12px;
-            padding:15px 17px; margin-bottom:14px; }
-        .ck-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
-        .ck-name { font-size:1.05rem; font-weight:800; color:#f1f5f9; }
-        .ck-prog { font-size:0.62rem; font-weight:800; padding:2px 8px; border-radius:10px; margin-left:8px; vertical-align:middle; }
+        /* Child grid — 2-up on a landscape tablet, 1-up when narrow. Compact cards. */
+        .ck-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(330px,1fr)); gap:14px; }
+        .ck-card { background:#1e293b; border:1px solid #334155; border-radius:14px; padding:14px 15px;
+            transition:border-color 0.12s; }
+        .ck-card-complete { opacity:0.62; }
+        .ck-card-head { display:flex; align-items:center; gap:11px; margin-bottom:11px; }
+        .ck-avatar { width:38px; height:38px; flex-shrink:0; border-radius:50%; background:#334155;
+            color:#e2e8f0; font-size:0.82rem; font-weight:800; display:flex; align-items:center; justify-content:center; }
+        .ck-card-id { flex:1; min-width:0; }
+        .ck-name { font-size:1rem; font-weight:800; color:#f1f5f9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .ck-prog { font-size:0.58rem; font-weight:800; padding:2px 7px; border-radius:9px; margin-left:7px; vertical-align:middle; }
         .ck-prog-pi  { background:#7c3aed33; color:#c4b5fd; }
         .ck-prog-pfa { background:#0891b233; color:#7dd3fc; }
-        .ck-meta { font-size:0.72rem; color:#94a3b8; margin-top:2px; }
-        .ck-status-ok  { font-size:0.72rem; font-weight:700; color:#4ade80; white-space:nowrap; }
-        .ck-status-out { font-size:0.72rem; font-weight:700; color:#fbbf24; white-space:nowrap; }
-        .ck-chips { display:flex; flex-wrap:wrap; gap:9px; }
-        /* Chips are large tap targets — a parent uses these with a fingertip or the stylus. */
-        .ck-chip { display:inline-flex; align-items:center; gap:6px; padding:11px 15px; border-radius:10px;
-            font-size:0.86rem; font-weight:700; cursor:pointer; border:1.5px solid #334155;
-            background:#0f172a; color:#cbd5e1; text-decoration:none; }
-        .ck-chip:hover { border-color:#2563eb; }
-        .ck-chip-done { background:#14532d33; border-color:#166534; color:#86efac; cursor:default; }
-        .ck-chip-partial { border-color:#b45309; color:#fbbf24; }
+        /* One badge: a count of what's left, or a green tick when done. */
+        .ck-badge { flex-shrink:0; min-width:26px; height:26px; padding:0 8px; border-radius:13px;
+            display:flex; align-items:center; justify-content:center; font-size:0.82rem; font-weight:800; }
+        .ck-badge-out { background:#78350f; color:#fde68a; }
+        .ck-badge-ok  { background:#14532d; color:#86efac; }
+        .ck-chips { display:flex; flex-wrap:wrap; gap:8px; }
+        /* Chips: outstanding ones are solid and tappable; done ones recede to a quiet tick. */
+        .ck-chip { display:inline-flex; align-items:center; gap:5px; padding:9px 13px; border-radius:9px;
+            font-size:0.8rem; font-weight:700; cursor:pointer; border:1.5px solid transparent;
+            background:#2563eb; color:#fff; text-decoration:none; }
+        .ck-chip:hover { background:#1d4ed8; }
+        .ck-chip:active { transform:scale(0.97); }
+        .ck-chip-done { background:transparent; border-color:#1e3a2f; color:#4ade80; cursor:default;
+            font-weight:600; padding:9px 11px; }
+        .ck-chip-partial { background:#b45309; color:#fff; }
+        .ck-chip-partial:hover { background:#92400e; }
 
-        /* Outstanding summary, collapsible. */
-        .ck-outstanding { background:#1e293b; border:1px solid #334155; border-radius:12px;
-            overflow:hidden; margin-bottom:16px; }
-        .ck-out-head { display:flex; align-items:center; gap:8px; width:100%; text-align:left;
-            padding:14px 17px; background:#0f172a; border:none; color:#e2e8f0; font-size:0.86rem;
-            font-weight:800; cursor:pointer; font-family:inherit; }
-        .ck-out-caret { transition:transform 0.15s; color:#94a3b8; font-size:0.72rem; }
-        .ck-outstanding.open .ck-out-caret { transform:rotate(90deg); }
-        .ck-out-body { display:none; }
-        .ck-outstanding.open .ck-out-body { display:block; }
-        .ck-out-row { display:flex; align-items:center; justify-content:space-between; gap:10px;
-            padding:11px 17px; border-top:1px solid #334155; font-size:0.84rem; }
-        .ck-out-label { font-weight:700; color:#cbd5e1; }
-        .ck-out-count { font-size:0.72rem; font-weight:700; color:#fbbf24; background:#78350f33;
-            padding:3px 10px; border-radius:11px; white-space:nowrap; }
-        .ck-alldone { padding:16px; border-radius:12px; background:#14532d33; border:1px solid #166534;
-            color:#86efac; font-size:0.86rem; margin-bottom:16px; }
+        .ck-empty { padding:48px; text-align:center; color:#94a3b8; font-size:0.95rem;
+            background:#1e293b; border:1px solid #334155; border-radius:12px; }
     </style>
 </head>
 <body>
@@ -286,68 +301,93 @@ function badPassword() {
 
 function buildRoomPicker() {
     const sel = $('ckRoom');
-    // Only rooms that actually have PFA/PI children to sign for.
-    const withKids = CK_ROOMS.filter(r =>
-        CK_STUDENTS.some(s => String(s.RoomNumber) === String(r.RoomNumber)
-            && (s.Active === 'Yes' || s.Active === 'YES')
-            && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI')));
-    const rooms = withKids.length ? withKids : CK_ROOMS;
+    // Every classroom is selectable — a teacher picks their room whatever its mix.
+    const rooms = CK_ROOMS.slice();
     if (!rooms.length) { $('ckBody').innerHTML = '<div class="ck-empty">No classrooms found.</div>'; return; }
     if (ckActiveRoom === null || !rooms.some(r => String(r.RoomNumber) === String(ckActiveRoom))) {
         ckActiveRoom = rooms[0].RoomNumber;
     }
-    sel.innerHTML = rooms.map(r =>
-        '<option value="' + esc(String(r.RoomNumber)) + '"' + (String(r.RoomNumber) === String(ckActiveRoom) ? ' selected' : '') + '>'
-        + esc(r.Room || ('Room ' + r.RoomNumber)) + '</option>').join('');
-    sel.onchange = () => { ckActiveRoom = sel.value; renderRoom(); };
+    sel.innerHTML = rooms.map(r => {
+        const n = roster(r.RoomNumber).length;
+        return '<option value="' + esc(String(r.RoomNumber)) + '"' + (String(r.RoomNumber) === String(ckActiveRoom) ? ' selected' : '') + '>'
+            + esc(r.Room || ('Room ' + r.RoomNumber)) + (n ? ' \u00b7 ' + n + ' children' : '') + '</option>';
+    }).join('');
+    sel.onchange = () => { ckActiveRoom = sel.value; ckOutstandingOpen = false; renderRoom(); };
     renderRoom();
 }
 
-// The PFA/PI children in a room, most-outstanding first.
+// Every ACTIVE child in a room. All children get these forms; PFA/PI is a tag on the
+// name, not a filter — the same rule the staff portal's classroom card uses. Sorted
+// most-outstanding first so the work to do rises to the top.
 function roster(roomNumber) {
     return CK_STUDENTS
         .filter(s => String(s.RoomNumber) === String(roomNumber)
-            && (s.Active === 'Yes' || s.Active === 'YES')
-            && (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI'))
+            && (s.Active === 'Yes' || s.Active === 'YES'))
         .sort(CofpForms.sortByName);
+}
+
+// How many checklist items a child still owes, for sorting and the count badge.
+function outstandingCount(s) {
+    const t = CK_TRACKING[s.Id] || {};
+    return CofpForms.COLUMNS.filter(col => !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
+}
+
+// Short labels for the chips — the full column labels are too long for a tight grid.
+const CK_SHORT = {
+    PermissionSlip: 'Permission', ParentInterview: 'Interview',
+    BegASQ: 'Beg ASQ', BegASE: 'Beg ASE', EndASQ: 'End ASQ', EndASE: 'End ASE',
+    MidYearReport: 'Mid Report', EndYearReport: 'End Report'
+};
+
+function actionFor(field, id) {
+    if (field === 'BegASQ' || field === 'EndASQ') return 'screening|' + id + '|ASQ-3|' + (field === 'BegASQ' ? 'Beginning' : 'End');
+    if (field === 'BegASE' || field === 'EndASE') return 'screening|' + id + '|ASQ:SE-2|' + (field === 'BegASE' ? 'Beginning' : 'End');
+    if (field === 'PermissionSlip') return 'permission|' + id;
+    if (field === 'ParentInterview') return 'interview|' + id;
+    if (field === 'MidYearReport' || field === 'EndYearReport') return 'upload|' + id + '|' + field;
+    return '';
 }
 
 function renderRoom() {
     const body = $('ckBody');
     const cols = CofpForms.COLUMNS;      // the eight teacher columns
-    const list = roster(ckActiveRoom);
-    if (!list.length) { body.innerHTML = '<div class="ck-empty">No PFA or PI children in this classroom.</div>'; return; }
+    // Most outstanding first, then by name.
+    const list = roster(ckActiveRoom).sort((a, b) => {
+        const d = outstandingCount(b) - outstandingCount(a);
+        return d !== 0 ? d : CofpForms.sortByName(a, b);
+    });
+    if (!list.length) { body.innerHTML = '<div class="ck-empty">No active children in this classroom.</div>'; return; }
 
-    // Outstanding summary (collapsible), print-free.
+    const totalOut = list.reduce((n, s) => n + outstandingCount(s), 0);
+    const roomName = (CK_ROOMS.find(r => String(r.RoomNumber) === String(ckActiveRoom)) || {}).Room || '';
+
+    // Room summary line: children count + outstanding, with a collapsible breakdown.
     const batch = cols.map(col => {
         const missing = list.filter(s => !ChildForms.isDone(s.Id, col.field, !!(CK_TRACKING[s.Id] || {})[col.field]));
         if (!missing.length) return '';
-        const label = col.label.replace(/<br>/g, ' ');
-        return '<div class="ck-out-row"><span class="ck-out-label">' + esc(label) + '</span>'
-            + '<span class="ck-out-count">' + missing.length + ' to do</span></div>';
+        return '<div class="ck-out-row"><span class="ck-out-label">' + esc(CK_SHORT[col.field] || col.field) + '</span>'
+            + '<span class="ck-out-count">' + missing.length + '</span></div>';
     }).filter(Boolean).join('');
 
-    const summary = batch
-        ? '<div class="ck-outstanding' + (ckOutstandingOpen ? ' open' : '') + '">'
-            + '<button type="button" class="ck-out-head" id="ckOutToggle" aria-expanded="' + (ckOutstandingOpen ? 'true' : 'false') + '">'
-            + '<span class="ck-out-caret">\u25B8</span> Outstanding for this classroom</button>'
-            + '<div class="ck-out-body">' + batch + '</div></div>'
-        : '<div class="ck-alldone">Everything for this classroom is complete for ' + esc(CK_YEAR) + '.</div>';
+    const summary =
+        '<div class="ck-summary">'
+        + '<div class="ck-summary-line">'
+        + '<span class="ck-summary-count">' + list.length + ' ' + (list.length === 1 ? 'child' : 'children') + '</span>'
+        + (totalOut
+            ? '<button type="button" class="ck-summary-out' + (ckOutstandingOpen ? ' open' : '') + '" id="ckOutToggle" aria-expanded="' + (ckOutstandingOpen ? 'true' : 'false') + '">'
+              + '<span class="ck-out-caret">\u25B8</span> ' + totalOut + ' to sign</button>'
+            : '<span class="ck-summary-done">\u2713 all complete</span>')
+        + '</div>'
+        + (totalOut ? '<div class="ck-out-body"' + (ckOutstandingOpen ? '' : ' style="display:none;"') + '>' + batch + '</div>' : '')
+        + '</div>';
 
     const cards = list.map(s => {
         const t = CK_TRACKING[s.Id] || {};
         const chips = cols.map(col => {
             const st = ChildForms.state(s.Id, col.field, !!t[col.field]);
             const done = st === 'form' || st === 'tick' || st === 'unknown';
-            const label = col.label.replace(/<br>/g, ' ');
-            let action = '';
-            if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
-                const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';
-                const period = col.field.indexOf('Beg') === 0 ? 'Beginning' : 'End';
-                action = 'screening|' + s.Id + '|' + type + '|' + period;
-            } else if (col.field === 'PermissionSlip') { action = 'permission|' + s.Id; }
-            else if (col.field === 'ParentInterview') { action = 'interview|' + s.Id; }
-            else if (col.field === 'MidYearReport' || col.field === 'EndYearReport') { action = 'upload|' + s.Id + '|' + col.field; }
+            const label = CK_SHORT[col.field] || col.field.replace(/<br>/g, ' ');
+            const action = actionFor(col.field, s.Id);
             const cls = 'ck-chip' + (done ? ' ck-chip-done' : '') + (st === 'partial' ? ' ck-chip-partial' : '');
             const inner = (done ? '\u2713 ' : '') + esc(label);
             return (action && !done)
@@ -355,24 +395,32 @@ function renderRoom() {
                 : '<span class="' + cls + '">' + inner + '</span>';
         }).join('');
 
-        const out = cols.filter(col => !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
-        const status = out ? '<span class="ck-status-out">' + out + ' outstanding</span>' : '<span class="ck-status-ok">\u2713 complete</span>';
+        const out = outstandingCount(s);
+        const status = out
+            ? '<span class="ck-badge ck-badge-out">' + out + '</span>'
+            : '<span class="ck-badge ck-badge-ok">\u2713</span>';
         const prog = String(s.PFA_PI_na || '').trim().toUpperCase();
         const progTag = (prog === 'PI' || prog === 'PFA')
             ? '<span class="ck-prog ck-prog-' + prog.toLowerCase() + '">' + prog + '</span>' : '';
+        const initials = ((s.First_Name || '')[0] || '') + ((s.Last_Name || '')[0] || '');
 
-        return '<div class="ck-card"><div class="ck-card-head">'
-            + '<div class="ck-name">' + esc(s.Last_Name + ', ' + s.First_Name) + progTag + '</div>'
-            + status + '</div><div class="ck-chips">' + chips + '</div></div>';
+        return '<div class="ck-card' + (out ? '' : ' ck-card-complete') + '">'
+            + '<div class="ck-card-head">'
+            + '<div class="ck-avatar">' + esc(initials.toUpperCase()) + '</div>'
+            + '<div class="ck-card-id"><div class="ck-name">' + esc(s.First_Name + ' ' + s.Last_Name) + progTag + '</div></div>'
+            + status + '</div>'
+            + '<div class="ck-chips">' + chips + '</div></div>';
     }).join('');
 
-    body.innerHTML = summary + cards;
+    body.innerHTML = '<div class="ck-roomtitle">' + esc(roomName) + '</div>'
+        + summary + '<div class="ck-grid">' + cards + '</div>';
 
     const toggle = $('ckOutToggle');
     if (toggle) toggle.addEventListener('click', () => {
         ckOutstandingOpen = !ckOutstandingOpen;
-        const card = toggle.closest('.ck-outstanding');
-        if (card) card.classList.toggle('open', ckOutstandingOpen);
+        toggle.classList.toggle('open', ckOutstandingOpen);
+        const bodyEl = toggle.closest('.ck-summary').querySelector('.ck-out-body');
+        if (bodyEl) bodyEl.style.display = ckOutstandingOpen ? '' : 'none';
         toggle.setAttribute('aria-expanded', ckOutstandingOpen ? 'true' : 'false');
     });
 
