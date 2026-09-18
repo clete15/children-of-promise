@@ -3572,9 +3572,10 @@ function handleRequest(req, res) {
     // GET students (internal - protected; classroom kiosk may read the roster)
     if (req.method === 'GET' && url === '/api/students') {
         if (!checkClassroomAuth(req, res)) return;
-        // Ensure CCAPStartDate column exists (separate batch so metadata refreshes)
-        runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='CCAPStartDate') ALTER TABLE rptMasterEnrollment ADD CCAPStartDate NVARCHAR(20)`);
-        const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
+        // Ensure late-added columns exist (separate batch so metadata refreshes).
+        runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='CCAPStartDate') ALTER TABLE rptMasterEnrollment ADD CCAPStartDate NVARCHAR(20);
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE rptMasterEnrollment ADD HomeLanguage NVARCHAR(60)`);
+        const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate,ISNULL(e.HomeLanguage,'') AS HomeLanguage FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         // NB the SELECT's 12th column is DCFSCapacity but the API exposes it as
         // Room_Capacity, so the key list here is authoritative, not the SELECT aliases.
@@ -3583,7 +3584,7 @@ function handleRequest(req, res) {
             'RoomNumber','Room','TeacherDescription','Type','Room_Capacity',
             'Monday','Tuesday','Wednesday','Thursday','Friday','Active','Category','PFA_PI_na',
             'F_R_P_Food','IEP','Military','HouseholdIncome','ProofOfIncomeFile',
-            'ProofOfIncomeUploaded','PublicBenefits','HouseholdSize','CCAPStartDate']);
+            'ProofOfIncomeUploaded','PublicBenefits','HouseholdSize','CCAPStartDate','HomeLanguage']);
         return sendJSON(res, 200, rows);
     }
 
@@ -3800,6 +3801,7 @@ function handleRequest(req, res) {
             if (d.publicBenefits !== undefined)   fields.push(`PublicBenefits=${esc(d.publicBenefits)}`);
             if (d.proofOfIncome !== undefined)    fields.push(`ProofOfIncomeUploaded=${d.proofOfIncome?1:0}`);
             if (d.ccapStartDate !== undefined)    fields.push(`CCAPStartDate=${esc(d.ccapStartDate)}`);
+            if (d.homeLanguage !== undefined)     fields.push(`HomeLanguage=${esc(d.homeLanguage)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
             const sql = `UPDATE rptMasterEnrollment SET ${fields.join(',')} WHERE First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
             console.log('[PUT SQL]', sql);
@@ -3953,7 +3955,8 @@ function handleRequest(req, res) {
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='DaysRequested') ALTER TABLE PreEnrollment ADD DaysRequested NVARCHAR(50);
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ScreeningDelayNoEi') ALTER TABLE PreEnrollment ADD ScreeningDelayNoEi NVARCHAR(10);
                 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='ParentEll') ALTER TABLE PreEnrollment ADD ParentEll NVARCHAR(10);
-                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='IncomeBelow50Fpl') ALTER TABLE PreEnrollment ADD IncomeBelow50Fpl NVARCHAR(10);`;
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='IncomeBelow50Fpl') ALTER TABLE PreEnrollment ADD IncomeBelow50Fpl NVARCHAR(10);
+                IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE PreEnrollment ADD HomeLanguage NVARCHAR(60);`;
             const insertSql = `
                 INSERT INTO PreEnrollment (
                     FirstName,LastName,Email,Address,City,Zip,Country,Phone,
@@ -3963,7 +3966,7 @@ function handleRequest(req, res) {
                     BrightpointSubsidy,LivingSituation,EarlyIntervention,
                     AbuseHistory,MentalIllness,DcfsInvolvement,SubstanceAbuse,
                     CaregiverOther,FamilyDeath,LowBirthWeight,ParentIncarcerated,
-                    ScreeningDelayNoEi,ParentEll,IncomeBelow50Fpl,Score
+                    ScreeningDelayNoEi,ParentEll,IncomeBelow50Fpl,HomeLanguage,Score
                 ) VALUES (
                     ${esc(d.firstName)},${esc(d.lastName)},${esc(d.email)},
                     ${esc(d.address)},${esc(d.city)},${esc(d.zip)},${esc(d.country)},
@@ -3977,7 +3980,7 @@ function handleRequest(req, res) {
                     ${esc(d.dcfsInvolvement)},${esc(d.substanceAbuse)},
                     ${esc(d.caregiverOther)},${esc(d.familyDeath)},
                     ${esc(d.lowBirthWeight)},${esc(d.parentIncarcerated)},
-                    ${esc(d.screeningDelayNoEi)},${esc(d.parentEll)},${esc(d.incomeBelow50Fpl)},
+                    ${esc(d.screeningDelayNoEi)},${esc(d.parentEll)},${esc(d.incomeBelow50Fpl)},${esc(d.homeLanguage)},
                     ${parseInt(d.score)||0}
                 );`;
             // 1. Make sure the table and every column exist. Its own batch, so the

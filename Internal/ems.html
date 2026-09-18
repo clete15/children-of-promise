@@ -214,6 +214,11 @@
                                 <label>Food Program</label>
                                 <input type="text" id="frpFood" readonly style="background:var(--sp-surface-2);font-weight:700;">
                             </div>
+                            <div class="form-group">
+                                <label>Primary Home Language</label>
+                                <input type="text" id="homeLanguage" placeholder="e.g. English, Spanish"
+                                       title="The language primarily spoken in the child's home. Fills the ELL column on the PFA Item 1 form.">
+                            </div>
                             <div class="form-group" style="display:none;align-items:flex-end;gap:16px;padding-bottom:2px;">
                                 <div class="checkbox-item"><input type="checkbox" id="iep"><label for="iep">IEP</label></div>
                                 <div class="checkbox-item"><input type="checkbox" id="military"><label for="military">Military</label></div>
@@ -432,6 +437,7 @@ function loadRecord(i) {
     document.getElementById('frpFood').value     = s.F_R_P_Food || '';
     document.getElementById('iep').checked       = isTruthy(s.IEP);
     document.getElementById('military').checked  = isTruthy(s.Military);
+    document.getElementById('homeLanguage').value = s.HomeLanguage || '';
     document.getElementById('householdIncome').value = s.HouseholdIncome || '';
     document.getElementById('householdSize').value   = s.HouseholdSize || '';
 
@@ -473,8 +479,8 @@ function setBenefitsReadOnly(readOnly, s) {
 }
 
 function clearForm() {
-    ['firstName','lastName','birthDate','startDate','cityTown','daysOld','householdIncome','householdSize']
-        .forEach(id => document.getElementById(id).value = '');
+    ['firstName','lastName','birthDate','startDate','cityTown','daysOld','householdIncome','householdSize','homeLanguage']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; })
     ['monday','tuesday','wednesday','thursday','friday','iep','military','benWIC','benMedicaid','benSNAP','benTANF','proofOfIncome']
         .forEach(id => document.getElementById(id).checked = false);
     document.getElementById('active').value = 'Yes';
@@ -542,6 +548,7 @@ function buildBody() {
         frpFood:    val('frpFood').value,
         iep:        val('iep').checked,
         military:   val('military').checked,
+        homeLanguage: val('homeLanguage') ? val('homeLanguage').value.trim() : '',
         householdIncome: val('householdIncome') ? val('householdIncome').value : '',
         householdSize:   val('householdSize') ? val('householdSize').value : '',
         publicBenefits:  collectBenefits(''),

@@ -327,11 +327,15 @@
     <div class="form-row">
         <div class="form-group">
             <label>Does the parent/caregiver primarily speak a language other than English at home? <span class="required">*</span></label>
-            <select id="nonEnglishHome" required>
+            <select id="nonEnglishHome" required onchange="document.getElementById('homeLanguageGroup').style.display = this.value === 'Yes' ? '' : 'none';">
                 <option value="">Select</option>
                 <option value="Yes">Yes</option>
                 <option value="No">No</option>
             </select>
+        </div>
+        <div class="form-group" id="homeLanguageGroup" style="display:none;">
+            <label>If yes, what language is primarily spoken at home?</label>
+            <input type="text" id="homeLanguage" placeholder="e.g. Spanish">
         </div>
         <div class="form-group">
             <label>Has the child previously participated in a formal early learning program? <span class="required">*</span></label>
@@ -750,6 +754,7 @@ function collectHouseholdData() {
         bornOutsideUS:      document.getElementById('bornOutsideUS').value,
         fosterAdopted:      document.getElementById('fosterAdopted').value,
         nonEnglishHome:     document.getElementById('nonEnglishHome').value,
+        homeLanguage:       document.getElementById('homeLanguage').value.trim(),
         activeMilitary:     document.getElementById('activeMilitary').value,
         priorEarlyLearning: document.getElementById('priorEarlyLearning').value,
         brightpointSubsidy: document.getElementById('brightpointSubsidy').value,
