@@ -327,10 +327,19 @@ function render() {
         /* Addressable, so a link can land on one item. The compliance checklist has
            always linked here with the item number in the hash, and nothing was listening
            for it: you arrived at the top of a list of forty folders and hunted. */
+        /* The item's display name. PI items are folder-based, so the folder name is
+           the label. PFA items are FILE-based (flat visit folder), so there is no
+           folder — fall back to the item key, then to the first file's name. Reading
+           folders[0] blind was the "Cannot read properties of undefined (reading
+           'replace')" crash the moment a file-based (PFA) folder was opened. */
+        const itLabelRaw = (it.folders && it.folders[0])
+            || it.item || k
+            || (it.files[0] && it.files[0].name)
+            || '';
         html += '<details class="dl-item" id="' + esc('item-' + (it.item || k)) + '">'
             + '<summary>'
             + '<span class="dl-num">' + esc(it.item || '—') + '</span>'
-            + '<span>' + esc(it.folders[0].replace(/\s*-\s*[MC]\s*$/, '')) + '</span>'
+            + '<span>' + esc(String(itLabelRaw).replace(/\s*-\s*[MC]\s*$/, '')) + '</span>'
             + '<span class="dl-own' + (it.owner ? '' : ' none') + '">'
             + esc(it.owner || 'no owner') + '</span>'
             + (stale ? '<span class="dl-badge stale">' + stale + ' earlier year</span>' : '')
