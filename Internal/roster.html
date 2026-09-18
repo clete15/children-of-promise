@@ -31,8 +31,10 @@
         .btn-mini { padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.72rem;font-weight:700;cursor:pointer; }
         .rr-settings table { width:100%;border-collapse:collapse;font-size:0.8rem; }
         .rr-settings th { padding:6px 8px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted); }
-        .rr-settings input { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem; }
-        .rr-settings select { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;font-family:inherit;background:white; }
+        .rr-settings input { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;background:#fff;color:#1e293b; }
+        /* Explicit dark-on-white so the option text is readable regardless of theme. */
+        .rr-settings select { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;font-family:inherit;background:#fff;color:#1e293b; }
+        .rr-settings select option { color:#1e293b;background:#fff; }
 
         /* Roster table */
         .rr-grid table { border-collapse:collapse;font-size:0.78rem; }
@@ -96,7 +98,7 @@
                         <th>Teacher 1</th>
                         <th>Teacher 2</th>
                         <th style="width:70px;">Capacity</th>
-                        <th style="width:90px;">Age Range</th>
+                        <th style="width:150px;">Age Range</th>
                         <th style="width:50px;text-align:center;">Save</th>
                     </tr></thead>
                     <tbody id="rosterSettingsBody"></tbody>
