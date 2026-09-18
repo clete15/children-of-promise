@@ -149,10 +149,16 @@
 
 <!-- Shared machinery: the sign pad, the form modals, the tick/evidence logic, and
      app.js helpers. The kiosk reuses exactly what the ISBE roster and the staff
-     portal use, so a signature captured here is filed the same way. -->
-<script src="/staff/sign-pad.js"></script>
-<script src="/staff/child-forms.js"></script>
-<script src="/staff/classroom-forms.js"></script>
+     portal use, so a signature captured here is filed the same way.
+
+     Each script records whether it FAILED to load (onerror) so the kiosk can name
+     the exact file that didn't arrive, instead of a vague "a page file didn't load".
+     A cache-buster query is appended so a tablet that cached an older kiosk (before
+     these modules existed, or a broken copy) is forced to re-fetch the current ones. -->
+<script>window.__ckScriptFail = [];</script>
+<script src="/staff/sign-pad.js?v=2" onerror="window.__ckScriptFail.push('sign-pad.js')"></script>
+<script src="/staff/child-forms.js?v=2" onerror="window.__ckScriptFail.push('child-forms.js')"></script>
+<script src="/staff/classroom-forms.js?v=2" onerror="window.__ckScriptFail.push('classroom-forms.js')"></script>
 <script>
 /* ── Classroom kiosk ──────────────────────────────────────────────────────────
    A signing station for a classroom tablet. It holds the classroom password (this
@@ -194,6 +200,7 @@ let CK_YEAR = '';
 let ckActiveRoom = null;
 let ckOutstandingOpen = false;
 let ckModulesMissing = false;
+let ckModuleDetail = '';
 
 function currentSchoolYear() {
     const now = new Date();
@@ -302,9 +309,17 @@ async function start() {
         CK_STUDENTS = await sRes.json(); if (!Array.isArray(CK_STUDENTS)) CK_STUDENTS = [];
         CK_ROOMS = await cRes.json();    if (!Array.isArray(CK_ROOMS)) CK_ROOMS = [];
 
-        if (!window.CofpForms || !window.ChildForms) {
-            console.error('[KIOSK] shared modules missing:',
-                { CofpForms: !!window.CofpForms, ChildForms: !!window.ChildForms });
+        if (!window.CofpForms || !window.ChildForms || !window.SignPad) {
+            const miss = [];
+            if (!window.SignPad) miss.push('sign-pad.js (SignPad)');
+            if (!window.ChildForms) miss.push('child-forms.js (ChildForms)');
+            if (!window.CofpForms) miss.push('classroom-forms.js (CofpForms)');
+            console.error('[KIOSK] shared modules missing:', miss,
+                'script load failures:', window.__ckScriptFail || []);
+            ckModuleDetail = miss.join(', ')
+                + ((window.__ckScriptFail && window.__ckScriptFail.length)
+                    ? '  |  did not load: ' + window.__ckScriptFail.join(', ')
+                    : '');
             ckModulesMissing = true;
         }
 
@@ -497,7 +512,10 @@ function renderRoom() {
 
     const warn = ckModulesMissing
         ? '<div class="ck-warn">Signing isn\u2019t available right now (a page file didn\u2019t load). '
-          + 'Reload the page; if it keeps happening, tell Clete.</div>'
+          + 'Reload the page; if it keeps happening, tell Clete.'
+          + (ckModuleDetail ? '<div style="margin-top:6px;font-size:0.75rem;opacity:0.85;">Missing: '
+              + esc(ckModuleDetail) + '</div>' : '')
+          + '</div>'
         : '';
 
     body.innerHTML = '<div class="ck-roomtitle">' + esc(roomName) + '</div>'
