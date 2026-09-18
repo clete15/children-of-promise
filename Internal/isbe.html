@@ -1340,7 +1340,12 @@ const COLUMNS = [
     { field: 'EndASQ', teacher: true, label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.' },
     { field: 'EndASE', teacher: true, label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.' },
     { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card', title: 'Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.' },
-    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', programs: ['PI'], title: 'PICC PI5.A - weighted eligibility form with income verification, dated on or before enrollment. Pre-fills from the pre-enrollment record.' },
+    /* Weighted Eligibility applies to BOTH programs. ISBE publishes a PFA/PFAE Weighted
+       Eligibility Form (the priority/weighted enrollment system: at-risk first, then
+       families under 4x poverty, then others) as well as the PI eligibility form, with
+       income verification within 6 months of enrollment retained in the child's file.
+       So it is not PI-only — no `programs` restriction. */
+    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', title: 'Weighted eligibility form with income verification, dated on or before enrollment, retained in the child\u2019s file. Required for PFA (priority/weighted enrollment) and PI. Pre-fills from the pre-enrollment record.' },
     { field: 'ScreeningResultsShared', label: 'Results<br>Shared', docForm: 'screeningResultsShared', programs: ['PI'], title: 'PICC PI10.H - documentation that developmental screening results were shared with the parent or guardian.' },
     { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment', docForm: 'familyAssessment', programs: ['PI'], title: 'PICC PI6.A - published, research-based Family Centered Assessment conducted within 6 months of enrollment (LSP, Baby TALK, FROG).' },
     { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan', docForm: 'familyGoalPlan', programs: ['PI'], title: 'PICC PI6.B - Individual Family Goal Plan developed within 6 months of enrollment and updated annually thereafter.' },
