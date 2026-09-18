@@ -265,44 +265,79 @@ function initForms() {
     ckFormsReady = true;
 }
 
+// A fetch that cannot hang forever: rejects after `ms` if the server never answers.
+function ckFetchT(url, ms) {
+    return Promise.race([
+        ckFetch(url),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timed out')), ms || 12000))
+    ]);
+}
+
 async function start() {
     CK_YEAR = currentSchoolYear();
     initForms();
+
+    /* ESSENTIAL first: only the roster and the room list are needed to render. These
+       are awaited (with a timeout so a stalled server shows an error instead of a
+       forever spinner). Everything else — tracking, screenings, which forms exist,
+       signatures — is an ENHANCEMENT that decorates the cards with done/undone state,
+       so it loads in the background and re-renders when it lands. This is what keeps
+       the page from hanging if one of those heavier calls is slow. */
     try {
-        const [sRes, cRes, tRes, scrRes] = await Promise.all([
-            ckFetch('/api/students'),
-            ckFetch('/api/classrooms'),
-            ckFetch(yq('/api/isbe-tracking')).catch(() => null),
-            ckFetch(yq('/api/screening-summary')).catch(() => null),
-            (window.ChildForms && ChildForms.load) ? ChildForms.load(CK_YEAR, ckFetch).catch(() => null) : Promise.resolve(),
-            (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(CK_YEAR, ckFetch).catch(() => null) : Promise.resolve(),
-            (window.CofpForms && CofpForms.loadSignatures) ? CofpForms.loadSignatures(CK_YEAR).then(s => { CK_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve()
+        const [sRes, cRes] = await Promise.all([
+            ckFetchT('/api/students', 12000),
+            ckFetchT('/api/classrooms', 12000)
         ]);
         if (sRes.status === 401 || cRes.status === 401) { badPassword(); return; }
         CK_STUDENTS = await sRes.json(); if (!Array.isArray(CK_STUDENTS)) CK_STUDENTS = [];
         CK_ROOMS = await cRes.json();    if (!Array.isArray(CK_ROOMS)) CK_ROOMS = [];
-        CK_TRACKING = {};
-        if (tRes && tRes.ok) { (await tRes.json() || []).forEach(t => { CK_TRACKING[t.StudentId] = t; }); }
-        CK_SCREENING = {};
-        if (scrRes && scrRes.ok) {
-            (await scrRes.json() || []).forEach(s => {
-                if (!CK_SCREENING[s.StudentId]) CK_SCREENING[s.StudentId] = {};
-                CK_SCREENING[s.StudentId][s.ScreeningType + '|' + s.Period] = s;
-            });
-        }
     } catch (e) {
-        $('ckBody').innerHTML = '<div class="ck-empty">Could not load: ' + esc(e.message) + '</div>';
+        $('ckBody').innerHTML = '<div class="ck-empty">Could not load the roster ('
+            + esc(e.message) + '). <button type="button" class="ck-exit" onclick="location.reload()" '
+            + 'style="margin-left:10px;">Reload</button></div>';
         return;
     }
-    // If the shared form modules did not load, the roster still renders (teachers can
-    // see who needs what) but signing won't open. Say so plainly rather than failing
-    // silently, and log it so it can be diagnosed from the tablet's console.
+
     if (!window.CofpForms || !window.ChildForms) {
         console.error('[CLASSROOM KIOSK] shared modules missing:',
             { CofpForms: !!window.CofpForms, ChildForms: !!window.ChildForms });
         ckModulesMissing = true;
     }
+
+    // Render immediately with what we have, then enrich in the background.
     buildRoomPicker();
+    loadEnhancements();
+    return;
+}
+
+/* The optional, decorating data. Loaded after the first paint so a slow or stalled
+   endpoint can never block the page. Each is independent and best-effort; when the
+   set finishes (or times out) the open room is redrawn so ticks/counts appear. */
+async function loadEnhancements() {
+    const settle = (p) => Promise.race([
+        Promise.resolve(p).catch(() => null),
+        new Promise(r => setTimeout(() => r(null), 12000))
+    ]);
+    try {
+        const [tRes, scrRes] = await Promise.all([
+            settle(ckFetch(yq('/api/isbe-tracking'))),
+            settle(ckFetch(yq('/api/screening-summary'))),
+            settle((window.ChildForms && ChildForms.load) ? ChildForms.load(CK_YEAR, ckFetch) : null),
+            settle((window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(CK_YEAR, ckFetch) : null),
+            settle((window.CofpForms && CofpForms.loadSignatures)
+                ? CofpForms.loadSignatures(CK_YEAR).then(s => { CK_SIGNATURES = s || {}; }) : null)
+        ]);
+        CK_TRACKING = {};
+        if (tRes && tRes.ok) { (await tRes.json().catch(() => []) || []).forEach(t => { CK_TRACKING[t.StudentId] = t; }); }
+        CK_SCREENING = {};
+        if (scrRes && scrRes.ok) {
+            (await scrRes.json().catch(() => []) || []).forEach(s => {
+                if (!CK_SCREENING[s.StudentId]) CK_SCREENING[s.StudentId] = {};
+                CK_SCREENING[s.StudentId][s.ScreeningType + '|' + s.Period] = s;
+            });
+        }
+    } catch (e) { /* best-effort: the roster already rendered without this */ }
+    renderRoom();
 }
 
 function badPassword() {
