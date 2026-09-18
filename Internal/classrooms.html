@@ -106,6 +106,8 @@
 
         .ck-empty { padding:48px; text-align:center; color:#94a3b8; font-size:0.95rem;
             background:#1e293b; border:1px solid #334155; border-radius:12px; }
+        .ck-warn { padding:12px 16px; margin-bottom:14px; border-radius:10px; font-size:0.85rem;
+            background:#7f1d1d33; border:1px solid #7f1d1d; color:#fca5a5; }
     </style>
 </head>
 <body>
@@ -191,6 +193,7 @@ let CK_SIGNATURES = {};      // by "studentId|Field|role"
 let CK_YEAR = '';
 let ckActiveRoom = null;
 let ckOutstandingOpen = false;
+let ckModulesMissing = false;
 
 function currentSchoolYear() {
     const now = new Date();
@@ -273,7 +276,7 @@ async function start() {
             ckFetch(yq('/api/screening-summary')).catch(() => null),
             (window.ChildForms && ChildForms.load) ? ChildForms.load(CK_YEAR, ckFetch).catch(() => null) : Promise.resolve(),
             (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(CK_YEAR, ckFetch).catch(() => null) : Promise.resolve(),
-            (window.CofpForms) ? CofpForms.loadSignatures(CK_YEAR).then(s => { CK_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve()
+            (window.CofpForms && CofpForms.loadSignatures) ? CofpForms.loadSignatures(CK_YEAR).then(s => { CK_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve()
         ]);
         if (sRes.status === 401 || cRes.status === 401) { badPassword(); return; }
         CK_STUDENTS = await sRes.json(); if (!Array.isArray(CK_STUDENTS)) CK_STUDENTS = [];
@@ -290,6 +293,14 @@ async function start() {
     } catch (e) {
         $('ckBody').innerHTML = '<div class="ck-empty">Could not load: ' + esc(e.message) + '</div>';
         return;
+    }
+    // If the shared form modules did not load, the roster still renders (teachers can
+    // see who needs what) but signing won't open. Say so plainly rather than failing
+    // silently, and log it so it can be diagnosed from the tablet's console.
+    if (!window.CofpForms || !window.ChildForms) {
+        console.error('[CLASSROOM KIOSK] shared modules missing:',
+            { CofpForms: !!window.CofpForms, ChildForms: !!window.ChildForms });
+        ckModulesMissing = true;
     }
     buildRoomPicker();
 }
@@ -316,20 +327,51 @@ function buildRoomPicker() {
     renderRoom();
 }
 
+// Name sort that works even if the shared module did not load.
+function byName(a, b) {
+    if (window.CofpForms && CofpForms.sortByName) return CofpForms.sortByName(a, b);
+    const c = (a.Last_Name || '').localeCompare(b.Last_Name || '');
+    return c !== 0 ? c : (a.First_Name || '').localeCompare(b.First_Name || '');
+}
+
+// The checklist columns, with a hardcoded fallback so the kiosk still renders if
+// classroom-forms.js failed to load (the shared list is the source of truth otherwise).
+function cols() {
+    return (window.CofpForms && CofpForms.COLUMNS) || [
+        { field: 'PermissionSlip', label: 'Permission Slip' },
+        { field: 'ParentInterview', label: 'Parent Interview' },
+        { field: 'BegASQ', label: 'Beg ASQ' }, { field: 'BegASE', label: 'Beg ASE' },
+        { field: 'MidYearReport', label: 'Mid Year Report Card' },
+        { field: 'EndASQ', label: 'End ASQ' }, { field: 'EndASE', label: 'End ASE' },
+        { field: 'EndYearReport', label: 'End Year Report Card' }
+    ];
+}
+
 // Every ACTIVE child in a room. All children get these forms; PFA/PI is a tag on the
-// name, not a filter — the same rule the staff portal's classroom card uses. Sorted
-// most-outstanding first so the work to do rises to the top.
+// name, not a filter. Sorted most-outstanding first so the work to do rises to the top.
 function roster(roomNumber) {
     return CK_STUDENTS
         .filter(s => String(s.RoomNumber) === String(roomNumber)
             && (s.Active === 'Yes' || s.Active === 'YES'))
-        .sort(CofpForms.sortByName);
+        .sort(byName);
+}
+
+// Whether a checklist item is done for a child — falls back to the raw tick if the
+// evidence module is missing.
+function itemDone(s, field) {
+    const ticked = !!(CK_TRACKING[s.Id] || {})[field];
+    if (window.ChildForms && ChildForms.isDone) return ChildForms.isDone(s.Id, field, ticked);
+    return ticked;
+}
+function itemState(s, field) {
+    const ticked = !!(CK_TRACKING[s.Id] || {})[field];
+    if (window.ChildForms && ChildForms.state) return ChildForms.state(s.Id, field, ticked);
+    return ticked ? 'tick' : 'none';
 }
 
 // How many checklist items a child still owes, for sorting and the count badge.
 function outstandingCount(s) {
-    const t = CK_TRACKING[s.Id] || {};
-    return CofpForms.COLUMNS.filter(col => !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
+    return cols().filter(col => !itemDone(s, col.field)).length;
 }
 
 // Short labels for the chips — the full column labels are too long for a tight grid.
@@ -350,11 +392,11 @@ function actionFor(field, id) {
 
 function renderRoom() {
     const body = $('ckBody');
-    const cols = CofpForms.COLUMNS;      // the eight teacher columns
+    const COLS = cols();      // the eight teacher columns (with a fallback)
     // Most outstanding first, then by name.
     const list = roster(ckActiveRoom).sort((a, b) => {
         const d = outstandingCount(b) - outstandingCount(a);
-        return d !== 0 ? d : CofpForms.sortByName(a, b);
+        return d !== 0 ? d : byName(a, b);
     });
     if (!list.length) { body.innerHTML = '<div class="ck-empty">No active children in this classroom.</div>'; return; }
 
@@ -362,8 +404,8 @@ function renderRoom() {
     const roomName = (CK_ROOMS.find(r => String(r.RoomNumber) === String(ckActiveRoom)) || {}).Room || '';
 
     // Room summary line: children count + outstanding, with a collapsible breakdown.
-    const batch = cols.map(col => {
-        const missing = list.filter(s => !ChildForms.isDone(s.Id, col.field, !!(CK_TRACKING[s.Id] || {})[col.field]));
+    const batch = COLS.map(col => {
+        const missing = list.filter(s => !itemDone(s, col.field));
         if (!missing.length) return '';
         return '<div class="ck-out-row"><span class="ck-out-label">' + esc(CK_SHORT[col.field] || col.field) + '</span>'
             + '<span class="ck-out-count">' + missing.length + '</span></div>';
@@ -382,9 +424,8 @@ function renderRoom() {
         + '</div>';
 
     const cards = list.map(s => {
-        const t = CK_TRACKING[s.Id] || {};
-        const chips = cols.map(col => {
-            const st = ChildForms.state(s.Id, col.field, !!t[col.field]);
+        const chips = COLS.map(col => {
+            const st = itemState(s, col.field);
             const done = st === 'form' || st === 'tick' || st === 'unknown';
             const label = CK_SHORT[col.field] || col.field.replace(/<br>/g, ' ');
             const action = actionFor(col.field, s.Id);
@@ -412,8 +453,13 @@ function renderRoom() {
             + '<div class="ck-chips">' + chips + '</div></div>';
     }).join('');
 
+    const warn = ckModulesMissing
+        ? '<div class="ck-warn">Signing isn\u2019t available right now (a page file didn\u2019t load). '
+          + 'Reload the page; if it keeps happening, tell Clete.</div>'
+        : '';
+
     body.innerHTML = '<div class="ck-roomtitle">' + esc(roomName) + '</div>'
-        + summary + '<div class="ck-grid">' + cards + '</div>';
+        + warn + summary + '<div class="ck-grid">' + cards + '</div>';
 
     const toggle = $('ckOutToggle');
     if (toggle) toggle.addEventListener('click', () => {
@@ -427,6 +473,7 @@ function renderRoom() {
     body.querySelectorAll('[data-act]').forEach(a => {
         a.addEventListener('click', e => {
             e.preventDefault();
+            if (!window.CofpForms) { alert('Signing is not available right now. Reload the page.'); return; }
             const parts = a.getAttribute('data-act').split('|');
             if (parts[0] === 'interview') CofpForms.openInterview(parseInt(parts[1], 10));
             else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
