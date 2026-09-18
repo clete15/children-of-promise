@@ -555,9 +555,6 @@
         var schoolYear = year();
 
         document.getElementById('psModalTitle').textContent = 'Permission Slip \u2013 ' + student.First_Name + ' ' + student.Last_Name;
-        document.getElementById('psParentNameDisplay').innerHTML = '&nbsp;';
-        document.getElementById('psTeacherDisplay').textContent = teacher || '\u00a0';
-        document.getElementById('psSchoolYearDisplay').textContent = schoolYear;
 
         document.getElementById('psParentName').value = '';
         document.getElementById('psSchoolYear').value = schoolYear;
@@ -580,12 +577,9 @@
             var data = await res.json();
             if (data && data.Id) {
                 document.getElementById('psParentName').value = data.ParentName || '';
-                document.getElementById('psParentNameDisplay').textContent = data.ParentName || '\u00a0';
                 document.getElementById('psSchoolYear').value = data.SchoolYear || schoolYear;
-                document.getElementById('psSchoolYearDisplay').textContent = data.SchoolYear || schoolYear;
                 document.getElementById('psDate').value = data.SignedDate || '';
                 document.getElementById('psTeacher').value = data.Teacher || teacher;
-                document.getElementById('psTeacherDisplay').textContent = data.Teacher || teacher || '\u00a0';
                 document.getElementById('psParentSig').value = data.ParentSignature || '';
                 document.getElementById('psParentSigDate').value = data.ParentSigDate || '';
                 document.getElementById('psTeacherSig').value = data.TeacherSignature || '';
@@ -1107,14 +1101,11 @@
         '<button class="pi-close" onclick="CofpForms.closePermissionSlip()" aria-label="Close">&times;</button></div>',
         '<div class="pi-modal-body">',
         '<div class="pi-section" style="text-align:center;padding:10px 0 20px;"><h4 style="font-size:1.1rem;font-weight:800;color:#1e3a8a;text-transform:none;letter-spacing:0;border:none;padding:0;margin:0 0 4px;">Children of Promise PFA</h4><div style="font-size:0.95rem;font-weight:700;color:#374151;">Permission to perform screenings</div></div>',
-        '<div class="pi-section"><div style="font-size:0.88rem;line-height:1.8;color:#374151;">I, <span style="display:inline-block;min-width:180px;border-bottom:1px solid #9ca3af;font-weight:600;text-align:center;" id="psParentNameDisplay">&nbsp;</span> consent to <span style="display:inline-block;min-width:180px;border-bottom:1px solid #9ca3af;font-style:italic;text-align:center;" id="psTeacherDisplay">&nbsp;</span> conducting screenings on my child for the <span style="display:inline-block;min-width:100px;border-bottom:1px solid #9ca3af;text-align:center;" id="psSchoolYearDisplay">&nbsp;</span> school year using Ages and Stages ASQ and ASE screening instruments.</div>',
+        '<div class="pi-section"><div style="font-size:0.88rem;line-height:2.4;color:#374151;">I, <input type="text" id="psParentName" class="pi-inline" placeholder="parent name"> consent to <input type="text" id="psTeacher" class="pi-inline pi-inline-italic" placeholder="teacher"> conducting screenings on my child for the <input type="text" id="psSchoolYear" class="pi-inline pi-inline-sm" placeholder="year"> school year using Ages and Stages ASQ and ASE screening instruments.</div></div>',
         '<p style="font-size:0.88rem;line-height:1.8;color:#374151;margin-top:16px;">Screenings will be performed at the beginning, middle, and end of the school year.</p>',
         '<p style="font-size:0.88rem;line-height:1.8;color:#374151;margin-top:16px;">Results of the screenings will be shared with the parents along with Teaching Strategies report cards at the middle and end of the school year.</p></div>',
         '<div class="pi-section" style="margin-top:24px;"><h4>Form Details</h4><div class="pi-grid">',
-        '<div class="pi-field"><label>Parent/Guardian Name</label><input type="text" id="psParentName" placeholder="Parent full name" oninput="document.getElementById(\'psParentNameDisplay\').textContent=this.value||\'\\u00a0\'"></div>',
-        '<div class="pi-field"><label>School Year</label><input type="text" id="psSchoolYear" placeholder="e.g. 2025-2026" oninput="document.getElementById(\'psSchoolYearDisplay\').textContent=this.value||\'\\u00a0\'"></div>',
-        '<div class="pi-field"><label>Date Signed</label><input type="date" id="psDate"></div>',
-        '<div class="pi-field"><label>Teacher</label><input type="text" id="psTeacher" placeholder="Teacher name" oninput="document.getElementById(\'psTeacherDisplay\').textContent=this.value||\'\\u00a0\'"></div></div></div>',
+        '<div class="pi-field"><label>Date Signed</label><input type="date" id="psDate"></div></div></div>',
         '<div class="pi-section" style="margin-top:20px;"><h4>Signatures</h4><div class="pi-grid">',
         '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="psParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="psParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="psParentSigDate" style="flex:1;" title="Date signed"></div></div>',
         '<div class="pi-field pi-full"><label>Teacher Signature</label><div id="psTeacherSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="psTeacherSig" placeholder="Printed name" style="flex:2;"><input type="date" id="psTeacherSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
@@ -1219,6 +1210,15 @@
         '.pi-field textarea:focus, .pi-field input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
         '.pi-field select { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:white; }',
         '.pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
+        /* Inline fill-in-the-blank inputs that sit in the consent sentence. They read as
+           blanks (underline, no box) until focused, so the sentence stays a sentence. */
+        '.pi-inline { display:inline-block;min-width:170px;font-size:0.88rem;font-family:inherit;color:#111;'
+            + 'text-align:center;border:none;border-bottom:1.5px solid #9ca3af;background:transparent;'
+            + 'padding:1px 6px;margin:0 2px; }',
+        '.pi-inline::placeholder { color:#c4c9d2;font-style:normal; }',
+        '.pi-inline:focus { outline:none;border-bottom-color:#2563eb;background:#eff6ff; }',
+        '.pi-inline-italic { font-style:italic;min-width:160px; }',
+        '.pi-inline-sm { min-width:90px; }',
         '.pi-full { grid-column:1/-1; }',
         '.pi-modal-footer { padding:16px 24px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:white;border-radius:0 0 12px 12px; }',
         '.pi-btn { padding:8px 18px;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.15s; }',
