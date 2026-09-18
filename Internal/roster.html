@@ -94,6 +94,14 @@
                         <button class="btn-mini" onclick="addNewRoom()">+ Add Room</button>
                     </div>
                 </div>
+                <!-- Center-wide, not per-room: one person oversees everything grant-related.
+                     Stored in SiteSettings under GrantDirector and read wherever the
+                     grant director's name is needed. -->
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+                    <label for="setDirector" style="font-size:0.8rem;font-weight:700;color:var(--text-muted);">Director (grant oversight)</label>
+                    <input type="text" id="setDirector" placeholder="Director name" style="min-width:220px;" oninput="markDirectorChanged()">
+                    <button class="btn-row-save" id="setDirectorSave" onclick="saveDirector()" disabled>Save</button>
+                </div>
                 <table>
                     <thead><tr style="border-bottom:1px solid var(--border);">
                         <th style="width:40px;">#</th>
@@ -341,6 +349,62 @@ function toggleRoomSettings() {
     } else {
         panel.style.display = 'block';
         renderSettings();
+        loadDirector();
+    }
+}
+
+// ── DIRECTOR (center-wide, SiteSettings key "GrantDirector") ──
+// One person oversees everything grant-related, so this is a single site value
+// rather than a per-room column. Defaults to Megan Nooney until changed.
+const DIRECTOR_KEY = 'GrantDirector';
+const DIRECTOR_DEFAULT = 'Megan Nooney';
+let directorDirty = false;
+
+async function loadDirector() {
+    const input = document.getElementById('setDirector');
+    if (!input) return;
+    try {
+        const res = await apiFetch('/api/site-settings');
+        const data = res.ok ? await res.json() : {};
+        input.value = (data && data[DIRECTOR_KEY]) || DIRECTOR_DEFAULT;
+    } catch (e) {
+        input.value = DIRECTOR_DEFAULT;
+    }
+    directorDirty = false;
+    const btn = document.getElementById('setDirectorSave');
+    if (btn) { btn.disabled = true; btn.style.opacity = ''; }
+}
+
+function markDirectorChanged() {
+    directorDirty = true;
+    const btn = document.getElementById('setDirectorSave');
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    const all = document.getElementById('setSaveAll');
+    if (all) { all.disabled = false; all.style.opacity = '1'; }
+}
+
+async function saveDirector() {
+    const input = document.getElementById('setDirector');
+    if (!input) return;
+    const value = input.value.trim();
+    try {
+        const res = await apiFetch('/api/site-settings', {
+            method: 'POST',
+            body: JSON.stringify({ key: DIRECTOR_KEY, value })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('Director saved', 'success');
+            directorDirty = false;
+            const btn = document.getElementById('setDirectorSave');
+            if (btn) { btn.disabled = true; btn.style.opacity = ''; }
+            return true;
+        }
+        showNotification('Save failed: ' + (data.error || ''), 'error');
+        return false;
+    } catch (e) {
+        showNotification('Network error', 'error');
+        return false;
     }
 }
 
@@ -416,8 +480,8 @@ function markSettingsChanged(i) {
 async function addNewRoom() {
     // Adding a room reloads and repaints the whole table, which would drop unsaved
     // edits in the existing rows. Offer to save them first rather than lose them.
-    if (dirtyRooms.size) {
-        if (confirm('You have unsaved room changes. Save them before adding a new room?')) {
+    if (dirtyRooms.size || directorDirty) {
+        if (confirm('You have unsaved changes. Save them before adding a new room?')) {
             await saveAllRooms();
         }
     }
@@ -506,13 +570,15 @@ async function saveRoom(i) {
    once everything is done — never mid-batch, which is what used to lose edits. */
 async function saveAllRooms() {
     const rows = Array.from(dirtyRooms).sort((a, b) => a - b);
-    if (!rows.length) return;
+    if (!rows.length && !directorDirty) return;
     let saved = 0, failed = 0;
     for (const i of rows) {
         const ok = await putRoom(i);
         ok ? saved++ : failed++;
     }
-    if (saved) showNotification(`Saved ${saved} room${saved === 1 ? '' : 's'}`
+    // The center-wide director rides along so one click commits everything on the panel.
+    if (directorDirty) { (await saveDirector()) ? saved++ : failed++; }
+    if (saved) showNotification(`Saved ${saved} change${saved === 1 ? '' : 's'}`
         + (failed ? `, ${failed} failed` : ''), failed ? 'error' : 'success');
     if (!dirtyRooms.size) {
         const all = document.getElementById('setSaveAll');
