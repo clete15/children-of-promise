@@ -528,11 +528,29 @@ function showPortal() {
     checkServer();
 }
 
+/* The staff-door word. Typing this at /staff is NOT a login — it grants no access on
+   its own. It simply sends the person to /me, the per-person sign-in, where identity
+   (and all real access) comes from their own account and token. So a plain staff member
+   starts at the same /staff address as admin: the word they type decides which door.
+
+   A UI gate on purpose: the real security is the personal token minted at /me, which the
+   server scopes to that one person's record. This string being visible in the page costs
+   nothing, because knowing it lets you reach only the sign-in form, not any data. */
+const STAFF_DOOR_WORD = 'cofpstaff';
+
 document.getElementById('pwForm').addEventListener('submit', async e => {
     e.preventDefault();
     const val = document.getElementById('pwInput').value;
     const err = document.getElementById('pwError');
     const btn = document.querySelector('#pwForm button[type=submit]');
+
+    /* The staff door: send them to /me to sign in as themselves. Checked before the
+       admin verify so it never travels to the server as a password attempt, and so a
+       staff member typing it is not told it "was not accepted". */
+    if (val.trim().toLowerCase() === STAFF_DOOR_WORD) {
+        location.replace('/me');
+        return;
+    }
 
     if (btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
     try {
