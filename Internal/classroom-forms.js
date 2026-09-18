@@ -275,6 +275,25 @@
         setTimeout(function () { pad.refresh(); }, 30);
     }
 
+    /* Re-fit every mounted signature pad now that its modal is actually visible.
+
+       A canvas sized while its modal is display:none gets a zero-size backing store
+       and bails out of fit(); the canvas then renders at its default 300x150 while
+       CSS stretches it to fill the wrapper. Pointer coordinates are measured in the
+       stretched (displayed) space but drawn into the unscaled backing store, so ink
+       lands offset and mis-scaled from the pen tip — the "half an inch up and to the
+       right" the stylus showed. mountSigPad's own 30ms refresh often fires during the
+       await before the modal opens, so it re-fits while still hidden and misses. This
+       runs after .open is set, across two animation frames so layout has settled. */
+    function refreshSigPads() {
+        var doFit = function () {
+            Object.keys(sigPads).forEach(function (k) {
+                if (sigPads[k] && sigPads[k].pad && sigPads[k].pad.refresh) sigPads[k].pad.refresh();
+            });
+        };
+        requestAnimationFrame(function () { requestAnimationFrame(doFit); });
+    }
+
     async function fileSignedForm(studentId, field, content) {
         var drawn = Object.keys(sigPads)
             .map(function (k) { return sigPads[k]; })
@@ -416,6 +435,7 @@
 
         loadIntakeRecord(studentId);
         document.getElementById('piOverlay').classList.add('open');
+        refreshSigPads();
     }
 
     async function loadIntakeRecord(studentId) {
@@ -588,6 +608,7 @@
         } catch (e) { console.error('Failed to load permission slip', e); }
 
         document.getElementById('psOverlay').classList.add('open');
+        refreshSigPads();
     }
 
     function closePermissionSlip() {
@@ -751,6 +772,7 @@
         } catch (e) { console.error('Failed to load screening', e); }
 
         document.getElementById('scrOverlay').classList.add('open');
+        refreshSigPads();
     }
 
     function closeScreening() {
