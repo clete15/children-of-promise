@@ -273,41 +273,48 @@ function ckFetchT(url, ms) {
     ]);
 }
 
-async function start() {
-    CK_YEAR = currentSchoolYear();
-    initForms();
+// Writes a message into the body, so any failure is visible on the tablet itself
+// rather than leaving a silent "Loading…". Includes a Reload button.
+function ckShow(msg) {
+    const b = $('ckBody');
+    if (b) b.innerHTML = '<div class="ck-empty">' + esc(msg)
+        + '<br><button type="button" class="ck-exit" style="margin-top:12px;" onclick="location.reload()">Reload</button></div>';
+}
 
-    /* ESSENTIAL first: only the roster and the room list are needed to render. These
-       are awaited (with a timeout so a stalled server shows an error instead of a
-       forever spinner). Everything else — tracking, screenings, which forms exist,
-       signatures — is an ENHANCEMENT that decorates the cards with done/undone state,
-       so it loads in the background and re-renders when it lands. This is what keeps
-       the page from hanging if one of those heavier calls is slow. */
+async function start() {
+    /* One try/catch around EVERYTHING. Before this, initForms() ran outside the guard,
+       so if the shared module threw while wiring up, start() died silently and the page
+       sat on "Loading…" forever. Now any failure — module wiring, a fetch, parsing —
+       lands on screen with the reason, instead of a frozen spinner. */
     try {
+        CK_YEAR = currentSchoolYear();
+        try { initForms(); } catch (e) { console.error('[KIOSK] initForms failed', e); ckModulesMissing = true; }
+
+        // ESSENTIAL: only the roster and room list are needed to render. Awaited with a
+        // timeout so a stalled server shows an error, never a forever spinner.
         const [sRes, cRes] = await Promise.all([
             ckFetchT('/api/students', 12000),
             ckFetchT('/api/classrooms', 12000)
         ]);
         if (sRes.status === 401 || cRes.status === 401) { badPassword(); return; }
+        if (!sRes.ok) { ckShow('Could not load the roster (students: HTTP ' + sRes.status + ').'); return; }
+        if (!cRes.ok) { ckShow('Could not load the classrooms (HTTP ' + cRes.status + ').'); return; }
         CK_STUDENTS = await sRes.json(); if (!Array.isArray(CK_STUDENTS)) CK_STUDENTS = [];
         CK_ROOMS = await cRes.json();    if (!Array.isArray(CK_ROOMS)) CK_ROOMS = [];
+
+        if (!window.CofpForms || !window.ChildForms) {
+            console.error('[KIOSK] shared modules missing:',
+                { CofpForms: !!window.CofpForms, ChildForms: !!window.ChildForms });
+            ckModulesMissing = true;
+        }
+
+        // Render immediately with what we have, then enrich in the background.
+        buildRoomPicker();
+        loadEnhancements();
     } catch (e) {
-        $('ckBody').innerHTML = '<div class="ck-empty">Could not load the roster ('
-            + esc(e.message) + '). <button type="button" class="ck-exit" onclick="location.reload()" '
-            + 'style="margin-left:10px;">Reload</button></div>';
-        return;
+        console.error('[KIOSK] start failed', e);
+        ckShow('Could not load: ' + (e && e.message ? e.message : e));
     }
-
-    if (!window.CofpForms || !window.ChildForms) {
-        console.error('[CLASSROOM KIOSK] shared modules missing:',
-            { CofpForms: !!window.CofpForms, ChildForms: !!window.ChildForms });
-        ckModulesMissing = true;
-    }
-
-    // Render immediately with what we have, then enrich in the background.
-    buildRoomPicker();
-    loadEnhancements();
-    return;
 }
 
 /* The optional, decorating data. Loaded after the first paint so a slow or stalled
