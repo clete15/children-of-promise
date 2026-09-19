@@ -7807,6 +7807,46 @@ ELSE
         });
     }
 
+    /* GET a read-only audit of the per-child document folders (internal - protected).
+       For each active child, reports whether their "Child Files/<child>" folder exists
+       and whether a weighted-eligibility document is present (in the Administrative
+       subfolder, or loose in the child folder for pre-split seeds). Used to confirm the
+       backfill landed on disk and, ongoing, to spot a child missing their folder. */
+    if (req.method === 'GET' && url === '/api/child-folder-audit') {
+        if (!checkAuth(req, res)) return;
+        const DOC_ROOT = findDocRoot();
+        if (!DOC_ROOT) return sendJSON(res, 500, { error: 'The document library is not reachable from the server.' });
+        const list = runSQLRows(
+            `SELECT Id, ISNULL(Last_Name,'') AS Last_Name, ISNULL(First_Name,'') AS First_Name
+             FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' ORDER BY Id`);
+        if (!list.ok) return sendJSON(res, 500, { error: list.error });
+        const base = path.join(DOC_ROOT, CHILD_FILES_ROOT_FOLDER);
+        // One directory read of the whole Child Files tree, matched to children by the
+        // trailing " - <Id>" suffix (the same key childFolder uses).
+        let dirs = [];
+        try { dirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory()); } catch (e) { /* base missing */ }
+        const hasWeighted = dir => {
+            const check = p => { try { return fs.readdirSync(p).some(n => /weighted eligibility/i.test(n)); } catch (e) { return false; } };
+            return check(path.join(dir, 'Administrative')) || check(dir);
+        };
+        let withFolder = 0, withForm = 0;
+        const missing = [];
+        list.rows.forEach(c => {
+            const id = parseInt(c.Id);
+            const match = dirs.find(d => d.name.endsWith(' - ' + id));
+            const name = (c.Last_Name + ', ' + c.First_Name).trim() || ('Student ' + id);
+            if (!match) { missing.push({ id, name, issue: 'no folder' }); return; }
+            withFolder++;
+            if (hasWeighted(path.join(base, match.name))) withForm++;
+            else missing.push({ id, name, issue: 'folder but no weighted eligibility form' });
+        });
+        return sendJSON(res, 200, {
+            success: true, activeChildren: list.rows.length, withFolder, withWeightedForm: withForm,
+            missing: missing,
+            message: `${list.rows.length} active children: ${withFolder} have a folder, ${withForm} have a weighted eligibility form, ${missing.length} need attention.`
+        });
+    }
+
     // GET management reports (internal - protected)
     if (req.method === 'GET' && url === '/api/reports') {
         if (!checkAuth(req, res)) return;
