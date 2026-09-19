@@ -152,6 +152,19 @@ const $ = id => document.getElementById(id);
 let pendingCurrent = '';
 let pendingPersist = true;
 
+/* Where to go after signing in. A page that bounced someone here (e.g. a PAS form
+   opened without a session) passes ?next=<relative path> so we return them to it.
+   Only a same-origin RELATIVE path is honoured — never an absolute URL or one that
+   starts with "//" — so this can't be turned into an open redirect. Default is the
+   staff portal. */
+function destAfterSignIn() {
+    try {
+        var n = new URLSearchParams(location.search).get('next');
+        if (n && n[0] === '/' && n[1] !== '/') return n;
+    } catch (e) {}
+    return '/staff/staff-portal.html';
+}
+
 function show(el, cls, text) {
     el.className = 'mp-msg ' + cls;
     el.textContent = text;
@@ -196,7 +209,7 @@ $('mpSignIn').addEventListener('submit', async e => {
             $('mpNew').focus();
             return;
         }
-        location.replace('/staff/staff-portal.html');
+        location.replace(destAfterSignIn());
     } catch (ex) {
         show(err, 'err', ex.message || 'Could not sign in.');
         $('mpPassword').value = '';
@@ -230,7 +243,7 @@ $('mpChange').addEventListener('submit', async e => {
         await CofpAuth.staffChangePassword(pendingCurrent, next);
         pendingCurrent = '';
         show(msg, 'ok', 'Saved. Taking you to your page…');
-        setTimeout(() => location.replace('/staff/staff-portal.html'), 700);
+        setTimeout(() => location.replace(destAfterSignIn()), 700);
     } catch (ex) {
         show(msg, 'err', ex.message || 'Could not change it.');
         btn.disabled = false;

@@ -504,6 +504,16 @@
         if (cfg.scope === 'staff-year' || cfg.scope === 'staff') {
             try {
                 const res = await api('/api/staff');
+                /* 401 means no active sign-in reached the server. Since sessions are now
+                   per-browser-session (no persisted shared password), a PAS page opened
+                   without signing in this session lands here. Send them to /me to sign
+                   in and come straight back, rather than degrading to a read-only page
+                   with an empty staff list. Return-to param so /me bounces them back. */
+                if (res.status === 401) {
+                    var back = encodeURIComponent(location.pathname + location.search);
+                    location.replace('/me?next=' + back);
+                    return;
+                }
                 staffList = res.ok ? await res.json() : [];
                 if (!Array.isArray(staffList)) staffList = [];
             } catch (e) { staffList = []; }
