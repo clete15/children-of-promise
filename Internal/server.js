@@ -1911,30 +1911,87 @@ function seededYesNoOrBlank(v) {
     if (s === 'no' || s === 'n' || s === 'false' || s === '0') return 'No';
     return '';
 }
+/* Cities that are official child-care deserts we prioritise. Matched case- and
+   whitespace-insensitively against the family's free-text city. Keep in step with the
+   client copy in External/preenrollment.html (CHILD_DESERT_CITIES). */
+const CHILD_DESERT_CITIES = ['belleville', 'dupo', 'cahokia heights'];
+function isChildDesertCity(city) {
+    return CHILD_DESERT_CITIES.indexOf(String(city || '').trim().toLowerCase()) !== -1;
+}
+
+/* CCAP income eligibility from the in-force CCAP table (225% FPL by household size).
+   Same numbers the reports and the client use, so the waiting-list score, the weighted
+   eligibility form and the CCAP report all agree. Blank/zero income or size → not
+   eligible (we cannot claim it without the figures). */
+function isCcapEligibleByIncome(income, householdSize) {
+    const inc = parseInt(income, 10);
+    const size = parseInt(householdSize, 10);
+    if (!inc || !size || inc <= 0 || size <= 0) return false;
+    const table = ccapTable();
+    const idx = Math.max(1, Math.min(size, 8)) - 1;
+    return inc <= table[idx];
+}
+
+/* THE weighted-eligibility scoring — one authoritative definition shared by the seeded
+   form (below) and kept in exact step with the public form's calcScore
+   (External/preenrollment.html) and the waiting-list Score it stores. Each entry:
+     label   printed on the form
+     picc    the PICC citation, where one applies
+     points  weight added to the total when the answer is Yes
+     from    reads intake (i) with an enrollment (e) fallback, returns 'Yes'/'No'/''
+   A criterion is "Yes" and scores its points when from() resolves to Yes; blank means
+   "not recorded" and scores nothing (and, on the backfill only, prints as No).
+
+   Point values MUST match calcScore: homeless/foster 50, single-parent 3, everything
+   else 5. Public benefits score 5 PER benefit (so they are expanded into one criterion
+   per benefit below), CCAP-by-income 5, child-desert city 5, prior early learning 5
+   when the child has NOT had it. */
+const BENEFIT_TYPES = ['WIC', 'Medicaid', 'SNAP', 'TANF'];
+function hasBenefit(str, name) {
+    return new RegExp('\\b' + name + '\\b', 'i').test(String(str || ''));
+}
 const SEEDED_WEIGHTED_CRITERIA = [
-    { label: 'Experiencing homelessness', picc: 'PI5.D', from: (i) => i.Homeless },
-    { label: 'Youth in Care (foster) or adopted', picc: 'PI5.E', from: (i, e) => i.FosterAdopted || (String(e.Category || '') === 'Foster' ? 'Yes' : '') },
-    { label: 'Enrolled in Early Intervention with an identified delay', picc: 'PI5.B', from: (i) => i.EarlyIntervention },
-    { label: 'Has an IEP', picc: 'PI5.B', from: (i, e) => i.IEP || e.IEP },
-    { label: 'Screening indicated a delay but no current Early Intervention referral', picc: 'PI5.C', from: (i) => i.ScreeningDelayNoEi },
-    { label: 'Family income at or below 50% of the federal poverty level', picc: 'PI5.F', from: (i) => i.IncomeBelow50Fpl },
-    { label: 'Parent or caregiver is an English language learner', picc: 'PI5.G', from: (i) => i.ParentEll },
-    { label: 'Primary language in the home is not English', from: (i) => i.NonEnglishHome },
-    { label: 'Receiving public benefits (WIC, Medicaid, SNAP, TANF)', from: (i, e) => (String(i.PublicBenefits || e.PublicBenefits || '').trim() ? 'Yes' : '') },
-    { label: 'Abuse or domestic violence history', from: (i) => i.AbuseHistory },
-    { label: 'Mental illness in the home', from: (i) => i.MentalIllness },
-    { label: 'DCFS involvement', from: (i) => i.DcfsInvolvement },
-    { label: 'Substance abuse in the home', from: (i) => i.SubstanceAbuse },
-    { label: 'Child cared for by someone other than a parent', from: (i) => i.CaregiverOther },
-    { label: 'Death in the immediate family', from: (i) => i.FamilyDeath },
-    { label: 'Low birth weight or failure to thrive', from: (i) => i.LowBirthWeight },
-    { label: 'Parent incarcerated', from: (i) => i.ParentIncarcerated },
-    { label: 'Teen parent', from: (i) => i.TeenParent },
-    { label: 'Parent without a high school diploma', from: (i) => i.NoHSDiploma },
-    { label: 'Child or parent born outside the United States', from: (i) => i.BornOutsideUS },
-    { label: 'Active military family', from: (i, e) => i.ActiveMilitary || seededYesNoOrBlank(e.Military) },
-    { label: 'Single-parent household', from: (i) => (String(i.LivingSituation || '') === 'Single Parent' ? 'Yes' : '') }
+    { label: 'Experiencing homelessness', picc: 'PI5.D', points: 50, from: (i) => i.Homeless },
+    { label: 'Youth in Care (foster) or adopted', picc: 'PI5.E', points: 50, from: (i, e) => i.FosterAdopted || (String(e.Category || '') === 'Foster' ? 'Yes' : '') },
+    { label: 'Enrolled in Early Intervention with an identified delay', picc: 'PI5.B', points: 5, from: (i) => i.EarlyIntervention },
+    { label: 'Has an IEP', picc: 'PI5.B', points: 5, from: (i, e) => i.IEP || e.IEP },
+    { label: 'Screening indicated a delay but no current Early Intervention referral', picc: 'PI5.C', points: 5, from: (i) => i.ScreeningDelayNoEi },
+    { label: 'Family income at or below 50% of the federal poverty level', picc: 'PI5.F', points: 5, from: (i) => i.IncomeBelow50Fpl },
+    { label: 'Family income eligible for CCAP (225% FPL)', points: 5, from: (i, e) => (isCcapEligibleByIncome(i.HouseholdIncome || e.HouseholdIncome, i.HouseholdSize || e.HouseholdSize) ? 'Yes' : 'No') },
+    { label: 'Lives in a child-care desert (Belleville, Dupo, Cahokia Heights)', points: 5, from: (i, e) => (isChildDesertCity(i.City || e.City_Town) ? 'Yes' : 'No') },
+    { label: 'Parent or caregiver is an English language learner', picc: 'PI5.G', points: 5, from: (i) => i.ParentEll },
+    { label: 'Primary language in the home is not English', points: 5, from: (i) => i.NonEnglishHome },
+    // One criterion PER public benefit, each worth 5 (up to 20 combined).
+    { label: 'Receiving WIC', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'WIC') ? 'Yes' : 'No') },
+    { label: 'Receiving Medicaid', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'Medicaid') ? 'Yes' : 'No') },
+    { label: 'Receiving SNAP', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'SNAP') ? 'Yes' : 'No') },
+    { label: 'Receiving TANF', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'TANF') ? 'Yes' : 'No') },
+    { label: 'Receiving Brightpoint childcare subsidy', points: 5, from: (i) => i.BrightpointSubsidy },
+    { label: 'No prior formal early-learning program', points: 5, from: (i) => (seededYesNoOrBlank(i.PriorEarlyLearning) === 'No' ? 'Yes' : (seededYesNoOrBlank(i.PriorEarlyLearning) === 'Yes' ? 'No' : '')) },
+    { label: 'Abuse or domestic violence history', points: 5, from: (i) => i.AbuseHistory },
+    { label: 'Mental illness in the home', points: 5, from: (i) => i.MentalIllness },
+    { label: 'DCFS involvement', points: 5, from: (i) => i.DcfsInvolvement },
+    { label: 'Substance abuse in the home', points: 5, from: (i) => i.SubstanceAbuse },
+    { label: 'Child cared for by someone other than a parent', points: 5, from: (i) => i.CaregiverOther },
+    { label: 'Death in the immediate family', points: 5, from: (i) => i.FamilyDeath },
+    { label: 'Low birth weight or failure to thrive', points: 5, from: (i) => i.LowBirthWeight },
+    { label: 'Parent incarcerated', points: 5, from: (i) => i.ParentIncarcerated },
+    { label: 'Teen parent', points: 5, from: (i) => i.TeenParent },
+    { label: 'Parent without a high school diploma', points: 5, from: (i) => i.NoHSDiploma },
+    { label: 'Child or parent born outside the United States', points: 5, from: (i) => i.BornOutsideUS },
+    { label: 'Active military family', points: 5, from: (i, e) => i.ActiveMilitary || seededYesNoOrBlank(e.Military) },
+    { label: 'Single-parent household', points: 3, from: (i) => (String(i.LivingSituation || '') === 'Single Parent' ? 'Yes' : '') }
 ];
+
+/* The total weighted points for a child, summing the points of every criterion whose
+   answer resolves to Yes. This is the same value the waiting list ranks by. */
+function scoreWeightedTotal(intake, enroll) {
+    return SEEDED_WEIGHTED_CRITERIA.reduce((sum, c) => {
+        let ans = '';
+        try { ans = seededYesNoOrBlank(c.from(intake || {}, enroll || {})); } catch (e) { ans = ''; }
+        return sum + (ans === 'Yes' ? (c.points || 0) : 0);
+    }, 0);
+}
 
 /* Reads a child's enrollment row and any linked pre-enrollment intake, and returns
    the two records the seeded weighted-eligibility form is built from. The intake is
@@ -1949,7 +2006,7 @@ function childRecordsForSeed(studentId) {
                 ISNULL(PFA_PI_na,'') AS PFA_PI_na, ISNULL(Category,'') AS Category,
                 ISNULL(IEP,'') AS IEP, ISNULL(Military,'') AS Military,
                 ISNULL(HouseholdIncome,'') AS HouseholdIncome, ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
-                ISNULL(PublicBenefits,'') AS PublicBenefits, ISNULL(PreEnrollmentId,0) AS PreEnrollmentId
+                ISNULL(PublicBenefits,'') AS PublicBenefits, ISNULL(City_Town,'') AS City_Town, ISNULL(PreEnrollmentId,0) AS PreEnrollmentId
          FROM rptMasterEnrollment WHERE Id=${id}`);
     if (!e.ok || !e.rows.length) return { error: e.error || 'Child record not found.' };
     const enroll = e.rows[0];
@@ -1961,13 +2018,29 @@ function childRecordsForSeed(studentId) {
         + `ISNULL(p.TeenParent,'') AS TeenParent,ISNULL(p.NoHSDiploma,'') AS NoHSDiploma,ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,`
         + `ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,ISNULL(p.LivingSituation,'') AS LivingSituation,`
         + `ISNULL(p.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(p.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(p.PublicBenefits,'') AS PublicBenefits,`
+        + `ISNULL(p.City,'') AS City,ISNULL(p.BrightpointSubsidy,'') AS BrightpointSubsidy,ISNULL(p.PriorEarlyLearning,'') AS PriorEarlyLearning,`
         + `ISNULL(p.ScreeningDelayNoEi,'') AS ScreeningDelayNoEi,ISNULL(p.ParentEll,'') AS ParentEll,ISNULL(p.IncomeBelow50Fpl,'') AS IncomeBelow50Fpl`;
+    /* Match the intake three ways, best first, taking the FIRST that hits:
+         1. the stored PreEnrollmentId link (authoritative);
+         2. exact name + DOB (a child enrolled before the link existed);
+         3. exact name only, newest submission — covers a DOB typo or format mismatch,
+            which was making most backfilled children match nothing and print all "No".
+       Each is ordered newest-first and TOP 1, and the whole thing is TOP 1 again so
+       only the best available match is used. Name comparison is case- and
+       whitespace-folded. */
+    const nameMatch = `LOWER(LTRIM(RTRIM(p.ChildName)))=LOWER(LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)))`;
     const iq = runSQLRows(
-        `SELECT TOP 1 ${cols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${id}
-         UNION ALL
-         SELECT TOP 1 ${cols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p
-             ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date)
-             WHERE e.Id=${id} AND e.PreEnrollmentId IS NULL`);
+        `SELECT TOP 1 * FROM (
+            SELECT TOP 1 1 AS pri, ${cols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${id} ORDER BY p.Id DESC
+            UNION ALL
+            SELECT TOP 1 2 AS pri, ${cols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p
+                ON ${nameMatch} AND TRY_CONVERT(date,p.ChildBirthDate)=TRY_CONVERT(date,e.Birth_date)
+                WHERE e.Id=${id} ORDER BY p.Id DESC
+            UNION ALL
+            SELECT TOP 1 3 AS pri, ${cols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p
+                ON ${nameMatch}
+                WHERE e.Id=${id} ORDER BY p.Id DESC
+        ) matches ORDER BY pri`);
     const intake = (iq.ok && iq.rows.length) ? iq.rows[0] : {};
     return { enroll, intake };
 }
@@ -2014,12 +2087,17 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         { label: 'Household income', value: (intake.HouseholdIncome || enroll.HouseholdIncome || '\u2014') }
     ];
 
+    // Each criterion shows its answer AND its point weight, and a Yes adds those points
+    // to the running total — the same total the waiting list ranks by.
+    let total = 0;
     const criteriaLines = SEEDED_WEIGHTED_CRITERIA.map(c => {
         let ans = '';
         try { ans = seededYesNoOrBlank(c.from(intake, enroll)); } catch (e) { ans = ''; }
         if (!ans && fillBlanksAsNo) ans = 'No';
+        if (ans === 'Yes') total += (c.points || 0);
         const box = ans === 'Yes' ? '[X] Yes' : ans === 'No' ? '[ ] Yes   [X] No' : '[ ] Yes   [ ] No';
-        return (c.picc ? '(' + c.picc + ') ' : '') + c.label + '  —  ' + box;
+        const pts = '(' + (c.points || 0) + ' pt' + ((c.points || 0) === 1 ? '' : 's') + ')';
+        return (c.picc ? '(' + c.picc + ') ' : '') + c.label + '  ' + pts + '  \u2014  ' + box;
     });
 
     const blocks = [
@@ -2027,13 +2105,16 @@ function seedWeightedEligibilityDoc(studentId, opts) {
           text: fillBlanksAsNo
               ? 'Pre-filled from the family\u2019s pre-enrollment submission where one exists; '
                 + 'any criterion not recorded at intake is shown as \u201CNo\u201D. Generated for a '
-                + 'child already enrolled — review and update before relying on it.'
+                + 'child already enrolled — review and update before relying on it. Points shown are '
+                + 'the same weights used to rank the waiting list.'
               : 'Pre-filled from the family\u2019s pre-enrollment submission where one exists. '
                 + 'Blank items were not recorded at intake and must be settled by staff before signing. '
-                + 'Boxes shown below reflect the pre-fill; confirm each before this form is signed.' },
+                + 'Boxes shown below reflect the pre-fill; confirm each before this form is signed. '
+                + 'Points shown are the same weights used to rank the waiting list.' },
         { text: criteriaLines.join('\n') },
         { heading: 'Determination (PICC PI5.H)',
-          text: 'Eligibility determination: ______________________________     Total weighted points: __________' },
+          text: 'Total weighted points (auto-calculated from the answers above): ' + total + '\n\n'
+              + 'Eligibility determination: ______________________________' },
         { heading: 'Income verification (PICC PI5.J)',
           text: 'Income verified by: ____________________________     Date verified: ______________' }
     ];

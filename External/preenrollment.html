@@ -774,6 +774,30 @@ function collectHouseholdData() {
     };
 }
 
+/* Waiting-list weighting. This MUST stay in exact step with the server's
+   SEEDED_WEIGHTED_CRITERIA / scoreWeightedTotal (Internal/server.js): the same factors
+   and the same points, so the waiting-list order and the child's weighted eligibility
+   form always agree. Homeless/foster 50, single-parent 3, everything else 5. */
+
+// Child-care deserts we prioritise — keep in step with server CHILD_DESERT_CITIES.
+const CHILD_DESERT_CITIES = ['belleville', 'dupo', 'cahokia heights'];
+
+/* CCAP income table (225% FPL by household size, 1..8+). MUST match the server's
+   CCAP_GUIDELINES for the in-force year. Update both each spring. */
+const CCAP_GUIDELINES_PE = {
+    2025: [35213,47588,59963,72338,84713,97088,109463,121838],
+    2026: [35910,48690,61470,74250,87030,99810,112590,125370],
+};
+function ccapEligiblePE(income, householdSize) {
+    const inc = parseInt(income, 10), size = parseInt(householdSize, 10);
+    if (!inc || !size || inc <= 0 || size <= 0) return false;
+    const now = new Date();
+    const y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    const table = CCAP_GUIDELINES_PE[y] || CCAP_GUIDELINES_PE[Object.keys(CCAP_GUIDELINES_PE).pop()];
+    const idx = Math.max(1, Math.min(size, 8)) - 1;
+    return inc <= table[idx];
+}
+
 function calcScore(d) {
     let score = 0;
     const yes = v => v === 'Yes';
@@ -800,7 +824,17 @@ function calcScore(d) {
     if (yes(d.bornOutsideUS))      score += 5;
     if (yes(d.nonEnglishHome))     score += 5;
     if (yes(d.activeMilitary))     score += 5;
-    if (d.publicBenefits)          score += 5;
+    if (yes(d.brightpointSubsidy)) score += 5;
+    // Prior early learning scores when the child has NOT had it (never enrolled before).
+    if (d.priorEarlyLearning === 'No') score += 5;
+    // Public benefits: 5 PER benefit (WIC, Medicaid, SNAP, TANF), up to 20.
+    ['WIC', 'Medicaid', 'SNAP', 'TANF'].forEach(b => {
+        if (new RegExp('\\b' + b + '\\b', 'i').test(d.publicBenefits || '')) score += 5;
+    });
+    // CCAP income eligibility (225% FPL) — same rule as the CCAP report and the form.
+    if (ccapEligiblePE(d.householdIncome, d.householdSize)) score += 5;
+    // Child-care desert city.
+    if (CHILD_DESERT_CITIES.indexOf(String(d.city || '').trim().toLowerCase()) !== -1) score += 5;
     if (d.livingSituation === 'Single Parent') score += 3;
     return score;
 }
