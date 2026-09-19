@@ -352,24 +352,16 @@
         <div class="dash-section" data-role="all">
             <div class="dash-section-title">Staff Portal</div>
             <div class="dash-group">
-                <!-- One entry, not three. The old "My Record & Credentials", "My Files"
-                     and "My Learning Plan & Forms" all opened the same page — two of them
-                     at the very top of it — so the list implied three destinations and
-                     delivered one. The page now has a tab per section, which is where that
-                     distinction belongs. -->
-                <!-- One card, and it goes through /me on purpose. /me is the single
-                     door: it sends a signed-in person (staff token, or Clete/Megan on
-                     the shared password) straight to their page, and shows the sign-in
-                     form only to someone with no credentials at all. That is the "force
-                     the password on the way in" the director asked for, without a
-                     second card telling people which door to use. Clete and Megan get
-                     the staff chooser on the page; everyone else lands on their own
-                     record and cannot see anyone else's. -->
-                <a class="dash-item" href="/me">
+                <!-- Opens the personal record page directly. The person is ALREADY
+                     signed in (that happened at /me before this dashboard), so this
+                     card is not a login — it is the destination. It carries the token
+                     the session already holds. Clete/Megan/Sara get the staff chooser
+                     on that page; everyone else lands on their own record. -->
+                <a class="dash-item" href="/staff/staff-portal.html">
                     <div class="di-icon">🎓</div>
                     <div class="di-content">
                         <div class="di-title">Staff Portal</div>
-                        <div class="di-desc">Sign in as yourself to see your credentials, files and forms. Megan and Clete can view any staff member.</div>
+                        <div class="di-desc">Your credentials, files and forms. Megan and Clete can view any staff member.</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>

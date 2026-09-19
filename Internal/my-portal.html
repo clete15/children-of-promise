@@ -180,13 +180,21 @@ function hide(el) {
     el.textContent = '';
 }
 
-/* The sign-in form is ALWAYS shown here — even on your own machine, even with a
-   valid token already saved. The gate is deliberate: signing in is an act you do
-   each visit, not something the browser does silently for you. The password field
-   still prefills from the browser's saved credentials, so it is one click, but it
-   is a click. Nothing auto-forwards to the portal on a stored token or the shared
-   password. (Change-password and the first-time forced change still work through
-   the normal submit flow below.) */
+/* Already signed in this session? Don't make them sign in again — /me is the door,
+   and once through it, going back to the door just carries you on to the dashboard.
+   Only a person with NO valid session sees the form. This is what "log in once"
+   means: the token from a prior sign-in this session forwards you straight to
+   /staff/ (or the ?next target), no flash of the form, no re-typing. A fresh browser
+   (no token) falls through and the form is shown. */
+(function alreadyIn() {
+    if (!(window.CofpAuth && CofpAuth.whoAmI)) return;   // no helper → show form
+    if (!(CofpAuth.token && CofpAuth.token())) return;   // no session → show form
+    CofpAuth.whoAmI().then(function (who) {
+        if (!who) return;                                // token stale → show form
+        if (who.mustChangePassword) return;              // owes a password change → form handles it
+        destAfterSignIn().then(function (dest) { location.replace(dest); });
+    }).catch(function () { /* offline → show form */ });
+})();
 
 $('mpSignIn').addEventListener('submit', async e => {
     e.preventDefault();
