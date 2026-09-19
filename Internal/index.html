@@ -294,7 +294,7 @@
         <div class="status-dot"></div>
         <span id="statusText">Checking server…</span>
     </div>
-    <button onclick="runDeploy()" id="deployBtn" style="padding:8px 16px;background:#16a34a;color:white;border:none;border-radius:20px;font-size:0.8rem;font-weight:700;cursor:pointer;transition:background 0.15s;margin-left:8px;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'" title="Pull latest code from GitHub and restart server">🚀 Deploy</button>
+    <button onclick="runDeploy()" id="deployBtn" data-role="admin" style="display:none;padding:8px 16px;background:#16a34a;color:white;border:none;border-radius:20px;font-size:0.8rem;font-weight:700;cursor:pointer;transition:background 0.15s;margin-left:8px;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'" title="Pull latest code from GitHub and restart server">🚀 Deploy</button>
 </header>
 
 <main>
@@ -303,8 +303,10 @@
         <p>The server may be restarting. Please wait a moment and refresh the page.</p>
     </div>
 
+    <p id="dashLead" style="max-width:680px;margin:0 auto 18px;color:#64748b;font-size:0.9rem;"></p>
+
     <div class="dashboard">
-        <div class="dash-section">
+        <div class="dash-section" data-role="admin">
             <div class="dash-section-title" style="display:flex;align-items:center;gap:8px;">
                 Daily Operations
                 <a href="/staff/alerts.html" id="alertBadgePortal" style="display:none;background:#dc2626;color:white;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:10px;text-decoration:none;cursor:pointer;animation:pulse-badge 2s infinite;" title="Click to view alerts">🔔 <span id="alertCountPortal"></span></a>
@@ -347,7 +349,7 @@
              holds, is owed and must do is a different question from administering
              everyone else, and it was previously reachable only by scrolling past two
              sections of centre-wide tools to find it filed beside Staff Cards. -->
-        <div class="dash-section">
+        <div class="dash-section" data-role="all">
             <div class="dash-section-title">Staff Portal</div>
             <div class="dash-group">
                 <!-- One entry, not three. The old "My Record & Credentials", "My Files"
@@ -374,10 +376,10 @@
             </div>
         </div>
 
-        <div class="dash-section">
+        <div class="dash-section" data-role="all">
             <div class="dash-section-title">Compliance &amp; Programs</div>
             <div class="dash-group">
-                <a class="dash-item" href="/staff/isbe.html">
+                <a class="dash-item" href="/staff/isbe.html" data-role="all">
                     <div class="di-icon">🏛️</div>
                     <div class="di-content">
                         <div class="di-title">ISBE PFA / PI</div>
@@ -385,7 +387,7 @@
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
-                <a class="dash-item" href="/staff/ccap.html">
+                <a class="dash-item" href="/staff/ccap.html" data-role="admin">
                     <div class="di-icon">🏦</div>
                     <div class="di-content">
                         <div class="di-title">CCAP</div>
@@ -393,7 +395,7 @@
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
-                <a class="dash-item" href="/staff/inccra.html">
+                <a class="dash-item" href="/staff/inccra.html" data-role="admin">
                     <div class="di-icon">💰</div>
                     <div class="di-content">
                         <div class="di-title">INCCRA Grants</div>
@@ -405,7 +407,7 @@
                      Training & Submissions area), since the two are assessed together.
                      ExceleRate Silver is the rolling check against staff credentials,
                      training and one environment rating per room. -->
-                <a class="dash-item" href="/staff/excelerate.html">
+                <a class="dash-item" href="/staff/excelerate.html" data-role="admin">
                     <div class="di-icon">🥈</div>
                     <div class="di-content">
                         <div class="di-title">ExceleRate Silver</div>
@@ -416,7 +418,7 @@
             </div>
         </div>
 
-        <div class="dash-section">
+        <div class="dash-section" data-role="admin">
             <div class="dash-section-title">Administration</div>
             <div class="dash-group">
                 <!-- Deciding whose each personnel document is. Deliberately not on My
@@ -455,7 +457,7 @@
             </div>
         </div>
 
-        <div class="dash-section">
+        <div class="dash-section" data-role="admin">
             <div class="dash-section-title">Settings</div>
             <div class="dash-group" style="border-color:#e2e8f0;background:#f8fafc;">
                 <a class="dash-item" href="/staff/roster.html?settings=1" style="background:#f8fafc;">
@@ -504,12 +506,19 @@
    The shared password still authorises the API underneath (the rescue fallback),
    but it does not render this page, because whoAmI ignores it. */
 window.WHO = null;
+/* The gate: reach this page by being SIGNED IN as a person. Not signed in → /me.
+   Once in, the VIEW is shaped by role:
+     - a centre admin (Clete/Megan/Sara) sees the whole dashboard,
+     - everyone else (a teacher) sees only the cards meant for them — the Staff
+       Portal card (their own record) and the ISBE PFA/PI card.
+   whoAmI() answers from the personal token only, so a stored shared password can no
+   longer walk in here without an actual sign-in. */
 async function checkAuth() {
     if (!window.CofpAuth || !CofpAuth.whoAmI) { location.replace('/me'); return; }
     let who = null;
     try { who = await CofpAuth.whoAmI(); } catch (e) { who = null; }
     window.WHO = who;
-    if (!who || !who.admin) {          // not signed in, or signed in but not a centre admin
+    if (!who) {                        // not signed in at all → the one door
         location.replace('/me');
         return;
     }
@@ -520,13 +529,27 @@ function showPortal() {
     document.getElementById('passwordOverlay').style.display = 'none';
     const mc = document.getElementById('mainContent');
     mc.style.display = 'flex';
-    /* The Deploy/Restart controls are the IT tier — Clete only. Hide the inline
-       Deploy button for a centre admin who is not an IT admin (Megan, Sara). The
-       floating deploy-widget gates itself the same way off window.WHO. */
-    if (!who_isItAdmin()) {
-        var db = document.getElementById('deployBtn');
-        if (db) db.style.display = 'none';
+
+    /* Role-shape the dashboard. Admin sees everything; a teacher sees only the
+       sections/cards marked data-role="all". Sections and individual cards carry
+       data-role="admin" (hidden from a teacher) or data-role="all" (everyone). */
+    const isAdmin = !!(window.WHO && window.WHO.admin);
+    document.body.classList.toggle('role-admin', isAdmin);
+    document.body.classList.toggle('role-staff', !isAdmin);
+    if (!isAdmin) {
+        document.querySelectorAll('[data-role="admin"]').forEach(function (el) {
+            el.style.display = 'none';
+        });
+        // A friendly heading for the trimmed staff view.
+        var t = document.getElementById('dashLead');
+        if (t) t.textContent = 'Welcome' + (window.WHO && window.WHO.name ? ', ' + window.WHO.name.split(' ')[0] : '')
+            + ' — here is what you have access to.';
     }
+
+    /* The Deploy control is the IT tier — Clete only. It starts hidden; reveal it
+       only for an IT admin. (Non-IT admins and teachers never see it.) */
+    var db = document.getElementById('deployBtn');
+    if (db) db.style.display = who_isItAdmin() ? '' : 'none';
     checkServer();
 }
 
