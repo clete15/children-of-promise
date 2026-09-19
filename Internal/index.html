@@ -531,7 +531,15 @@ function showPortal() {
 }
 
 function who_isItAdmin() {
-    return !!(window.WHO && window.WHO.itAdmin);
+    /* Show the Deploy control to an IT admin. During the transition — before the
+       server that reports `itAdmin` is itself deployed — an older server answers
+       whoAmI without that field, so fall back to `admin` (which the old server does
+       send) rather than hiding the button that ships the very update adding the field.
+       The SERVER still enforces checkITAdmin, so a non-IT admin who sees the button is
+       refused at the endpoint; this only decides visibility. */
+    if (!window.WHO) return false;
+    if (typeof window.WHO.itAdmin === 'boolean') return window.WHO.itAdmin;
+    return !!window.WHO.admin;
 }
 
 // ── SERVER STATUS ──

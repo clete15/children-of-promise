@@ -153,7 +153,14 @@
     function injectIfITAdmin() {
         if (!window.CofpAuth || !CofpAuth.whoAmI) return;   // no auth helper -> no controls
         CofpAuth.whoAmI().then(function (who) {
-            if (who && who.itAdmin) inject();
+            if (!who) return;
+            /* IT admin sees the controls. Transitional: an older server (the one
+               running until this very update is deployed) answers whoAmI without an
+               `itAdmin` field, so fall back to `admin` rather than hiding the button
+               needed to ship that update. The server still enforces checkITAdmin, so
+               visibility is not authority. */
+            var show = (typeof who.itAdmin === 'boolean') ? who.itAdmin : !!who.admin;
+            if (show) inject();
         }).catch(function () { /* not signed in / unreachable -> no controls */ });
     }
 
