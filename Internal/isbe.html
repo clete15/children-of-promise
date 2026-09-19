@@ -2111,6 +2111,18 @@ function renderRoster() {
                     + weightedEligibilityCell(s) + '</td>';
             }
 
+            // Results Shared (PICC PI10.H) is now a signed classroom form captured on the
+            // Child Files Teacher tab. Read-only here: a green "on file" pill when the
+            // record exists, plain otherwise. No editable checkbox or [form] link.
+            if (f === 'ScreeningResultsShared') {
+                const done = ChildForms.state(s.Id, 'ScreeningResultsShared',
+                    !!(trackingData[s.Id] || {})['ScreeningResultsShared']) === 'form';
+                const cell = done
+                    ? '<span class="cf-pill" title="Screening results shared with the parent — recorded on the Child Files Teacher tab.">\u2713 on file</span>'
+                    : '<span class="cf-pill" style="opacity:0.6;" title="Not recorded yet. Capture it on the Child Files Teacher tab when the results are shared.">not on file</span>';
+                return '<td class="' + ('cf-doc' + divide).trim() + '">' + cell + '</td>';
+            }
+
             // The rest are editable checkboxes / document links (unchanged).
             const box = checkBox(s, f);
             // Green, amber or plain, depending on whether a form is actually behind

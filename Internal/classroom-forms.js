@@ -216,13 +216,18 @@
         { field: 'MidYearReport', teacher: true, label: 'Mid Year<br>Report Card' },
         { field: 'EndASQ', teacher: true, label: 'End ASQ' },
         { field: 'EndASE', teacher: true, label: 'End ASE' },
-        { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card' }
+        { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card' },
+        // Screening results shared with the parent (PICC PI10.H). A signed classroom
+        // form: captured when the teacher hands the report card / screening results to
+        // the family. Moved here from the ISBE roster's editable [form].
+        { field: 'ScreeningResultsShared', teacher: true, label: 'Results<br>Shared' }
     ];
     var SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
     // A column has a form behind it when opening it produces a modal. Mid/End year
     // report cards are tick-only, so they are deliberately excluded.
     function columnHasForm(field) {
         return field === 'PermissionSlip' || field === 'ParentInterview'
+            || field === 'ScreeningResultsShared'
             || SCREENING_FIELDS.indexOf(field) !== -1;
     }
 
@@ -740,6 +745,138 @@
         document.getElementById('psOverlay').removeAttribute('data-printing');
     }
 
+    // ── Screening Results Shared with Parent (PICC PI10.H) ────────────────────
+    var currentRSStudentId = null;
+
+    async function openResultsShared(studentId) {
+        currentRSStudentId = studentId;
+        var student = students().find(function (s) { return String(s.Id) === String(studentId); });
+        if (!student) return;
+        var today = new Date().toISOString().split('T')[0];
+
+        document.getElementById('rsModalTitle').textContent = 'Screening Results Shared \u2013 ' + student.First_Name + ' ' + student.Last_Name;
+        document.getElementById('rsChildName').textContent = student.First_Name + ' ' + student.Last_Name;
+        document.getElementById('rsDOB').textContent = student.Birth_date || '\u2014';
+        document.getElementById('rsRoom').textContent = getRoom(student.RoomNumber) || '\u2014';
+
+        // Reset fields.
+        ['rsToolUsed','rsToolOther','rsScreeningDate','rsScreenerName','rsResultsSummary',
+         'rsSharedWith','rsSharedMethod','rsEvidence','rsParentResponse','rsConcern','rsReferral',
+         'rsFollowUp','rsParentSig','rsParentSigDate','rsStaffSig','rsStaffSigDate']
+            .forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+        document.getElementById('rsSharedDate').value = today;
+        document.getElementById('rsSavedBadge').style.display = 'none';
+
+        sigPads = {};
+        mountSigPad('rsParentSigPad', studentId, 'ScreeningResultsShared', 'parent',
+            { label: 'Parent/Guardian signature', printedName: 'rsParentSig', dateField: 'rsParentSigDate' });
+        mountSigPad('rsStaffSigPad', studentId, 'ScreeningResultsShared', 'staff',
+            { label: 'Staff signature', printedName: 'rsStaffSig', dateField: 'rsStaffSigDate' });
+
+        // Load an existing record so re-opening shows what was captured.
+        try {
+            var res = await apiFetch(yearQS('/api/pi-doc/screening-results-shared/' + studentId));
+            var data = await res.json();
+            if (data && data.Id) {
+                var set = function (id, v) { var el = document.getElementById(id); if (el && v != null) el.value = v; };
+                set('rsToolUsed', data.ToolUsed); set('rsToolOther', data.ToolOther);
+                set('rsScreeningDate', data.ScreeningDate); set('rsScreenerName', data.ScreenerName);
+                set('rsResultsSummary', data.ResultsSummary); set('rsSharedDate', data.SharedDate);
+                set('rsSharedWith', data.SharedWith); set('rsSharedMethod', data.SharedMethod);
+                set('rsEvidence', data.EvidenceOfSharing); set('rsParentResponse', data.ParentResponse);
+                set('rsConcern', data.ConcernIdentified); set('rsReferral', data.ReferralMade);
+                set('rsFollowUp', data.FollowUpNotes);
+                set('rsParentSig', data.ParentSignature); set('rsStaffSig', data.StaffSignature);
+                set('rsParentSigDate', data.SignedDate); set('rsStaffSigDate', data.SignedDate);
+            }
+        } catch (e) { console.error('Failed to load results-shared record', e); }
+
+        document.getElementById('rsOverlay').classList.add('open');
+        refreshSigPads();
+    }
+
+    function closeResultsShared() {
+        document.getElementById('rsOverlay').classList.remove('open');
+        currentRSStudentId = null;
+    }
+
+    async function saveResultsShared() {
+        if (!currentRSStudentId) return;
+        var btn = document.getElementById('rsSaveBtn');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        var val = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+        // Field keys must match the server PI_DOC_FORMS['screening-results-shared'] columns.
+        var body = {
+            year: year(),
+            toolUsed: val('rsToolUsed'), toolOther: val('rsToolOther'),
+            screeningDate: val('rsScreeningDate'), screenerName: val('rsScreenerName'),
+            resultsSummary: val('rsResultsSummary'), sharedDate: val('rsSharedDate'),
+            sharedWith: val('rsSharedWith'), sharedMethod: val('rsSharedMethod'),
+            evidenceOfSharing: val('rsEvidence'), parentResponse: val('rsParentResponse'),
+            concernIdentified: val('rsConcern'), referralMade: val('rsReferral'),
+            followUpNotes: val('rsFollowUp'),
+            parentSignature: val('rsParentSig'), staffSignature: val('rsStaffSig'),
+            signedDate: val('rsStaffSigDate') || val('rsParentSigDate')
+        };
+        try {
+            // 1. Store the structured record (also ticks the ScreeningResultsShared column,
+            //    which is what lights the roster pill and the chip via /api/child-forms).
+            var res = await apiFetch('/api/pi-doc/screening-results-shared/' + currentRSStudentId, {
+                method: 'POST', body: JSON.stringify(body)
+            });
+            var data = await res.json();
+            if (!data.success) { alert('Save failed: ' + (data.error || 'Unknown error')); return; }
+
+            var t = tracking();
+            if (!t[currentRSStudentId]) t[currentRSStudentId] = {};
+            t[currentRSStudentId].ScreeningResultsShared = 1;
+            ChildForms().mark(currentRSStudentId, 'ScreeningResultsShared', body.sharedDate);
+
+            // 2. File the signed PDF into the child's Teacher folder (if signed).
+            var st = students().find(function (s) { return String(s.Id) === String(currentRSStudentId); });
+            var sigProblems = await fileSignedForm(currentRSStudentId, 'ScreeningResultsShared', {
+                formTitle: 'Screening Results Shared with Parent',
+                rows: [
+                    { label: 'Child', value: st ? st.Last_Name + ', ' + st.First_Name : '' },
+                    { label: 'Date of birth', value: st ? (st.Birth_date || '') : '' },
+                    { label: 'Tool used', value: body.toolUsed === 'Other' ? body.toolOther : body.toolUsed },
+                    { label: 'Date screened', value: body.screeningDate },
+                    { label: 'Screener', value: body.screenerName },
+                    { label: 'Date shared', value: body.sharedDate },
+                    { label: 'Shared with', value: body.sharedWith },
+                    { label: 'How shared', value: body.sharedMethod }
+                ],
+                blocks: [
+                    { heading: 'Results summary', text: body.resultsSummary || '\u2014' },
+                    { heading: 'Evidence the results were shared', text: body.evidenceOfSharing || '\u2014' },
+                    { heading: 'Parent response', text: body.parentResponse || '\u2014' },
+                    { heading: 'Follow-up',
+                      text: 'Concern identified: ' + (body.concernIdentified || '\u2014')
+                          + '\nReferred for further evaluation: ' + (body.referralMade || '\u2014')
+                          + (body.followUpNotes ? '\n' + body.followUpNotes : '') }
+                ]
+            });
+            refreshActiveView();
+            if (sigProblems.length) {
+                alert('The record was saved, but the signed copy was not filed:\n\n' + sigProblems.join('\n'));
+            }
+            document.getElementById('rsSavedBadge').style.display = 'inline-flex';
+            setTimeout(function () { document.getElementById('rsSavedBadge').style.display = 'none'; }, 3000);
+        } catch (e) {
+            alert('Save failed: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Save Record';
+        }
+    }
+
+    function printResultsShared() {
+        document.getElementById('rsOverlay').setAttribute('data-printing', '1');
+        window.print();
+        document.getElementById('rsOverlay').removeAttribute('data-printing');
+    }
+
     // ── Screening (ASQ-3 / ASQ:SE-2) ─────────────────────────────────────────
     var currentScrStudentId = null;
     var currentScrType = '';
@@ -1196,6 +1333,44 @@
         '<button class="pi-btn pi-btn-primary" id="psSaveBtn" onclick="CofpForms.savePermissionSlip()">Save Permission Slip</button></div>',
         '</div></div>',
 
+        // ── Screening Results Shared (PICC PI10.H) ──
+        '<div class="pi-overlay" id="rsOverlay"><div class="pi-modal">',
+        '<div class="pi-modal-header"><h3 id="rsModalTitle">Screening Results Shared with Parent</h3>',
+        '<button class="pi-close" onclick="CofpForms.closeResultsShared()" aria-label="Close">&times;</button></div>',
+        '<div class="pi-modal-body">',
+        '<div class="pi-section"><h4>Child</h4><div class="pi-grid three">',
+        '<div class="pi-field"><label>Child Name</label><div class="pi-value" id="rsChildName"></div></div>',
+        '<div class="pi-field"><label>Date of Birth</label><div class="pi-value" id="rsDOB"></div></div>',
+        '<div class="pi-field"><label>Classroom</label><div class="pi-value" id="rsRoom"></div></div></div></div>',
+        '<div class="pi-section"><h4>Screening</h4><div class="pi-grid">',
+        '<div class="pi-field"><label>Research-Based Tool Used</label><select id="rsToolUsed"><option value="">Select</option><option>ASQ-3</option><option>ASQ:SE-2</option><option>ASQ-3 + ASQ:SE-2</option><option value="Other">Other</option></select></div>',
+        '<div class="pi-field"><label>If Other, name the tool</label><input type="text" id="rsToolOther"></div>',
+        '<div class="pi-field"><label>Date Child Was Screened</label><input type="date" id="rsScreeningDate"></div>',
+        '<div class="pi-field"><label>Name of Screener (staff)</label><input type="text" id="rsScreenerName"></div>',
+        '<div class="pi-field pi-full"><label>Results Summary</label><textarea id="rsResultsSummary" placeholder="Domains screened and the outcome in each."></textarea></div></div></div>',
+        '<div class="pi-section"><h4>Sharing with Parent</h4><div class="pi-grid">',
+        '<div class="pi-field"><label>Date Results Were Shared</label><input type="date" id="rsSharedDate"></div>',
+        '<div class="pi-field"><label>Shared With (parent/guardian name)</label><input type="text" id="rsSharedWith"></div>',
+        '<div class="pi-field"><label>How Results Were Shared</label><select id="rsSharedMethod"><option value="">Select</option><option>In person with report card</option><option>Conference</option><option>Phone</option><option>Sent home</option><option>Email</option><option value="Other">Other</option></select></div>',
+        '<div class="pi-field pi-full"><label>Evidence the Results Were Shared</label><textarea id="rsEvidence" placeholder="What was given to or discussed with the parent, and any copy retained in the file."></textarea></div>',
+        '<div class="pi-field pi-full"><label>Parent Questions or Response</label><textarea id="rsParentResponse"></textarea></div></div></div>',
+        '<div class="pi-section"><h4>Follow-Up</h4>',
+        '<div class="doc-note">PI10.I requires a referral for further evaluation when a screening identifies a concern. Record the referral itself on the Referral form.</div>',
+        '<div class="pi-grid">',
+        '<div class="pi-field"><label>Screening Identified a Concern</label><select id="rsConcern"><option value="">Select</option><option>No</option><option>Yes</option></select></div>',
+        '<div class="pi-field"><label>Referred for Further Evaluation</label><select id="rsReferral"><option value="">Select</option><option>N/A</option><option>No</option><option>Yes</option></select></div>',
+        '<div class="pi-field pi-full"><label>Follow-Up Notes</label><textarea id="rsFollowUp"></textarea></div></div></div>',
+        '<div class="pi-section"><h4>Signatures</h4>',
+        '<div class="doc-note">Sign here when the results are shared. Signing files a PDF of this record into the child\u2019s folder; re-signing files a fresh copy and keeps the old one.</div>',
+        '<div class="pi-grid">',
+        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="rsParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="rsParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="rsParentSigDate" style="flex:1;" title="Date signed"></div></div>',
+        '<div class="pi-field pi-full"><label>Staff Signature</label><div id="rsStaffSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="rsStaffSig" placeholder="Printed name" style="flex:2;"><input type="date" id="rsStaffSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
+        '</div>',
+        '<div class="pi-modal-footer"><span class="pi-saved-badge" id="rsSavedBadge" style="display:none;">&#10003; Saved</span>',
+        '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printResultsShared()">&#x1F5A8;&#xFE0F; Print</button>',
+        '<button class="pi-btn pi-btn-primary" id="rsSaveBtn" onclick="CofpForms.saveResultsShared()">Save Record</button></div>',
+        '</div></div>',
+
         '<div class="pi-overlay" id="scrOverlay"><div class="pi-modal">',
         '<div class="pi-modal-header"><h3 id="scrModalTitle">Screening Score Entry</h3>',
         '<button class="pi-close" onclick="CofpForms.closeScreening()" aria-label="Close">&times;</button></div>',
@@ -1375,6 +1550,10 @@
         savePermissionSlip: savePermissionSlip,
         closePermissionSlip: closePermissionSlip,
         printPermissionSlip: printPermissionSlip,
+        openResultsShared: openResultsShared,
+        saveResultsShared: saveResultsShared,
+        closeResultsShared: closeResultsShared,
+        printResultsShared: printResultsShared,
         openScreening: openScreening,
         saveScreening: saveScreening,
         closeScreening: closeScreening,

@@ -331,6 +331,7 @@ function chipFor(s, col) {
     else if (col.field === 'BegASQ' || col.field === 'EndASQ') act = 'screening|' + s.Id + '|ASQ-3|' + (col.field === 'BegASQ' ? 'Beginning' : 'End');
     else if (col.field === 'BegASE' || col.field === 'EndASE') act = 'screening|' + s.Id + '|ASQ:SE-2|' + (col.field === 'BegASE' ? 'Beginning' : 'End');
     else if (col.field === 'MidYearReport' || col.field === 'EndYearReport') act = 'upload|' + s.Id + '|' + col.field;
+    else if (col.field === 'ScreeningResultsShared') act = 'resultsShared|' + s.Id;
     var cls = 'tf-chip' + (done ? ' done' : '');
     return act
         ? '<a href="#" class="' + cls + '" data-act="' + escapeHtml(act) + '">' + inner + '</a>'
@@ -395,6 +396,7 @@ function renderTeacher() {
             else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
             else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
             else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
+            else if (parts[0] === 'resultsShared') CofpForms.openResultsShared(parseInt(parts[1], 10));
             // The relPath can contain a pipe in theory, so rejoin the tail.
             else if (parts[0] === 'weighted') openDoc(parts.slice(1).join('|'), 'Weighted Eligibility');
         });
