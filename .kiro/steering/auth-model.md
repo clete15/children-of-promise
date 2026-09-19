@@ -62,8 +62,11 @@ Do not "improve" it or add gates that are not described here.
    fix; deploy remotely on the VPS: `& "C:\Program Files\Git\cmd\git.exe" -C "C:\app"
    pull` then restart node. The Deploy button can't fix the code that breaks the Deploy
    button.
-4. **`COFP_SESSION_SECRET`** — if unset, every server restart signs everyone out (a new
-   signing key each boot). Set once on the server to keep sessions across deploys.
+4. **`COFP_SESSION_SECRET`** — **SET on the VPS as of 19 Sep 2026** (machine-wide via
+   `setx ... /M`), so staff sessions now survive restarts/deploys. If the server ever
+   starts logging `[STAFF AUTH] COFP_SESSION_SECRET is not set...` again, it was lost —
+   re-set it. Setting/rotating it signs everyone out ONCE (old tokens were signed with
+   the previous key); do it at a quiet time.
 
 ## Server guards (Internal/server.js) — which credential each accepts
 
@@ -75,3 +78,56 @@ Do not "improve" it or add gates that are not described here.
 
 Admin lists live in one place: `STAFF_ADMIN_LOGINS = ['CleteH','MeganN','SaraH']`,
 `IT_ADMIN_LOGINS = ['CleteH']`.
+
+## Operational reality — where things run (learned the hard way, 19 Sep 2026)
+
+- **This dev machine (`acp-client`) is NOT the web server.** The live server is a
+  separate VPS at **`160.153.187.39`** (public: `childrenofpromisedaycare.com`). Do not
+  assume `localhost` here is production.
+- **The real database is on the VPS**, reached from SSMS as `160.153.187.39,1433`
+  (login `cofpadmin`), DB `CofPMillstadt`, with all the real tables (Staff,
+  ISBETracking, ParentInterviews, etc.). The `localhost\SQLEXPRESS\CofPMillstadt` on the
+  dev machine is a near-empty stale copy — queries against it are misleading. Verify DB
+  facts against the VPS, not localhost.
+- **Deploy flow:** commit + push to GitHub from the dev repo
+  (`c:\Users\child\source\repos\Children Of Promise`) → then the change is live only
+  after the VPS pulls and restarts. The user does that on the VPS.
+- **The server's `C:\app` is its own clone.** Deploy = on the VPS:
+  `& "C:\Program Files\Git\cmd\git.exe" -C "C:\app" pull` then relaunch node. The portal
+  Deploy button can work once the running server is current, but it CANNOT ship the fix
+  that repairs the Deploy button — that first recovery is always a manual VPS pull.
+- **Server launcher:** `C:\app\Launch.bat` — `cd Internal` then `node server.js`
+  (foreground, blocks on `pause`). To restart cleanly on the VPS:
+  1. `Get-Process node | Select Id,StartTime,Path` → find the server's node Id.
+  2. `Stop-Process -Id <id> -Force`.
+  3. `Start-Process cmd -ArgumentList '/c','C:\app\Launch.bat'` (own window, inherits a
+     freshly-set env var — an in-app restart does NOT pick up a new setx value).
+  4. Verify: `GET https://childrenofpromisedaycare.com/api/health` → `200 {"ok":true}`.
+- **Verify live behaviour from the public URL, not the user's browser.** "It let me
+  straight in" is almost always a live sessionStorage token. Fetch the page/endpoint
+  directly (e.g. grep the served HTML for a gate marker, or hit `/api/staff-whoami`
+  unauthenticated and expect 401) to know the truth.
+
+## Terminal quirks on this dev machine (so output is readable)
+
+- **git is NOT on PATH** — always call it by full path:
+  `& "C:\Program Files\Git\cmd\git.exe" ...` (see git-workflow steering).
+- **The PowerShell terminal echoes/garbles inline output.** For anything whose result
+  matters (git push/status, node --check, web checks), redirect to a temp file and read
+  it back, then delete it:
+  `... > _out.txt 2>&1` then read `_out.txt` (may be UTF-16, still readable).
+- **Verifying an HTML page's inline JS parses:** extract the largest `<script>` block to
+  a temp `.js` and `node --check` it:
+  `$h=Get-Content -Raw file.html; $b=[regex]::Matches($h,'(?s)<script>(.*?)</script>');`
+  `$big=($b|Sort {$_.Groups[1].Value.Length} -Desc)[0].Groups[1].Value;`
+  `[IO.File]::WriteAllText("$PWD\_c.js",$big); node --check _c.js; Remove-Item _c.js`
+  Exit code 0 = parses. Always do this after editing an inline `<script>`; async/await
+  or a stray brace fails fast here instead of on the live site.
+- Clean up every temp `_*.txt` / `_c.js` after use.
+
+## Adding cards to the staff dashboard (`/staff/`, Internal/index.html)
+
+- Each card / section carries `data-role`: `"all"` = everyone sees it, `"admin"` = only
+  centre admins. The gate in `checkAuth()`/`showPortal()` hides `data-role="admin"`
+  nodes for non-admins. Adding a new staff-visible card = add the `<a class="dash-item"
+  data-role="all" href="...">` in the right section. No JS change needed.
