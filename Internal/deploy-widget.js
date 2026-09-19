@@ -54,11 +54,19 @@
         btn.dataset.state = 'pending';
         btn.textContent = opts.pendingText;
         try {
-            // Credentials come from the Staff Portal sign-in via the shared helper.
+            /* Prefer the personal token (an IT admin signed in as themselves), and
+               fall back to the shared password if that is all this browser holds.
+               checkITAdmin on the server accepts either. */
+            var hdrs = {};
+            if (window.CofpAuth) {
+                var t = CofpAuth.token && CofpAuth.token();
+                if (t) hdrs['X-Staff-Token'] = t;
+                var basic = CofpAuth.header && CofpAuth.header();
+                if (basic) hdrs['Authorization'] = basic;
+            }
             const res = await fetch(opts.url, {
                 method: 'POST',
-                headers: (window.CofpAuth && CofpAuth.header())
-                    ? { 'Authorization': CofpAuth.header() } : {}
+                headers: hdrs
             });
             let json = {};
             try { json = await res.json(); } catch (e) { /* restart may cut the response short */ }
@@ -136,9 +144,22 @@
         document.head.appendChild(s);
     }
 
+    /* Only an IT admin gets these controls. Deploy/Restart ship code and restart the
+       server — the IT tier (Clete for now), not the centre-admin tier. So the widget
+       asks whoAmI and injects itself only when the signed-in person is an IT admin.
+       Everyone else — staff, and centre admins like Megan or Sara — never sees it, and
+       the server refuses the endpoints for them regardless (checkITAdmin), so the gate
+       is defence in depth rather than the only lock. */
+    function injectIfITAdmin() {
+        if (!window.CofpAuth || !CofpAuth.whoAmI) return;   // no auth helper -> no controls
+        CofpAuth.whoAmI().then(function (who) {
+            if (who && who.itAdmin) inject();
+        }).catch(function () { /* not signed in / unreachable -> no controls */ });
+    }
+
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', inject);
+        document.addEventListener('DOMContentLoaded', injectIfITAdmin);
     } else {
-        inject();
+        injectIfITAdmin();
     }
 })();

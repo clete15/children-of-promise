@@ -264,31 +264,19 @@
 <body>
 
 <!-- PASSWORD OVERLAY -->
+<!-- The dashboard no longer has its own password box. Reaching it requires a
+     centre-admin personal sign-in (Clete, Megan or Sara) done at /me; this overlay
+     is only the brief "checking who you are" state before the page either shows or
+     bounces you to /me. A staff member, or anyone with just the shared centre
+     password, is sent to /me and never sees the whole-centre view here. -->
 <div id="passwordOverlay">
     <img src="/staff/logo-sm.png" alt="Children Of Promise">
     <h2>Staff Portal</h2>
     <p>Children Of Promise &nbsp;·&nbsp; Millstadt, IL</p>
-    <form class="pw-box" id="pwForm">
-        <label for="pwInput">Password</label>
-        <div class="pw-input-wrap">
-            <input type="password" id="pwInput" placeholder="Enter password" autocomplete="current-password" autofocus>
-            <button type="button" class="pw-toggle" id="pwToggle" title="Show/hide password">👁</button>
-        </div>
-        <div class="pw-error" id="pwError">Incorrect password. Please try again.</div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:var(--text-muted);cursor:pointer;font-weight:500;">
-            <input type="checkbox" id="pwRemember" checked style="width:auto;accent-color:var(--primary);cursor:pointer;">
-            Remember me on this device
-        </label>
-        <button type="submit">Sign In</button>
-        <!-- This overlay is the ADMIN door (the shared password). Staff who are not
-             administrators do not have this password and should never be typing it here
-             — that is how someone ends up seeing the whole roster. Send them to /me,
-             where they sign in as themselves and see only their own record. -->
-        <div style="text-align:center;border-top:1px solid var(--border);margin-top:4px;padding-top:14px;">
-            <div style="font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;">Staff member?</div>
-            <a href="/me" style="display:inline-block;font-size:0.85rem;font-weight:700;color:var(--primary);text-decoration:none;padding:8px 16px;border:1.5px solid var(--primary);border-radius:8px;">Sign in with your own name →</a>
-        </div>
-    </form>
+    <div class="pw-box" style="text-align:center;">
+        <p style="font-size:0.9rem;color:var(--text-muted);margin:0 0 14px;">Checking your sign-in…</p>
+        <a href="/me" style="display:inline-block;font-size:0.9rem;font-weight:700;color:var(--primary);text-decoration:none;padding:9px 18px;border:1.5px solid var(--primary);border-radius:8px;">Go to sign-in →</a>
+    </div>
 </div>
 
 <!-- MAIN CONTENT (hidden until authenticated) -->
@@ -502,98 +490,49 @@
 <script>
 // The password is not held here any more; the server is the only authority.
 
-// ── PASSWORD GATE ──
-// Signed in means we hold a password the server accepted, not merely a flag.
-// The old version stored '1' and compared the typed value against a constant in
-// this file, so the page believed itself authenticated while API calls had no
-// credentials at all.
-function checkAuth() {
-    if (!window.CofpAuth) return;
-    /* A staff member signed in as THEMSELVES (a personal token, and no shared
-       admin password on this browser) does not belong on the admin dashboard — it
-       is the whole-centre view. Send them to /me, which lands them on their own
-       record. Only the shared admin password unlocks this page. */
-    if (CofpAuth.isStaffSession && CofpAuth.isStaffSession()) {
+/* ── ADMIN GATE ──────────────────────────────────────────────────────────────
+   This dashboard is the whole-centre view, so reaching it now requires being a
+   CENTRE ADMIN signed in as yourself (Clete, Megan or Sara) — not merely holding
+   the shared password. That is the whole point of the change: a staff member who
+   knows the shared centre password must not be able to see the roster and staff
+   records here. Identity, from the personal token, is the gate.
+
+   whoAmI() answers from the personal token only. So:
+     - nobody signed in            -> /me to sign in
+     - signed in but not an admin  -> /me (their own page; they don't belong here)
+     - a centre admin              -> show the dashboard
+   The shared password still authorises the API underneath (the rescue fallback),
+   but it does not render this page, because whoAmI ignores it. */
+window.WHO = null;
+async function checkAuth() {
+    if (!window.CofpAuth || !CofpAuth.whoAmI) { location.replace('/me'); return; }
+    let who = null;
+    try { who = await CofpAuth.whoAmI(); } catch (e) { who = null; }
+    window.WHO = who;
+    if (!who || !who.admin) {          // not signed in, or signed in but not a centre admin
         location.replace('/me');
         return;
     }
-    /* The password overlay is ALWAYS shown here, even when the shared admin password
-       is already saved on this browser. A saved password used to send you straight
-       into the dashboard with no prompt at all — which is what "it just goes in" was.
-       The password is still remembered (the browser prefills the field via
-       autocomplete, and verify() on submit refreshes it), so signing in is one click;
-       but it is a deliberate click every visit rather than a silent pass-through.
-       Leaving the overlay up is the whole gate — showPortal() runs only on submit. */
+    showPortal();
 }
 
 function showPortal() {
     document.getElementById('passwordOverlay').style.display = 'none';
     const mc = document.getElementById('mainContent');
     mc.style.display = 'flex';
+    /* The Deploy/Restart controls are the IT tier — Clete only. Hide the inline
+       Deploy button for a centre admin who is not an IT admin (Megan, Sara). The
+       floating deploy-widget gates itself the same way off window.WHO. */
+    if (!who_isItAdmin()) {
+        var db = document.getElementById('deployBtn');
+        if (db) db.style.display = 'none';
+    }
     checkServer();
 }
 
-/* The staff-door word. Typing this at /staff is NOT a login — it grants no access on
-   its own. It simply sends the person to /me, the per-person sign-in, where identity
-   (and all real access) comes from their own account and token. So a plain staff member
-   starts at the same /staff address as admin: the word they type decides which door.
-
-   A UI gate on purpose: the real security is the personal token minted at /me, which the
-   server scopes to that one person's record. This string being visible in the page costs
-   nothing, because knowing it lets you reach only the sign-in form, not any data. */
-const STAFF_DOOR_WORD = 'cofpstaff';
-
-document.getElementById('pwForm').addEventListener('submit', async e => {
-    e.preventDefault();
-    const val = document.getElementById('pwInput').value;
-    const err = document.getElementById('pwError');
-    const btn = document.querySelector('#pwForm button[type=submit]');
-
-    /* The staff door: send them to /me to sign in as themselves. Checked before the
-       admin verify so it never travels to the server as a password attempt, and so a
-       staff member typing it is not told it "was not accepted". */
-    if (val.trim().toLowerCase() === STAFF_DOOR_WORD) {
-        location.replace('/me');
-        return;
-    }
-
-    if (btn) { btn.disabled = true; btn.textContent = 'Checking...'; }
-    try {
-        /* Checked rather than assumed. When auth.js fails to load this threw a
-           ReferenceError, and the catch below dutifully showed staff the words "CofpAuth
-           is not defined" under the password box — which reads as though they typed
-           something wrong. Say what actually happened and what to do about it. */
-        if (!window.CofpAuth) {
-            throw new Error('This page did not load fully, so the password cannot be '
-                + 'checked. Reload the page. If it keeps happening, open '
-                + 'childrenofpromisedaycare.com/staff/ with the slash on the end.');
-        }
-        // The server decides, not this page.
-        const ok = await CofpAuth.verify(val);
-        if (ok) {
-            CofpAuth.remember(val, document.getElementById('pwRemember').checked);
-            err.style.display = 'none';
-            showPortal();
-        } else {
-            err.textContent = 'That password was not accepted.';
-            err.style.display = 'block';
-            document.getElementById('pwInput').value = '';
-            document.getElementById('pwInput').focus();
-        }
-    } catch (ex) {
-        // Distinguish "wrong password" from "could not ask", so a server problem
-        // is not reported to staff as their mistake.
-        err.textContent = ex.message || 'Could not reach the server.';
-        err.style.display = 'block';
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
-    }
-});
-
-document.getElementById('pwToggle').addEventListener('click', () => {
-    const input = document.getElementById('pwInput');
-    input.type = input.type === 'password' ? 'text' : 'password';
-});
+function who_isItAdmin() {
+    return !!(window.WHO && window.WHO.itAdmin);
+}
 
 // ── SERVER STATUS ──
 async function checkServer() {

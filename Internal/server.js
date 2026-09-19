@@ -146,9 +146,18 @@ function basicPassword(req) {
 }
 
 function checkAuth(req, res) {
-    // A missing header and a wrong password are the same answer to the caller, so
-    // they share one branch rather than two identical ones.
-    if (basicPassword(req) !== INTERNAL_PASSWORD) {
+    /* Two ways to be authorised for the centre-level API:
+         - the shared password (option A: the rescue fallback, so a deploy or a lost
+           personal password can never lock the centre out), OR
+         - a centre-admin personal token (Clete, Megan or Sara signed in as themselves
+           at /me). Without this second path a centre admin who signed in personally —
+           and so holds a token but NOT the shared password on that browser — would pass
+           the dashboard's identity gate yet get 401 on every data call. Accepting their
+           token here is what makes the personal sign-in actually work for the whole-
+           centre view. A plain staff member's token is NOT accepted: their reach is
+           their own record through the personal endpoints, not this centre-wide API. */
+    const byCentreToken = staffIdIsAdmin(readSession(req.headers['x-staff-token']));
+    if (basicPassword(req) !== INTERNAL_PASSWORD && !byCentreToken) {
         /* Deliberately NO 'WWW-Authenticate: Basic' header. That header is what makes
            the browser throw up its own native "Sign in to access this site" popup on
            top of our own password page — which is confusing and looks like a second,
@@ -192,6 +201,23 @@ function hasClassroomAccess(req) {
    as checkAuth (no WWW-Authenticate), so the kiosk page shows its own message. */
 function checkClassroomAuth(req, res) {
     if (!hasClassroomAccess(req)) {
+        res.writeHead(401, { 'Content-Type': 'text/plain' });
+        res.end('Unauthorized');
+        return false;
+    }
+    return true;
+}
+
+/* Guard for the three dangerous IT controls — Deploy, Restart, run SQL. These ship
+   code and change the server itself, so they are the IT tier, not the centre-admin
+   tier: Clete only. Accepts the shared password (the API fallback, so a rescue
+   deploy is always possible) OR a personal token belonging to an IT admin. A centre
+   admin like Megan or Sara, signed in personally, is refused here — they run the
+   centre, not the software. */
+function checkITAdmin(req, res) {
+    const bySharedPassword = basicPassword(req) === INTERNAL_PASSWORD;
+    const byITToken = staffIdIsITAdmin(readSession(req.headers['x-staff-token']));
+    if (!bySharedPassword && !byITToken) {
         res.writeHead(401, { 'Content-Type': 'text/plain' });
         res.end('Unauthorized');
         return false;
@@ -290,13 +316,32 @@ function readSession(token) {
    business in a colleague's appraisal, and a rule that quietly widens as job titles change
    is the wrong shape for a permission. Two names, changed here, visible in one place.
 
-   Compared case-insensitively against LoginName, which is derived as FirstnameL. */
-const STAFF_ADMIN_LOGINS = ['CleteH', 'MeganN'];
+   Compared case-insensitively against LoginName, which is derived as FirstnameL.
+
+   TWO tiers, deliberately separate:
+
+   CENTRE ADMIN (STAFF_ADMIN_LOGINS) — the whole-centre view: the full roster, staff
+   records, compliance, the staff chooser. Clete, Megan and Sara. This is what the
+   admin dashboard and the `admin` flag gate.
+
+   IT ADMIN (IT_ADMIN_LOGINS) — the dangerous controls: Deploy, Restart and raw SQL,
+   i.e. the ability to ship code and change the server. Clete only, because these
+   change the software, not the centre's records. A director could be added here the
+   day they are trained to ship updates through Kiro. Every IT admin is also a centre
+   admin, but not the other way round. */
+const STAFF_ADMIN_LOGINS = ['CleteH', 'MeganN', 'SaraH'];
+const IT_ADMIN_LOGINS = ['CleteH'];
 
 function isAdminLogin(loginName) {
     const l = String(loginName || '').trim().toLowerCase();
     if (!l) return false;
     return STAFF_ADMIN_LOGINS.some(a => a.toLowerCase() === l);
+}
+
+function isITAdminLogin(loginName) {
+    const l = String(loginName || '').trim().toLowerCase();
+    if (!l) return false;
+    return IT_ADMIN_LOGINS.some(a => a.toLowerCase() === l);
 }
 
 /* Is this staff id one of the administrators? Read from the row rather than passed in,
@@ -309,6 +354,15 @@ function staffIdIsAdmin(staffId) {
     return isAdminLogin(r.rows[0].LoginName);
 }
 
+// As above, but for the IT tier (deploy/restart/sql).
+function staffIdIsITAdmin(staffId) {
+    const id = parseInt(staffId, 10);
+    if (!id) return false;
+    const r = runSQLRows(`SELECT ISNULL(LoginName,'') AS LoginName FROM Staff WHERE Id=${id}`);
+    if (!r.ok || !r.rows[0]) return false;
+    return isITAdminLogin(r.rows[0].LoginName);
+}
+
 /* Who is asking? Either the director by shared password, or one specific staff
    member by signed token, or nobody.
 
@@ -317,13 +371,20 @@ function staffIdIsAdmin(staffId) {
    treating it as one is how "my page" becomes "anyone's page". */
 function resolveActor(req) {
     if (basicPassword(req) === INTERNAL_PASSWORD) {
-        return { director: true, staffId: null, admin: true };
+        /* The shared password is the API fallback (option A): it still authorises the
+           centre-level API so a deploy can never lock everyone out. itAdmin is true
+           here too, so the IT controls keep working from the shared password if a
+           personal sign-in is ever unavailable. What it does NOT do is render the
+           admin VIEW — the dashboard page requires a centre-admin personal token, so a
+           staff member who merely knows the shared password cannot see the roster. */
+        return { director: true, staffId: null, admin: true, itAdmin: true };
     }
     const id = readSession(req.headers['x-staff-token']);
     /* `admin` is what widens the reach; `director` still means "arrived by shared
        password" and is left alone, because several endpoints use it to mean exactly that.
-       Anything that should apply to Clete and Megan signed in as themselves checks admin. */
-    if (id) return { director: false, staffId: id, admin: staffIdIsAdmin(id) };
+       Anything that should apply to Clete/Megan/Sara signed in as themselves checks admin;
+       the three dangerous controls check itAdmin (Clete only). */
+    if (id) return { director: false, staffId: id, admin: staffIdIsAdmin(id), itAdmin: staffIdIsITAdmin(id) };
     return null;
 }
 
@@ -3858,9 +3919,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         return;
     }
 
-    // POST run SQL (internal - protected)
+    // POST run SQL (IT admin only — Clete, or the shared-password fallback)
     if (req.method === 'POST' && url === '/api/sql') {
-        if (!checkAuth(req, res)) return;
+        if (!checkITAdmin(req, res)) return;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             if (!d.query) return sendJSON(res, 400, { error: 'No query provided' });
@@ -3871,9 +3932,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         return;
     }
 
-    // POST deploy (internal - protected) — pulls code only, no restart
+    // POST deploy (IT admin only — Clete, or the shared-password fallback) — pulls code only, no restart
     if (req.method === 'POST' && url === '/api/deploy') {
-        if (!checkAuth(req, res)) return;
+        if (!checkITAdmin(req, res)) return;
         try {
             const out = execSync('"C:\\Program Files\\Git\\mingw64\\bin\\git.exe" fetch origin && "C:\\Program Files\\Git\\mingw64\\bin\\git.exe" reset --hard origin/master', { encoding: 'utf8', shell: 'cmd.exe', cwd: 'C:\\app' });
             console.log('[DEPLOY]', out);
@@ -3883,9 +3944,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         }
     }
 
-    // POST restart server (internal - protected)
+    // POST restart server (IT admin only — Clete, or the shared-password fallback)
     if (req.method === 'POST' && url === '/api/restart') {
-        if (!checkAuth(req, res)) return;
+        if (!checkITAdmin(req, res)) return;
         sendJSON(res, 200, { success: true, message: 'Server restarting...' });
         setTimeout(() => {
             try {
@@ -6126,7 +6187,7 @@ ELSE
     if (req.method === 'GET' && url === '/api/staff-whoami') {
         const actor = resolveActor(req);
         if (!actor) return sendJSON(res, 401, { error: 'Sign in first' });
-        if (actor.director) return sendJSON(res, 200, { director: true, admin: true });
+        if (actor.director) return sendJSON(res, 200, { director: true, admin: true, itAdmin: true });
         const r = runSQLRows(
             `SELECT Id, ISNULL(Name,'') AS Name, ISNULL(LoginName,'') AS LoginName,
                     ISNULL(CAST(MustChangePassword AS INT),1) AS MustChangePassword
@@ -6140,6 +6201,11 @@ ELSE
                themselves is still director:false — they have a name and their own record —
                but admin:true, so they keep the chooser and everyone else does not. */
             admin: isAdminLogin(row.LoginName),
+            /* The IT tier (deploy/restart/sql + the Deploy widget). Clete only for now;
+               a trained director can be added to IT_ADMIN_LOGINS later. Kept separate
+               from admin so Megan and Sara get the whole-centre view without the power
+               to ship code. */
+            itAdmin: isITAdminLogin(row.LoginName),
             staffId: String(row.Id),
             name: String(row.Name || ''),
             loginName: String(row.LoginName || ''),
