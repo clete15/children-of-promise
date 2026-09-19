@@ -66,6 +66,18 @@
     }
     .mp-foot a { color: #fff; }
     .mp-hint { font-size: 0.73rem; color: #94a3b8; line-height: 1.55; margin: 0; }
+    /* First-time credentials guidance: the one thing a new person MUST read, so it is a
+       callout with a label and a left accent bar rather than faint grey hint text. */
+    .mp-firsttime {
+        font-size: 0.8rem; color: #1e3a8a; line-height: 1.6; margin: 0;
+        background: #eff6ff; border-left: 4px solid #2563eb;
+        border-radius: 0 8px 8px 0; padding: 12px 14px;
+    }
+    .mp-firsttime .mp-ft-label {
+        display: block; font-weight: 800; color: #1d4ed8; text-transform: uppercase;
+        letter-spacing: 0.04em; font-size: 0.68rem; margin-bottom: 4px;
+    }
+    .mp-firsttime strong { color: #1e3a8a; }
 </style>
 </head>
 <body>
@@ -93,9 +105,11 @@
             <input type="password" id="mpPassword" name="password" autocomplete="current-password">
         </div>
 
-        <p class="mp-hint">First time? Your sign-in name and password are both your first
-            name followed by the initial of your surname — Molly Ellis would be
-            <strong>MollyE</strong>. You will be asked to choose your own password.</p>
+        <p class="mp-firsttime">
+            <span class="mp-ft-label">First time signing in?</span>
+            Your sign-in name and password are both your first name followed by the initial
+            of your surname — Molly Ellis would be <strong>MollyE</strong>. You will be asked
+            to choose your own password.</p>
 
         <p class="mp-hint" style="margin-top:2px;">You will be asked to sign in each time
             for security, even on this device. Your browser can remember your password so
