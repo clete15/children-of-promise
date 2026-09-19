@@ -1071,6 +1071,10 @@ async function setSchoolYear(year) {
    the fact that one exists and where it is — because the roster needs to know which
    forms are signed, not what the signatures look like. */
 let signatures = {};
+// weightedFiles[studentId] = relPath of the child's weighted-eligibility form on disk.
+// Fed from /api/weighted-eligibility-files — the SAME source Child Files uses — so the
+// roster's Weighted Eligibility cell reflects the Child Files form, not a separate record.
+let weightedFiles = {};
 
 function sigKey(studentId, field, role) {
     return String(studentId) + '|' + field + '|' + role;
@@ -1217,7 +1221,7 @@ async function init() {
         renderYearPicker();
         // Site-level facts (DCFS license). Awaited so the CB2 status and the
         // license alert are correct on first render, including via a deep link.
-        const [sRes, cRes, tRes, scrRes] = await Promise.all([
+        const [sRes, cRes, tRes, scrRes, , , , , weData] = await Promise.all([
             apiFetch('/api/students'),
             apiFetch('/api/classrooms'),
             apiFetch(yearQS('/api/isbe-tracking')),
@@ -1229,10 +1233,14 @@ async function init() {
             // Uploaded evidence (parent questionnaires, report-card scans) — required
             // for a screening's two-part completion and for the report-card columns.
             ChildForms.loadFiles(activeSchoolYear, apiFetch),
-            loadSignatures(activeSchoolYear)
+            loadSignatures(activeSchoolYear),
+            // Which children have a weighted-eligibility form on disk (Child Files), so
+            // the roster's Weighted Eligibility cell shows a green pill fed from there.
+            apiFetch('/api/weighted-eligibility-files').then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
         students = await sRes.json();
         classrooms = await cRes.json();
+        weightedFiles = (weData && weData.files) ? weData.files : {};
         const tData = await tRes.json();
         tData.forEach(t => { trackingData[t.StudentId] = t; });
         // Index screenings by studentId -> "TYPE|Period" so the roster can show
@@ -1899,6 +1907,20 @@ function teacherPill(student, field, extra) {
         + (extra || '');
 }
 
+/* Weighted Eligibility on the roster is a read-only VIEW of the Child Files form, not a
+   separate record. A green pill when the form exists on disk (click to open it), a plain
+   pill when it does not. Editing/generating happens in Child Files — this only reflects
+   it, the same way the teacher pills reflect the classroom card. */
+function weightedEligibilityCell(student) {
+    const rel = weightedFiles[student.Id] || weightedFiles[String(student.Id)];
+    if (rel) {
+        return '<a class="cf-pill" href="#" title="Weighted eligibility form is on file (Child Files) — click to open."'
+            + ' onclick="event.preventDefault();openDoc(\'' + String(rel).replace(/'/g, "\\'") + "','Weighted Eligibility',true)\">"
+            + '\u2713 on file</a>';
+    }
+    return '<span class="cf-pill" style="opacity:0.6;" title="No weighted eligibility form on file yet. Create it in Child Files.">not on file</span>';
+}
+
 /* Proof of Income is a document, not a tick: it is uploaded (pay stub, tax return,
    benefits letter) and lives on the enrollment record (ProofOfIncomeUploaded /
    ProofOfIncomeFile). So instead of a checkbox the roster shows ONE pill:
@@ -2048,6 +2070,13 @@ function renderRoster() {
             if (f === 'ProofOfIncome') {
                 return '<td class="' + ('cf-doc' + divide).trim() + '">'
                     + proofOfIncomeCell(s) + '</td>';
+            }
+
+            // Weighted Eligibility is read-only here: a pill fed from the Child Files
+            // form, not the old editable checkbox+[form]. Editing happens in Child Files.
+            if (f === 'WeightedEligibility') {
+                return '<td class="' + ('cf-doc' + divide).trim() + '">'
+                    + weightedEligibilityCell(s) + '</td>';
             }
 
             // The rest are editable checkboxes / document links (unchanged).
