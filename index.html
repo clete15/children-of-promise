@@ -98,11 +98,34 @@
    and every call here started coming back 401 "Unauthorized". Attaching the header
    explicitly, the way the rest of the site does, restores it without the popup. */
 function authHeaders(extra) {
+    /* Deploy / Restart / SQL are the IT tier (checkITAdmin on the server): they accept
+       the shared password OR an IT-admin PERSONAL token. Since sign-in is now personal
+       and session-scoped, this browser usually holds a TOKEN, not the shared password —
+       so send both. Sending only the shared password (the old behaviour) meant a
+       personally-signed-in admin got no header at all and the call came back 401
+       "Unauthorized", which then broke res.json() with "Unexpected token U". */
     var h = extra || {};
-    if (window.CofpAuth && CofpAuth.header && CofpAuth.header()) {
-        h['Authorization'] = CofpAuth.header();
+    if (window.CofpAuth) {
+        var t = CofpAuth.token && CofpAuth.token();
+        if (t) h['X-Staff-Token'] = t;
+        var basic = CofpAuth.header && CofpAuth.header();
+        if (basic) h['Authorization'] = basic;
     }
     return h;
+}
+
+/* Read a response as JSON, but tolerate a plain-text error (the server's 401 body is
+   the word "Unauthorized", which is not JSON). Returns a usable object with a clear
+   message instead of throwing a confusing "Unexpected token U" parse error. */
+async function readJsonSafe(res) {
+    var text = '';
+    try { text = await res.text(); } catch (e) {}
+    try { return JSON.parse(text); } catch (e) {
+        if (res.status === 401) {
+            return { success: false, error: 'Not authorised. Sign in as an IT admin (Clete) first, then try again.' };
+        }
+        return { success: false, error: (text || ('HTTP ' + res.status)) };
+    }
 }
 
 async function runDeploy() {
@@ -114,7 +137,7 @@ async function runDeploy() {
     msg.textContent = 'Deploying...';
     try {
         const res = await fetch('/api/deploy', { method: 'POST', headers: authHeaders() });
-        const json = await res.json();
+        const json = await readJsonSafe(res);
         if (json.success) {
             msg.textContent = '✓ ' + (json.message || 'Code updated successfully.');
             msg.style.background = '#f0fdf4';
@@ -158,7 +181,7 @@ async function runSQL() {
             headers: authHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ query })
         });
-        const json = await res.json();
+        const json = await readJsonSafe(res);
         if (json.success) {
             status.textContent = '✓ Success';
             status.style.color = 'var(--success)';
