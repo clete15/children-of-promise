@@ -2066,10 +2066,21 @@ function seedWeightedEligibilityDoc(studentId, opts) {
     const folder = childSubFolder(studentId, 'Administrative');
     if (folder.error) { console.warn('[SEED] ' + folder.error); return { ok: false, error: folder.error }; }
 
+    const overwrite = !!(opts && opts.overwrite);
     let existing = [];
     try { existing = fs.readdirSync(folder.path); } catch (e) { /* new folder */ }
-    if (existing.some(n => /weighted eligibility/i.test(n))) {
-        return { ok: true, skipped: true };
+    const priorForms = existing.filter(n => /weighted eligibility/i.test(n));
+    if (priorForms.length) {
+        if (!overwrite) return { ok: true, skipped: true };
+        /* Overwrite mode: remove the stale weighted-eligibility file(s) so a fresh one is
+           generated with the current scoring. Also clears any pre-split copy left loose in
+           the parent child folder, so a child does not end up with two. */
+        priorForms.forEach(n => { try { fs.unlinkSync(path.join(folder.path, n)); } catch (e) { /* ignore */ } });
+        try {
+            const parent = path.dirname(folder.path);
+            fs.readdirSync(parent).filter(n => /weighted eligibility/i.test(n))
+                .forEach(n => { try { fs.unlinkSync(path.join(parent, n)); } catch (e) { /* ignore */ } });
+        } catch (e) { /* parent unreadable — nothing to clean */ }
     }
 
     const recs = childRecordsForSeed(studentId);
@@ -7866,6 +7877,9 @@ ELSE
        eligibility file, so running this twice does not duplicate anything. */
     if (req.method === 'POST' && url === '/api/backfill-child-folders') {
         if (!checkAuth(req, res)) return;
+        // ?overwrite=1 regenerates each child's weighted-eligibility form with the current
+        // scoring, replacing a stale one, rather than skipping children who already have one.
+        const overwrite = new URLSearchParams(req.url.split('?')[1] || '').get('overwrite') === '1';
         const list = runSQLRows(
             `SELECT Id FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' ORDER BY Id`);
         if (!list.ok) return sendJSON(res, 500, { error: list.error });
@@ -7874,17 +7888,52 @@ ELSE
         const errors = [];
         for (const id of ids) {
             let out;
-            try { out = seedWeightedEligibilityDoc(id, { fillBlanksAsNo: true }); }
+            try { out = seedWeightedEligibilityDoc(id, { fillBlanksAsNo: true, overwrite: overwrite }); }
             catch (e) { out = { ok: false, error: e.message }; }
             if (out && out.ok && out.skipped) skipped++;
             else if (out && out.ok) created++;
             else { failed++; if (errors.length < 10) errors.push('#' + id + ': ' + (out && out.error || 'unknown')); }
         }
-        console.log(`[BACKFILL] children=${ids.length} created=${created} skipped=${skipped} failed=${failed}`);
+        console.log(`[BACKFILL] overwrite=${overwrite} children=${ids.length} created=${created} skipped=${skipped} failed=${failed}`);
         return sendJSON(res, 200, {
             success: true, total: ids.length, created, skipped, failed,
             errors: errors.length ? errors : undefined,
-            message: `${ids.length} enrolled children: ${created} new form(s), ${skipped} already had one, ${failed} failed.`
+            message: `${ids.length} enrolled children: ${created} ${overwrite ? 'form(s) refreshed' : 'new form(s)'}, ${skipped} skipped, ${failed} failed.`
+        });
+    }
+
+    /* POST recalculate the stored waiting-list Score for every pending pre-enrollment
+       row, using the current scoring rules (internal - protected). The Score is written
+       at submit time, so changing the rules leaves existing rows stale until this runs.
+       Uses the SAME scoreWeightedTotal as the weighted eligibility form, mapping each
+       PreEnrollment row into the intake shape the scorer reads, so the waiting list and
+       the forms rank on identical logic. */
+    if (req.method === 'POST' && url === '/api/rescore-waitlist') {
+        if (!checkAuth(req, res)) return;
+        const rows = runSQLRows(
+            `SELECT Id, ISNULL(Homeless,'') AS Homeless, ISNULL(FosterAdopted,'') AS FosterAdopted, ISNULL(IEP,'') AS IEP,
+                    ISNULL(EarlyIntervention,'') AS EarlyIntervention, ISNULL(AbuseHistory,'') AS AbuseHistory, ISNULL(MentalIllness,'') AS MentalIllness,
+                    ISNULL(DcfsInvolvement,'') AS DcfsInvolvement, ISNULL(SubstanceAbuse,'') AS SubstanceAbuse, ISNULL(CaregiverOther,'') AS CaregiverOther,
+                    ISNULL(FamilyDeath,'') AS FamilyDeath, ISNULL(LowBirthWeight,'') AS LowBirthWeight, ISNULL(ParentIncarcerated,'') AS ParentIncarcerated,
+                    ISNULL(TeenParent,'') AS TeenParent, ISNULL(NoHSDiploma,'') AS NoHSDiploma, ISNULL(BornOutsideUS,'') AS BornOutsideUS,
+                    ISNULL(NonEnglishHome,'') AS NonEnglishHome, ISNULL(ActiveMilitary,'') AS ActiveMilitary, ISNULL(LivingSituation,'') AS LivingSituation,
+                    ISNULL(HouseholdIncome,'') AS HouseholdIncome, ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize, ISNULL(PublicBenefits,'') AS PublicBenefits,
+                    ISNULL(City,'') AS City, ISNULL(BrightpointSubsidy,'') AS BrightpointSubsidy, ISNULL(PriorEarlyLearning,'') AS PriorEarlyLearning,
+                    ISNULL(ScreeningDelayNoEi,'') AS ScreeningDelayNoEi, ISNULL(ParentEll,'') AS ParentEll, ISNULL(IncomeBelow50Fpl,'') AS IncomeBelow50Fpl
+             FROM PreEnrollment WHERE ISNULL(WaitlistStatus,'Pending') NOT IN ('Enrolled','Declined')`);
+        if (!rows.ok) return sendJSON(res, 500, { error: rows.error });
+        let updated = 0, failed = 0;
+        for (const r of rows.rows) {
+            // The scorer reads intake (i) with an enrollment (e) fallback; a waitlist row
+            // has no enrollment record, so pass it as the intake and an empty enroll.
+            const score = scoreWeightedTotal(r, {});
+            const u = runSQL(`UPDATE PreEnrollment SET Score=${parseInt(score) || 0} WHERE Id=${parseInt(r.Id)}`);
+            if (u.ok) updated++; else failed++;
+        }
+        console.log(`[RESCORE] waitlist rows=${rows.rows.length} updated=${updated} failed=${failed}`);
+        return sendJSON(res, 200, {
+            success: true, total: rows.rows.length, updated, failed,
+            message: `${rows.rows.length} waiting-list children: ${updated} re-scored, ${failed} failed.`
         });
     }
 

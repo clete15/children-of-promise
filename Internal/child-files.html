@@ -129,6 +129,16 @@
                     title="Create a folder and a pre-filled weighted eligibility form for every currently enrolled child. Safe to run more than once.">
                     &#128193; Create child folders + weighted eligibility forms
                 </button>
+                <button class="btn-secondary" id="cfRefreshBtn" onclick="backfillFolders(true)"
+                    style="font-size:0.75rem;padding:6px 12px;"
+                    title="Regenerate every child's weighted eligibility form with the current scoring, replacing the existing one. Use after the scoring rules change.">
+                    &#128260; Refresh weighted eligibility forms
+                </button>
+                <button class="btn-secondary" id="cfRescoreBtn" onclick="rescoreWaitlist()"
+                    style="font-size:0.75rem;padding:6px 12px;"
+                    title="Recalculate the weighted score for every waiting-list child using the current rules, so the list re-ranks.">
+                    &#128290; Recalculate waiting-list scores
+                </button>
                 <span id="cfActionStatus" style="font-size:0.72rem;color:#6b7280;"></span>
             </div>
             <div class="cf-body" id="afBody"><div class="cf-loading">Loading…</div></div>
@@ -524,16 +534,39 @@ async function carryForward() {
         status.textContent = '\u26a0 ' + e.message; status.style.color = '#b91c1c';
     } finally { btn.disabled = false; }
 }
-async function backfillFolders() {
+async function backfillFolders(overwrite) {
     var status = document.getElementById('cfActionStatus');
-    if (!confirm('Create a document folder and a pre-filled weighted eligibility form for every currently '
-        + 'enrolled child?\n\nNew enrollments already get this automatically; this catches up children enrolled '
-        + 'earlier. Any criterion not on record is filled in as \u201CNo\u201D. Safe to run more than once.')) return;
-    var btn = document.getElementById('cfBackfillBtn');
+    var msg = overwrite
+        ? 'Regenerate EVERY enrolled child\u2019s weighted eligibility form with the current scoring, '
+            + 'replacing the existing one?\n\nUse this after the scoring rules change. The previous form is '
+            + 'removed and a fresh one written. Any criterion not on record is filled in as \u201CNo\u201D.'
+        : 'Create a document folder and a pre-filled weighted eligibility form for every currently '
+            + 'enrolled child?\n\nNew enrollments already get this automatically; this catches up children enrolled '
+            + 'earlier. Any criterion not on record is filled in as \u201CNo\u201D. Safe to run more than once.';
+    if (!confirm(msg)) return;
+    var btn = document.getElementById(overwrite ? 'cfRefreshBtn' : 'cfBackfillBtn');
     btn.disabled = true;
     status.textContent = 'Working\u2026 this can take a moment.'; status.style.color = '#6b7280';
     try {
-        var res = await apiFetch('/api/backfill-child-folders', { method: 'POST' });
+        var res = await apiFetch('/api/backfill-child-folders' + (overwrite ? '?overwrite=1' : ''), { method: 'POST' });
+        var d = await res.json();
+        if (!d.success) throw new Error(d.error || 'failed');
+        status.textContent = d.message; status.style.color = d.failed ? '#b45309' : '#166534';
+    } catch (e) {
+        status.textContent = '\u26a0 ' + e.message; status.style.color = '#b91c1c';
+    } finally { btn.disabled = false; }
+}
+
+async function rescoreWaitlist() {
+    var status = document.getElementById('cfActionStatus');
+    if (!confirm('Recalculate the weighted score for every waiting-list child using the current rules?\n\n'
+        + 'This re-ranks the waiting list to match the updated scoring. It changes only pending '
+        + 'pre-enrollment records, not enrolled children.')) return;
+    var btn = document.getElementById('cfRescoreBtn');
+    btn.disabled = true;
+    status.textContent = 'Recalculating\u2026'; status.style.color = '#6b7280';
+    try {
+        var res = await apiFetch('/api/rescore-waitlist', { method: 'POST' });
         var d = await res.json();
         if (!d.success) throw new Error(d.error || 'failed');
         status.textContent = d.message; status.style.color = d.failed ? '#b45309' : '#166534';
