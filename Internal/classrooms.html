@@ -301,6 +301,24 @@ function loadScriptFresh(src) {
         document.head.appendChild(s);
     });
 }
+/* Wait for the three shared modules to finish EXECUTING before deciding they are
+   missing. They are plain <script src> tags above this code, so on a fast machine
+   they are ready by the time start() runs — but on a classroom tablet, or a cold
+   cache where the ?v= query forces a fresh fetch, the 89 KB classroom-forms.js can
+   still be parsing when start() first looks. That race is what flashed "Signing
+   isn't available", even though a Retry a second later found everything present.
+   Polling briefly here turns that false alarm into a short, silent wait. */
+function waitForModules(timeoutMs) {
+    var deadline = Date.now() + (timeoutMs || 4000);
+    return new Promise(function (resolve) {
+        (function check() {
+            if (window.SignPad && window.ChildForms && window.CofpForms) return resolve(true);
+            if (Date.now() > deadline) return resolve(false);
+            setTimeout(check, 100);
+        })();
+    });
+}
+
 async function reloadMissingModules() {
     const need = [];
     if (!window.SignPad)    need.push('/staff/sign-pad.js');
@@ -334,7 +352,10 @@ async function start() {
        lands on screen with the reason, instead of a frozen spinner. */
     try {
         CK_YEAR = currentSchoolYear();
-        try { initForms(); } catch (e) { console.error('[KIOSK] initForms failed', e); ckModulesMissing = true; }
+        // A first, optimistic attempt — if the modules are already executed it wires up
+        // now. If they are not, this no-ops silently; the real missing-check happens
+        // after waitForModules() below, so a slow load is not pre-judged as an outage.
+        try { initForms(); } catch (e) { console.error('[KIOSK] initForms failed', e); }
 
         // ESSENTIAL: only the roster and room list are needed to render. Awaited with a
         // timeout so a stalled server shows an error, never a forever spinner.
@@ -348,10 +369,21 @@ async function start() {
         CK_STUDENTS = await sRes.json(); if (!Array.isArray(CK_STUDENTS)) CK_STUDENTS = [];
         CK_ROOMS = await cRes.json();    if (!Array.isArray(CK_ROOMS)) CK_ROOMS = [];
 
+        // Give the shared modules a moment to finish executing before judging them
+        // missing — on a tablet they are usually just slow, not absent. This alone
+        // resolves the "Signing isn't available on first entry, fine after Retry" race.
         if (!window.CofpForms || !window.ChildForms || !window.SignPad) {
-            // A shared module didn't arrive — often a single dropped/stale request on
-            // a tablet, not a real outage. Try re-fetching the missing ones once with
-            // a fresh cache-busting query before giving up and showing the warning.
+            await waitForModules(4000);
+        }
+
+        if (window.CofpForms && window.ChildForms && window.SignPad) {
+            // Present (they were just slow to execute). Wire up now — initForms is
+            // idempotent, so this is safe whether or not the early attempt took.
+            ckModulesMissing = false;
+            try { initForms(); } catch (e) { console.error('[KIOSK] initForms failed', e); }
+        } else {
+            // Genuinely not here after waiting — try re-fetching the missing ones once
+            // with a fresh cache-busting query before giving up and showing the warning.
             const healed = await reloadMissingModules();
             if (!healed) {
                 const miss = [];
