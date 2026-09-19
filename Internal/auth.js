@@ -58,21 +58,45 @@
     var TOKEN_KEY = 'copStaffToken';
     var TOKEN_NAME_KEY = 'copStaffTokenName';
 
+    /* ── Purge any PERSISTED credential the moment this script loads ──
+       A sign-in must be an act you perform each session — the gate should appear
+       every fresh visit, even on the centre's own machine. Sessions therefore live
+       ONLY in sessionStorage (cleared when the browser closes). Older builds, and the
+       "keep me signed in" option, wrote the token and the shared password into
+       localStorage, which persists across browser restarts — so a machine used for
+       testing kept getting carried straight in past the login screen. That is the
+       "something is saving and letting me bypass" behaviour.
+
+       Wiping localStorage here, before anything reads a credential, guarantees no
+       leftover persisted token or password can silently authorise a session. It is a
+       no-op on a clean browser and self-heals the ones that still carry old state.
+       sessionStorage is untouched, so a sign-in done this session still works until
+       the browser is closed. */
+    try {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(TOKEN_NAME_KEY);
+        localStorage.removeItem(KEY);
+        localStorage.removeItem('copStaffAuth');
+    } catch (e) { /* private mode / storage disabled — nothing persisted anyway */ }
+
     function stored() {
         try {
-            return localStorage.getItem(KEY) || sessionStorage.getItem(KEY) || '';
+            // sessionStorage only: a persisted shared password must not carry a session.
+            return sessionStorage.getItem(KEY) || '';
         } catch (e) { return ''; }
     }
 
     function token() {
         try {
-            return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY) || '';
+            // sessionStorage only, for the same reason as stored(): no silent carry-in
+            // from a token a previous build left in localStorage.
+            return sessionStorage.getItem(TOKEN_KEY) || '';
         } catch (e) { return ''; }
     }
 
     function tokenName() {
         try {
-            return localStorage.getItem(TOKEN_NAME_KEY) || sessionStorage.getItem(TOKEN_NAME_KEY) || '';
+            return sessionStorage.getItem(TOKEN_NAME_KEY) || '';
         } catch (e) { return ''; }
     }
 
@@ -128,9 +152,14 @@
     }
 
     function remember(pw, persist) {
+        /* Always session-scoped, never localStorage, regardless of `persist`. A
+           remembered shared password in localStorage is exactly what let a browser
+           skip the login screen across restarts; keeping it in sessionStorage means
+           the gate returns every fresh visit. `persist` is ignored (kept for callers). */
+        void persist;
         try {
-            if (persist) localStorage.setItem(KEY, pw);
-            else sessionStorage.setItem(KEY, pw);
+            sessionStorage.setItem(KEY, pw);
+            localStorage.removeItem(KEY);
         } catch (e) { /* private browsing — the session still works in memory */ }
     }
 
