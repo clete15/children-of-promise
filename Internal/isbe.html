@@ -16,6 +16,21 @@
         .isbe-sidebar button div { font-size:0.82rem;font-weight:700;color:white; }
         .isbe-sidebar button span { font-size:0.68rem;color:rgba(255,255,255,0.6); }
         .isbe-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
+        /* Child Files checklist grid */
+        .cf-grid { border-collapse:collapse;width:100%;font-size:0.78rem; }
+        .cf-grid th, .cf-grid td { border:1px solid #e5e7eb;padding:6px 8px;text-align:center; }
+        .cf-grid thead th { background:#1e3a8a;color:#fff;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.03em;position:sticky;top:0; }
+        .cf-grid th.cf-name, .cf-grid td.cf-name { text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:0;background:#fff; }
+        .cf-grid thead th.cf-name { background:#1e3a8a; }
+        .cf-grid td.cf-room { text-align:left;color:#64748b;white-space:nowrap; }
+        .cf-grid tr:nth-child(even) td { background:#f8fafc; }
+        .cf-grid tr:nth-child(even) td.cf-name { background:#f8fafc; }
+        .cf-cell { min-width:70px; }
+        .cf-cell.cf-on { background:#dcfce7 !important; }
+        .cf-check input { width:16px;height:16px;accent-color:#16a34a;cursor:pointer;vertical-align:middle; }
+        .cf-attach, .cf-attached { display:inline-block;margin-left:6px;cursor:pointer;text-decoration:none;font-size:0.9rem; }
+        .cf-attach:hover { opacity:0.7; }
+        .cf-attached { color:#16a34a; }
 
         .isbe-header { padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px; }
         .isbe-header h2 { font-size:1rem;font-weight:800;color:var(--text);margin:0; }
@@ -388,6 +403,17 @@
                 <div>✅ PI<br>Compliance</div>
                 <span style="font-size:0.62rem;color:rgba(255,255,255,0.5);">Site-level</span>
             </button>
+            <!-- Per-child file document checklists (compliance Item 2 / PI5). A grid of
+                 the required documents per child; each is checked off or has a scan
+                 attached into the child's folder. -->
+            <button id="btnPFAChildFiles" onclick="setProgram('pfaChildFiles')">
+                <div>🗂️ PFA<br>Child Files</div>
+                <span id="pfaChildFilesCount" style="font-size:0.62rem;color:rgba(255,255,255,0.5);"></span>
+            </button>
+            <button id="btnPIChildFiles" onclick="setProgram('piChildFiles')">
+                <div>🗂️ PI<br>Child Files</div>
+                <span id="piChildFilesCount" style="font-size:0.62rem;color:rgba(255,255,255,0.5);"></span>
+            </button>
             <!-- Last, so the two Compliance panels sit together. Follow-up is an
                  exception report that is usually empty, not a place to start. -->
             <button id="btnFollowUp" onclick="setProgram('followUp')">
@@ -427,6 +453,15 @@
                 <div id="startYearBody"></div>
             </div>
             <!-- The My Classroom panel moved to My Page (staff-portal.html). -->
+            <!-- Per-child document checklist grid (Item 2 / PI5) -->
+            <div id="childFilesPanel" style="display:none;overflow:auto;flex:1;padding:20px;">
+                <p style="font-size:0.78rem;color:#6b7280;margin-bottom:14px;">
+                    The required documents in each child's file. Check a box when the document is on file, or
+                    attach a scan — either way it counts as evidence, and scans are filed into the child's folder.
+                    Both directors and teachers can attach.
+                </p>
+                <div id="childFilesBody"></div>
+            </div>
             <!-- Screening Follow-Up: children whose screening flagged a concern -->
             <div id="followUpPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
                 <p style="font-size:0.78rem;color:#6b7280;margin-bottom:16px;">
@@ -1221,14 +1256,23 @@ function setProgram(prog) {
     document.getElementById('btnPICompliance').classList.toggle('active', prog === 'piCompliance');
     document.getElementById('btnFollowUp').classList.toggle('active', prog === 'followUp');
     document.getElementById('btnStartYear').classList.toggle('active', prog === 'startYear');
+    document.getElementById('btnPFAChildFiles').classList.toggle('active', prog === 'pfaChildFiles');
+    document.getElementById('btnPIChildFiles').classList.toggle('active', prog === 'piChildFiles');
 
     const grid = document.getElementById('isbeRosterGrid');
     const compliance = document.getElementById('compliancePanel');
     const followUp = document.getElementById('followUpPanel');
     const startYear = document.getElementById('startYearPanel');
-    [grid, compliance, followUp, startYear].forEach(el => { el.style.display = 'none'; });
+    const childFiles = document.getElementById('childFilesPanel');
+    [grid, compliance, followUp, startYear, childFiles].forEach(el => { el.style.display = 'none'; });
 
-    if (prog === 'pfaCompliance' || prog === 'piCompliance') {
+    if (prog === 'pfaChildFiles' || prog === 'piChildFiles') {
+        var cfProg = prog === 'pfaChildFiles' ? 'PFA' : 'PI';
+        document.getElementById('isbeTitle').textContent = cfProg + ' Child Files';
+        document.getElementById('isbeCount').textContent = '';
+        childFiles.style.display = 'block';
+        renderChildFilesGrid(cfProg);
+    } else if (prog === 'pfaCompliance' || prog === 'piCompliance') {
         document.getElementById('isbeTitle').textContent = prog === 'pfaCompliance' ? 'PFA Compliance' : 'PI Compliance';
         document.getElementById('isbeCount').textContent = '';
         compliance.style.display = 'block';
@@ -1498,6 +1542,129 @@ function yesNo(v) {
 function sortByName(a, b) {
     const cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
     return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
+}
+
+/* ── Per-child document checklist grid (compliance Item 2 / PI5) ──────────────
+   The required documents in each child's file, as a grid: children down the rows
+   (classroom youngest-first, then name), documents across the columns. Each cell is
+   a checkbox ("on file") plus an attach control that files a scan into the child's
+   folder. Attached-or-checked both count; a scan is the stronger evidence. */
+var CHILD_DOCS = [
+    { key: 'birthcert', label: 'Birth Cert' },
+    { key: 'immunizations', label: 'Physical / Immun.' },
+    { key: 'vision', label: 'Vision' },
+    { key: 'hearing', label: 'Hearing' },
+    { key: 'emergency', label: 'Emergency / Release' },
+    { key: 'incomeproof', label: 'Proof of Income' },
+    { key: 'behaviorplan', label: 'Behavior Plan*' },
+    { key: 'transitionplan', label: 'Transition Plan*' }
+];
+// Checkbox state: docChecklist[studentId][docKey] = true/false. Loaded from the server.
+var docChecklist = {};
+
+async function loadChildDocChecklist() {
+    docChecklist = {};
+    try {
+        var res = await apiFetch(yearQS('/api/child-doc-checklist'));
+        if (!res.ok) return;
+        var d = await res.json();
+        (d.docs || []).forEach(function (row) {
+            var id = String(row.StudentId);
+            if (!docChecklist[id]) docChecklist[id] = {};
+            docChecklist[id][String(row.DocKey).toLowerCase()] = (row.OnFile === 1 || row.OnFile === '1' || row.OnFile === true);
+        });
+    } catch (e) { /* grid still renders; empty = nothing checked */ }
+}
+
+// A scan attached for this child+doc, if any (reuses the child-files index).
+function childDocFile(studentId, docKey) {
+    // ChildForms.fileFor(studentId, field, kind) — our docs use field 'ChildDoc'.
+    if (window.ChildForms && ChildForms.fileFor) return ChildForms.fileFor(studentId, 'ChildDoc', docKey);
+    return null;
+}
+
+async function renderChildFilesGrid(program) {
+    var body = document.getElementById('childFilesBody');
+    body.innerHTML = '<div style="padding:20px;color:#94a3b8;">Loading\u2026</div>';
+    await loadChildDocChecklist();
+
+    var roster = students
+        .filter(function (s) { return s.PFA_PI_na === program && (s.Active === 'Yes' || s.Active === 'YES'); })
+        .sort(sortByRoomThenName);
+
+    if (!roster.length) {
+        body.innerHTML = '<div style="padding:20px;color:#94a3b8;">No active ' + program + ' children.</div>';
+        return;
+    }
+
+    var head = '<tr><th class="cf-name">Child</th><th class="cf-room">Room</th>'
+        + CHILD_DOCS.map(function (d) { return '<th class="cf-doc">' + escapeHtml(d.label) + '</th>'; }).join('')
+        + '</tr>';
+
+    var rows = roster.map(function (s) {
+        var cells = CHILD_DOCS.map(function (doc) {
+            var checked = !!(docChecklist[String(s.Id)] || {})[doc.key];
+            var file = childDocFile(s.Id, doc.key);
+            var onFile = checked || !!file;
+            var box = '<label class="cf-check" title="On file">'
+                + '<input type="checkbox"' + (checked ? ' checked' : '')
+                + ' onchange="toggleChildDoc(' + s.Id + ',\'' + doc.key + '\',this.checked)"></label>';
+            var attach = file
+                ? '<a class="cf-attached" href="#" title="' + escapeHtml(file.name || 'attached')
+                    + '" onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
+                    + '\',\'' + escapeHtml(file.name || 'file').replace(/'/g, "\\'") + '\',true)">\uD83D\uDCCE</a>'
+                : '<label class="cf-attach" title="Attach a scan into the child\u2019s folder">\u2795'
+                    + '<input type="file" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"'
+                    + ' onchange="uploadChildDoc(' + s.Id + ',\'' + doc.key + '\',this)"></label>';
+            return '<td class="cf-cell' + (onFile ? ' cf-on' : '') + '">' + box + attach + '</td>';
+        }).join('');
+        return '<tr><td class="cf-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + '</td>'
+            + '<td class="cf-room">' + escapeHtml(getRoomName(s.RoomNumber)) + '</td>' + cells + '</tr>';
+    }).join('');
+
+    body.innerHTML = '<table class="cf-grid"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>'
+        + '<div style="font-size:0.7rem;color:#94a3b8;margin-top:10px;">* Behavior and transition plans are only required where applicable.</div>';
+}
+
+function getRoomName(roomNumber) {
+    var c = (classrooms || []).find(function (r) { return String(r.RoomNumber) === String(roomNumber); });
+    return c ? (c.Room || ('Room ' + roomNumber)) : (roomNumber || '\u2014');
+}
+
+async function toggleChildDoc(studentId, docKey, checked) {
+    try {
+        var res = await apiFetch('/api/child-doc-checklist', {
+            method: 'POST',
+            body: JSON.stringify({ studentId: studentId, docKey: docKey, year: activeSchoolYear, onFile: checked })
+        });
+        var d = await res.json();
+        if (!d.success) throw new Error(d.error || 'save failed');
+        if (!docChecklist[String(studentId)]) docChecklist[String(studentId)] = {};
+        docChecklist[String(studentId)][docKey] = checked;
+    } catch (e) { alert('Could not save that: ' + e.message); }
+}
+
+async function uploadChildDoc(studentId, docKey, input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { alert('That file is over 15 MB. A PDF scan is usually much smaller.'); return; }
+    var fd = new FormData();
+    fd.append('file', file);
+    try {
+        var res = await fetch('/api/child-file-upload?studentId=' + encodeURIComponent(studentId)
+            + '&field=ChildDoc&kind=' + encodeURIComponent(docKey)
+            + '&year=' + encodeURIComponent(activeSchoolYear), {
+            method: 'POST',
+            headers: (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
+            body: fd
+        });
+        var d = await res.json();
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        // Reflect the new file in the index so the cell shows attached without a reload.
+        if (window.ChildForms && ChildForms.markFile) ChildForms.markFile(studentId, 'ChildDoc', docKey, d.relPath, d.name);
+        var active = document.getElementById('btnPFAChildFiles').classList.contains('active') ? 'PFA' : 'PI';
+        renderChildFilesGrid(active);
+    } catch (e) { alert('Upload failed: ' + e.message); }
 }
 
 // Roster order: by room number, then alphabetical by name within each room.
@@ -2863,7 +3030,8 @@ const PICC_ITEMS = [
         na: 'N. Families living outside Chicago/CPS applies to home visiting programs only.',
         guidance: 'Eligibility documents must be completed and dated on or prior to the enrollment date. Income verification is required each time a weighted eligibility form is completed. Sections L and M may not be left blank.',
         waitlistLink: true,
-        forms: [{ label: 'Weighted Eligibility Form', href: 'pfa-item6-eligibility.html?program=PI&item=5' }]
+        forms: [{ label: 'Weighted Eligibility Form', href: 'pfa-item6-eligibility.html?program=PI&item=5' }],
+        childDocGrid: 'PI'
     },
     {
         num: 'PI6', title: 'Family Centered Assessment and Individual Family Goal Plan',
@@ -3075,7 +3243,10 @@ const PFA_CHECKLIST_ITEMS = [
            not held here, so this roll-up is a partial answer and the sub-list above
            remains the full one. Named from the sub-item "Proof of family income". */
         childFields: ['ProofOfIncome'],
-        evidence: 'Income proof may be pay stubs (two most recent consecutive), WIC, SNAP, TANF, SSI, CCAP, most recent tax return, W-2, employer letter, Medicaid enrolment, or a signed statement where income is zero.'
+        evidence: 'Income proof may be pay stubs (two most recent consecutive), WIC, SNAP, TANF, SSI, CCAP, most recent tax return, W-2, employer letter, Medicaid enrolment, or a signed statement where income is zero.',
+        /* Item 2 is a per-child file completeness check — the required documents in each
+           child's folder. The Child Files grid is where they are checked off / scanned. */
+        childDocGrid: 'PFA'
     },
     {
         num: 'Item3', n: '3', title: 'Requirements for homeless children',
@@ -4284,6 +4455,13 @@ function renderPfaChecklistSection(data) {
            removed: the ONE "Open document library" button in the section header is the
            way to browse everything, and evidence is maintained through these forms. */
         var actions = '';
+        // A per-child file document checklist grid, for items that are "every child's
+        // folder has these documents" (Item 2). Opens the Child Files view.
+        if (item.childDocGrid) {
+            actions += '<a class="picc-btn picc-btn-primary" href="#" '
+                + 'onclick="event.preventDefault();setProgram(\'' + (item.childDocGrid === 'PI' ? 'piChildFiles' : 'pfaChildFiles') + '\')" '
+                + 'title="Open the per-child document checklist">Child file checklist</a>';
+        }
         (item.forms || []).forEach(function (f) {
             actions += '<a class="picc-btn picc-btn-primary" href="' + String(f.href).replace(/"/g, '&quot;') + '" '
                 + 'target="_blank" rel="noopener" title="Open, edit and sign this evidence form in the app">'
@@ -4427,6 +4605,11 @@ function renderPiccItem(item, data) {
        ONE "Open document library" button in the section header browses everything, and
        evidence is maintained through these forms. */
     var evidence = '';
+    if (item.childDocGrid) {
+        evidence += '<a class="picc-btn picc-btn-primary" href="#" '
+            + 'onclick="event.preventDefault();setProgram(\'' + (item.childDocGrid === 'PI' ? 'piChildFiles' : 'pfaChildFiles') + '\')" '
+            + 'title="Open the per-child document checklist">Child file checklist</a>';
+    }
     (item.forms || []).forEach(function (f) {
         evidence += '<a class="picc-btn picc-btn-primary" href="' + String(f.href).replace(/"/g, '&quot;') + '" '
             + 'target="_blank" rel="noopener" title="Open, edit and sign this evidence form in the app">'

@@ -639,6 +639,22 @@ const ISBE_TRACKING_COLUMNS = [
     'RemoveFromSIS', 'GrantPerfReport'
 ];
 
+/* The required documents in each child's file (compliance Item 2). Each is either
+   marked "on file" (a paper copy in the child's folder) or has a scan attached — both
+   go through the same child folder as every other child artefact. Keyed by a stable
+   docKey; the value is the human label used for the filed scan's filename and the grid
+   column header. "if applicable" documents (behavior/transition plan) are optional. */
+const CHILD_DOC_KEYS = {
+    birthcert: 'Birth Certificate',
+    immunizations: 'Physical & Immunization Records',
+    vision: 'Vision Screening',
+    hearing: 'Hearing Screening',
+    emergency: 'Emergency Contacts / Release',
+    incomeproof: 'Proof of Income',
+    behaviorplan: 'Behavior Support Plan',
+    transitionplan: 'Transition Plan'
+};
+
 function isbeTrackingEnsureSQL() {
     let sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ISBETracking')
     CREATE TABLE ISBETracking (
@@ -1746,6 +1762,24 @@ function childFileEnsureSQL() {
         RelPath NVARCHAR(500),
         UploadedBy NVARCHAR(120),
         UploadedAt DATETIME
+    );
+GO
+`;
+}
+
+/* The "on file" checkbox state for each required child-file document (compliance
+   Item 2). A scan attached through ChildFiles (field ChildDoc) is stronger evidence;
+   this records a document confirmed present without a scan. One row per (student,
+   year, docKey). */
+function childDocChecklistEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ChildDocChecklist')
+    CREATE TABLE ChildDocChecklist (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StudentId INT NOT NULL,
+        SchoolYear NVARCHAR(20),
+        DocKey NVARCHAR(40),
+        OnFile BIT DEFAULT 0,
+        UpdatedAt DATETIME DEFAULT GETDATE()
     );
 GO
 `;
@@ -4373,20 +4407,30 @@ ELSE
         const field = String(qs.get('field') || '').trim();
         const kind = String(qs.get('kind') || '').trim().toLowerCase();
         if (!studentId) return sendJSON(res, 400, { error: 'Which child?' });
-        if (!ISBE_TRACKING_COLUMNS.includes(field)) {
-            return sendJSON(res, 400, { error: 'Unknown form: ' + field });
-        }
-        // A questionnaire belongs to a screening column; a report to a report column.
-        const SCREENING = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
-        const REPORTS = ['MidYearReport', 'EndYearReport'];
-        if (kind === 'questionnaire' && SCREENING.indexOf(field) === -1) {
-            return sendJSON(res, 400, { error: 'A questionnaire attaches to an ASQ or ASE column.' });
-        }
-        if (kind === 'report' && REPORTS.indexOf(field) === -1) {
-            return sendJSON(res, 400, { error: 'A report card attaches to a report-card column.' });
-        }
-        if (kind !== 'questionnaire' && kind !== 'report') {
-            return sendJSON(res, 400, { error: 'Unknown upload kind.' });
+
+        /* Item 2 child-file documents (birth certificate, immunisations, income proof,
+           etc.) attach to the SAME child folder as everything else, but they are not
+           checklist forms — so they use the sentinel field "ChildDoc" and a doc key as
+           the kind, bypassing the tracking-column validation the forms need. */
+        const isChildDoc = field === 'ChildDoc';
+        if (!isChildDoc) {
+            if (!ISBE_TRACKING_COLUMNS.includes(field)) {
+                return sendJSON(res, 400, { error: 'Unknown form: ' + field });
+            }
+            // A questionnaire belongs to a screening column; a report to a report column.
+            const SCREENING = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
+            const REPORTS = ['MidYearReport', 'EndYearReport'];
+            if (kind === 'questionnaire' && SCREENING.indexOf(field) === -1) {
+                return sendJSON(res, 400, { error: 'A questionnaire attaches to an ASQ or ASE column.' });
+            }
+            if (kind === 'report' && REPORTS.indexOf(field) === -1) {
+                return sendJSON(res, 400, { error: 'A report card attaches to a report-card column.' });
+            }
+            if (kind !== 'questionnaire' && kind !== 'report') {
+                return sendJSON(res, 400, { error: 'Unknown upload kind.' });
+            }
+        } else if (!CHILD_DOC_KEYS[kind]) {
+            return sendJSON(res, 400, { error: 'Unknown child-file document: ' + kind });
         }
 
         // Program, name and (for the folder) the year come from the child's record,
@@ -4445,7 +4489,7 @@ ELSE
                     BegASE: 'Beginning ASQ SE-2 questionnaire', EndASE: 'End ASQ SE-2 questionnaire',
                     MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card'
                 };
-                const label = LABELS[field] || field;
+                const label = isChildDoc ? (CHILD_DOC_KEYS[kind] || kind) : (LABELS[field] || field);
                 const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
                 const stamp = new Date().toISOString().slice(0, 10);
                 let base = [safe(childName) || ('Student ' + studentId), safe(label), year, 'uploaded ' + stamp]
@@ -4506,6 +4550,44 @@ ELSE
             childFileEnsureSQL());
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         return sendJSON(res, 200, { year: year, files: r.rows });
+    }
+
+    /* ── Per-child document checklist (compliance Item 2) ─────────────────
+       The "on file" checkbox state for each required child-file document. A scan
+       attached through /api/child-file-upload (field=ChildDoc) is the stronger
+       evidence; this table records the case where the document is confirmed present
+       in the child's folder without a scan yet (e.g. a paper copy). One row per
+       (student, year, docKey). */
+    if (req.method === 'GET' && url === '/api/child-doc-checklist') {
+        if (!checkClassroomAuth(req, res)) return;
+        const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
+        const r = runSQLRows(
+            `SELECT StudentId, DocKey, OnFile FROM ChildDocChecklist WHERE SchoolYear=${esc(year)}`,
+            childDocChecklistEnsureSQL());
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        return sendJSON(res, 200, { year: year, docs: r.rows });
+    }
+
+    if (req.method === 'POST' && url === '/api/child-doc-checklist') {
+        if (!checkClassroomAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const studentId = parseInt(d.studentId, 10);
+            const docKey = String(d.docKey || '').trim().toLowerCase();
+            if (!studentId) return sendJSON(res, 400, { error: 'Which child?' });
+            if (!CHILD_DOC_KEYS[docKey]) return sendJSON(res, 400, { error: 'Unknown document: ' + docKey });
+            const year = resolveSchoolYear(d.year);
+            const onFile = (d.onFile === true || d.onFile === 1 || d.onFile === '1') ? 1 : 0;
+            const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} AND DocKey=${esc(docKey)}`;
+            const sql = childDocChecklistEnsureSQL()
+                + `IF EXISTS (SELECT 1 FROM ChildDocChecklist WHERE ${where})
+    UPDATE ChildDocChecklist SET OnFile=${onFile},UpdatedAt=GETDATE() WHERE ${where}
+ELSE
+    INSERT INTO ChildDocChecklist (StudentId,SchoolYear,DocKey,OnFile) VALUES (${studentId},${esc(year)},${esc(docKey)},${onFile});`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true });
+        });
     }
 
     // GET parent interview for a student (internal - protected)
