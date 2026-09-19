@@ -56,6 +56,12 @@
            the grid scrolls horizontally. Student/Room are excluded — they are fixed. */
         th.col-teacher, th.col-admin { min-width:78px; }
 
+        /* Classroom-card / Admin roster toggle tabs. */
+        .rg-tab { padding:7px 14px;border:1px solid var(--border);background:#fff;cursor:pointer;
+                  font-size:0.78rem;font-weight:700;color:#64748b;border-radius:8px;margin-right:6px; }
+        .rg-tab:hover { color:#334155; }
+        .rg-tab.active { color:#1e3a8a;background:#eef2ff;border-color:#93c5fd; }
+
         /* ── Teacher / Admin group banners ── */
         th.grp { font-size:0.64rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
                  padding:5px 6px;border-bottom:1px solid var(--border); }
@@ -445,6 +451,14 @@
                     <select id="rosterYear" onchange="setSchoolYear(this.value)"></select>
                     <span id="yearBadge"></span>
                 </div>
+            </div>
+            <!-- Classroom-card vs Admin column toggle. Shown only for the PI/PFA roster
+                 views; lets a monitor look at one column group at a time instead of a
+                 wide side-by-side table. -->
+            <div id="rgToggle" style="display:none;padding:8px 20px 0;">
+                <button type="button" class="rg-tab active" data-group="teacher" onclick="setRosterGroup('teacher')">📋 Classroom Card</button>
+                <button type="button" class="rg-tab" data-group="admin" onclick="setRosterGroup('admin')">🗂️ Admin</button>
+                <button type="button" class="rg-tab" data-group="all" onclick="setRosterGroup('all')">Both</button>
             </div>
             <!-- Student roster grid -->
             <div class="isbe-grid" id="isbeRosterGrid">
@@ -1309,6 +1323,9 @@ function setProgram(prog) {
     const startYear = document.getElementById('startYearPanel');
     const childFiles = document.getElementById('childFilesPanel');
     [grid, compliance, followUp, startYear, childFiles].forEach(el => { el.style.display = 'none'; });
+    // The classroom/admin column toggle belongs only to the PI/PFA roster views.
+    var rgt = document.getElementById('rgToggle');
+    if (rgt) rgt.style.display = (prog === 'PFA' || prog === 'PI') ? '' : 'none';
 
     if (prog === 'pfaChildFiles' || prog === 'piChildFiles') {
         var cfProg = prog === 'pfaChildFiles' ? 'PFA' : 'PI';
@@ -1459,10 +1476,25 @@ function visibleColumns() {
                the grant report, and the PICC document forms.
    Every render (header, body, Print All) walks `ordered` so header and body cannot
    drift, and the group boundary (teacher.length) is where the divider is drawn. */
+/* Which column group the roster is showing: 'teacher' (the classroom card columns),
+   'admin' (office columns), or 'all' (both, side by side). Toggled above the grid so a
+   monitor can look at one job at a time instead of a wide horizontally-scrolling table.
+   Defaults to the classroom card. */
+let activeRosterGroup = 'teacher';
+function setRosterGroup(g) {
+    activeRosterGroup = g;
+    document.querySelectorAll('.rg-tab').forEach(function (b) {
+        b.classList.toggle('active', b.getAttribute('data-group') === g);
+    });
+    renderRoster();
+}
 function partitionedColumns() {
     const vis = visibleColumns();
-    const teacher = vis.filter(c => c.teacher);
-    const admin = vis.filter(c => !c.teacher);
+    let teacher = vis.filter(c => c.teacher);
+    let admin = vis.filter(c => !c.teacher);
+    // Honor the toggle: show only the selected group (Student/Room stay pinned either way).
+    if (activeRosterGroup === 'teacher') admin = [];
+    else if (activeRosterGroup === 'admin') teacher = [];
     return { teacher: teacher, admin: admin, ordered: teacher.concat(admin) };
 }
 
