@@ -40,6 +40,18 @@
         font-size: 0.95rem; font-family: inherit;
     }
     .mp-card input:focus { outline: none; border-color: #2563eb; }
+    /* Password field with a show/hide eye. The wrapper is positioned so the eye sits
+       inside the input's right edge; the input gets extra right padding so typed text
+       never runs under the eye. The eye button is deliberately NOT styled like the blue
+       .mp-card button (Sign in) — it is a plain, quiet control. */
+    .mp-pw-wrap { position: relative; }
+    .mp-pw-wrap input { padding-right: 42px; }
+    .mp-eye {
+        position: absolute; top: 50%; right: 6px; transform: translateY(-50%);
+        background: none; border: none; padding: 4px 6px; cursor: pointer;
+        font-size: 1.05rem; line-height: 1; color: #64748b; border-radius: 6px;
+    }
+    .mp-eye:hover { background: #f1f5f9; color: #334155; }
     .mp-card button {
         padding: 11px 14px; border: none; border-radius: 7px;
         background: #2563eb; color: #fff; font-size: 0.9rem;
@@ -102,7 +114,11 @@
         </div>
         <div>
             <label for="mpPassword">Password</label>
-            <input type="password" id="mpPassword" name="password" autocomplete="current-password">
+            <div class="mp-pw-wrap">
+                <input type="password" id="mpPassword" name="password" autocomplete="current-password">
+                <button type="button" class="mp-eye" id="mpEye" onclick="togglePw()"
+                        aria-label="Show password" title="Show password">&#128065;</button>
+            </div>
         </div>
 
         <p class="mp-firsttime">
@@ -182,6 +198,19 @@ async function destAfterSignIn() {
         if (who && who.admin) return '/staff/';
     } catch (e) { /* fall through to the personal page */ }
     return '/staff/staff-portal.html';
+}
+
+/* Show/hide the password so a person can confirm what their browser autofilled or what
+   they typed. Flips the input type and swaps the eye icon; purely local, nothing leaves
+   the page. */
+function togglePw() {
+    var input = document.getElementById('mpPassword');
+    var eye = document.getElementById('mpEye');
+    var showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    eye.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+    eye.setAttribute('title', showing ? 'Show password' : 'Hide password');
+    eye.innerHTML = showing ? '\uD83D\uDC41' : '\uD83D\uDE48';   // 👁 vs 🙈
 }
 
 function show(el, cls, text) {
