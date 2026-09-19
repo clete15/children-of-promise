@@ -139,6 +139,21 @@
         /* How many files in the library look like this child's. */
         .cf-files { font-size:0.62rem;font-weight:700;color:#1d4ed8;
                     background:#eff6ff;border-radius:7px;padding:1px 5px;margin-left:5px;white-space:nowrap; }
+        /* Transferred-out child: the whole row is muted, with a pill after the name.
+           They stay on the roster for the school year they left so their transition
+           plan and referral can still be completed. */
+        tr.cf-transferred td { background:#fff7ed !important;color:#9a6a3c; }
+        tr.cf-transferred:hover td { background:#ffedd5 !important; }
+        .cf-xfer-pill { display:inline-block;font-size:0.58rem;font-weight:800;letter-spacing:0.02em;
+                        color:#9a3412;background:#ffedd5;border:1px solid #fed7aa;border-radius:999px;
+                        padding:1px 7px;margin-left:5px;white-space:nowrap;cursor:pointer; }
+        .cf-xfer-pill:hover { background:#fed7aa; }
+        /* The "mark transferred" link is deliberately quiet — a rare action, not a
+           button competing with the child's name. Shows on row hover. */
+        .cf-xfer-link { font-size:0.58rem;font-weight:700;color:#cbd5e1;margin-left:6px;
+                        text-decoration:none;white-space:nowrap;opacity:0; }
+        tr:hover .cf-xfer-link { opacity:1;color:#94a3b8; }
+        .cf-xfer-link:hover { color:#ea580c;text-decoration:underline; }
 
         /* Screening date + status shown under each screening checkbox */
         .scr-meta { display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:2px;line-height:1.2; }
@@ -1252,11 +1267,25 @@ async function init() {
             // the roster's Weighted Eligibility cell shows a green pill fed from there.
             apiFetch('/api/weighted-eligibility-files').then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
+        /* The roster cannot render without the student list, so a failure here is fatal
+           and must say WHY — a 401 (expired session) used to surface as a silent "0
+           students", which reads as the children having vanished. Check .ok and show a
+           clear, recoverable message instead. */
+        if (!sRes || !sRes.ok) {
+            const msg = (sRes && sRes.status === 401)
+                ? 'Your session has expired. Please sign in again.'
+                : 'Could not load the roster (HTTP ' + (sRes ? sRes.status : '\u2014') + ').';
+            const body = document.getElementById('isbeBody');
+            if (body) body.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:#b91c1c;">'
+                + msg + ' <a href="/me?next=%2Fstaff%2Fisbe.html" style="color:#2563eb;font-weight:700;">Sign in</a></td></tr>';
+            return;
+        }
         students = await sRes.json();
-        classrooms = await cRes.json();
+        classrooms = (cRes && cRes.ok) ? await cRes.json() : [];
         weightedFiles = (weData && weData.files) ? weData.files : {};
-        const tData = await tRes.json();
-        tData.forEach(t => { trackingData[t.StudentId] = t; });
+        // Tracking/screening are additive — a failure must not blank the roster.
+        const tData = (tRes && tRes.ok) ? await tRes.json() : [];
+        (Array.isArray(tData) ? tData : []).forEach(t => { trackingData[t.StudentId] = t; });
         // Index screenings by studentId -> "TYPE|Period" so the roster can show
         // dates, concern flags and referral status inline.
         try {
@@ -1500,7 +1529,13 @@ function partitionedColumns() {
 
 // Columns wired to a form, so Print All knows which cells to offer.
 const SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
+/* Transition Plan and Referral keep their `docForm` key (it still resolves the
+   spec/title and the read-only pill), but they are now filled out in Child Files,
+   not on the roster. So the roster offers no form action or Print All for them —
+   exclude them here the same way the teacher and Results Shared columns are. */
+const ROSTER_READONLY_DOCFORMS = ['TransitionPlan', 'Referral'];
 function columnHasForm(c) {
+    if (ROSTER_READONLY_DOCFORMS.indexOf(c.field) !== -1) return false;
     return !!c.docForm || c.field === 'PermissionSlip' || c.field === 'ParentInterview'
         || SCREENING_FIELDS.indexOf(c.field) !== -1;
 }
@@ -1818,6 +1853,82 @@ function sortByRoomThenName(a, b) {
     return sortByName(a, b);
 }
 
+/* A child flagged TransferredOut is kept on the ISBE roster for the school year they
+   left in — long enough to finish the transition-plan / referral paperwork a transfer
+   requires — then drops off. A school year runs July 1 (start year) to June 30 (end
+   year); the transfer date is stored as YYYY-MM-DD. No/blank date is treated as the
+   current year so a freshly-marked child never disappears before it is dated. */
+function isTransferred(s) {
+    return String(s.TransferredOut) === '1' || s.TransferredOut === 1 || s.TransferredOut === true;
+}
+function transferInActiveYear(s) {
+    if (!isTransferred(s)) return false;
+    const d = String(s.TransferDate || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return true;   // undated: show this year
+    const startYear = parseInt(activeSchoolYear.split('-')[0]);
+    const yStart = startYear + '-07-01';
+    const yEnd = (startYear + 1) + '-06-30';
+    return d >= yStart && d <= yEnd;
+}
+// A child belongs on the roster if they are actively enrolled OR they transferred out
+// during the school year currently being viewed.
+function onRoster(s) {
+    if (s.PFA_PI_na !== activeProgram) return false;
+    if (s.Active === 'Yes' || s.Active === 'YES') return true;
+    return transferInActiveYear(s);
+}
+
+/* The marker shown after a child's name: a "transferred" pill when they have left,
+   otherwise a small "mark transferred" link. Clicking either goes through markTransfer.
+   Transferred children stay on the roster (for this year) so their transition-plan and
+   referral paperwork can still be completed. */
+function transferMarker(s) {
+    if (isTransferred(s)) {
+        const when = String(s.TransferDate || '').slice(0, 10);
+        return ' <span class="cf-xfer-pill" title="Transferred out'
+            + (when ? ' on ' + when : '') + '. Still shown this year so the transition plan '
+            + 'and referral can be completed. Click to undo." '
+            + 'onclick="markTransfer(' + s.Id + ',false)">\u2192 transferred</span>';
+    }
+    return ' <a href="#" class="cf-xfer-link" title="Mark this child as transferred out. '
+        + 'They stay on the roster for this school year so their paperwork can be finished." '
+        + 'onclick="event.preventDefault();markTransfer(' + s.Id + ',true)">mark transferred</a>';
+}
+
+/* Set or clear a child's transferred-out status. Confirmed both ways because it flips
+   the child's Active flag (out of, or back into, the active counts everywhere else).
+   On mark, asks for the date so the roster knows which year to keep them in. */
+async function markTransfer(studentId, transferred) {
+    const s = students.find(x => String(x.Id) === String(studentId));
+    if (!s) return;
+    const who = s.Last_Name + ', ' + s.First_Name;
+    let date = '';
+    if (transferred) {
+        date = prompt('Transfer-out date for ' + who + ' (YYYY-MM-DD):',
+            new Date().toISOString().split('T')[0]);
+        if (date === null) return;                 // cancelled
+        date = String(date).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { alert('Please enter the date as YYYY-MM-DD.'); return; }
+    } else {
+        if (!confirm('Undo transfer for ' + who + '? They go back to actively enrolled.')) return;
+    }
+    try {
+        const res = await apiFetch('/api/students/' + studentId + '/transfer', {
+            method: 'POST',
+            body: JSON.stringify({ transferred: transferred, date: date })
+        });
+        const d = await res.json();
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        // Reflect it locally so the row updates without a full reload.
+        s.TransferredOut = transferred ? 1 : 0;
+        s.TransferDate = transferred ? date : '';
+        s.Active = transferred ? 'No' : 'Yes';
+        renderRoster();
+    } catch (e) {
+        alert('Could not update transfer status: ' + (e.message || e));
+    }
+}
+
 // Mirrors the server's flag logic so a just-saved screening reflects immediately.
 // ASQ-3: higher is better, so 'Below' cutoff is the concern.
 // ASQ:SE-2: higher means more concern, so 'Above' cutoff is the concern.
@@ -2070,8 +2181,13 @@ function renderRoster() {
     const firstAdminField = parts.admin.length && parts.teacher.length ? parts.admin[0].field : null;
     const span = cols.length + 2;  // + Student and Room
 
-    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES')).sort(sortByRoomThenName);
-    document.getElementById('isbeCount').textContent = roster.length + ' students';
+    const roster = students.filter(onRoster).sort(sortByRoomThenName);
+    // The headline count is enrolled children; transferred-out children are shown but
+    // called out separately so the number still reads as "who is here".
+    const transferredCount = roster.filter(isTransferred).length;
+    const activeCount = roster.length - transferredCount;
+    document.getElementById('isbeCount').textContent = activeCount + ' students'
+        + (transferredCount ? ' \u00b7 ' + transferredCount + ' transferred' : '');
     const tbody = document.getElementById('isbeBody');
     if (!roster.length) { tbody.innerHTML = '<tr><td colspan="' + span + '" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
 
@@ -2123,6 +2239,20 @@ function renderRoster() {
                 return '<td class="' + ('cf-doc' + divide).trim() + '">' + cell + '</td>';
             }
 
+            // Transition Plan and Referral are now filled out in Child Files (the
+            // Administrative tab), like Weighted Eligibility. Read-only here: a green
+            // "on file" pill when the form exists, plain otherwise. No editable
+            // checkbox or [form] link — editing moved off the roster.
+            if (f === 'TransitionPlan' || f === 'Referral') {
+                const done = ChildForms.state(s.Id, f,
+                    !!(trackingData[s.Id] || {})[f]) === 'form';
+                const label = f === 'TransitionPlan' ? 'Transition plan' : 'Referral';
+                const cell = done
+                    ? '<span class="cf-pill" title="' + label + ' is on file \u2014 filled out in Child Files (Administrative).">\u2713 on file</span>'
+                    : '<span class="cf-pill" style="opacity:0.6;" title="Not on file yet. Fill it out in Child Files (Administrative).">not on file</span>';
+                return '<td class="' + ('cf-doc' + divide).trim() + '">' + cell + '</td>';
+            }
+
             // The rest are editable checkboxes / document links (unchanged).
             const box = checkBox(s, f);
             // Green, amber or plain, depending on whether a form is actually behind
@@ -2151,8 +2281,10 @@ function renderRoster() {
             }
             return td + box + '</td>';
         }).join('');
-        return '<tr><td class="left pin-1" style="font-weight:600;font-size:0.73rem;">'
-            + childNameCell(s)
+        const transferred = isTransferred(s);
+        return '<tr' + (transferred ? ' class="cf-transferred"' : '') + '>'
+            + '<td class="left pin-1" style="font-weight:600;font-size:0.73rem;">'
+            + childNameCell(s) + transferMarker(s)
             + '</td><td class="pin-2" style="font-size:0.7rem;color:var(--text-muted);">'
             + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
     }).join('');

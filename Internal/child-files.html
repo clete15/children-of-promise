@@ -66,6 +66,65 @@
         .tf-roomgroup-title { font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;
             color:#64748b;margin:14px 2px 8px; }
         .cf-actions { padding:0 20px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap; }
+
+        /* Admin "on file" pills for the PICC document forms (Transition Plan, Referral).
+           Green with a check when the form exists for this child + year, faded otherwise.
+           Both open the shared form engine — green loads the saved copy, faded starts a
+           blank one. Mirrors the Weighted Eligibility pill on the roster. */
+        .cfg-pill { display:inline-block;font-size:0.72rem;font-weight:600;padding:4px 10px;border-radius:14px;
+            text-decoration:none;cursor:pointer;border:1px solid #cbd5e1;color:#334155;background:#f8fafc; }
+        .cfg-pill:hover { border-color:#93c5fd;background:#eef2ff; }
+        .cfg-pill.on { background:#dcfce7;border-color:#86efac;color:#166534; }
+        .cfg-pill.off { opacity:0.75; }
+
+        /* PICC document form modal — same shell as the ISBE roster forms, rendered by
+           pi-forms.js. Copied here so the forms open on this page too. */
+        .pi-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center; }
+        .pi-overlay.open { display:flex; }
+        .pi-modal { background:white;border-radius:12px;width:95%;max-width:800px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.3); }
+        .pi-modal-header { display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid #e5e7eb;position:sticky;top:0;background:white;z-index:2;border-radius:12px 12px 0 0; }
+        .pi-modal-header h3 { margin:0;font-size:1.1rem;font-weight:700;color:#1e3a8a; }
+        .pi-modal-header .pi-close { background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;padding:4px 8px;border-radius:4px; }
+        .pi-modal-header .pi-close:hover { background:#f3f4f6;color:#111; }
+        .pi-modal-body { padding:24px; }
+        .pi-section { margin-bottom:20px; }
+        .pi-section h4 { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin:0 0 10px 0;padding-bottom:6px;border-bottom:1px solid #f3f4f6; }
+        .pi-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px 16px; }
+        .pi-grid.three { grid-template-columns:1fr 1fr 1fr; }
+        .pi-field { display:flex;flex-direction:column;gap:3px; }
+        .pi-field label { font-size:0.7rem;font-weight:600;color:#6b7280; }
+        .pi-field .pi-value { font-size:0.82rem;font-weight:500;color:#111;padding:6px 10px;background:#f8fafc;border-radius:6px;min-height:28px;display:flex;align-items:center; }
+        .pi-field textarea, .pi-field input[type=text], .pi-field input[type=date] { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;resize:vertical; }
+        .pi-field textarea { min-height:60px; }
+        .pi-field textarea:focus, .pi-field input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .pi-field select { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:white; }
+        .pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .pi-full { grid-column:1/-1; }
+        .pi-modal-footer { padding:16px 24px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:white;border-radius:0 0 12px 12px; }
+        .pi-btn { padding:8px 18px;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.15s; }
+        .pi-btn-primary { background:#2563eb;color:white; }
+        .pi-btn-primary:hover { background:#1d4ed8; }
+        .pi-btn-secondary { background:white;color:#374151;border-color:#d1d5db; }
+        .pi-btn-secondary:hover { background:#f9fafb; }
+        .pi-btn:disabled { opacity:0.5;cursor:not-allowed; }
+        .pi-saved-badge { display:inline-flex;align-items:center;gap:4px;font-size:0.72rem;color:#059669;font-weight:600; }
+        .pi-flags { display:flex;flex-wrap:wrap;gap:6px;padding:4px 0; }
+        .pi-flag { padding:3px 9px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:0.7rem;font-weight:700;white-space:nowrap; }
+        .doc-picc { font-size:0.74rem;color:#374151;background:#f8fafc;border-left:3px solid #2563eb;padding:10px 12px;border-radius:0 6px 6px 0;margin-bottom:16px;line-height:1.5; }
+        .doc-picc strong { color:#1d4ed8; }
+        .doc-note { font-size:0.72rem;color:#6b7280;margin:-4px 0 10px 0;line-height:1.5; }
+
+        @media print {
+            body * { visibility:hidden; }
+            .pi-overlay:not([data-printing]) { display:none !important; }
+            .pi-overlay[data-printing] .pi-modal, .pi-overlay[data-printing] .pi-modal * { visibility:visible; }
+            .pi-overlay[data-printing] { display:block !important;position:static;background:none; }
+            .pi-overlay[data-printing] .pi-modal { position:static;width:100%;max-width:100%;max-height:none;overflow:visible;box-shadow:none;border-radius:0;margin:0; }
+            .pi-modal-footer { display:none; }
+            .pi-modal-header .pi-close { display:none; }
+            .pi-overlay[data-printing] input::placeholder,
+            .pi-overlay[data-printing] textarea::placeholder { color:transparent !important; opacity:0 !important; }
+        }
     </style>
 </head>
 <body>
@@ -146,6 +205,23 @@
     </div>
 </div>
 
+<!-- PICC document form modal (Transition Plan, Referral). Shared shell rendered by
+     pi-forms.js — the Administrative pills open these here now, moved off the roster. -->
+<div class="pi-overlay" id="docOverlay">
+    <div class="pi-modal">
+        <div class="pi-modal-header">
+            <h3 id="docModalTitle">PICC Document</h3>
+            <button class="pi-close" onclick="closeDocForm()" aria-label="Close">&times;</button>
+        </div>
+        <div class="pi-modal-body" id="docModalBody"></div>
+        <div class="pi-modal-footer">
+            <span class="pi-saved-badge" id="docSavedBadge" style="display:none;">&#10003; Saved</span>
+            <button class="pi-btn pi-btn-secondary" onclick="printDocForm()">&#x1F5A8;&#xFE0F; Print</button>
+            <button class="pi-btn pi-btn-primary" id="docSaveBtn" onclick="saveDocForm()">Save</button>
+        </div>
+    </div>
+</div>
+
 <!-- Shared per-child form machinery for the Teacher subset. -->
 <script src="pi-forms.js"></script>
 <script src="child-forms.js"></script>
@@ -180,6 +256,23 @@ var teacherLoaded = false;
 var docChecklist = {};
 var adminLoaded = false;
 
+/* ── Bridges for pi-forms.js ──
+   pi-forms.js (the shared PICC document-form engine) reads a few values by bare
+   name at call time, using the names isbe.html happens to give them. This page
+   uses different names, so expose thin aliases here rather than renaming ours.
+     • activeSchoolYear — pi-forms uses this for the ?year= scope. We track it to
+       activeYear so it always matches the year picker.
+     • getRoom — pi-forms' Child Information header calls getRoom(RoomNumber); we
+       have getRoomName.
+     • refreshActiveView — pi-forms calls this (as a global) after a save; redraw
+       whichever subset is showing so a just-filed form flips its pill to green. */
+var activeSchoolYear = '';
+function getRoom(roomNumber) { return getRoomName(roomNumber); }
+function refreshActiveView() {
+    if (activeTab === 'admin') renderAdmin();
+    else renderTeacher();
+}
+
 // The administrative documents required for every child (mirrors server CHILD_DOC_KEYS).
 var CHILD_DOCS = [
     { key: 'birthcert', label: 'Birth Cert' },
@@ -190,6 +283,18 @@ var CHILD_DOCS = [
     { key: 'incomeproof', label: 'Proof of Income' },
     { key: 'behaviorplan', label: 'Behavior Plan*' },
     { key: 'transitionplan', label: 'Transition Plan*' }
+];
+
+/* PICC document forms shown on the Administrative tab as green "on file" pills,
+   moved here off the PI/PFA roster. `docForm` is the DOC_FORM_SPECS key in
+   pi-forms.js; `field` is the ISBETracking column ChildForms.state() checks to
+   decide whether a real form exists for the child this year. Clicking the pill
+   opens the shared form engine (openDocForm) — green loads the saved copy, faded
+   starts a blank one. The old upload-only "Transition Plan*" column in CHILD_DOCS
+   stays for a scanned copy; this new column is the fillable form. */
+var DOC_FORM_COLS = [
+    { docForm: 'transitionPlan', field: 'TransitionPlan', label: 'Transition Plan' },
+    { docForm: 'referral', field: 'Referral', label: 'Referral' }
 ];
 
 // ── Helpers ──
@@ -259,6 +364,7 @@ function buildYearPicker() {
         return '<option value="' + y + '"' + (y === cur ? ' selected' : '') + '>' + y + '</option>';
     }).join('');
     activeYear = cur;
+    activeSchoolYear = cur;   // keep the pi-forms.js alias in step with the picker
 }
 function buildRoomPicker() {
     var sel = document.getElementById('tfRoom');
@@ -285,6 +391,7 @@ function showTab(which) {
 }
 function setYear(y) {
     activeYear = y;
+    activeSchoolYear = y;   // keep the pi-forms.js alias in step with the picker
     // Reload whichever subsets have been opened, so both stay on the chosen year.
     teacherLoaded = false; adminLoaded = false;
     if (activeTab === 'teacher') loadTeacher(); else loadAdmin();
@@ -463,7 +570,9 @@ function renderAdmin() {
     var roster = activeRoster().sort(sortByRoomThenName);
     if (!roster.length) { body.innerHTML = '<div class="cf-empty">No enrolled children.</div>'; return; }
     var head = '<tr><th class="cfg-name">Child</th><th class="cfg-room">Room</th>'
-        + CHILD_DOCS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('') + '</tr>';
+        + CHILD_DOCS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
+        + DOC_FORM_COLS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
+        + '</tr>';
     var rows = roster.map(function (s) {
         var cells = CHILD_DOCS.map(function (doc) {
             var file = childDocFile(s.Id, doc.key);
@@ -498,9 +607,22 @@ function renderAdmin() {
                     + ' onchange="uploadChildDoc(' + s.Id + ',\'' + doc.key + '\',this)"></label>';
             return '<td class="cfg-cell' + cellClass + '">' + box + attach + '</td>';
         }).join('');
+        /* The moved-here PICC form pills. Green "\u2713 on file" when a real form exists
+           for this child + year (ChildForms.state === 'form'), faded otherwise. Both
+           open the shared form engine; green loads the saved copy, faded opens blank. */
+        var formCells = DOC_FORM_COLS.map(function (col) {
+            var on = ChildForms.state(s.Id, col.field, !!(TRACKING[s.Id] || {})[col.field]) === 'form';
+            var pill = '<a href="#" class="cfg-pill ' + (on ? 'on' : 'off') + '"'
+                + ' title="' + (on
+                    ? escapeHtml(col.label) + ' is on file \u2014 click to open the form'
+                    : 'No ' + escapeHtml(col.label) + ' on file yet \u2014 click to fill it out') + '"'
+                + ' onclick="event.preventDefault();openDocForm(\'' + col.docForm + '\',' + s.Id + ')">'
+                + (on ? '\u2713 on file' : 'not on file') + '</a>';
+            return '<td class="cfg-cell' + (on ? ' filed' : '') + '">' + pill + '</td>';
+        }).join('');
         var prog = (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') ? '<span class="cfg-prog">' + s.PFA_PI_na + '</span>' : '';
         return '<tr><td class="cfg-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + prog + '</td>'
-            + '<td class="cfg-room">' + escapeHtml(getRoomName(s.RoomNumber)) + '</td>' + cells + '</tr>';
+            + '<td class="cfg-room">' + escapeHtml(getRoomName(s.RoomNumber)) + '</td>' + cells + formCells + '</tr>';
     }).join('');
     body.innerHTML = '<table class="cfg"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>'
         + '<div style="font-size:0.7rem;color:#94a3b8;margin:10px 20px;">* Behavior and transition plans are only required where applicable.</div>';
@@ -509,6 +631,9 @@ async function loadAdmin() {
     document.getElementById('afBody').innerHTML = '<div class="cf-loading">Loading…</div>';
     await Promise.all([
         loadChildDocChecklist(),
+        // The document-form pills (Transition Plan, Referral) read ChildForms.state(),
+        // which needs the forms index, not just the file index. Load both.
+        (window.ChildForms && ChildForms.load) ? ChildForms.load(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
         (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve()
     ]);
     adminLoaded = true;

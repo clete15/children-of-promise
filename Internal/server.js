@@ -4074,8 +4074,10 @@ function handleRequest(req, res) {
         if (!checkClassroomAuth(req, res)) return;
         // Ensure late-added columns exist (separate batch so metadata refreshes).
         runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='CCAPStartDate') ALTER TABLE rptMasterEnrollment ADD CCAPStartDate NVARCHAR(20);
-IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE rptMasterEnrollment ADD HomeLanguage NVARCHAR(60)`);
-        const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate,ISNULL(e.HomeLanguage,'') AS HomeLanguage FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE rptMasterEnrollment ADD HomeLanguage NVARCHAR(60);
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='TransferredOut') ALTER TABLE rptMasterEnrollment ADD TransferredOut BIT NOT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='TransferDate') ALTER TABLE rptMasterEnrollment ADD TransferDate NVARCHAR(20)`);
+        const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate,ISNULL(e.HomeLanguage,'') AS HomeLanguage,ISNULL(CAST(e.TransferredOut AS NVARCHAR),'0') AS TransferredOut,ISNULL(e.TransferDate,'') AS TransferDate FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         // NB the SELECT's 12th column is DCFSCapacity but the API exposes it as
         // Room_Capacity, so the key list here is authoritative, not the SELECT aliases.
@@ -4084,7 +4086,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             'RoomNumber','Room','TeacherDescription','Type','Room_Capacity',
             'Monday','Tuesday','Wednesday','Thursday','Friday','Active','Category','PFA_PI_na',
             'F_R_P_Food','IEP','Military','HouseholdIncome','ProofOfIncomeFile',
-            'ProofOfIncomeUploaded','PublicBenefits','HouseholdSize','CCAPStartDate','HomeLanguage']);
+            'ProofOfIncomeUploaded','PublicBenefits','HouseholdSize','CCAPStartDate','HomeLanguage',
+            'TransferredOut','TransferDate']);
         return sendJSON(res, 200, rows);
     }
 
@@ -4341,6 +4344,50 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             sendJSON(res, 200, { success: true });
         });
         return;
+    }
+
+    /* POST mark a child transferred out (or undo it) — /api/students/:id/transfer.
+
+       A transfer is NOT the same as a plain withdrawal. A withdrawn child flips
+       Active to 'No' and drops off every roster and count, which is right for a child
+       who simply left. But a PFA/PI child who transfers out mid-year still needs to be
+       visible on the ISBE roster for the rest of that school year, so staff can finish
+       the transition plan / referral paperwork the transfer itself requires. There was
+       no field for this before — only Active — so this adds two:
+         TransferredOut (bit)   — the child transferred rather than withdrew
+         TransferDate  (date)   — when, so the roster shows them only for that year
+
+       Marking transferred also sets Active='No' so the child leaves the ACTIVE counts
+       (attendance, capacity, FRP) everywhere else; the ISBE roster then re-includes
+       them explicitly via TransferredOut. Undoing restores Active='Yes' and clears the
+       transfer. Guarded by checkAuth (a centre-admin action, like the other student
+       mutations). */
+    if (req.method === 'POST' && url.match(/^\/api\/students\/\d+\/transfer$/)) {
+        if (!checkAuth(req, res)) return;
+        const sid = parseInt(url.split('/')[3]);
+        if (isNaN(sid)) return sendJSON(res, 400, { error: 'Bad student id' });
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            // Ensure the columns exist even if /api/students has not been hit yet.
+            runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='TransferredOut') ALTER TABLE rptMasterEnrollment ADD TransferredOut BIT NOT NULL DEFAULT 0;
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='TransferDate') ALTER TABLE rptMasterEnrollment ADD TransferDate NVARCHAR(20)`);
+
+            const transferred = d.transferred === true || d.transferred === 'true' || d.transferred === 1;
+            let sql;
+            if (transferred) {
+                // Accept a supplied date, else stamp today. Kept as YYYY-MM-DD text to
+                // match the other date columns on this table.
+                const dateVal = /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || ''))
+                    ? d.date : new Date().toISOString().split('T')[0];
+                sql = `UPDATE rptMasterEnrollment SET TransferredOut=1,TransferDate=${esc(dateVal)},Active='No' WHERE Id=${sid}`;
+            } else {
+                sql = `UPDATE rptMasterEnrollment SET TransferredOut=0,TransferDate=NULL,Active='Yes' WHERE Id=${sid}`;
+            }
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            if (!r.data.includes('rows affected')) return sendJSON(res, 404, { error: 'No matching child.' });
+            return sendJSON(res, 200, { success: true, transferred: transferred });
+        });
     }
 
     // POST run SQL (IT admin only — Clete, or the shared-password fallback)
