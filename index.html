@@ -69,7 +69,13 @@
             <p>Access the internal enrollment management system for staff and administrators.</p>
             <span class="card-btn">Go to Staff Portal</span>
         </a>
-        <div class="portal-card" style="cursor:default;max-width:420px;flex:1 1 380px;">
+        <a id="itSignIn" class="portal-card" href="/me?next=%2Fportal" style="display:none;max-width:420px;flex:1 1 380px;">
+            <div class="card-icon">🛠️</div>
+            <h3>Site Administration</h3>
+            <p>Deploy, restart, and database tools. Sign in as the site administrator to continue.</p>
+            <span class="card-btn">Sign in</span>
+        </a>
+        <div id="itPanel" class="portal-card" style="cursor:default;max-width:420px;flex:1 1 380px;display:none;">
             <div class="card-icon">🚀</div>
             <h3>Deploy & Database</h3>
             <p style="margin-bottom:12px;">Pull latest from GitHub, run SQL, or restart the server.</p>
@@ -113,6 +119,29 @@ function authHeaders(extra) {
     }
     return h;
 }
+
+/* The Deploy & Database panel is the IT tier — it ships code and runs SQL, so only an
+   IT admin (Clete) ever sees it. On load we ask the server who we are; the panel is
+   revealed only for an itAdmin, and stays hidden for everyone else so the portal reads
+   as two clean choices (Public Website / Staff Portal). If an IT admin lands here
+   without a session, we show a small "Sign in to deploy" link rather than dead
+   controls that 401. */
+(function gateItPanel() {
+    var panel = document.getElementById('itPanel');
+    if (!panel) return;
+    if (!(window.CofpAuth && CofpAuth.whoAmI)) return;   // stays hidden
+    CofpAuth.whoAmI().then(function (who) {
+        if (who && who.itAdmin) {
+            panel.style.display = '';
+        } else if (!who) {
+            /* Not signed in. Offer a discreet route to sign in and come back, so an IT
+               admin is never stranded, without exposing controls to anyone else. */
+            var m = document.getElementById('itSignIn');
+            if (m) m.style.display = '';
+        }
+        // Signed in but not IT (a teacher, Megan, Sara): panel stays hidden. Correct.
+    }).catch(function () { /* offline — leave hidden */ });
+})();
 
 /* Read a response as JSON, but tolerate a plain-text error (the server's 401 body is
    the word "Unauthorized", which is not JSON). Returns a usable object with a clear
