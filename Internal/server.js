@@ -192,9 +192,18 @@ const CLASSROOM_PASSWORD = process.env.COFP_CLASSROOM_PASSWORD || 'cofpstaff';
 
 // True when the caller holds EITHER the admin password OR the classroom password.
 // Used only by the child-data + child-form endpoints the kiosk needs.
+// Three ways in, because three legitimate callers reach child paperwork:
+//   - the shared ADMIN password (director at a desk),
+//   - the shared CLASSROOM password (the signing tablet, no personal login), and
+//   - ANY signed-in staff member's personal token. This last one is what makes the
+//     staff-portal model work: once a teacher signs in ONCE at the front door, the
+//     ISBE roster and the child forms they were sent to do must open without a second
+//     password. Child paperwork is squarely within a teacher's remit, so any valid
+//     token is accepted here (unlike checkAuth, which is centre-admin only).
 function hasClassroomAccess(req) {
     const pw = basicPassword(req);
-    return pw === INTERNAL_PASSWORD || pw === CLASSROOM_PASSWORD;
+    if (pw === INTERNAL_PASSWORD || pw === CLASSROOM_PASSWORD) return true;
+    return !!readSession(req.headers['x-staff-token']);
 }
 
 /* Guard for the endpoints the classroom kiosk is allowed to reach. Same 401 shape
