@@ -69,12 +69,6 @@
             <p>Access the internal enrollment management system for staff and administrators.</p>
             <span class="card-btn">Go to Staff Portal</span>
         </a>
-        <a id="itSignIn" class="portal-card" href="/me?next=%2Fportal" style="display:none;max-width:420px;flex:1 1 380px;">
-            <div class="card-icon">🛠️</div>
-            <h3>Site Administration</h3>
-            <p>Deploy, restart, and database tools. Sign in as the site administrator to continue.</p>
-            <span class="card-btn">Sign in</span>
-        </a>
         <div id="itPanel" class="portal-card" style="cursor:default;max-width:420px;flex:1 1 380px;display:none;">
             <div class="card-icon">🚀</div>
             <h3>Deploy & Database</h3>
@@ -131,15 +125,10 @@ function authHeaders(extra) {
     if (!panel) return;
     if (!(window.CofpAuth && CofpAuth.whoAmI)) return;   // stays hidden
     CofpAuth.whoAmI().then(function (who) {
-        if (who && who.itAdmin) {
-            panel.style.display = '';
-        } else if (!who) {
-            /* Not signed in. Offer a discreet route to sign in and come back, so an IT
-               admin is never stranded, without exposing controls to anyone else. */
-            var m = document.getElementById('itSignIn');
-            if (m) m.style.display = '';
-        }
-        // Signed in but not IT (a teacher, Megan, Sara): panel stays hidden. Correct.
+        // Only an IT admin sees the Deploy/Database panel. Everyone else just gets the
+        // two portal cards (Public Website, Staff Portal). No extra card, no sign-in
+        // prompt on the portal.
+        if (who && who.itAdmin) panel.style.display = '';
     }).catch(function () { /* offline — leave hidden */ });
 })();
 
