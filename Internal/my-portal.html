@@ -163,28 +163,26 @@ function hide(el) {
     el.textContent = '';
 }
 
-/* Already signed in? Go straight through rather than asking again. A staff member
-   who bookmarked this page should land on their own page, not a form. */
+/* Already signed in? Go straight through rather than asking again — but ONLY for a
+   personal token, never the shared centre password. */
 (function alreadyIn() {
-    /* Two ways to already be in, because this is now the ONLY door to My Page.
+    /* A personal token is a deliberate, individual sign-in, so we honour it: send
+       them through, unless the server no longer accepts the token (expired, or the
+       signing key changed on a restart) or a password change is still owed — in
+       both of those the form is the right thing to show.
 
-       A personal token: send them through, unless the server no longer accepts the
-       token (expired, or the signing key changed on a restart) or a password change
-       is still owed — in both of those the form is the right thing to show.
-
-       Or the shared centre password, which is Clete or Megan at their own desk. They
-       have no personal token, so without this they would hit the sign-in form on the
-       way to a page they already have full access to. whoAmI() answers director:true
-       for them, and the staff chooser on the page is what they actually want. */
+       The shared centre password is DELIBERATELY not enough to skip this form. A
+       browser that merely has 'cofpstaff'/'cofpadmin' saved used to flash the form
+       and then bounce straight into the portal, which meant the portal opened with
+       no one actually signing in. Now the password may be remembered and prefilled,
+       but the person still has to submit the form each visit — nothing auto-enters
+       on the shared password alone. A director who wants the whole-centre view types
+       it here (or signs in as themselves) rather than being carried through. */
     if (window.CofpAuth && CofpAuth.whoAmI) {
         var hasToken = CofpAuth.token && CofpAuth.token();
-        var hasShared = CofpAuth.stored && CofpAuth.stored();
-        if (hasToken || hasShared) {
+        if (hasToken) {
             CofpAuth.whoAmI().then(function (who) {
-                if (!who) return;                                   // no valid credential — show the form
-                if (who.director) {                                 // shared-password director
-                    return location.replace('/staff/staff-portal.html');
-                }
+                if (!who) return;                                   // token no longer valid — show the form
                 if (!who.mustChangePassword) {                      // signed-in staff, nothing owed
                     location.replace('/staff/staff-portal.html');
                 }

@@ -2942,13 +2942,15 @@ async function load() {
         // Identity first, and on its own: everything below is shaped by the answer.
         WHO = (window.CofpAuth && CofpAuth.whoAmI) ? await CofpAuth.whoAmI() : null;
 
-        /* Nobody signed in — no personal token and no shared password. Send them to
-           the one door rather than showing "could not load your record", which is
-           what a visitor with no credentials used to get here. /me shows the sign-in
-           form and, once they are in, sends them right back. This is the same gate
-           the dashboard card leans on; having it here too means a saved link straight
-           to this page still lands a stranger on the login rather than an error. */
-        if (!WHO && !(window.CofpAuth && CofpAuth.signedIn && CofpAuth.signedIn())) {
+        /* No identity — send them to the one door. WHO comes from the PERSONAL
+           credential (the token) via whoAmI, so this is null both for a visitor with
+           nothing AND for a browser that only has the shared centre password saved.
+           That second case is deliberate: the shared password alone must not carry
+           anyone into the portal without signing in, so we require a real WHO here
+           and let /me ask for a login every visit. /me shows the sign-in form and,
+           once they are in, sends them right back — so a saved link straight to this
+           page still lands on the login rather than silently opening the portal. */
+        if (!WHO) {
             location.replace('/me');
             return;
         }
