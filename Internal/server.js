@@ -6928,7 +6928,12 @@ ELSE
     }
 
     if (req.method === 'GET' && url.startsWith('/api/doc-index')) {
-        if (!checkAuth(req, res)) return;
+        // The document library is compliance / child evidence, the same tier as the ISBE
+        // roster and the child forms. It belongs behind checkClassroomAuth (admin OR
+        // classroom password OR any signed-in staff token), NOT checkAuth (centre-admin
+        // only). Under checkAuth a signed-in teacher got 401 and the page showed
+        // 'Unexpected token U, "Unauthorized" is not valid JSON'.
+        if (!checkClassroomAuth(req, res)) return;
         const qs = new URLSearchParams(req.url.split('?')[1] || '');
         const program = qs.get('program') === 'PFA' ? 'Preschool for All' : 'Birth to Three';
         /* A visit folder is named for ONE calendar year. Callers sometimes hold a school
@@ -7261,7 +7266,9 @@ ELSE
        explanation. Requires the same login as the rest of the site — these are
        children's records and must never be reachable by URL alone. */
     if (req.method === 'GET' && url.startsWith('/api/doc-file')) {
-        if (!checkAuth(req, res)) return;
+        // Same tier as the rest of the library (see /api/doc-index): any signed-in staff
+        // member may open a monitoring-evidence file, so guard with checkClassroomAuth.
+        if (!checkClassroomAuth(req, res)) return;
         const rel = new URLSearchParams(req.url.split('?')[1] || '').get('path');
         const full = resolveDocPath(rel);
         if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
@@ -7317,7 +7324,8 @@ ELSE
        The original folder name is preserved inside the archive, because "which item
        was this evidence for" is the question anyone looking in there will have. */
     if (req.method === 'POST' && url === '/api/doc-archive') {
-        if (!checkAuth(req, res)) return;
+        // Same tier as the rest of the library (see /api/doc-index).
+        if (!checkClassroomAuth(req, res)) return;
         return readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const rel = String(d.relPath || '').trim();
@@ -7369,7 +7377,8 @@ ELSE
 
     // Check a file out or back in. Sending a blank name checks it back in.
     if (req.method === 'POST' && url === '/api/doc-checkout') {
-        if (!checkAuth(req, res)) return;
+        // Same tier as the rest of the library (see /api/doc-index).
+        if (!checkClassroomAuth(req, res)) return;
         return readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const rel = String(d.relPath || '').trim();
