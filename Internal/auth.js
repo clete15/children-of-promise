@@ -177,9 +177,20 @@
             return r.json().then(function (body) {
                 if (!r.ok) throw new Error(body && body.error ? body.error : 'Could not sign in');
                 try {
-                    var store = persist ? localStorage : sessionStorage;
-                    store.setItem(TOKEN_KEY, body.token);
-                    store.setItem(TOKEN_NAME_KEY, body.name || '');
+                    /* The token is ALWAYS session-scoped (sessionStorage), never
+                       localStorage, regardless of any "remember me" choice. That is what
+                       makes the sign-in a gate on every fresh visit: when the browser is
+                       closed and reopened, the session token is gone and /me asks again.
+                       The PASSWORD is still remembered by the browser's own credential
+                       store and prefills the field, so signing back in is one click — but
+                       it is a deliberate click, not a silent carry-through. `persist` is
+                       accepted for call-compatibility and intentionally ignored. */
+                    void persist;
+                    sessionStorage.setItem(TOKEN_KEY, body.token);
+                    sessionStorage.setItem(TOKEN_NAME_KEY, body.name || '');
+                    // Clear any token a previous build left in localStorage, so an old
+                    // persisted session cannot keep silently signing someone in.
+                    try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(TOKEN_NAME_KEY); } catch (e) {}
                 } catch (e) { /* private browsing — the tab still works */ }
                 return body;
             });

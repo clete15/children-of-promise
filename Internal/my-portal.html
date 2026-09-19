@@ -97,10 +97,9 @@
             name followed by the initial of your surname — Molly Ellis would be
             <strong>MollyE</strong>. You will be asked to choose your own password.</p>
 
-        <label class="mp-remember">
-            <input type="checkbox" id="mpRemember" checked>
-            Keep me signed in on this device
-        </label>
+        <p class="mp-hint" style="margin-top:2px;">You will be asked to sign in each time
+            for security, even on this device. Your browser can remember your password so
+            it is just one click.</p>
 
         <div class="mp-msg" id="mpError" role="alert" aria-live="polite"></div>
         <button type="submit" id="mpSubmit">Sign in</button>
@@ -163,35 +162,13 @@ function hide(el) {
     el.textContent = '';
 }
 
-/* Already signed in? Go straight through rather than asking again — but ONLY for a
-   personal token, never the shared centre password. */
-(function alreadyIn() {
-    /* A personal token is a deliberate, individual sign-in, so we honour it: send
-       them through, unless the server no longer accepts the token (expired, or the
-       signing key changed on a restart) or a password change is still owed — in
-       both of those the form is the right thing to show.
-
-       The shared centre password is DELIBERATELY not enough to skip this form. A
-       browser that merely has 'cofpstaff'/'cofpadmin' saved used to flash the form
-       and then bounce straight into the portal, which meant the portal opened with
-       no one actually signing in. Now the password may be remembered and prefilled,
-       but the person still has to submit the form each visit — nothing auto-enters
-       on the shared password alone. A director who wants the whole-centre view types
-       it here (or signs in as themselves) rather than being carried through. */
-    if (window.CofpAuth && CofpAuth.whoAmI) {
-        var hasToken = CofpAuth.token && CofpAuth.token();
-        if (hasToken) {
-            CofpAuth.whoAmI().then(function (who) {
-                if (!who) return;                                   // token no longer valid — show the form
-                if (!who.mustChangePassword) {                      // signed-in staff, nothing owed
-                    location.replace('/staff/staff-portal.html');
-                }
-                // A staff token that still owes a password change falls through to the
-                // change form below rather than being bounced to the page.
-            });
-        }
-    }
-})();
+/* The sign-in form is ALWAYS shown here — even on your own machine, even with a
+   valid token already saved. The gate is deliberate: signing in is an act you do
+   each visit, not something the browser does silently for you. The password field
+   still prefills from the browser's saved credentials, so it is one click, but it
+   is a click. Nothing auto-forwards to the portal on a stored token or the shared
+   password. (Change-password and the first-time forced change still work through
+   the normal submit flow below.) */
 
 $('mpSignIn').addEventListener('submit', async e => {
     e.preventDefault();
@@ -208,7 +185,9 @@ $('mpSignIn').addEventListener('submit', async e => {
     btn.disabled = true;
     btn.textContent = 'Signing in…';
     try {
-        pendingPersist = $('mpRemember').checked;
+        // The token is always session-scoped now (see auth.js staffLogin); the old
+        // "keep me signed in" choice no longer applies, so this is always false.
+        pendingPersist = false;
         const body = await CofpAuth.staffLogin(login, password, pendingPersist);
         if (body.mustChangePassword) {
             pendingCurrent = password;
