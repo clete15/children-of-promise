@@ -262,10 +262,17 @@
        "you are Paige" rather than "you are the director". Getting that wrong is what
        put the staff chooser on a staff member's own page. */
     function whoAmI() {
-        return personalFetch('/api/staff-whoami').then(function (r) {
-            if (!r.ok) return null;
-            return r.json();
-        }).catch(function () { return null; });
+        /* Identity is asked with the TOKEN ONLY — never the shared password. Who you
+           are is a person; the shared centre password is not a person. Sending it here
+           is what let a browser holding the password report as "director" and walk
+           straight into the staff dashboard with no sign-in. So this deliberately does
+           NOT use personalHeaders() (which falls back to the password): no token means
+           not signed in, which is the honest answer and sends the visitor to /me. */
+        var t = token();
+        if (!t) return Promise.resolve(null);
+        return fetch('/api/staff-whoami', { headers: { 'X-Staff-Token': t } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .catch(function () { return null; });
     }
 
     window.CofpAuth = {

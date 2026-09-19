@@ -6192,15 +6192,24 @@ ELSE
     }
 
     /* GET who the caller is, so a page can tell a staff member from the director
-       without guessing. Deliberately thin: identity only, no record. */
+       without guessing. Deliberately thin: identity only, no record.
+
+       IDENTITY COMES FROM THE PERSONAL TOKEN ONLY — never the shared password.
+       Identity is a PERSON, and the shared centre password is not a person; letting
+       it answer here is exactly what carried a browser "straight into" the staff
+       dashboard with no sign-in, because the password sitting in sessionStorage
+       silently reported as "director". So we read the token directly rather than
+       through resolveActor (which honours the shared password as a fallback). No
+       token -> 401 -> the page sends the visitor to /me to sign in as themselves.
+       The shared password still authorises DATA endpoints as a rescue fallback; it
+       just can no longer BE an identity. */
     if (req.method === 'GET' && url === '/api/staff-whoami') {
-        const actor = resolveActor(req);
-        if (!actor) return sendJSON(res, 401, { error: 'Sign in first' });
-        if (actor.director) return sendJSON(res, 200, { director: true, admin: true, itAdmin: true });
+        const tokenId = readSession(req.headers['x-staff-token']);
+        if (!tokenId) return sendJSON(res, 401, { error: 'Sign in first' });
         const r = runSQLRows(
             `SELECT Id, ISNULL(Name,'') AS Name, ISNULL(LoginName,'') AS LoginName,
                     ISNULL(CAST(MustChangePassword AS INT),1) AS MustChangePassword
-             FROM Staff WHERE Id=${parseInt(actor.staffId, 10)}`);
+             FROM Staff WHERE Id=${parseInt(tokenId, 10)}`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const row = r.rows[0];
         if (!row) return sendJSON(res, 404, { error: 'Staff record not found' });
