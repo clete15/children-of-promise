@@ -172,6 +172,7 @@ var activeRoom = 'all';
 var TRACKING = {};
 var SCREENING = {};
 var SIGNATURES = {};
+var WEIGHTED = {};      // StudentId -> relPath of the weighted eligibility file on disk
 var formsReady = false;
 var teacherLoaded = false;
 
@@ -335,8 +336,18 @@ function chipFor(s, col) {
         ? '<a href="#" class="' + cls + '" data-act="' + escapeHtml(act) + '">' + inner + '</a>'
         : '<span class="' + cls + '">' + inner + '</span>';
 }
+function weightedChip(s) {
+    /* Weighted Eligibility, shown alongside the teacher forms so a monitor sees every
+       electronic document for the child in one place. Highlighted when the form is on
+       disk; clicking opens it. Not a checklist column — it is a generated document. */
+    var rel = WEIGHTED[s.Id] || WEIGHTED[String(s.Id)];
+    return rel
+        ? '<a href="#" class="tf-chip done" data-act="' + escapeHtml('weighted|' + rel)
+            + '" title="Weighted eligibility form is on file \u2014 click to open">\u2713 Weighted Eligibility</a>'
+        : '<span class="tf-chip" title="No weighted eligibility form on file yet">Weighted Eligibility</span>';
+}
 function childCard(s) {
-    var chips = COLS.map(function (col) { return chipFor(s, col); }).join('');
+    var chips = COLS.map(function (col) { return chipFor(s, col); }).join('') + weightedChip(s);
     var outstanding = COLS.filter(function (col) {
         return !ChildForms.isDone(s.Id, col.field, !!(TRACKING[s.Id] || {})[col.field]);
     }).length;
@@ -384,6 +395,8 @@ function renderTeacher() {
             else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
             else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
             else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
+            // The relPath can contain a pipe in theory, so rejoin the tail.
+            else if (parts[0] === 'weighted') openDoc(parts.slice(1).join('|'), 'Weighted Eligibility');
         });
     });
 }
@@ -396,9 +409,15 @@ async function loadTeacher() {
             apiFetch(yearQS('/api/screening-summary')).catch(function () { return null; }),
             (window.ChildForms && ChildForms.load) ? ChildForms.load(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
             (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
-            (window.CofpForms) ? CofpForms.loadSignatures(activeYear).then(function (s) { SIGNATURES = s || {}; }).catch(function () { return null; }) : Promise.resolve()
+            (window.CofpForms) ? CofpForms.loadSignatures(activeYear).then(function (s) { SIGNATURES = s || {}; }).catch(function () { return null; }) : Promise.resolve(),
+            // Which children have a weighted eligibility form on disk, so the pill lights.
+            apiFetch('/api/weighted-eligibility-files').catch(function () { return null; })
         ]);
-        var tRes = results[0], scrRes = results[1];
+        var tRes = results[0], scrRes = results[1], weRes = results[5];
+        WEIGHTED = {};
+        if (weRes && weRes.ok) {
+            try { var we = await weRes.json(); WEIGHTED = (we && we.files) ? we.files : {}; } catch (e) { /* additive */ }
+        }
         TRACKING = {};
         if (tRes && tRes.ok) {
             var tData = await tRes.json();
