@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Child Files – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        .cf-layout { padding:20px;max-width:1200px;margin:0 auto; }
+        .cf-shell { background:white;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);overflow:hidden; }
+        .cf-top { padding:14px 20px 0;border-bottom:1px solid var(--border); }
+        .cf-top h2 { font-size:1.05rem;font-weight:800;color:var(--text);margin:0 0 4px; }
+        .cf-top .cf-lead { font-size:0.72rem;color:var(--text-muted);margin-bottom:12px; }
+        /* Teacher / Administrative subset tabs */
+        .cf-tabs { display:flex;gap:4px; }
+        .cf-tab { padding:9px 18px;border:none;background:transparent;cursor:pointer;font-size:0.82rem;
+            font-weight:700;color:#64748b;border-bottom:3px solid transparent;transition:color 0.15s,border-color 0.15s; }
+        .cf-tab:hover { color:#334155; }
+        .cf-tab.active { color:#1e3a8a;border-bottom-color:#2563eb; }
+
+        .cf-controls { padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border); }
+        .cf-controls label { font-size:0.72rem;color:var(--text-muted); }
+        .cf-controls select { padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem; }
+        .cf-note { padding:10px 20px;font-size:0.74rem;color:#6b7280;border-bottom:1px solid var(--border);line-height:1.6; }
+        .cf-legend span.key { display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:2px; }
+        .cf-view { display:none; }
+        .cf-view.active { display:block; }
+        .cf-body { overflow:auto;max-height:calc(100vh - 280px); }
+        .cf-empty, .cf-loading { padding:28px;text-align:center;color:#94a3b8;font-size:0.85rem; }
+
+        /* ── Administrative checklist grid (reuses ISBE cf-grid styling) ── */
+        .cfg { border-collapse:collapse;width:100%;font-size:0.78rem; }
+        .cfg th, .cfg td { border:1px solid #e5e7eb;padding:6px 8px;text-align:center; }
+        .cfg thead th { background:#1e3a8a;color:#fff;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.03em;position:sticky;top:0;z-index:2; }
+        .cfg th.cfg-name, .cfg td.cfg-name { text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1; }
+        .cfg thead th.cfg-name { background:#1e3a8a;z-index:3; }
+        .cfg td.cfg-room { text-align:left;color:#64748b;white-space:nowrap; }
+        .cfg tr:nth-child(even) td { background:#f8fafc; }
+        .cfg tr:nth-child(even) td.cfg-name { background:#f8fafc; }
+        .cfg .cfg-prog { font-size:0.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-left:6px; }
+        .cfg-cell { min-width:74px; }
+        .cfg-cell.filed { background:#dcfce7 !important; }
+        .cfg-cell.paper { background:#fef3c7 !important; }
+        .cfg-check input { width:16px;height:16px;accent-color:#16a34a;cursor:pointer;vertical-align:middle; }
+        .cfg-attach, .cfg-attached { display:inline-block;margin-left:6px;cursor:pointer;text-decoration:none;font-size:0.9rem; }
+        .cfg-attach:hover { opacity:0.7; }
+        .cfg-attached { color:#16a34a; }
+
+        /* ── Teacher forms cards ── */
+        .tf-child { border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff; }
+        .tf-child-top { display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px; }
+        .tf-child-name { font-size:0.95rem;font-weight:800;color:#1e293b; }
+        .tf-child-meta { font-size:0.72rem;color:#94a3b8; }
+        .tf-prog { font-size:0.6rem;font-weight:800;color:#2563eb;text-transform:uppercase;background:#eff6ff;padding:1px 6px;border-radius:8px; }
+        .tf-out { margin-left:auto;font-size:0.72rem;color:#b45309;font-weight:700; }
+        .tf-out.done { color:#166534; }
+        .tf-chips { display:flex;flex-wrap:wrap;gap:8px; }
+        .tf-chip { display:inline-flex;align-items:center;gap:6px;font-size:0.74rem;font-weight:600;
+            padding:6px 12px;border:1px solid #cbd5e1;border-radius:20px;color:#334155;background:#f8fafc;
+            text-decoration:none;cursor:pointer;transition:background 0.15s,border-color 0.15s; }
+        a.tf-chip:hover { background:#eef2ff;border-color:#93c5fd; }
+        .tf-chip.done { background:#dcfce7;border-color:#86efac;color:#166534; }
+        span.tf-chip { cursor:default; }
+        .tf-flag { font-size:0.62rem;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 6px;border-radius:8px; }
+        .tf-roomgroup-title { font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;
+            color:#64748b;margin:14px 2px 8px; }
+        .cf-actions { padding:0 20px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap; }
+    </style>
+</head>
+<body>
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Child Files &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="cf-layout">
+    <div class="cf-shell">
+        <div class="cf-top">
+            <h2>🗂️ Child Files</h2>
+            <div class="cf-lead">Every enrolled child's documents. Two subsets: classroom forms teachers own, and the administrative records required for everyone.</div>
+            <div class="cf-tabs">
+                <button class="cf-tab active" id="tabTeacher" onclick="showTab('teacher')">📋 Teacher</button>
+                <button class="cf-tab" id="tabAdmin" onclick="showTab('admin')">🗂️ Administrative</button>
+            </div>
+        </div>
+
+        <div class="cf-controls">
+            <span id="tfRoomWrap"><label for="tfRoom">Room</label>
+                <select id="tfRoom" onchange="setRoom(this.value)"></select></span>
+            <span><label for="cfYear">School year</label>
+                <select id="cfYear" onchange="setYear(this.value)"></select></span>
+        </div>
+
+        <!-- TEACHER subset -->
+        <div class="cf-view active" id="viewTeacher">
+            <div class="cf-note">
+                Open a form to complete and sign it on screen. Signed copies are filed into the child's
+                <strong>Teacher</strong> folder. Report cards are uploaded. Anyone can help keep these current.
+            </div>
+            <div class="cf-body" id="tfBody"><div class="cf-loading">Loading…</div></div>
+        </div>
+
+        <!-- ADMINISTRATIVE subset -->
+        <div class="cf-view" id="viewAdmin">
+            <div class="cf-note">
+                Check a box when a document is on file, or attach a scan — scans are filed into the child's
+                <strong>Administrative</strong> folder. Anyone can help keep these up to date.
+                <div class="cf-legend" style="margin-top:6px;">
+                    <span class="key" style="background:#dcfce7;border:1px solid #86efac;"></span> Scan filed (openable here) &nbsp;&nbsp;
+                    <span class="key" style="background:#fef3c7;border:1px solid #fcd34d;"></span> Checked as on paper (no scan) &nbsp;&nbsp;
+                    <span class="key" style="background:#fff;border:1px solid #e5e7eb;"></span> Nothing on file
+                </div>
+            </div>
+            <div class="cf-actions">
+                <button class="btn-secondary" id="cfCarryBtn" onclick="carryForward()"
+                    style="font-size:0.75rem;padding:6px 12px;"
+                    title="Copy last year's checked documents into this year as a starting point to confirm">
+                    &#8617; Copy last year's checkmarks forward
+                </button>
+                <button class="btn-secondary" id="cfBackfillBtn" onclick="backfillFolders()"
+                    style="font-size:0.75rem;padding:6px 12px;"
+                    title="Create a folder and a pre-filled weighted eligibility form for every currently enrolled child. Safe to run more than once.">
+                    &#128193; Create child folders + weighted eligibility forms
+                </button>
+                <span id="cfActionStatus" style="font-size:0.72rem;color:#6b7280;"></span>
+            </div>
+            <div class="cf-body" id="afBody"><div class="cf-loading">Loading…</div></div>
+        </div>
+    </div>
+</div>
+
+<!-- Shared per-child form machinery for the Teacher subset. -->
+<script src="pi-forms.js"></script>
+<script src="child-forms.js"></script>
+<script src="sign-pad.js"></script>
+<script src="classroom-forms.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+/* Child Files — one page, two subsets:
+     Teacher        — the My Classroom form set (permission slip, parent interview,
+                      screenings, report cards) for every enrolled child.
+     Administrative — the required-document checklist (birth cert, physical, income
+                      proof, etc.) for every enrolled child.
+   Both are the editable source of truth; the ISBE Child Files grid is a read-only
+   PI/PFA subset of the Administrative data. */
+
+// ── Shared state ──
+var students = [];
+var classrooms = [];
+var activeYear = '';
+var activeTab = 'teacher';
+var activeRoom = 'all';
+
+// Teacher-subset state
+var TRACKING = {};
+var SCREENING = {};
+var SIGNATURES = {};
+var formsReady = false;
+var teacherLoaded = false;
+
+// Administrative-subset state
+var docChecklist = {};
+var adminLoaded = false;
+
+// The administrative documents required for every child (mirrors server CHILD_DOC_KEYS).
+var CHILD_DOCS = [
+    { key: 'birthcert', label: 'Birth Cert' },
+    { key: 'immunizations', label: 'Physical / Immun.' },
+    { key: 'vision', label: 'Vision' },
+    { key: 'hearing', label: 'Hearing' },
+    { key: 'emergency', label: 'Emergency / Release' },
+    { key: 'incomeproof', label: 'Proof of Income' },
+    { key: 'behaviorplan', label: 'Behavior Plan*' },
+    { key: 'transitionplan', label: 'Transition Plan*' }
+];
+
+// ── Helpers ──
+function apiFetch(url, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' },
+        (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
+        opts.headers || {});
+    return fetch(url, opts);
+}
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function currentSchoolYear() {
+    var now = new Date();
+    var y = now.getFullYear();
+    var startYear = now.getMonth() >= 6 ? y : y - 1;
+    return startYear + '-' + (startYear + 1);
+}
+function yearQS(url) {
+    return url + (url.indexOf('?') === -1 ? '?' : '&') + 'year=' + encodeURIComponent(activeYear);
+}
+function sortByName(a, b) {
+    var cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
+    return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
+}
+function sortByRoomThenName(a, b) {
+    var ra = parseInt(a.RoomNumber), rb = parseInt(b.RoomNumber);
+    var an = isNaN(ra) ? Infinity : ra, bn = isNaN(rb) ? Infinity : rb;
+    if (an !== bn) return an - bn;
+    return sortByName(a, b);
+}
+function getRoomName(roomNumber) {
+    var c = (classrooms || []).find(function (r) { return String(r.RoomNumber) === String(roomNumber); });
+    return c ? (c.Room || ('Room ' + roomNumber)) : (roomNumber || '\u2014');
+}
+function activeRoster() {
+    return students.filter(function (s) { return s.Active === 'Yes' || s.Active === 'YES'; });
+}
+function roomRoster(roomNumber) {
+    return activeRoster().filter(function (s) { return String(s.RoomNumber) === String(roomNumber); });
+}
+function openDoc(rel, name) {
+    apiFetch('/api/doc-file?path=' + encodeURIComponent(rel))
+        .then(function (res) {
+            if (!res.ok) throw new Error(res.status === 401 ? 'Not signed in' : ('HTTP ' + res.status));
+            return res.blob();
+        })
+        .then(function (blob) {
+            var url = URL.createObjectURL(blob);
+            window.open(url, '_blank', 'noopener');
+            setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        })
+        .catch(function (e) { alert('Could not open "' + (name || 'file') + '": ' + e.message); });
+}
+
+// ── Pickers ──
+function buildYearPicker() {
+    var sel = document.getElementById('cfYear');
+    var cur = currentSchoolYear();
+    var startY = parseInt(cur.split('-')[0]);
+    var opts = [];
+    for (var i = 1; i >= -2; i--) { var s = startY + i; opts.push(s + '-' + (s + 1)); }
+    sel.innerHTML = opts.map(function (y) {
+        return '<option value="' + y + '"' + (y === cur ? ' selected' : '') + '>' + y + '</option>';
+    }).join('');
+    activeYear = cur;
+}
+function buildRoomPicker() {
+    var sel = document.getElementById('tfRoom');
+    var withKids = {};
+    activeRoster().forEach(function (s) { withKids[s.RoomNumber] = true; });
+    var rooms = (classrooms || []).filter(function (r) { return withKids[r.RoomNumber]; });
+    sel.innerHTML = '<option value="all">All rooms</option>'
+        + rooms.map(function (r) {
+            return '<option value="' + escapeHtml(String(r.RoomNumber)) + '">' + escapeHtml(r.Room || ('Room ' + r.RoomNumber)) + '</option>';
+        }).join('');
+}
+
+// ── Tab switching ──
+function showTab(which) {
+    activeTab = which;
+    document.getElementById('tabTeacher').classList.toggle('active', which === 'teacher');
+    document.getElementById('tabAdmin').classList.toggle('active', which === 'admin');
+    document.getElementById('viewTeacher').classList.toggle('active', which === 'teacher');
+    document.getElementById('viewAdmin').classList.toggle('active', which === 'admin');
+    // The room picker only makes sense for the teacher grid.
+    document.getElementById('tfRoomWrap').style.display = which === 'teacher' ? '' : 'none';
+    if (which === 'teacher' && !teacherLoaded) loadTeacher();
+    if (which === 'admin' && !adminLoaded) loadAdmin();
+}
+function setYear(y) {
+    activeYear = y;
+    // Reload whichever subsets have been opened, so both stay on the chosen year.
+    teacherLoaded = false; adminLoaded = false;
+    if (activeTab === 'teacher') loadTeacher(); else loadAdmin();
+}
+function setRoom(r) { activeRoom = r; renderTeacher(); }
+
+// ══════════════ TEACHER SUBSET ══════════════
+function initForms() {
+    if (formsReady || !window.CofpForms) return;
+    CofpForms.init({
+        getStudents: function () { return students; },
+        getClassrooms: function () { return classrooms; },
+        getTracking: function () { return TRACKING; },
+        getScreening: function () { return SCREENING; },
+        getSignatures: function () { return SIGNATURES; },
+        setSignatures: function (sig) { SIGNATURES = sig || {}; },
+        getYear: function () { return activeYear || currentSchoolYear(); },
+        apiFetch: function (url, opts) { return apiFetch(url, opts); },
+        ChildForms: window.ChildForms,
+        refreshActiveView: function () { renderTeacher(); },
+        classroomRoster: function () { return activeRoom === 'all' ? activeRoster() : roomRoster(activeRoom); }
+    });
+    formsReady = true;
+}
+
+var COLS = null;
+function chipFor(s, col) {
+    var t = TRACKING[s.Id] || {};
+    var st = ChildForms.state(s.Id, col.field, !!t[col.field]);
+    var done = st === 'form' || st === 'tick' || st === 'unknown';
+    var label = col.label.replace(/<br>/g, ' ');
+    var flag = '';
+    if (st === 'tick-only') flag = '<span class="tf-flag" title="Ticked, but nothing saved here. If done on paper that is fine; otherwise open the form.">on paper?</span>';
+    if (st === 'partial' && ChildForms.isScreening && ChildForms.isScreening(col.field)) {
+        var haveQ = ChildForms.hasFile(s.Id, col.field, 'questionnaire');
+        var haveScored = ChildForms.hasForm(s.Id, col.field);
+        var need = !haveQ ? 'needs questionnaire' : !haveScored ? 'needs scoring' : 'in progress';
+        flag = '<span class="tf-flag">' + need + '</span>';
+    }
+    var inner = (done ? '\u2713 ' : '') + escapeHtml(label) + flag;
+    var act = '';
+    if (col.field === 'PermissionSlip') act = 'permission|' + s.Id;
+    else if (col.field === 'ParentInterview') act = 'interview|' + s.Id;
+    else if (col.field === 'BegASQ' || col.field === 'EndASQ') act = 'screening|' + s.Id + '|ASQ-3|' + (col.field === 'BegASQ' ? 'Beginning' : 'End');
+    else if (col.field === 'BegASE' || col.field === 'EndASE') act = 'screening|' + s.Id + '|ASQ:SE-2|' + (col.field === 'BegASE' ? 'Beginning' : 'End');
+    else if (col.field === 'MidYearReport' || col.field === 'EndYearReport') act = 'upload|' + s.Id + '|' + col.field;
+    var cls = 'tf-chip' + (done ? ' done' : '');
+    return act
+        ? '<a href="#" class="' + cls + '" data-act="' + escapeHtml(act) + '">' + inner + '</a>'
+        : '<span class="' + cls + '">' + inner + '</span>';
+}
+function childCard(s) {
+    var chips = COLS.map(function (col) { return chipFor(s, col); }).join('');
+    var outstanding = COLS.filter(function (col) {
+        return !ChildForms.isDone(s.Id, col.field, !!(TRACKING[s.Id] || {})[col.field]);
+    }).length;
+    var status = outstanding
+        ? '<span class="tf-out">' + outstanding + ' outstanding</span>'
+        : '<span class="tf-out done">\u2713 all done</span>';
+    var prog = (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') ? '<span class="tf-prog">' + s.PFA_PI_na + '</span>' : '';
+    return '<div class="tf-child"><div class="tf-child-top">'
+        + '<span class="tf-child-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + '</span>'
+        + prog + '<span class="tf-child-meta">' + escapeHtml(getRoomName(s.RoomNumber)) + '</span>'
+        + status + '</div><div class="tf-chips">' + chips + '</div></div>';
+}
+function renderTeacher() {
+    var body = document.getElementById('tfBody');
+    COLS = window.CofpForms ? CofpForms.COLUMNS : [];
+    var roster = (activeRoom === 'all' ? activeRoster() : roomRoster(activeRoom)).slice().sort(function (a, b) {
+        var ra = parseInt(a.RoomNumber), rb = parseInt(b.RoomNumber);
+        var an = isNaN(ra) ? Infinity : ra, bn = isNaN(rb) ? Infinity : rb;
+        if (activeRoom === 'all' && an !== bn) return an - bn;
+        return sortByName(a, b);
+    });
+    if (!roster.length) {
+        body.innerHTML = '<div class="cf-empty">No enrolled children' + (activeRoom === 'all' ? '.' : ' in this room.') + '</div>';
+        return;
+    }
+    var html = '';
+    if (activeRoom === 'all') {
+        var lastRoom = null;
+        roster.forEach(function (s) {
+            if (String(s.RoomNumber) !== String(lastRoom)) {
+                lastRoom = s.RoomNumber;
+                html += '<div class="tf-roomgroup-title">' + escapeHtml(getRoomName(s.RoomNumber)) + '</div>';
+            }
+            html += childCard(s);
+        });
+    } else {
+        html = roster.map(childCard).join('');
+    }
+    body.innerHTML = html;
+    body.querySelectorAll('[data-act]').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            var parts = a.getAttribute('data-act').split('|');
+            if (parts[0] === 'interview') CofpForms.openInterview(parseInt(parts[1], 10));
+            else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
+            else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
+            else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
+        });
+    });
+}
+async function loadTeacher() {
+    initForms();
+    document.getElementById('tfBody').innerHTML = '<div class="cf-loading">Loading…</div>';
+    try {
+        var results = await Promise.all([
+            apiFetch(yearQS('/api/isbe-tracking')).catch(function () { return null; }),
+            apiFetch(yearQS('/api/screening-summary')).catch(function () { return null; }),
+            (window.ChildForms && ChildForms.load) ? ChildForms.load(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
+            (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
+            (window.CofpForms) ? CofpForms.loadSignatures(activeYear).then(function (s) { SIGNATURES = s || {}; }).catch(function () { return null; }) : Promise.resolve()
+        ]);
+        var tRes = results[0], scrRes = results[1];
+        TRACKING = {};
+        if (tRes && tRes.ok) {
+            var tData = await tRes.json();
+            (Array.isArray(tData) ? tData : []).forEach(function (t) { TRACKING[t.StudentId] = t; });
+        }
+        SCREENING = {};
+        if (scrRes && scrRes.ok) {
+            try {
+                var scr = await scrRes.json();
+                if (Array.isArray(scr)) scr.forEach(function (s) {
+                    if (!SCREENING[s.StudentId]) SCREENING[s.StudentId] = {};
+                    SCREENING[s.StudentId][s.ScreeningType + '|' + s.Period] = s;
+                });
+            } catch (e) { /* additive */ }
+        }
+    } catch (e) { /* renders on tick-only data */ }
+    teacherLoaded = true;
+    renderTeacher();
+}
+
+// ══════════════ ADMINISTRATIVE SUBSET ══════════════
+async function loadChildDocChecklist() {
+    docChecklist = {};
+    try {
+        var res = await apiFetch(yearQS('/api/child-doc-checklist'));
+        if (!res.ok) return;
+        var d = await res.json();
+        (d.docs || []).forEach(function (row) {
+            var id = String(row.StudentId);
+            if (!docChecklist[id]) docChecklist[id] = {};
+            docChecklist[id][String(row.DocKey).toLowerCase()] = (row.OnFile === 1 || row.OnFile === '1' || row.OnFile === true);
+        });
+    } catch (e) { /* empty = nothing checked */ }
+}
+function childDocFile(studentId, docKey) {
+    if (window.ChildForms && ChildForms.fileFor) return ChildForms.fileFor(studentId, 'ChildDoc', docKey);
+    return null;
+}
+function renderAdmin() {
+    var body = document.getElementById('afBody');
+    var roster = activeRoster().sort(sortByRoomThenName);
+    if (!roster.length) { body.innerHTML = '<div class="cf-empty">No enrolled children.</div>'; return; }
+    var head = '<tr><th class="cfg-name">Child</th><th class="cfg-room">Room</th>'
+        + CHILD_DOCS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('') + '</tr>';
+    var rows = roster.map(function (s) {
+        var cells = CHILD_DOCS.map(function (doc) {
+            var checked = !!(docChecklist[String(s.Id)] || {})[doc.key];
+            if (doc.key === 'incomeproof' && !checked && (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1)) checked = true;
+            var file = childDocFile(s.Id, doc.key);
+            var cellClass = file ? ' filed' : (checked ? ' paper' : '');
+            var box = '<label class="cfg-check" title="Confirm this document is on file (paper copy)">'
+                + '<input type="checkbox"' + (checked ? ' checked' : '')
+                + ' onchange="toggleChildDoc(' + s.Id + ',\'' + doc.key + '\',this.checked)"></label>';
+            var attach = file
+                ? '<a class="cfg-attached" href="#" title="Filed: ' + escapeHtml(file.name || 'attached')
+                    + ' \u2014 click to open" onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
+                    + '\',\'' + escapeHtml(file.name || 'file').replace(/'/g, "\\'") + '\')">\uD83D\uDCCE</a>'
+                : '<label class="cfg-attach" title="Attach a scan into the child\u2019s Administrative folder">\u2795'
+                    + '<input type="file" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"'
+                    + ' onchange="uploadChildDoc(' + s.Id + ',\'' + doc.key + '\',this)"></label>';
+            return '<td class="cfg-cell' + cellClass + '">' + box + attach + '</td>';
+        }).join('');
+        var prog = (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') ? '<span class="cfg-prog">' + s.PFA_PI_na + '</span>' : '';
+        return '<tr><td class="cfg-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + prog + '</td>'
+            + '<td class="cfg-room">' + escapeHtml(getRoomName(s.RoomNumber)) + '</td>' + cells + '</tr>';
+    }).join('');
+    body.innerHTML = '<table class="cfg"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>'
+        + '<div style="font-size:0.7rem;color:#94a3b8;margin:10px 20px;">* Behavior and transition plans are only required where applicable.</div>';
+}
+async function loadAdmin() {
+    document.getElementById('afBody').innerHTML = '<div class="cf-loading">Loading…</div>';
+    await Promise.all([
+        loadChildDocChecklist(),
+        (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve()
+    ]);
+    adminLoaded = true;
+    renderAdmin();
+}
+async function toggleChildDoc(studentId, docKey, checked) {
+    try {
+        var res = await apiFetch('/api/child-doc-checklist', {
+            method: 'POST',
+            body: JSON.stringify({ studentId: studentId, docKey: docKey, year: activeYear, onFile: checked })
+        });
+        var d = await res.json();
+        if (!d.success) throw new Error(d.error || 'save failed');
+        if (!docChecklist[String(studentId)]) docChecklist[String(studentId)] = {};
+        docChecklist[String(studentId)][docKey] = checked;
+        renderAdmin();
+    } catch (e) { alert('Could not save that: ' + e.message); }
+}
+async function uploadChildDoc(studentId, docKey, input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    if (file.size > 15 * 1024 * 1024) { alert('That file is over 15 MB. A PDF scan is usually much smaller.'); return; }
+    var fd = new FormData();
+    fd.append('file', file);
+    try {
+        var res = await fetch('/api/child-file-upload?studentId=' + encodeURIComponent(studentId)
+            + '&field=ChildDoc&kind=' + encodeURIComponent(docKey)
+            + '&year=' + encodeURIComponent(activeYear), {
+            method: 'POST',
+            headers: (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
+            body: fd
+        });
+        var d = await res.json();
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        if (window.ChildForms && ChildForms.markFile) ChildForms.markFile(studentId, 'ChildDoc', docKey, d.relPath, d.name);
+        renderAdmin();
+    } catch (e) { alert('Upload failed: ' + e.message); }
+}
+async function carryForward() {
+    var status = document.getElementById('cfActionStatus');
+    if (!confirm('Copy last year\u2019s checked documents into ' + activeYear + ' for returning children?\n\n'
+        + 'This only fills documents not already marked this year, and does not copy scans. Review each child after.')) return;
+    var btn = document.getElementById('cfCarryBtn');
+    btn.disabled = true;
+    status.textContent = 'Copying\u2026'; status.style.color = '#6b7280';
+    try {
+        var total = 0;
+        for (var _i = 0, progs = ['PFA', 'PI']; _i < progs.length; _i++) {
+            var res = await apiFetch('/api/child-doc-checklist/carry-forward', {
+                method: 'POST', body: JSON.stringify({ year: activeYear, program: progs[_i] })
+            });
+            var d = await res.json();
+            if (!d.success) throw new Error(d.error || 'failed');
+            total += (d.copied || 0);
+        }
+        status.textContent = 'Copied ' + total + ' checkmark' + (total === 1 ? '' : 's') + ' \u2014 review below.';
+        status.style.color = '#166534';
+        adminLoaded = false; await loadAdmin();
+    } catch (e) {
+        status.textContent = '\u26a0 ' + e.message; status.style.color = '#b91c1c';
+    } finally { btn.disabled = false; }
+}
+async function backfillFolders() {
+    var status = document.getElementById('cfActionStatus');
+    if (!confirm('Create a document folder and a pre-filled weighted eligibility form for every currently '
+        + 'enrolled child?\n\nNew enrollments already get this automatically; this catches up children enrolled '
+        + 'earlier. Any criterion not on record is filled in as \u201CNo\u201D. Safe to run more than once.')) return;
+    var btn = document.getElementById('cfBackfillBtn');
+    btn.disabled = true;
+    status.textContent = 'Working\u2026 this can take a moment.'; status.style.color = '#6b7280';
+    try {
+        var res = await apiFetch('/api/backfill-child-folders', { method: 'POST' });
+        var d = await res.json();
+        if (!d.success) throw new Error(d.error || 'failed');
+        status.textContent = d.message; status.style.color = d.failed ? '#b45309' : '#166534';
+    } catch (e) {
+        status.textContent = '\u26a0 ' + e.message; status.style.color = '#b91c1c';
+    } finally { btn.disabled = false; }
+}
+
+// ── Init ──
+async function init() {
+    if (!window.CofpAuth || !CofpAuth.whoAmI) { location.replace('/me'); return; }
+    var who = null;
+    try { who = await CofpAuth.whoAmI(); } catch (e) { who = null; }
+    if (!who) { location.replace('/me'); return; }
+
+    activeYear = currentSchoolYear();
+    buildYearPicker();
+    try {
+        var [sRes, cRes] = await Promise.all([apiFetch('/api/students'), apiFetch('/api/classrooms')]);
+        students = sRes.ok ? await sRes.json() : [];
+        classrooms = cRes.ok ? await cRes.json() : [];
+        if (!Array.isArray(students)) students = [];
+        if (!Array.isArray(classrooms)) classrooms = [];
+    } catch (e) {
+        document.getElementById('tfBody').innerHTML = '<div class="cf-empty">Could not load the roster: ' + escapeHtml(e.message) + '</div>';
+        return;
+    }
+    buildRoomPicker();
+    // Teacher is the default open subset.
+    await loadTeacher();
+}
+
+init();
+</script>
+</body>
+</html>
