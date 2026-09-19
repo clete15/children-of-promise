@@ -152,16 +152,21 @@ const $ = id => document.getElementById(id);
 let pendingCurrent = '';
 let pendingPersist = true;
 
-/* Where to go after signing in. A page that bounced someone here (e.g. a PAS form
-   opened without a session) passes ?next=<relative path> so we return them to it.
-   Only a same-origin RELATIVE path is honoured — never an absolute URL or one that
-   starts with "//" — so this can't be turned into an open redirect. Default is the
-   staff portal. */
-function destAfterSignIn() {
+/* Where to go after signing in.
+   1. If a page bounced someone here it passes ?next=<relative path>; honour that
+      (same-origin RELATIVE only, so it can't be an open redirect).
+   2. Otherwise route by ROLE: a centre admin (Clete/Megan/Sara) lands on the staff
+      DASHBOARD (/staff/, all the cards); everyone else lands on their own record
+      (My Page). Role comes from whoAmI, which reads the token we just minted. */
+async function destAfterSignIn() {
     try {
         var n = new URLSearchParams(location.search).get('next');
         if (n && n[0] === '/' && n[1] !== '/') return n;
     } catch (e) {}
+    try {
+        var who = (window.CofpAuth && CofpAuth.whoAmI) ? await CofpAuth.whoAmI() : null;
+        if (who && who.admin) return '/staff/';
+    } catch (e) { /* fall through to the personal page */ }
     return '/staff/staff-portal.html';
 }
 
@@ -209,7 +214,7 @@ $('mpSignIn').addEventListener('submit', async e => {
             $('mpNew').focus();
             return;
         }
-        location.replace(destAfterSignIn());
+        location.replace(await destAfterSignIn());
     } catch (ex) {
         show(err, 'err', ex.message || 'Could not sign in.');
         $('mpPassword').value = '';
@@ -243,7 +248,8 @@ $('mpChange').addEventListener('submit', async e => {
         await CofpAuth.staffChangePassword(pendingCurrent, next);
         pendingCurrent = '';
         show(msg, 'ok', 'Saved. Taking you to your page…');
-        setTimeout(() => location.replace(destAfterSignIn()), 700);
+        const dest = await destAfterSignIn();
+        setTimeout(() => location.replace(dest), 700);
     } catch (ex) {
         show(msg, 'err', ex.message || 'Could not change it.');
         btn.disabled = false;
