@@ -690,6 +690,7 @@ let CLS_STUDENTS = [];
 let CLS_TRACKING = {};      // by StudentId
 let CLS_SCREENING = {};     // by StudentId -> "TYPE|Period"
 let CLS_SIGNATURES = {};    // by "studentId|Field|role"
+let CLS_WEIGHTED = {};      // by StudentId -> relPath of the weighted eligibility file on disk
 let CLS_YEAR = '';          // active school year, from the tracking endpoint's default
 let clsState = 'idle';      // idle | loading | ready | error
 let clsError = '';
@@ -2001,6 +2002,17 @@ function classroomChecklistHtml(rooms) {
                 : '<span class="' + cls + '">' + inner + '</span>';
         }).join('');
 
+        /* Weighted Eligibility pill. Not a checklist column (it is a document seeded into
+           the child's Administrative folder, not a tracked form), so it is appended after
+           the column chips. Highlighted when the form exists on disk; clicking opens it.
+           A child with no form yet shows a plain, non-highlighted pill. */
+        const weRel = CLS_WEIGHTED[s.Id] || CLS_WEIGHTED[String(s.Id)];
+        const weChip = weRel
+            ? '<a href="#" class="cls-chip cls-chip-done" data-act="' + esc('weighted|' + weRel)
+                + '" title="Weighted eligibility form is on file \u2014 click to open">\u2713 Weighted Eligibility</a>'
+            : '<span class="cls-chip" title="No weighted eligibility form on file yet">Weighted Eligibility</span>';
+        const chipsWithWeighted = chips + weChip;
+
         const outstanding = cols.filter(col =>
             !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
         const status = outstanding
@@ -2023,7 +2035,7 @@ function classroomChecklistHtml(rooms) {
             + '<div><div class="cls-name">' + esc(s.Last_Name + ', ' + s.First_Name) + progTag + '</div>'
             + (meta ? '<div class="cls-meta">' + meta + '</div>' : '') + '</div>'
             + status + '</div>'
-            + '<div class="cls-chips">' + chips + '</div></div>';
+            + '<div class="cls-chips">' + chipsWithWeighted + '</div></div>';
     }).join('');
 
     return pick + batchBlock + '<div class="cls-cards">' + cards + '</div>';
@@ -2033,6 +2045,30 @@ function classroomChecklistHtml(rooms) {
    clicks (which open the shared forms), and the Print All links. Delegated through
    data- attributes rather than inline onclick, so the handlers survive the CSP and
    there is no global leakage. */
+/* Open a child's weighted-eligibility document. Fetched WITH credentials (a plain link
+   would 401) and shown in a new tab. If it is an Office document the library can edit,
+   it opens in the OnlyOffice editor instead so it can be edited in place; a PDF just
+   opens to view. */
+function openWeightedDoc(rel) {
+    if (!rel) return;
+    var isOffice = /\.(docx?|xlsx?|pptx?)$/i.test(rel);
+    if (isOffice) {
+        window.open('/staff/office.html?path=' + encodeURIComponent(rel), '_blank', 'noopener');
+        return;
+    }
+    myFetch('/api/doc-file?path=' + encodeURIComponent(rel))
+        .then(function (res) {
+            if (!res.ok) throw new Error(res.status === 401 ? 'Not signed in' : ('HTTP ' + res.status));
+            return res.blob();
+        })
+        .then(function (blob) {
+            var u = URL.createObjectURL(blob);
+            window.open(u, '_blank', 'noopener');
+            setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+        })
+        .catch(function (e) { alert('Could not open the weighted eligibility form: ' + e.message); });
+}
+
 function wireClassroom() {
     const teacher = document.getElementById('clsTeacher');
     if (teacher && activeClsRoom != null) {
@@ -2051,6 +2087,9 @@ function wireClassroom() {
             else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
             else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
             else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
+            // The relPath can (in theory) contain a pipe, so rejoin the tail rather than
+            // taking parts[1] alone.
+            else if (parts[0] === 'weighted') openWeightedDoc(parts.slice(1).join('|'));
         });
     });
     // Collapse / expand the "Outstanding for this classroom" summary.
@@ -2860,7 +2899,7 @@ async function loadClassroomData() {
     try {
         initClassroomForms();
         const yq = url => url + (url.indexOf('?') === -1 ? '?' : '&') + 'year=' + encodeURIComponent(CLS_YEAR);
-        const [sRes, tRes, scrRes] = await Promise.all([
+        const [sRes, tRes, scrRes, , , , weRes] = await Promise.all([
             myFetch('/api/students'),
             myFetch(yq('/api/isbe-tracking')).catch(() => null),
             myFetch(yq('/api/screening-summary')).catch(() => null),
@@ -2870,7 +2909,10 @@ async function loadClassroomData() {
             // Uploaded evidence (parent ASQ/ASE questionnaires, report-card scans), so a
             // screening's two halves and a filed report card show from the first render.
             (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(CLS_YEAR, myFetch).catch(() => null) : Promise.resolve(),
-            (window.CofpForms) ? CofpForms.loadSignatures(CLS_YEAR).then(s => { CLS_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve()
+            (window.CofpForms) ? CofpForms.loadSignatures(CLS_YEAR).then(s => { CLS_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve(),
+            // Which children have a weighted-eligibility form on disk, so the pill can
+            // highlight when it exists and open it. Optional; absent = no pills lit.
+            myFetch('/api/weighted-eligibility-files').catch(() => null)
         ]);
         if (!sRes || !sRes.ok) throw new Error('students: HTTP ' + (sRes ? sRes.status : '—'));
         CLS_STUDENTS = await sRes.json();
@@ -2888,6 +2930,13 @@ async function loadClassroomData() {
                     if (!CLS_SCREENING[s.StudentId]) CLS_SCREENING[s.StudentId] = {};
                     CLS_SCREENING[s.StudentId][s.ScreeningType + '|' + s.Period] = s;
                 });
+            } catch (e) { /* additive */ }
+        }
+        CLS_WEIGHTED = {};
+        if (weRes && weRes.ok) {
+            try {
+                const we = await weRes.json();
+                CLS_WEIGHTED = (we && we.files) ? we.files : {};
             } catch (e) { /* additive */ }
         }
         clsState = 'ready';

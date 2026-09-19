@@ -7807,6 +7807,38 @@ ELSE
         });
     }
 
+    /* GET each active child's weighted-eligibility file path (internal - protected).
+       Returns { files: { <studentId>: <relPath> } } for children that have one on disk,
+       so the classroom view can show a "Weighted Eligibility" pill — highlighted when the
+       form exists — and open it. Walks the Child Files tree once and matches folders to
+       children by the trailing " - <Id>" suffix; looks in the Administrative subfolder
+       first, then loose in the child folder (pre-split seeds). */
+    if (req.method === 'GET' && url === '/api/weighted-eligibility-files') {
+        if (!checkClassroomAuth(req, res)) return;
+        const DOC_ROOT = findDocRoot();
+        if (!DOC_ROOT) return sendJSON(res, 200, { files: {} });
+        const base = path.join(DOC_ROOT, CHILD_FILES_ROOT_FOLDER);
+        let dirs = [];
+        try { dirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory()); } catch (e) { return sendJSON(res, 200, { files: {} }); }
+        const findForm = dir => {
+            const scan = p => {
+                try {
+                    const hit = fs.readdirSync(p).find(n => /weighted eligibility/i.test(n) && /\.(pdf|html?)$/i.test(n));
+                    return hit ? path.join(p, hit) : null;
+                } catch (e) { return null; }
+            };
+            return scan(path.join(dir, 'Administrative')) || scan(dir);
+        };
+        const files = {};
+        dirs.forEach(d => {
+            const m = d.name.match(/ - (\d+)$/);
+            if (!m) return;
+            const full = findForm(path.join(base, d.name));
+            if (full) files[m[1]] = path.relative(DOC_ROOT, full).replace(/\\/g, '/');
+        });
+        return sendJSON(res, 200, { files: files });
+    }
+
     /* GET a read-only audit of the per-child document folders (internal - protected).
        For each active child, reports whether their "Child Files/<child>" folder exists
        and whether a weighted-eligibility document is present (in the Administrative
