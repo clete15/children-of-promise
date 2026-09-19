@@ -304,6 +304,15 @@
         .sy-license.sy-due { background:#fffbeb;color:#92400e; }
         .sy-license a { margin-left:8px;font-weight:700; }
 
+        /* Child-first worklist: room groups and per-item chips. */
+        .sy-room-group { border-top:1px solid #f1f5f9; }
+        .sy-room-group:first-child { border-top:none; }
+        .sy-room-name { padding:8px 15px 2px;font-size:0.66rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#475569; }
+        .sy-chips { line-height:2; }
+        .sy-chip { display:inline-block;font-size:0.68rem;font-weight:700;padding:2px 9px;border-radius:11px;background:#eff6ff;color:#2563eb;border:1px solid #dbeafe;white-space:nowrap;text-decoration:none;margin:0 3px 3px 0; }
+        a.sy-chip:hover { background:#dbeafe;text-decoration:none; }
+        .sy-chip-noform { background:#f8fafc;color:#64748b;border-color:#e5e7eb;font-weight:600; }
+
         /* DCFS license panel inside CB2 */
         .lic-panel { border:1px solid #e5e7eb;border-radius:8px;padding:11px 13px;margin-top:10px;background:#f8fafc; }
         .lic-head { font-size:0.78rem;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:9px; }
@@ -3765,6 +3774,79 @@ function syBlock(title, sub, body) {
 
 function nameOf(s) { return s.Last_Name + ', ' + s.First_Name; }
 
+/* The onclick that opens the form behind a teacher checklist column, so the
+   child-first worklist can link each outstanding item straight to its form.
+   Mirrors the routing in openColumnForm(): permission slip, interview, the four
+   screenings, or a shared docForm overlay. Report-card columns have no form to
+   open (they are printed/sent), so they get no link. */
+function worklistOpenFor(col, studentId) {
+    if (col.field === 'PermissionSlip') return 'openPermissionSlip(' + studentId + ')';
+    if (col.field === 'ParentInterview') return 'openInterview(' + studentId + ')';
+    if (col.field === 'BegASQ') return "openScreening(" + studentId + ",'ASQ','Beginning')";
+    if (col.field === 'BegASE') return "openScreening(" + studentId + ",'ASE','Beginning')";
+    if (col.field === 'EndASQ') return "openScreening(" + studentId + ",'ASQ','End')";
+    if (col.field === 'EndASE') return "openScreening(" + studentId + ",'ASE','End')";
+    if (col.docForm) return "openDocForm('" + col.docForm + "'," + studentId + ')';
+    return null; // report cards: nothing to open, they are printed and sent
+}
+
+/* Child-first roll-up for the start-of-year view. The task-first block above is
+   for a director batching one job across the roster ("print all permission
+   slips"); this is for a teacher working one child's file at a time ("what does
+   Ava still need?"). Same done-test as outstandingByTask so the two can never
+   disagree: a teacher column is outstanding when its tracking flag is falsy.
+   Grouped by room (teachers own a room), youngest room first to match the grid. */
+function renderStartYearWorklist(program) {
+    const roster = activeRoster(program);
+    if (!roster.length) return '';
+    const teacherCols = visibleColumnsFor(program).filter(c => c.teacher);
+
+    // Per child: the teacher columns still outstanding, in checklist order.
+    const perChild = roster.map(s => {
+        const missing = teacherCols.filter(c => !(trackingData[s.Id] || {})[c.field]);
+        return { student: s, missing: missing };
+    }).filter(x => x.missing.length);
+
+    if (!perChild.length) {
+        return syBlock(program + ' \u2014 each child\u2019s remaining items', null,
+            '<div class="sy-done">Every teacher item is complete for all ' + roster.length
+            + ' active ' + program + ' children.</div>');
+    }
+
+    // Group by room, youngest room first (same ordering as the roster grid), and
+    // sort children within a room by name.
+    perChild.sort((a, b) => sortByRoomThenName(a.student, b.student));
+    const byRoom = [];
+    perChild.forEach(x => {
+        const room = getRoom(x.student.RoomNumber) || '\u2014';
+        let g = byRoom.find(r => r.room === room);
+        if (!g) { g = { room: room, kids: [] }; byRoom.push(g); }
+        g.kids.push(x);
+    });
+
+    const body = byRoom.map(g => {
+        const rows = g.kids.map(x => {
+            const chips = x.missing.map(c => {
+                const label = c.label.replace(/<br>/g, ' ');
+                const open = worklistOpenFor(c, x.student.Id);
+                return open
+                    ? '<a class="sy-chip" href="#" onclick="event.preventDefault();' + open + '">' + label + '</a>'
+                    : '<span class="sy-chip sy-chip-noform" title="Printed and sent home \u2014 no form to open here">' + label + '</span>';
+            }).join(' ');
+            return '<tr><td>' + nameOf(x.student) + '</td>'
+                + '<td class="sy-count">' + x.missing.length + '</td>'
+                + '<td class="sy-chips">' + chips + '</td></tr>';
+        }).join('');
+        return '<div class="sy-room-group"><div class="sy-room-name">' + g.room + '</div>'
+            + '<table class="sy-table"><thead><tr><th>Child</th><th>Left</th><th>Still needs</th></tr></thead><tbody>'
+            + rows + '</tbody></table></div>';
+    }).join('');
+
+    return syBlock(program + ' \u2014 each child\u2019s remaining items',
+        'For working one child\u2019s file at a time. Grouped by room, youngest first. Click an item to open its form. Report cards are printed and sent, so they have no link.',
+        body);
+}
+
 function renderStartYear() {
     const isCurrent = activeSchoolYear === getSchoolYear();
     const pfa = activeRoster('PFA').length;
@@ -3870,6 +3952,13 @@ function renderStartYear() {
             'Grouped by task, since these are done in batches. Counts are for active children only.',
             '<table class="sy-table"><thead><tr><th>Task</th><th>Outstanding</th><th>Children</th><th></th></tr></thead><tbody>'
             + rows + '</tbody></table>');
+    });
+
+    // 2b. Same outstanding work, but child-first — for a teacher finishing one
+    // file at a time rather than batching a task across the roster.
+    ['PFA', 'PI'].forEach(program => {
+        if (!activeRoster(program).length) return;
+        html += renderStartYearWorklist(program);
     });
 
     // 3. Program-level PICC items with nothing recorded.
