@@ -98,13 +98,15 @@
 
 <script src="/staff/auth.js"></script>
 <script>
-// Authorization is deliberately NOT set here. The browser attaches the
-// staff Basic credentials to same-origin requests by itself, so hardcoding
-// the password would ship it to every visitor and break on every rotation.
+/* Credentials come from the Staff Portal sign-in, never from source. Use
+   CofpAuth.headers() (the personal token AND the shared password when present),
+   not header() alone: after the move to personal session sign-in a signed-in user
+   holds a TOKEN and no stored shared password, so header() would be null and this
+   page sent NO auth at all — the 401 "not connected" symptom. headers() lets the
+   token ride along so the one sign-in at the front door carries through here. */
 function apiFetch(url, opts = {}) {
     opts.headers = Object.assign({ 'Content-Type': 'application/json' },
-        // Credentials come from the Staff Portal sign-in, never from source.
-        (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
         opts.headers || {});
     return fetch(url, opts);
 }

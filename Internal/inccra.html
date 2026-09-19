@@ -125,10 +125,13 @@
 // staff Basic credentials to same-origin requests by itself, so hardcoding
 // the password would ship it to every visitor and break on every rotation.
 
+/* Credentials come from the Staff Portal sign-in, never from source. Use
+   CofpAuth.headers() (token + shared password when present), not header() alone:
+   a personally-signed-in user holds a TOKEN and no stored shared password, so
+   header() would be null and this page would send NO auth (the 401 symptom). */
 function apiFetch(url, opts = {}) {
     opts.headers = Object.assign({ 'Content-Type': 'application/json' },
-        // Credentials come from the Staff Portal sign-in, never from source.
-        (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
         opts.headers || {});
     return fetch(url, opts);
 }

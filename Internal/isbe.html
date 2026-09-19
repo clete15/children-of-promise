@@ -944,13 +944,15 @@
 
 <script src="/staff/auth.js"></script>
 <script>
-// Authorization is deliberately NOT set here. The browser attaches the
-// staff Basic credentials to same-origin requests by itself, so hardcoding
-// the password would ship it to every visitor and break on every rotation.
+/* Credentials come from the Staff Portal sign-in, never from source. Use
+   CofpAuth.headers() (the personal token AND the shared password when present),
+   not header() alone: after the move to personal session sign-in a signed-in user
+   holds a TOKEN and no stored shared password, so header() would be null and this
+   page sent NO auth at all — the 401 "not connected" symptom. headers() lets the
+   token ride along so the one sign-in at the front door carries through here. */
 function apiFetch(url, opts = {}) {
     opts.headers = Object.assign({ 'Content-Type': 'application/json' },
-        // Credentials come from the Staff Portal sign-in, never from source.
-        (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
         opts.headers || {});
     return fetch(url, opts);
 }
@@ -1898,8 +1900,10 @@ function uploadIncome(studentId) {
         const key = (student.First_Name || '') + '|' + (student.Last_Name || '');
         const form = new FormData();
         form.append('file', file, file.name);
-        // Multipart: attach only the auth header and let the browser set the boundary.
-        const headers = (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {};
+        // Multipart: send the auth headers (token + shared password when present) and
+        // let the browser set the boundary. headers() carries no Content-Type, so it is
+        // safe for multipart; header() alone would send nothing for a token-only user.
+        const headers = (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {};
         try {
             const res = await fetch('/api/upload/income/' + encodeURIComponent(key), {
                 method: 'POST', headers: headers, body: form
@@ -2635,7 +2639,7 @@ async function uploadChildFile(studentId, field, kind, file) {
         + '&field=' + encodeURIComponent(field) + '&kind=' + encodeURIComponent(kind)
         + '&year=' + encodeURIComponent(activeSchoolYear),
         { method: 'POST',
-          headers: (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+          headers: (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
           body: form });
     var d = await res.json();
     if (!res.ok || !d.success) throw new Error((d && d.error) || ('HTTP ' + res.status));
@@ -4320,7 +4324,7 @@ function uploadEvidence(num, input) {
     // FormData sets its own multipart boundary, so no Content-Type here.
     fetch('/api/doc-upload?folder=' + encodeURIComponent(folder), {
         method: 'POST',
-        headers: (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        headers: (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
         body: fd
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
@@ -4491,7 +4495,7 @@ function uploadChildFile(input) {
     say('Uploading ' + name + '\u2026');
     fetch('/api/doc-upload?folder=' + encodeURIComponent(folder), {
         method: 'POST',
-        headers: (window.CofpAuth && CofpAuth.header()) ? { 'Authorization': CofpAuth.header() } : {},
+        headers: (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
         body: fd
     }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
       .then(function (res) {
