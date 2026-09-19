@@ -633,9 +633,14 @@ GO
 const ISBE_TRACKING_COLUMNS = [
     'PermissionSlip', 'ParentInterview', 'ProofOfIncome', 'EnterSIS',
     'BegASQ', 'BegASE', 'MidYearReport', 'EndASQ', 'EndASE', 'EndYearReport',
+    // Weighted Eligibility applies to BOTH programs (PFA priority/weighted enrollment
+    // and PI), so it has no program restriction on the roster.
+    'WeightedEligibility',
     // PICC per-child document forms (Prevention Initiative only).
-    'WeightedEligibility', 'ScreeningResultsShared',
+    'ScreeningResultsShared',
     'FamilyCenteredAssessment', 'FamilyGoalPlan', 'TransitionPlan', 'Referral',
+    // RemoveFromSIS is retained server-side but no longer shown on the roster (dropped
+    // on request as end-of-year housekeeping); it stays whitelisted for the tracking PUT.
     'RemoveFromSIS', 'GrantPerfReport'
 ];
 

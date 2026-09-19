@@ -2127,7 +2127,11 @@ async function printAllForColumn(field) {
     // which prints through its own copy of this in classroom-forms.js.)
     const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'))
         .sort(sortByRoomThenName);
-    const unchecked = roster.filter(s => !(trackingData[s.Id] || {})[field]);
+    // "Unchecked" here means not truly done, matching the footer's own count
+    // (ChildForms.isDone): a hand-ticked box with no saved form still needs a blank
+    // to work from, so it belongs in the print run.
+    const unchecked = roster.filter(s =>
+        !ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field]));
     if (!unchecked.length) { alert('All forms in this column are already completed!'); return; }
 
     const count = unchecked.length;
@@ -3625,11 +3629,15 @@ function activeRoster(program) {
 }
 
 // Per-task outstanding counts for one program.
+// A task is outstanding for a child when it is not truly done: ChildForms.isDone
+// treats a hand-ticked box with no form/scan behind it as NOT done, so this agrees
+// with the roster grid and the compliance rollup rather than the raw tracking bit.
 function outstandingByTask(program) {
     const roster = activeRoster(program);
     return visibleColumnsFor(program)
         .map(col => {
-            const missing = roster.filter(s => !(trackingData[s.Id] || {})[col.field]);
+            const missing = roster.filter(s =>
+                !ChildForms.isDone(s.Id, col.field, !!(trackingData[s.Id] || {})[col.field]));
             return { col: col, missing: missing, total: roster.length };
         })
         .filter(t => t.missing.length);
@@ -3657,7 +3665,10 @@ function beginningScreeningStatus(program) {
         const lateOne = isLateEnrollee(s, activeSchoolYear);
         ['BegASQ', 'BegASE'].forEach(field => {
             const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
-            const done = !!(trackingData[s.Id] || {})[field];
+            // A screening is done only when BOTH halves are on file (parent
+            // questionnaire + teacher's scored form); ChildForms.isDone enforces that,
+            // so a bare tick no longer counts the batch as complete.
+            const done = ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field]);
             if (lateOne) {
                 if (done) return;
                 const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
@@ -3793,8 +3804,9 @@ function worklistOpenFor(col, studentId) {
 /* Child-first roll-up for the start-of-year view. The task-first block above is
    for a director batching one job across the roster ("print all permission
    slips"); this is for a teacher working one child's file at a time ("what does
-   Ava still need?"). Same done-test as outstandingByTask so the two can never
-   disagree: a teacher column is outstanding when its tracking flag is falsy.
+   Ava still need?"). Uses ChildForms.isDone, the same done-test as the roster grid,
+   outstandingByTask and the compliance rollup, so a hand-ticked box with nothing
+   filed still shows as outstanding here and none of the views can disagree.
    Grouped by room (teachers own a room), youngest room first to match the grid. */
 function renderStartYearWorklist(program) {
     const roster = activeRoster(program);
@@ -3803,7 +3815,8 @@ function renderStartYearWorklist(program) {
 
     // Per child: the teacher columns still outstanding, in checklist order.
     const perChild = roster.map(s => {
-        const missing = teacherCols.filter(c => !(trackingData[s.Id] || {})[c.field]);
+        const missing = teacherCols.filter(c =>
+            !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field]));
         return { student: s, missing: missing };
     }).filter(x => x.missing.length);
 
