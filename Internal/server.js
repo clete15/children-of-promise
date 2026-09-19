@@ -1869,6 +1869,33 @@ function childFolder(studentId) {
     return { path: dir, rel: path.relative(DOC_ROOT, dir).replace(/\\/g, '/') };
 }
 
+/* A named subfolder inside a child's folder. Each child's documents are split into two:
+     "Teacher"        — the classroom-owned forms (permission slip, parent interview,
+                        screenings, report cards) — the My Classroom set.
+     "Administrative" — everything else required for every child: the child-file
+                        checklist documents (birth cert, physical, vision, hearing,
+                        emergency/release, proof of income, behaviour/transition plans)
+                        and the weighted eligibility form.
+   Both apply to EVERY enrolled child regardless of program; ISBE only monitors the
+   PI/PFA subset. Resolves the child folder first (creating it if needed), then the
+   subfolder. Returns { path, rel } or { error }. */
+const CHILD_SUBFOLDERS = ['Teacher', 'Administrative'];
+function childSubFolder(studentId, sub) {
+    const which = CHILD_SUBFOLDERS.indexOf(sub) !== -1 ? sub : 'Administrative';
+    const base = childFolder(studentId);
+    if (base.error) return base;
+    const dir = path.join(base.path, which);
+    try {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+            console.log('[DOC] created child subfolder ' + path.relative(findDocRoot() || '', dir));
+        }
+    } catch (e) {
+        return { error: 'Could not create the "' + which + '" folder: ' + e.message };
+    }
+    return { path: dir, rel: path.relative(findDocRoot() || '', dir).replace(/\\/g, '/') };
+}
+
 /* The weighted-eligibility criteria, server side, kept in step with the client copy
    in pi-forms.js (WEIGHTED_CRITERIA) and the public form's scoring. Only what the
    seeded starter document needs: the printed label, the points, and how to read a
@@ -1961,7 +1988,9 @@ function childRecordsForSeed(studentId) {
    would misstate what the family actually reported. */
 function seedWeightedEligibilityDoc(studentId, opts) {
     const fillBlanksAsNo = !!(opts && opts.fillBlanksAsNo);
-    const folder = childFolder(studentId);
+    // Weighted eligibility is an administrative document, so it lives in the child's
+    // Administrative subfolder alongside the other required-for-everyone paperwork.
+    const folder = childSubFolder(studentId, 'Administrative');
     if (folder.error) { console.warn('[SEED] ' + folder.error); return { ok: false, error: folder.error }; }
 
     let existing = [];
@@ -4567,12 +4596,12 @@ DROP TABLE #cf;`;
                 return sendJSON(res, 400, { error: 'Nothing was signed, so there is nothing to file' });
             }
 
-            /* Filed into the child's own permanent folder, not a monitoring-visit
-               folder. The visit folder only exists in a year the office has set up,
-               so filing a permission slip there failed for any year not yet created —
-               the error this fixes. A per-child document belongs to the child, and
-               childFolder creates the folder on demand, so this always succeeds. */
-            const folder = childFolder(studentId);
+            /* Filed into the child's Teacher subfolder — these are the classroom-owned
+               forms (permission slip, parent interview, screenings). Not a monitoring-
+               visit folder: that only exists in a year the office has set up, so filing
+               there failed for any year not yet created. childSubFolder creates the
+               folder on demand, so this always succeeds. */
+            const folder = childSubFolder(studentId, 'Teacher');
             if (folder.error) return sendJSON(res, 400, { error: folder.error });
 
             let pdf;
@@ -4841,10 +4870,12 @@ ELSE
         const childName = (child.Last_Name + ', ' + child.First_Name).trim();
         const year = resolveSchoolYear(qs.get('year'));
 
-        /* Into the child's own permanent folder, not the monitoring-visit folder, for
-           the same reason as the signed forms above: an uploaded scan belongs to the
-           child and must not fail to file because a visit for the year is not set up. */
-        const folder = childFolder(studentId);
+        /* Into the child's own permanent folder, split by responsibility: a ChildDoc
+           (birth cert, physical, income proof, etc.) is administrative; a screening
+           questionnaire or a report-card scan is a teacher/classroom artefact. Never a
+           monitoring-visit folder — an uploaded scan belongs to the child and must not
+           fail to file because a visit for the year is not set up. */
+        const folder = childSubFolder(studentId, isChildDoc ? 'Administrative' : 'Teacher');
         if (folder.error) return sendJSON(res, 400, { error: folder.error });
 
         let chunks = [];

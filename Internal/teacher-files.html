@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Files – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        .tf-layout { padding:20px;max-width:1200px;margin:0 auto; }
+        .tf-card { background:white;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);overflow:hidden; }
+        .tf-header { padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap; }
+        .tf-header h2 { font-size:1.05rem;font-weight:800;color:var(--text);margin:0; }
+        .tf-header .tf-sub { font-size:0.72rem;color:var(--text-muted); }
+        .tf-controls { margin-left:auto;display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
+        .tf-controls label { font-size:0.72rem;color:var(--text-muted); }
+        .tf-controls select { padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem; }
+        .tf-note { padding:10px 20px;font-size:0.74rem;color:#6b7280;border-bottom:1px solid var(--border);line-height:1.6; }
+        .tf-body { padding:16px 20px;overflow:auto;max-height:calc(100vh - 230px); }
+
+        .tf-child { border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff; }
+        .tf-child-top { display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px; }
+        .tf-child-name { font-size:0.95rem;font-weight:800;color:#1e293b; }
+        .tf-child-meta { font-size:0.72rem;color:#94a3b8; }
+        .tf-prog { font-size:0.6rem;font-weight:800;color:#2563eb;text-transform:uppercase;background:#eff6ff;padding:1px 6px;border-radius:8px; }
+        .tf-out { margin-left:auto;font-size:0.72rem;color:#b45309;font-weight:700; }
+        .tf-out.done { color:#166534; }
+        .tf-chips { display:flex;flex-wrap:wrap;gap:8px; }
+        .tf-chip { display:inline-flex;align-items:center;gap:6px;font-size:0.74rem;font-weight:600;
+            padding:6px 12px;border:1px solid #cbd5e1;border-radius:20px;color:#334155;background:#f8fafc;
+            text-decoration:none;cursor:pointer;transition:background 0.15s,border-color 0.15s; }
+        a.tf-chip:hover { background:#eef2ff;border-color:#93c5fd; }
+        .tf-chip.done { background:#dcfce7;border-color:#86efac;color:#166534; }
+        span.tf-chip { cursor:default; }
+        .tf-flag { font-size:0.62rem;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 6px;border-radius:8px; }
+        .tf-empty, .tf-loading { padding:28px;text-align:center;color:#94a3b8;font-size:0.85rem; }
+        .tf-roomgroup-title { font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;
+            color:#64748b;margin:14px 2px 8px; }
+    </style>
+</head>
+<body>
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Teacher Files &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="tf-layout">
+    <div class="tf-card">
+        <div class="tf-header">
+            <h2>📋 Teacher Files</h2>
+            <span class="tf-sub">Permission slips, parent interviews, screenings and report cards — every enrolled child.</span>
+            <div class="tf-controls">
+                <span><label for="tfRoom">Room</label>
+                    <select id="tfRoom" onchange="setRoom(this.value)"></select></span>
+                <span><label for="tfYear">School year</label>
+                    <select id="tfYear" onchange="setYear(this.value)"></select></span>
+            </div>
+        </div>
+        <div class="tf-note">
+            Open a form to complete and sign it on screen. Signed copies are filed into the child's
+            <strong>Teacher</strong> folder. Report cards are uploaded. Anyone can help keep these current.
+        </div>
+        <div class="tf-body" id="tfBody">
+            <div class="tf-loading">Loading…</div>
+        </div>
+    </div>
+</div>
+
+<!-- The shared per-child form machinery: pi-forms holds PICC specs, child-forms tells a
+     tick from a filed form, sign-pad is the signature canvas, classroom-forms is the
+     modals themselves. classroom-forms injects its own modal markup + CSS here. -->
+<script src="pi-forms.js"></script>
+<script src="child-forms.js"></script>
+<script src="sign-pad.js"></script>
+<script src="classroom-forms.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+/* Teacher Files — the My Classroom form set, but for EVERY enrolled child rather than
+   one room at a time. Reuses the shared CofpForms module for the modals and filing. */
+
+var students = [];
+var classrooms = [];
+var TRACKING = {};      // by StudentId
+var SCREENING = {};     // by StudentId -> "TYPE|Period"
+var SIGNATURES = {};    // by "studentId|Field|role"
+var activeYear = '';
+var activeRoom = 'all';
+var formsReady = false;
+
+function apiFetch(url, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' },
+        (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
+        opts.headers || {});
+    return fetch(url, opts);
+}
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function currentSchoolYear() {
+    var now = new Date();
+    var y = now.getFullYear();
+    var startYear = now.getMonth() >= 6 ? y : y - 1;
+    return startYear + '-' + (startYear + 1);
+}
+function sortByName(a, b) {
+    var cmp = (a.Last_Name || '').localeCompare(b.Last_Name || '', undefined, { sensitivity: 'base' });
+    return cmp !== 0 ? cmp : (a.First_Name || '').localeCompare(b.First_Name || '', undefined, { sensitivity: 'base' });
+}
+function getRoomName(roomNumber) {
+    var c = (classrooms || []).find(function (r) { return String(r.RoomNumber) === String(roomNumber); });
+    return c ? (c.Room || ('Room ' + roomNumber)) : (roomNumber || '\u2014');
+}
+
+// Every enrolled child is a teacher-files child (the whole point of this page), so
+// the roster is not scoped to PFA/PI the way the ISBE views are.
+function activeRoster() {
+    return students.filter(function (s) { return s.Active === 'Yes' || s.Active === 'YES'; });
+}
+function roomRoster(roomNumber) {
+    return activeRoster().filter(function (s) { return String(s.RoomNumber) === String(roomNumber); });
+}
+
+function initForms() {
+    if (formsReady || !window.CofpForms) return;
+    CofpForms.init({
+        getStudents: function () { return students; },
+        getClassrooms: function () { return classrooms; },
+        getTracking: function () { return TRACKING; },
+        getScreening: function () { return SCREENING; },
+        getSignatures: function () { return SIGNATURES; },
+        setSignatures: function (sig) { SIGNATURES = sig || {}; },
+        getYear: function () { return activeYear || currentSchoolYear(); },
+        apiFetch: function (url, opts) { return apiFetch(url, opts); },
+        ChildForms: window.ChildForms,
+        // After a save the module calls this so the grid re-renders with the new state.
+        refreshActiveView: function () { renderGrid(); },
+        // Print All is scoped to whatever is on screen (the selected room, or all).
+        classroomRoster: function () { return activeRoom === 'all' ? activeRoster() : roomRoster(activeRoom); }
+    });
+    formsReady = true;
+}
+
+function buildYearPicker() {
+    var sel = document.getElementById('tfYear');
+    var cur = currentSchoolYear();
+    var startY = parseInt(cur.split('-')[0]);
+    var opts = [];
+    for (var i = 1; i >= -2; i--) { var s = startY + i; opts.push(s + '-' + (s + 1)); }
+    sel.innerHTML = opts.map(function (y) {
+        return '<option value="' + y + '"' + (y === cur ? ' selected' : '') + '>' + y + '</option>';
+    }).join('');
+    activeYear = cur;
+}
+function buildRoomPicker() {
+    var sel = document.getElementById('tfRoom');
+    // Only rooms that actually have active children, plus "All".
+    var withKids = {};
+    activeRoster().forEach(function (s) { withKids[s.RoomNumber] = true; });
+    var rooms = (classrooms || []).filter(function (r) { return withKids[r.RoomNumber]; });
+    sel.innerHTML = '<option value="all">All rooms</option>'
+        + rooms.map(function (r) {
+            return '<option value="' + escapeHtml(String(r.RoomNumber)) + '">' + escapeHtml(r.Room || ('Room ' + r.RoomNumber)) + '</option>';
+        }).join('');
+}
+
+function setYear(y) { activeYear = y; reloadAndRender(); }
+function setRoom(r) { activeRoom = r; renderGrid(); }
+
+var COLS = null;   // from CofpForms.COLUMNS once the module is loaded
+
+function chipFor(s, col) {
+    var t = TRACKING[s.Id] || {};
+    var st = ChildForms.state(s.Id, col.field, !!t[col.field]);
+    var done = st === 'form' || st === 'tick' || st === 'unknown';
+    var label = col.label.replace(/<br>/g, ' ');
+    var flag = '';
+    if (st === 'tick-only') flag = '<span class="tf-flag" title="Ticked, but nothing saved here. If done on paper that is fine; otherwise open the form.">on paper?</span>';
+    if (st === 'partial' && ChildForms.isScreening && ChildForms.isScreening(col.field)) {
+        var haveQ = ChildForms.hasFile(s.Id, col.field, 'questionnaire');
+        var haveScored = ChildForms.hasForm(s.Id, col.field);
+        var need = !haveQ ? 'needs questionnaire' : !haveScored ? 'needs scoring' : 'in progress';
+        flag = '<span class="tf-flag">' + need + '</span>';
+    }
+    var inner = (done ? '\u2713 ' : '') + escapeHtml(label) + flag;
+
+    var act = '';
+    if (col.field === 'PermissionSlip') act = 'permission|' + s.Id;
+    else if (col.field === 'ParentInterview') act = 'interview|' + s.Id;
+    else if (col.field === 'BegASQ' || col.field === 'EndASQ') act = 'screening|' + s.Id + '|ASQ-3|' + (col.field === 'BegASQ' ? 'Beginning' : 'End');
+    else if (col.field === 'BegASE' || col.field === 'EndASE') act = 'screening|' + s.Id + '|ASQ:SE-2|' + (col.field === 'BegASE' ? 'Beginning' : 'End');
+    else if (col.field === 'MidYearReport' || col.field === 'EndYearReport') act = 'upload|' + s.Id + '|' + col.field;
+
+    var cls = 'tf-chip' + (done ? ' done' : '');
+    return act
+        ? '<a href="#" class="' + cls + '" data-act="' + escapeHtml(act) + '">' + inner + '</a>'
+        : '<span class="' + cls + '">' + inner + '</span>';
+}
+
+function childCard(s) {
+    var chips = COLS.map(function (col) { return chipFor(s, col); }).join('');
+    var outstanding = COLS.filter(function (col) {
+        return !ChildForms.isDone(s.Id, col.field, !!(TRACKING[s.Id] || {})[col.field]);
+    }).length;
+    var status = outstanding
+        ? '<span class="tf-out">' + outstanding + ' outstanding</span>'
+        : '<span class="tf-out done">\u2713 all done</span>';
+    var prog = (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI')
+        ? '<span class="tf-prog">' + s.PFA_PI_na + '</span>' : '';
+    return '<div class="tf-child">'
+        + '<div class="tf-child-top">'
+        + '<span class="tf-child-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + '</span>'
+        + prog
+        + '<span class="tf-child-meta">' + escapeHtml(getRoomName(s.RoomNumber)) + '</span>'
+        + status + '</div>'
+        + '<div class="tf-chips">' + chips + '</div></div>';
+}
+
+function renderGrid() {
+    var body = document.getElementById('tfBody');
+    COLS = window.CofpForms ? CofpForms.COLUMNS : [];
+    var roster = (activeRoom === 'all' ? activeRoster() : roomRoster(activeRoom)).slice().sort(function (a, b) {
+        var ra = parseInt(a.RoomNumber), rb = parseInt(b.RoomNumber);
+        var an = isNaN(ra) ? Infinity : ra, bn = isNaN(rb) ? Infinity : rb;
+        if (activeRoom === 'all' && an !== bn) return an - bn;
+        return sortByName(a, b);
+    });
+    if (!roster.length) {
+        body.innerHTML = '<div class="tf-empty">No enrolled children' + (activeRoom === 'all' ? '.' : ' in this room.') + '</div>';
+        return;
+    }
+
+    var html = '';
+    if (activeRoom === 'all') {
+        // Group by room, in room-number order, with a small heading per room.
+        var lastRoom = null;
+        roster.forEach(function (s) {
+            if (String(s.RoomNumber) !== String(lastRoom)) {
+                lastRoom = s.RoomNumber;
+                html += '<div class="tf-roomgroup-title">' + escapeHtml(getRoomName(s.RoomNumber)) + '</div>';
+            }
+            html += childCard(s);
+        });
+    } else {
+        html = roster.map(childCard).join('');
+    }
+    body.innerHTML = html;
+
+    // Wire chip clicks to the shared form module.
+    body.querySelectorAll('[data-act]').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+            e.preventDefault();
+            var parts = a.getAttribute('data-act').split('|');
+            if (parts[0] === 'interview') CofpForms.openInterview(parseInt(parts[1], 10));
+            else if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
+            else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
+            else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
+        });
+    });
+}
+
+async function reloadAndRender() {
+    document.getElementById('tfBody').innerHTML = '<div class="tf-loading">Loading…</div>';
+    var yq = function (u) { return u + (u.indexOf('?') === -1 ? '?' : '&') + 'year=' + encodeURIComponent(activeYear); };
+    try {
+        var results = await Promise.all([
+            apiFetch(yq('/api/isbe-tracking')).catch(function () { return null; }),
+            apiFetch(yq('/api/screening-summary')).catch(function () { return null; }),
+            (window.ChildForms && ChildForms.load) ? ChildForms.load(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
+            (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
+            (window.CofpForms) ? CofpForms.loadSignatures(activeYear).then(function (s) { SIGNATURES = s || {}; }).catch(function () { return null; }) : Promise.resolve()
+        ]);
+        var tRes = results[0], scrRes = results[1];
+        TRACKING = {};
+        if (tRes && tRes.ok) {
+            var tData = await tRes.json();
+            (Array.isArray(tData) ? tData : []).forEach(function (t) { TRACKING[t.StudentId] = t; });
+        }
+        SCREENING = {};
+        if (scrRes && scrRes.ok) {
+            try {
+                var scr = await scrRes.json();
+                if (Array.isArray(scr)) scr.forEach(function (s) {
+                    if (!SCREENING[s.StudentId]) SCREENING[s.StudentId] = {};
+                    SCREENING[s.StudentId][s.ScreeningType + '|' + s.Period] = s;
+                });
+            } catch (e) { /* additive */ }
+        }
+    } catch (e) { /* the grid still renders on tick-only data */ }
+    renderGrid();
+}
+
+async function init() {
+    if (!window.CofpAuth || !CofpAuth.whoAmI) { location.replace('/me'); return; }
+    var who = null;
+    try { who = await CofpAuth.whoAmI(); } catch (e) { who = null; }
+    if (!who) { location.replace('/me'); return; }
+
+    activeYear = currentSchoolYear();
+    initForms();
+    buildYearPicker();
+
+    try {
+        var [sRes, cRes] = await Promise.all([
+            apiFetch('/api/students'),
+            apiFetch('/api/classrooms')
+        ]);
+        students = sRes.ok ? await sRes.json() : [];
+        classrooms = cRes.ok ? await cRes.json() : [];
+        if (!Array.isArray(students)) students = [];
+        if (!Array.isArray(classrooms)) classrooms = [];
+    } catch (e) {
+        document.getElementById('tfBody').innerHTML = '<div class="tf-empty">Could not load the roster: ' + escapeHtml(e.message) + '</div>';
+        return;
+    }
+    buildRoomPicker();
+    await reloadAndRender();
+}
+
+init();
+</script>
+</body>
+</html>

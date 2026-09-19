@@ -465,9 +465,15 @@
             <!-- The My Classroom panel moved to My Page (staff-portal.html). -->
             <!-- Per-child document checklist grid (Item 2 / PI5) -->
             <div id="childFilesPanel" style="display:none;overflow:auto;flex:1;padding:20px;">
+                <!-- READ-ONLY VIEW. This is the PI/PFA monitoring view of the child-document
+                     checklist. Editing (checking on file / attaching scans) happens on the
+                     "Administrative Files" card on the staff dashboard, which covers every
+                     enrolled child. This grid simply reflects that data for the program. -->
                 <p style="font-size:0.78rem;color:#6b7280;margin-bottom:8px;">
-                    The required documents in each child's file. Check a box when the document is on file, or
-                    attach a scan — scans are filed into the child's folder. Both directors and teachers can attach.
+                    A read-only view of the required documents in each child's file, for this program.
+                    To check a document on file or attach a scan, use the
+                    <a href="/staff/admin-files.html" style="color:#2563eb;font-weight:700;">Administrative Files</a>
+                    page — it covers every enrolled child and is the source of truth for this grid.
                 </p>
                 <p style="font-size:0.72rem;color:#6b7280;margin-bottom:10px;">
                     <span style="display:inline-block;width:12px;height:12px;background:#dcfce7;border:1px solid #86efac;vertical-align:middle;"></span>
@@ -477,23 +483,6 @@
                     <span style="display:inline-block;width:12px;height:12px;background:#fff;border:1px solid #e5e7eb;vertical-align:middle;"></span>
                     Nothing on file
                 </p>
-                <div style="margin-bottom:12px;">
-                    <button class="picc-btn" id="cfCarryBtn" onclick="carryForwardChildDocs()"
-                        title="Copy last year's checked documents into this year as a starting point to confirm">
-                        &#8617; Copy last year's checkmarks forward
-                    </button>
-                    <span id="cfCarryStatus" style="font-size:0.72rem;color:#6b7280;margin-left:8px;"></span>
-                </div>
-                <!-- One-time catch-up: every enrolled child gets a document folder with a
-                     pre-filled weighted-eligibility form. New enrollments get this
-                     automatically; this button seeds the children already enrolled. -->
-                <div style="margin-bottom:12px;">
-                    <button class="picc-btn" id="cfBackfillBtn" onclick="backfillChildFolders()"
-                        title="Create a document folder and a pre-filled weighted eligibility form for every currently enrolled child. Safe to run more than once.">
-                        &#128193; Create child folders + weighted eligibility forms
-                    </button>
-                    <span id="cfBackfillStatus" style="font-size:0.72rem;color:#6b7280;margin-left:8px;"></span>
-                </div>
                 <div id="childFilesBody"></div>
             </div>
             <!-- Screening Follow-Up: children whose screening flagged a concern -->
@@ -1664,16 +1653,18 @@ async function renderChildFilesGrid(program) {
                box with no scan is "on paper" (amber) — a monitor cannot open it here; and
                nothing is blank. */
             var cellClass = file ? ' cf-filed' : (checked ? ' cf-paper' : '');
-            var box = '<label class="cf-check" title="Confirm this document is on file (paper copy)">'
-                + '<input type="checkbox"' + (checked ? ' checked' : '')
-                + ' onchange="toggleChildDoc(' + s.Id + ',\'' + doc.key + '\',this.checked)"></label>';
+            /* READ-ONLY here. This grid is a PI/PFA monitoring VIEW of the child-document
+               checklist; the editable source of truth is the "Administrative Files" card
+               on the staff dashboard (admin-files.html), which covers every child. So the
+               checkbox is disabled and there is no attach control — a filed scan can still
+               be opened, but nothing is changed from this page. */
+            var box = '<label class="cf-check" title="Read-only here \u2014 edit on the Administrative Files card">'
+                + '<input type="checkbox" disabled' + (checked ? ' checked' : '') + '></label>';
             var attach = file
                 ? '<a class="cf-attached" href="#" title="Filed: ' + escapeHtml(file.name || 'attached')
                     + ' \u2014 click to open" onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
                     + '\',\'' + escapeHtml(file.name || 'file').replace(/'/g, "\\'") + '\',true)">\uD83D\uDCCE</a>'
-                : '<label class="cf-attach" title="Attach a scan into the child\u2019s folder">\u2795'
-                    + '<input type="file" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"'
-                    + ' onchange="uploadChildDoc(' + s.Id + ',\'' + doc.key + '\',this)"></label>';
+                : '';
             return '<td class="cf-cell' + cellClass + '">' + box + attach + '</td>';
         }).join('');
         return '<tr><td class="cf-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + '</td>'
