@@ -4212,8 +4212,10 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
     }
 
     // POST run SQL (IT admin only — Clete, or the shared-password fallback)
+    // Portal actions (SQL / deploy / restart) are intentionally OPEN — no auth. The
+    // portal page's Deploy & Database panel is meant to work with no sign-in, so these
+    // three endpoints deliberately carry no checkITAdmin guard.
     if (req.method === 'POST' && url === '/api/sql') {
-        if (!checkITAdmin(req, res)) return;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             if (!d.query) return sendJSON(res, 400, { error: 'No query provided' });
@@ -4224,9 +4226,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         return;
     }
 
-    // POST deploy (IT admin only — Clete, or the shared-password fallback) — pulls code only, no restart
+    // POST deploy — pulls code only, no restart. OPEN (no auth): the portal Deploy button
+    // is meant to work with no sign-in.
     if (req.method === 'POST' && url === '/api/deploy') {
-        if (!checkITAdmin(req, res)) return;
         try {
             const out = execSync('"C:\\Program Files\\Git\\mingw64\\bin\\git.exe" fetch origin && "C:\\Program Files\\Git\\mingw64\\bin\\git.exe" reset --hard origin/master', { encoding: 'utf8', shell: 'cmd.exe', cwd: 'C:\\app' });
             console.log('[DEPLOY]', out);
@@ -4236,9 +4238,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         }
     }
 
-    // POST restart server (IT admin only — Clete, or the shared-password fallback)
+    // POST restart server. OPEN (no auth): the portal Restart button is meant to work
+    // with no sign-in.
     if (req.method === 'POST' && url === '/api/restart') {
-        if (!checkITAdmin(req, res)) return;
         sendJSON(res, 200, { success: true, message: 'Server restarting...' });
         setTimeout(() => {
             try {
