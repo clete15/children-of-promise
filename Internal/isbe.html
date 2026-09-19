@@ -484,6 +484,16 @@
                     </button>
                     <span id="cfCarryStatus" style="font-size:0.72rem;color:#6b7280;margin-left:8px;"></span>
                 </div>
+                <!-- One-time catch-up: every enrolled child gets a document folder with a
+                     pre-filled weighted-eligibility form. New enrollments get this
+                     automatically; this button seeds the children already enrolled. -->
+                <div style="margin-bottom:12px;">
+                    <button class="picc-btn" id="cfBackfillBtn" onclick="backfillChildFolders()"
+                        title="Create a document folder and a pre-filled weighted eligibility form for every currently enrolled child. Safe to run more than once.">
+                        &#128193; Create child folders + weighted eligibility forms
+                    </button>
+                    <span id="cfBackfillStatus" style="font-size:0.72rem;color:#6b7280;margin-left:8px;"></span>
+                </div>
                 <div id="childFilesBody"></div>
             </div>
             <!-- Screening Follow-Up: children whose screening flagged a concern -->
@@ -1689,6 +1699,32 @@ async function carryForwardChildDocs() {
         if (!d.success) throw new Error(d.error || 'failed');
         if (status) { status.textContent = 'Copied ' + d.copied + ' checkmark' + (d.copied === 1 ? '' : 's') + ' \u2014 review below.'; status.style.color = '#166534'; }
         renderChildFilesGrid(program);
+    } catch (e) {
+        if (status) { status.textContent = '\u26a0 ' + e.message; status.style.color = '#b91c1c'; }
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+/* One-time catch-up for children enrolled before per-child folders existed: create a
+   folder and a pre-filled weighted-eligibility form for every currently enrolled child.
+   New enrollments already do this automatically. Unrecorded criteria print as "No"
+   (handled server-side). Safe to run repeatedly — a child who already has a form is
+   skipped. */
+async function backfillChildFolders() {
+    var status = document.getElementById('cfBackfillStatus');
+    if (!confirm('Create a document folder and a pre-filled weighted eligibility form for '
+        + 'every currently enrolled child?\n\nNew enrollments already get this automatically; this '
+        + 'catches up children enrolled earlier. Any criterion not on record is filled in as \u201CNo\u201D. '
+        + 'Safe to run more than once.')) return;
+    var btn = document.getElementById('cfBackfillBtn');
+    btn.disabled = true;
+    if (status) { status.textContent = 'Working\u2026 this can take a moment.'; status.style.color = '#6b7280'; }
+    try {
+        var res = await apiFetch('/api/backfill-child-folders', { method: 'POST' });
+        var d = await res.json();
+        if (!d.success) throw new Error(d.error || 'failed');
+        if (status) { status.textContent = d.message; status.style.color = d.failed ? '#b45309' : '#166534'; }
     } catch (e) {
         if (status) { status.textContent = '\u26a0 ' + e.message; status.style.color = '#b91c1c'; }
     } finally {

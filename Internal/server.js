@@ -1282,6 +1282,12 @@ const STAFF_UPLOAD_MAX_BYTES = 15 * 1024 * 1024;
    people's pages on its own. Anything outside this list is reported to the
    director as unrecognised instead. */
 const STAFF_DOC_ROOT_FOLDER = 'Staff';
+
+/* The top folder that holds one permanent sub-folder per enrolled child. Sits beside
+   "Staff" in the library so a child's own documents (permission slip, weighted
+   eligibility form, screenings) have one home that does not depend on a monitoring
+   visit having been set up for the year. See childFolder(). */
+const CHILD_FILES_ROOT_FOLDER = 'Child Files';
 const STAFF_DOC_CATEGORIES = [
     ['Staff Transcripts', 'Transcript'],
     ['Staff Gateways Education Reports', 'Gateways education report'],
@@ -1790,6 +1796,254 @@ function childFilesFolder(program, year) {
     } catch (e) {
         return { error: 'Could not create a child files folder: ' + e.message };
     }
+}
+
+/* The one permanent folder that belongs to a single child, program-independent and
+   present from the day they are enrolled.
+
+   WHY THIS EXISTS, separate from childFilesFolder above: that one files evidence into
+   a monitoring-VISIT folder ("Birth to Three/2027 PI Monitoring Visit/Child or Family
+   Files"), which only exists in a year the office has set up, and refuses to guess the
+   year-folder name. So a plain permission slip could not be filed for a child until a
+   monitoring visit for that year had been created — the error the office actually hit.
+   A permission slip, a weighted-eligibility form and every other per-child document
+   belong to the CHILD, not to a visit, so they live here instead: one stable folder
+   per child under "Child Files", made when the child is enrolled and never dependent
+   on a visit being set up.
+
+   Named "<Last, First> - <Id>" so a person browsing the library reads the name, while
+   the trailing Id keeps two children of the same name apart and survives a rename.
+   Keyed on the Id: the folder is FOUND by its "- <Id>" suffix before a new one is made,
+   so renaming a child (or a typo fixed later) never orphans their existing documents.
+
+   Returns { path, rel } on success or { error } a person can act on. Creates the
+   folder if missing — unlike the visit folder, creating this is always correct. */
+function childFolder(studentId) {
+    const id = parseInt(studentId);
+    if (!id) return { error: 'A valid child id is required.' };
+    const DOC_ROOT = findDocRoot();
+    if (!DOC_ROOT) return { error: 'The document library is not reachable from the server.' };
+
+    // Authoritative name from the enrollment row, not the request, so the folder is
+    // named consistently however the child is reached.
+    const who = runSQLRows(
+        `SELECT ISNULL(Last_Name,'') AS Last_Name, ISNULL(First_Name,'') AS First_Name
+         FROM rptMasterEnrollment WHERE Id=${id}`);
+    if (!who.ok) return { error: who.error };
+    if (!who.rows.length) return { error: 'Child record not found.' };
+    const c = who.rows[0];
+    const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
+    const label = (safe(c.Last_Name) + ', ' + safe(c.First_Name)).replace(/^, |, $/g, '').trim()
+        || ('Student ' + id);
+    const folderName = label + ' - ' + id;
+
+    const base = path.join(DOC_ROOT, CHILD_FILES_ROOT_FOLDER);
+    try {
+        if (!fs.existsSync(base)) fs.mkdirSync(base, { recursive: true });
+    } catch (e) {
+        return { error: 'Could not create the "' + CHILD_FILES_ROOT_FOLDER + '" folder: ' + e.message };
+    }
+
+    // Find an existing folder for this child by its "- <Id>" suffix before making one,
+    // so a rename never leaves their documents behind in the old-named folder.
+    let dir = null;
+    try {
+        const suffix = ' - ' + id;
+        const match = fs.readdirSync(base, { withFileTypes: true })
+            .filter(d => d.isDirectory() && d.name.endsWith(suffix))
+            .map(d => path.join(base, d.name))[0];
+        if (match) dir = match;
+    } catch (e) { /* fall through to creating one */ }
+
+    if (!dir) {
+        dir = path.join(base, folderName);
+        try {
+            if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir);
+                console.log('[DOC] created child folder ' + path.relative(DOC_ROOT, dir));
+            }
+        } catch (e) {
+            return { error: 'Could not create the child folder: ' + e.message };
+        }
+    }
+    return { path: dir, rel: path.relative(DOC_ROOT, dir).replace(/\\/g, '/') };
+}
+
+/* The weighted-eligibility criteria, server side, kept in step with the client copy
+   in pi-forms.js (WEIGHTED_CRITERIA) and the public form's scoring. Only what the
+   seeded starter document needs: the printed label, the points, and how to read a
+   Yes / No / blank answer from the intake record — with a fallback to the enrollment
+   row for a child who has no pre-enrollment record.
+
+   Blank is deliberate and is NOT "No": "we never recorded it" and "the family said no"
+   are different answers, and only one is safe to pre-print on a compliance form. Staff
+   settle the blanks and sign the finished form; this file is only the starting point. */
+function seededYesNoOrBlank(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    if (s === 'yes' || s === 'y' || s === 'true' || s === '1') return 'Yes';
+    if (s === 'no' || s === 'n' || s === 'false' || s === '0') return 'No';
+    return '';
+}
+const SEEDED_WEIGHTED_CRITERIA = [
+    { label: 'Experiencing homelessness', picc: 'PI5.D', from: (i) => i.Homeless },
+    { label: 'Youth in Care (foster) or adopted', picc: 'PI5.E', from: (i, e) => i.FosterAdopted || (String(e.Category || '') === 'Foster' ? 'Yes' : '') },
+    { label: 'Enrolled in Early Intervention with an identified delay', picc: 'PI5.B', from: (i) => i.EarlyIntervention },
+    { label: 'Has an IEP', picc: 'PI5.B', from: (i, e) => i.IEP || e.IEP },
+    { label: 'Screening indicated a delay but no current Early Intervention referral', picc: 'PI5.C', from: (i) => i.ScreeningDelayNoEi },
+    { label: 'Family income at or below 50% of the federal poverty level', picc: 'PI5.F', from: (i) => i.IncomeBelow50Fpl },
+    { label: 'Parent or caregiver is an English language learner', picc: 'PI5.G', from: (i) => i.ParentEll },
+    { label: 'Primary language in the home is not English', from: (i) => i.NonEnglishHome },
+    { label: 'Receiving public benefits (WIC, Medicaid, SNAP, TANF)', from: (i, e) => (String(i.PublicBenefits || e.PublicBenefits || '').trim() ? 'Yes' : '') },
+    { label: 'Abuse or domestic violence history', from: (i) => i.AbuseHistory },
+    { label: 'Mental illness in the home', from: (i) => i.MentalIllness },
+    { label: 'DCFS involvement', from: (i) => i.DcfsInvolvement },
+    { label: 'Substance abuse in the home', from: (i) => i.SubstanceAbuse },
+    { label: 'Child cared for by someone other than a parent', from: (i) => i.CaregiverOther },
+    { label: 'Death in the immediate family', from: (i) => i.FamilyDeath },
+    { label: 'Low birth weight or failure to thrive', from: (i) => i.LowBirthWeight },
+    { label: 'Parent incarcerated', from: (i) => i.ParentIncarcerated },
+    { label: 'Teen parent', from: (i) => i.TeenParent },
+    { label: 'Parent without a high school diploma', from: (i) => i.NoHSDiploma },
+    { label: 'Child or parent born outside the United States', from: (i) => i.BornOutsideUS },
+    { label: 'Active military family', from: (i, e) => i.ActiveMilitary || seededYesNoOrBlank(e.Military) },
+    { label: 'Single-parent household', from: (i) => (String(i.LivingSituation || '') === 'Single Parent' ? 'Yes' : '') }
+];
+
+/* Reads a child's enrollment row and any linked pre-enrollment intake, and returns
+   the two records the seeded weighted-eligibility form is built from. The intake is
+   found by the stored PreEnrollmentId first, then by an exact name + DOB match for a
+   child enrolled before that link existed — the same rule /api/student-intake uses.
+   Returns { enroll, intake } where intake is {} when none is found. */
+function childRecordsForSeed(studentId) {
+    const id = parseInt(studentId);
+    const e = runSQLRows(
+        `SELECT ISNULL(First_Name,'') AS First_Name, ISNULL(Last_Name,'') AS Last_Name,
+                ISNULL(Birth_date,'') AS Birth_date, ISNULL(Start_Date,'') AS Start_Date,
+                ISNULL(PFA_PI_na,'') AS PFA_PI_na, ISNULL(Category,'') AS Category,
+                ISNULL(IEP,'') AS IEP, ISNULL(Military,'') AS Military,
+                ISNULL(HouseholdIncome,'') AS HouseholdIncome, ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
+                ISNULL(PublicBenefits,'') AS PublicBenefits, ISNULL(PreEnrollmentId,0) AS PreEnrollmentId
+         FROM rptMasterEnrollment WHERE Id=${id}`);
+    if (!e.ok || !e.rows.length) return { error: e.error || 'Child record not found.' };
+    const enroll = e.rows[0];
+
+    const cols = `ISNULL(p.Homeless,'') AS Homeless,ISNULL(p.FosterAdopted,'') AS FosterAdopted,ISNULL(p.IEP,'') AS IEP,`
+        + `ISNULL(p.EarlyIntervention,'') AS EarlyIntervention,ISNULL(p.AbuseHistory,'') AS AbuseHistory,ISNULL(p.MentalIllness,'') AS MentalIllness,`
+        + `ISNULL(p.DcfsInvolvement,'') AS DcfsInvolvement,ISNULL(p.SubstanceAbuse,'') AS SubstanceAbuse,ISNULL(p.CaregiverOther,'') AS CaregiverOther,`
+        + `ISNULL(p.FamilyDeath,'') AS FamilyDeath,ISNULL(p.LowBirthWeight,'') AS LowBirthWeight,ISNULL(p.ParentIncarcerated,'') AS ParentIncarcerated,`
+        + `ISNULL(p.TeenParent,'') AS TeenParent,ISNULL(p.NoHSDiploma,'') AS NoHSDiploma,ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,`
+        + `ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,ISNULL(p.LivingSituation,'') AS LivingSituation,`
+        + `ISNULL(p.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(p.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(p.PublicBenefits,'') AS PublicBenefits,`
+        + `ISNULL(p.ScreeningDelayNoEi,'') AS ScreeningDelayNoEi,ISNULL(p.ParentEll,'') AS ParentEll,ISNULL(p.IncomeBelow50Fpl,'') AS IncomeBelow50Fpl`;
+    const iq = runSQLRows(
+        `SELECT TOP 1 ${cols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${id}
+         UNION ALL
+         SELECT TOP 1 ${cols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p
+             ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date)
+             WHERE e.Id=${id} AND e.PreEnrollmentId IS NULL`);
+    const intake = (iq.ok && iq.rows.length) ? iq.rows[0] : {};
+    return { enroll, intake };
+}
+
+/* Writes the child's FIRST document — a pre-filled Weighted Eligibility Determination
+   — into their folder, as a PDF matching the signed forms the app files elsewhere.
+   Best-effort: enrollment must not fail because the library is momentarily unreachable,
+   so this logs and returns { ok:false } rather than throwing. It never overwrites: if a
+   weighted-eligibility starter is already there, it leaves it alone, because staff may
+   have begun working the blanks.
+
+   opts.fillBlanksAsNo — when true, a criterion with no recorded answer prints "No"
+   instead of an empty pair of boxes. Used only by the one-time backfill of children
+   already enrolled: for them the form is a monitoring artefact after the fact, not a
+   live intake to be completed, so an unanswered criterion is treated as "No" to make a
+   finished document. A NEW enrollment leaves unknowns blank, because that form is a
+   live compliance form staff still complete and sign, and defaulting to "No" there
+   would misstate what the family actually reported. */
+function seedWeightedEligibilityDoc(studentId, opts) {
+    const fillBlanksAsNo = !!(opts && opts.fillBlanksAsNo);
+    const folder = childFolder(studentId);
+    if (folder.error) { console.warn('[SEED] ' + folder.error); return { ok: false, error: folder.error }; }
+
+    let existing = [];
+    try { existing = fs.readdirSync(folder.path); } catch (e) { /* new folder */ }
+    if (existing.some(n => /weighted eligibility/i.test(n))) {
+        return { ok: true, skipped: true };
+    }
+
+    const recs = childRecordsForSeed(studentId);
+    if (recs.error) { console.warn('[SEED] ' + recs.error); return { ok: false, error: recs.error }; }
+    const { enroll, intake } = recs;
+    const program = String(enroll.PFA_PI_na).toUpperCase() === 'PFA' ? 'PFA' : 'PI';
+    const childName = (enroll.First_Name + ' ' + enroll.Last_Name).trim();
+
+    const rows = [
+        { label: 'Child', value: childName || ('Student ' + studentId) },
+        { label: 'Date of birth', value: enroll.Birth_date || '\u2014' },
+        { label: 'Enrollment date', value: enroll.Start_Date || '\u2014' },
+        { label: 'Program', value: program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative' },
+        { label: 'Household size', value: (intake.HouseholdSize || enroll.HouseholdSize || '\u2014') },
+        { label: 'Household income', value: (intake.HouseholdIncome || enroll.HouseholdIncome || '\u2014') }
+    ];
+
+    const criteriaLines = SEEDED_WEIGHTED_CRITERIA.map(c => {
+        let ans = '';
+        try { ans = seededYesNoOrBlank(c.from(intake, enroll)); } catch (e) { ans = ''; }
+        if (!ans && fillBlanksAsNo) ans = 'No';
+        const box = ans === 'Yes' ? '[X] Yes' : ans === 'No' ? '[ ] Yes   [X] No' : '[ ] Yes   [ ] No';
+        return (c.picc ? '(' + c.picc + ') ' : '') + c.label + '  —  ' + box;
+    });
+
+    const blocks = [
+        { heading: 'Weighted eligibility criteria (PICC PI5.A / PI5.B\u2013G)',
+          text: fillBlanksAsNo
+              ? 'Pre-filled from the family\u2019s pre-enrollment submission where one exists; '
+                + 'any criterion not recorded at intake is shown as \u201CNo\u201D. Generated for a '
+                + 'child already enrolled — review and update before relying on it.'
+              : 'Pre-filled from the family\u2019s pre-enrollment submission where one exists. '
+                + 'Blank items were not recorded at intake and must be settled by staff before signing. '
+                + 'Boxes shown below reflect the pre-fill; confirm each before this form is signed.' },
+        { text: criteriaLines.join('\n') },
+        { heading: 'Determination (PICC PI5.H)',
+          text: 'Eligibility determination: ______________________________     Total weighted points: __________' },
+        { heading: 'Income verification (PICC PI5.J)',
+          text: 'Income verified by: ____________________________     Date verified: ______________' }
+    ];
+
+    let pdf;
+    try {
+        pdf = buildFormPdf({
+            title: 'Weighted Eligibility Determination',
+            subtitle: 'Children of Promise LLC \u2014 '
+                + (program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative')
+                + (fillBlanksAsNo ? ' \u2014 pre-filled from records' : ' \u2014 pre-filled at enrollment, not yet signed'),
+            rows: rows,
+            blocks: blocks,
+            signatures: [],
+            footer: (fillBlanksAsNo
+                ? 'Generated for an already-enrolled child on ' + new Date().toLocaleString('en-US')
+                    + '. Unrecorded criteria are shown as \u201CNo\u201D; review before relying on it.'
+                : 'Generated at enrollment on ' + new Date().toLocaleString('en-US')
+                    + '. This is a draft to be reviewed, completed and signed.')
+        });
+    } catch (e) {
+        console.error('[SEED] could not build weighted eligibility PDF: ' + e.message);
+        return { ok: false, error: e.message };
+    }
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
+    const base = (safe(childName) || ('Student ' + studentId)) + ' - Weighted Eligibility - ' + stamp;
+    let target = path.join(folder.path, base + '.pdf');
+    let n = 2;
+    while (fs.existsSync(target) && n < 50) { target = path.join(folder.path, base + ' (' + n + ').pdf'); n++; }
+    try {
+        fs.writeFileSync(target, pdf);
+        console.log('[SEED] weighted eligibility -> ' + path.relative(findDocRoot() || '', target));
+    } catch (e) {
+        console.error('[SEED] could not write weighted eligibility PDF: ' + e.message);
+        return { ok: false, error: e.message };
+    }
+    return { ok: true, path: target, rel: path.relative(findDocRoot() || '', target).replace(/\\/g, '/') };
 }
 
 // ── Captured signatures ──
@@ -3784,10 +4038,39 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             const preId = parseInt(d.preEnrollmentId);
             const preIdVal = isNaN(preId) ? 'NULL' : preId;
             const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='PreEnrollmentId') ALTER TABLE rptMasterEnrollment ADD PreEnrollmentId INT NULL;
-                INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,HouseholdSize,PublicBenefits,ProofOfIncomeUploaded,PreEnrollmentId) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${parseInt(d.householdSize)||0},${esc(d.publicBenefits)},0,${preIdVal})`;
+                INSERT INTO rptMasterEnrollment (Last_Name,First_Name,Birth_date,Start_Date,City_Town,Days_Old,RoomNumber,Monday,Tuesday,Wednesday,Thursday,Friday,Active,Category,PFA_PI_na,F_R_P_Food,IEP,Military,HouseholdIncome,HouseholdSize,PublicBenefits,ProofOfIncomeUploaded,PreEnrollmentId) VALUES (${esc(d.lastName)},${esc(d.firstName)},${esc(d.birthDate)},${esc(d.startDate)},${esc(d.cityTown)},${esc(d.daysOld)},${esc(d.roomNumber)},${d.monday?1:0},${d.tuesday?1:0},${d.wednesday?1:0},${d.thursday?1:0},${d.friday?1:0},${esc(d.active)},${esc(d.category)},${esc(d.pfaPiNa)},${esc(frpFood)},${esc(d.iep)},${esc(d.military)},${esc(d.householdIncome)},${parseInt(d.householdSize)||0},${esc(d.publicBenefits)},0,${preIdVal});
+                /* Return the new row's Id in the SAME batch as the INSERT. SCOPE_IDENTITY
+                   is connection-scoped and runSQL opens a fresh sqlcmd connection each
+                   call, so a separate query would read NULL — it must be selected here. */
+                SELECT CAST(SCOPE_IDENTITY() AS INT) AS NewId;`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             if (!r.data.includes('rows affected')) return sendJSON(res, 500, { error: 'No rows written: ' + r.data });
+
+            /* The child is now officially enrolled off the waiting list, so give them
+               their permanent document folder and drop in their first document — the
+               pre-filled weighted eligibility form. Best-effort and non-fatal: a child
+               is enrolled whether or not the library is reachable this instant, and the
+               folder is created lazily anyway the next time anything files for them, so
+               a failure here must not turn a successful enrollment into an error. The
+               new row's Id is read back with SCOPE_IDENTITY so the seed targets the
+               child just inserted. */
+            try {
+                // The trailing SELECT prints the new Id as a bare number line in the
+                // sqlcmd output; pick the first standalone integer after the insert.
+                const idLine = String(r.data || '').split('\n')
+                    .map(l => l.trim()).find(l => /^\d+$/.test(l));
+                const newId = idLine ? parseInt(idLine) : 0;
+                if (newId) {
+                    const seeded = seedWeightedEligibilityDoc(newId);
+                    if (!seeded.ok) console.warn('[ENROLL] child folder/seed deferred: ' + (seeded.error || 'unknown'));
+                } else {
+                    console.warn('[ENROLL] could not read new student id; folder will be created on first filing');
+                }
+            } catch (e) {
+                console.warn('[ENROLL] seed step skipped: ' + e.message);
+            }
+
             sendJSON(res, 200, { success: true });
         });
         return;
@@ -4275,7 +4558,12 @@ DROP TABLE #cf;`;
                 return sendJSON(res, 400, { error: 'Nothing was signed, so there is nothing to file' });
             }
 
-            const folder = childFilesFolder(program, year);
+            /* Filed into the child's own permanent folder, not a monitoring-visit
+               folder. The visit folder only exists in a year the office has set up,
+               so filing a permission slip there failed for any year not yet created —
+               the error this fixes. A per-child document belongs to the child, and
+               childFolder creates the folder on demand, so this always succeeds. */
+            const folder = childFolder(studentId);
             if (folder.error) return sendJSON(res, 400, { error: folder.error });
 
             let pdf;
@@ -4521,7 +4809,10 @@ ELSE
         const childName = (child.Last_Name + ', ' + child.First_Name).trim();
         const year = resolveSchoolYear(qs.get('year'));
 
-        const folder = childFilesFolder(program, year);
+        /* Into the child's own permanent folder, not the monitoring-visit folder, for
+           the same reason as the signed forms above: an uploaded scan belongs to the
+           child and must not fail to file because a visit for the year is not set up. */
+        const folder = childFolder(studentId);
         if (folder.error) return sendJSON(res, 400, { error: folder.error });
 
         let chunks = [];
@@ -7414,6 +7705,43 @@ ELSE
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         sendJSON(res, 200, { success: true, message: `All F/R/P values recalculated using ${yr}-${yr + 1} thresholds` });
         return;
+    }
+
+    /* POST one-time backfill: a folder for every currently-enrolled child, each with a
+       pre-filled weighted-eligibility form in it (internal - protected).
+
+       New enrollments get their folder and form automatically from now on; this catches
+       up the children who were already enrolled before that existed. Unrecorded criteria
+       are printed as "No" (fillBlanksAsNo) because for an already-enrolled child the form
+       is an after-the-fact monitoring artefact, not a live intake to complete — the office
+       is monitored on HAVING one for PI and PFA, and having a finished document on file is
+       the point. Every child gets a folder regardless of program; the form is only
+       relevant to PI/PFA but a copy on file is harmless and keeps the folders uniform.
+
+       Idempotent: seedWeightedEligibilityDoc skips a child who already has a weighted-
+       eligibility file, so running this twice does not duplicate anything. */
+    if (req.method === 'POST' && url === '/api/backfill-child-folders') {
+        if (!checkAuth(req, res)) return;
+        const list = runSQLRows(
+            `SELECT Id FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' ORDER BY Id`);
+        if (!list.ok) return sendJSON(res, 500, { error: list.error });
+        const ids = list.rows.map(r => parseInt(r.Id)).filter(Boolean);
+        let created = 0, skipped = 0, failed = 0;
+        const errors = [];
+        for (const id of ids) {
+            let out;
+            try { out = seedWeightedEligibilityDoc(id, { fillBlanksAsNo: true }); }
+            catch (e) { out = { ok: false, error: e.message }; }
+            if (out && out.ok && out.skipped) skipped++;
+            else if (out && out.ok) created++;
+            else { failed++; if (errors.length < 10) errors.push('#' + id + ': ' + (out && out.error || 'unknown')); }
+        }
+        console.log(`[BACKFILL] children=${ids.length} created=${created} skipped=${skipped} failed=${failed}`);
+        return sendJSON(res, 200, {
+            success: true, total: ids.length, created, skipped, failed,
+            errors: errors.length ? errors : undefined,
+            message: `${ids.length} enrolled children: ${created} new form(s), ${skipped} already had one, ${failed} failed.`
+        });
     }
 
     // GET management reports (internal - protected)
