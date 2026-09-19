@@ -517,8 +517,13 @@ function checkAuth() {
         location.replace('/me');
         return;
     }
-    // Shared admin password already held — straight into the dashboard.
-    if (CofpAuth.stored && CofpAuth.stored()) showPortal();
+    /* The password overlay is ALWAYS shown here, even when the shared admin password
+       is already saved on this browser. A saved password used to send you straight
+       into the dashboard with no prompt at all — which is what "it just goes in" was.
+       The password is still remembered (the browser prefills the field via
+       autocomplete, and verify() on submit refreshes it), so signing in is one click;
+       but it is a deliberate click every visit rather than a silent pass-through.
+       Leaving the overlay up is the whole gate — showPortal() runs only on submit. */
 }
 
 function showPortal() {
