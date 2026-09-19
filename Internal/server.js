@@ -4524,6 +4524,12 @@ ELSE
 `;
                 // A report card is the whole requirement, so filing it ticks the box.
                 if (kind === 'report') sql += trackingTickSQL(studentId, year, field);
+                // Proof of income also lives on the enrollment record; a scan here is the
+                // real evidence, so mark the flag and remember the file so the roster's
+                // ProofOfIncome column and the dashboard counts agree with this grid.
+                if (isChildDoc && kind === 'incomeproof') {
+                    sql += `\nUPDATE rptMasterEnrollment SET ProofOfIncomeUploaded=1,ProofOfIncomeFile=${esc(fileName)} WHERE Id=${studentId};`;
+                }
                 const w = runSQL(sql);
                 if (!w.ok) {
                     return sendJSON(res, 500, {
@@ -4579,14 +4585,58 @@ ELSE
             const year = resolveSchoolYear(d.year);
             const onFile = (d.onFile === true || d.onFile === 1 || d.onFile === '1') ? 1 : 0;
             const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} AND DocKey=${esc(docKey)}`;
-            const sql = childDocChecklistEnsureSQL()
+            let sql = childDocChecklistEnsureSQL()
                 + `IF EXISTS (SELECT 1 FROM ChildDocChecklist WHERE ${where})
     UPDATE ChildDocChecklist SET OnFile=${onFile},UpdatedAt=GETDATE() WHERE ${where}
 ELSE
     INSERT INTO ChildDocChecklist (StudentId,SchoolYear,DocKey,OnFile) VALUES (${studentId},${esc(year)},${esc(docKey)},${onFile});`;
+            /* Proof of income has a second home on the enrollment record
+               (ProofOfIncomeUploaded), read by the roster's ProofOfIncome column and the
+               dashboard counts. Keep the two in step so the grid and the roster can never
+               disagree: checking the income row here sets that flag too. */
+            if (docKey === 'incomeproof') {
+                sql += `\nUPDATE rptMasterEnrollment SET ProofOfIncomeUploaded=${onFile} WHERE Id=${studentId};`;
+            }
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
+        });
+    }
+
+    /* Carry a returning child's document-checklist forward: copy the newest EARLIER
+       year's "on file" flags into the year in view, as a starting point staff confirm.
+       Only fills rows the current year does not already have, so it never overwrites
+       work already done this year. Scans are NOT copied — a scan is that year's
+       evidence. POST { year, program } (program limits it to that roster's children). */
+    if (req.method === 'POST' && url === '/api/child-doc-checklist/carry-forward') {
+        if (!checkClassroomAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const year = resolveSchoolYear(d.year);
+            const program = d.program === 'PFA' ? 'PFA' : 'PI';
+            /* For each active child in the program, find their latest prior-year rows and
+               insert any the current year is missing. Done in SQL so it is one round trip.
+               The prior year is picked per child (MAX(SchoolYear) < current). */
+            const sql = childDocChecklistEnsureSQL()
+                + `;WITH latest AS (
+    SELECT c.StudentId, c.DocKey, c.OnFile,
+           ROW_NUMBER() OVER (PARTITION BY c.StudentId, c.DocKey ORDER BY c.SchoolYear DESC) rn
+    FROM ChildDocChecklist c
+    JOIN rptMasterEnrollment e ON e.Id = c.StudentId
+    WHERE c.SchoolYear < ${esc(year)} AND (e.Active='Yes' OR e.Active='YES')
+      AND ISNULL(e.PFA_PI_na,'') = ${esc(program)}
+)
+INSERT INTO ChildDocChecklist (StudentId, SchoolYear, DocKey, OnFile)
+SELECT l.StudentId, ${esc(year)}, l.DocKey, l.OnFile
+FROM latest l
+WHERE l.rn = 1 AND l.OnFile = 1
+  AND NOT EXISTS (SELECT 1 FROM ChildDocChecklist cur
+                  WHERE cur.StudentId = l.StudentId AND cur.SchoolYear = ${esc(year)} AND cur.DocKey = l.DocKey);
+SELECT @@ROWCOUNT AS Copied;`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            const m = (r.data || '').match(/(\d+)/);
+            sendJSON(res, 200, { success: true, copied: m ? parseInt(m[1], 10) : 0 });
         });
     }
 
@@ -4594,9 +4644,18 @@ ELSE
     if (req.method === 'GET' && url.startsWith('/api/parent-interview/')) {
         if (!checkClassroomAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
-        const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
+        const iqs = new URLSearchParams(req.url.split('?')[1] || '');
+        const year = resolveSchoolYear(iqs.get('year'));
+        /* ?priorTo=<year> returns the newest interview from an EARLIER year, for
+           carrying a returning child's answers forward as a starting point rather than
+           a blank form. SchoolYear is stored "YYYY-YYYY", so a plain string comparison
+           orders chronologically. Otherwise this returns the interview for `year`. */
+        const priorTo = iqs.get('priorTo') ? resolveSchoolYear(iqs.get('priorTo')) : null;
+        const whereYear = priorTo
+            ? `SchoolYear < ${esc(priorTo)} ORDER BY SchoolYear DESC`
+            : `SchoolYear=${esc(year)}`;
         const sql = parentInterviewEnsureSQL()
-            + `SELECT Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')} FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}`;
+            + `SELECT ${priorTo ? 'TOP 1 ' : ''}Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')} FROM ParentInterviews WHERE StudentId=${studentId} AND ${whereYear}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')

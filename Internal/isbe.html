@@ -26,7 +26,8 @@
         .cf-grid tr:nth-child(even) td { background:#f8fafc; }
         .cf-grid tr:nth-child(even) td.cf-name { background:#f8fafc; }
         .cf-cell { min-width:70px; }
-        .cf-cell.cf-on { background:#dcfce7 !important; }
+        .cf-cell.cf-filed { background:#dcfce7 !important; }   /* scan attached: filed evidence */
+        .cf-cell.cf-paper { background:#fef3c7 !important; }   /* checked only: on paper, no scan */
         .cf-check input { width:16px;height:16px;accent-color:#16a34a;cursor:pointer;vertical-align:middle; }
         .cf-attach, .cf-attached { display:inline-block;margin-left:6px;cursor:pointer;text-decoration:none;font-size:0.9rem; }
         .cf-attach:hover { opacity:0.7; }
@@ -455,11 +456,25 @@
             <!-- The My Classroom panel moved to My Page (staff-portal.html). -->
             <!-- Per-child document checklist grid (Item 2 / PI5) -->
             <div id="childFilesPanel" style="display:none;overflow:auto;flex:1;padding:20px;">
-                <p style="font-size:0.78rem;color:#6b7280;margin-bottom:14px;">
+                <p style="font-size:0.78rem;color:#6b7280;margin-bottom:8px;">
                     The required documents in each child's file. Check a box when the document is on file, or
-                    attach a scan — either way it counts as evidence, and scans are filed into the child's folder.
-                    Both directors and teachers can attach.
+                    attach a scan — scans are filed into the child's folder. Both directors and teachers can attach.
                 </p>
+                <p style="font-size:0.72rem;color:#6b7280;margin-bottom:10px;">
+                    <span style="display:inline-block;width:12px;height:12px;background:#dcfce7;border:1px solid #86efac;vertical-align:middle;"></span>
+                    Scan filed (a monitor can open it here) &nbsp;&nbsp;
+                    <span style="display:inline-block;width:12px;height:12px;background:#fef3c7;border:1px solid #fcd34d;vertical-align:middle;"></span>
+                    Checked as on paper (no scan) &nbsp;&nbsp;
+                    <span style="display:inline-block;width:12px;height:12px;background:#fff;border:1px solid #e5e7eb;vertical-align:middle;"></span>
+                    Nothing on file
+                </p>
+                <div style="margin-bottom:12px;">
+                    <button class="picc-btn" id="cfCarryBtn" onclick="carryForwardChildDocs()"
+                        title="Copy last year's checked documents into this year as a starting point to confirm">
+                        &#8617; Copy last year's checkmarks forward
+                    </button>
+                    <span id="cfCarryStatus" style="font-size:0.72rem;color:#6b7280;margin-left:8px;"></span>
+                </div>
                 <div id="childFilesBody"></div>
             </div>
             <!-- Screening Follow-Up: children whose screening flagged a concern -->
@@ -1604,19 +1619,30 @@ async function renderChildFilesGrid(program) {
     var rows = roster.map(function (s) {
         var cells = CHILD_DOCS.map(function (doc) {
             var checked = !!(docChecklist[String(s.Id)] || {})[doc.key];
+            // Proof of income is also tracked on the enrollment record; reflect that
+            // legacy flag so a child marked there shows as on-file here without a
+            // separate checklist row. (Saving here writes both, keeping them in step.)
+            if (doc.key === 'incomeproof' && !checked
+                && (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1)) {
+                checked = true;
+            }
             var file = childDocFile(s.Id, doc.key);
-            var onFile = checked || !!file;
-            var box = '<label class="cf-check" title="On file">'
+            /* Three states, matching the "ticked, no form saved" distinction used on the
+               roster: a scan attached is the strongest evidence (green "filed"); a checked
+               box with no scan is "on paper" (amber) — a monitor cannot open it here; and
+               nothing is blank. */
+            var cellClass = file ? ' cf-filed' : (checked ? ' cf-paper' : '');
+            var box = '<label class="cf-check" title="Confirm this document is on file (paper copy)">'
                 + '<input type="checkbox"' + (checked ? ' checked' : '')
                 + ' onchange="toggleChildDoc(' + s.Id + ',\'' + doc.key + '\',this.checked)"></label>';
             var attach = file
-                ? '<a class="cf-attached" href="#" title="' + escapeHtml(file.name || 'attached')
-                    + '" onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
+                ? '<a class="cf-attached" href="#" title="Filed: ' + escapeHtml(file.name || 'attached')
+                    + ' \u2014 click to open" onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
                     + '\',\'' + escapeHtml(file.name || 'file').replace(/'/g, "\\'") + '\',true)">\uD83D\uDCCE</a>'
                 : '<label class="cf-attach" title="Attach a scan into the child\u2019s folder">\u2795'
                     + '<input type="file" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"'
                     + ' onchange="uploadChildDoc(' + s.Id + ',\'' + doc.key + '\',this)"></label>';
-            return '<td class="cf-cell' + (onFile ? ' cf-on' : '') + '">' + box + attach + '</td>';
+            return '<td class="cf-cell' + cellClass + '">' + box + attach + '</td>';
         }).join('');
         return '<tr><td class="cf-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + '</td>'
             + '<td class="cf-room">' + escapeHtml(getRoomName(s.RoomNumber)) + '</td>' + cells + '</tr>';
@@ -1629,6 +1655,34 @@ async function renderChildFilesGrid(program) {
 function getRoomName(roomNumber) {
     var c = (classrooms || []).find(function (r) { return String(r.RoomNumber) === String(roomNumber); });
     return c ? (c.Room || ('Room ' + roomNumber)) : (roomNumber || '\u2014');
+}
+
+/* Copy last year's checked documents into the year in view, so a returning child's
+   grid starts from where it ended rather than blank. Only fills gaps (never overwrites
+   this year's work), and does not copy scans (each year's scan is its own evidence).
+   Staff still confirm each carried-forward checkmark. */
+async function carryForwardChildDocs() {
+    var program = document.getElementById('btnPFAChildFiles').classList.contains('active') ? 'PFA' : 'PI';
+    var status = document.getElementById('cfCarryStatus');
+    if (!confirm('Copy last year\u2019s checked documents into ' + activeSchoolYear + ' for returning '
+        + program + ' children?\n\nThis only fills documents not already marked this year, and does not '
+        + 'copy scans. Please review each child after.')) return;
+    var btn = document.getElementById('cfCarryBtn');
+    btn.disabled = true;
+    if (status) { status.textContent = 'Copying\u2026'; status.style.color = '#6b7280'; }
+    try {
+        var res = await apiFetch('/api/child-doc-checklist/carry-forward', {
+            method: 'POST', body: JSON.stringify({ year: activeSchoolYear, program: program })
+        });
+        var d = await res.json();
+        if (!d.success) throw new Error(d.error || 'failed');
+        if (status) { status.textContent = 'Copied ' + d.copied + ' checkmark' + (d.copied === 1 ? '' : 's') + ' \u2014 review below.'; status.style.color = '#166534'; }
+        renderChildFilesGrid(program);
+    } catch (e) {
+        if (status) { status.textContent = '\u26a0 ' + e.message; status.style.color = '#b91c1c'; }
+    } finally {
+        btn.disabled = false;
+    }
 }
 
 async function toggleChildDoc(studentId, docKey, checked) {

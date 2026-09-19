@@ -265,7 +265,15 @@
                             dateField: opts.dateField || '' };
         var existing = signatureFor(studentId, field, role);
         if (existing && existing.RelPath) {
-            pad.showExisting('/api/doc-file?path=' + encodeURIComponent(existing.RelPath));
+            /* Fetch the on-file signature WITH credentials and hand the pad a blob URL.
+               A bare <img src="/api/doc-file?..."> is a plain GET that carries no auth
+               header, so the thumbnail came back Unauthorized and showed blank. */
+            (function (p, rel) {
+                apiFetch('/api/doc-file?path=' + encodeURIComponent(rel))
+                    .then(function (r) { return r.ok ? r.blob() : null; })
+                    .then(function (b) { if (b) p.showExisting(URL.createObjectURL(b)); })
+                    .catch(function () { /* leave the pad empty on failure */ });
+            })(pad, existing.RelPath);
             pad.setStatus('Signed' + (existing.SignedAt ? ' ' + existing.SignedAt.slice(0, 10) : '')
                 + ' \u2014 press Clear to sign again', '#166534');
         } else {
@@ -398,6 +406,8 @@
         document.getElementById('piMilitary').textContent = yesNo(student.Military);
         document.getElementById('piCategory').textContent = student.Category || '\u2014';
 
+        var oldCarry = document.getElementById('piCarryNote');
+        if (oldCarry) oldCarry.remove();
         document.getElementById('piDate').value = new Date().toISOString().split('T')[0];
         document.getElementById('piGoals').value = '';
         document.getElementById('piConcerns').value = '';
@@ -405,7 +415,11 @@
         document.getElementById('piNotes').value = '';
         document.getElementById('piParentSig').value = '';
         document.getElementById('piStaffSig').value = '';
-        document.getElementById('piPreferredLanguage').value = '';
+        /* Preferred language defaults from the child's enrollment HomeLanguage so the
+           ISBE-required language field is pre-filled rather than retyped. A saved
+           interview value (loaded below) still wins. Blank HomeLanguage or plain
+           "English" leaves it for the interviewer to confirm. */
+        document.getElementById('piPreferredLanguage').value = student.HomeLanguage || '';
         document.getElementById('piTranslatorNeeded').value = '';
         document.getElementById('piTranslatorArrangements').value = '';
         document.getElementById('piSavedBadge').style.display = 'none';
@@ -427,15 +441,49 @@
                 document.getElementById('piNotes').value = data.Notes || '';
                 document.getElementById('piParentSig').value = data.ParentSignature || '';
                 document.getElementById('piStaffSig').value = data.StaffSignature || '';
-                document.getElementById('piPreferredLanguage').value = data.PreferredLanguage || '';
+                // A saved language wins, but keep the HomeLanguage pre-fill when the
+                // saved record has none (older interviews predate the language field).
+                if (data.PreferredLanguage) document.getElementById('piPreferredLanguage').value = data.PreferredLanguage;
                 document.getElementById('piTranslatorNeeded').value = data.TranslatorNeeded || '';
                 document.getElementById('piTranslatorArrangements').value = data.TranslatorArrangements || '';
+            } else {
+                /* No interview for this year yet. For a returning child, carry the most
+                   recent PRIOR year's answers forward as a starting point so this is an
+                   update, not a blank restart. Signatures and the interview date are NOT
+                   carried (each year is signed fresh); the narrative and language are. */
+                await carryForwardInterview(studentId);
             }
         } catch (e) { console.error('Failed to load interview', e); }
 
         loadIntakeRecord(studentId);
         document.getElementById('piOverlay').classList.add('open');
         refreshSigPads();
+    }
+
+    /* Pull the newest interview from an earlier year and pre-fill the narrative +
+       language fields so a returning child's interview starts from last year rather
+       than blank. Best-effort: on any failure the form simply stays empty. Shows a
+       small "carried forward" note so staff know to review and update it. */
+    async function carryForwardInterview(studentId) {
+        try {
+            var res = await apiFetch('/api/parent-interview/' + studentId + '?priorTo=' + encodeURIComponent(year()));
+            var prior = await res.json();
+            if (!prior || !prior.Id) return;
+            document.getElementById('piGoals').value = prior.ParentGoals || '';
+            document.getElementById('piConcerns').value = prior.ParentConcerns || '';
+            document.getElementById('piStrengths').value = prior.ChildStrengths || '';
+            document.getElementById('piNotes').value = prior.Notes || '';
+            if (prior.PreferredLanguage) document.getElementById('piPreferredLanguage').value = prior.PreferredLanguage;
+            if (prior.TranslatorNeeded) document.getElementById('piTranslatorNeeded').value = prior.TranslatorNeeded;
+            if (prior.TranslatorArrangements) document.getElementById('piTranslatorArrangements').value = prior.TranslatorArrangements;
+            // A visible cue on the modal title area that this is last year's content.
+            var title = document.getElementById('piModalTitle');
+            if (title && title.textContent.indexOf('(carried forward') === -1) {
+                title.insertAdjacentHTML('afterend',
+                    '<div id="piCarryNote" style="font-size:0.72rem;color:#b45309;font-weight:600;margin:2px 0 0;">'
+                    + 'Pre-filled from last year\u2019s interview \u2014 review, update, and sign for this year.</div>');
+            }
+        } catch (e) { /* leave blank on failure */ }
     }
 
     async function loadIntakeRecord(studentId) {
