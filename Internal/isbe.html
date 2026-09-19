@@ -2833,6 +2833,7 @@ const PICC_ITEMS = [
         num: 'PI2', title: 'Mission statement developed cooperatively',
         requires: 'A mission statement built with parents, families, staff and community representatives, and made publicly available.',
         subs: ['A. Mission statement has been developed', 'B. Mission statement is publicly available'],
+        forms: [{ label: 'Mission Statement (public site)', href: '/mission.html' }],
         evidence: 'Copy of the mission statement. A district statement is acceptable, as is one printed in a brochure or on paperwork. Posting it in the vestibule, main office or classrooms satisfies part B.'
     },
     {
@@ -2861,7 +2862,8 @@ const PICC_ITEMS = [
         childFields: ['WeightedEligibility', 'ProofOfIncome', 'ParentInterview'],
         na: 'N. Families living outside Chicago/CPS applies to home visiting programs only.',
         guidance: 'Eligibility documents must be completed and dated on or prior to the enrollment date. Income verification is required each time a weighted eligibility form is completed. Sections L and M may not be left blank.',
-        waitlistLink: true
+        waitlistLink: true,
+        forms: [{ label: 'Weighted Eligibility Form', href: 'pfa-item6-eligibility.html?program=PI&item=5' }]
     },
     {
         num: 'PI6', title: 'Family Centered Assessment and Individual Family Goal Plan',
@@ -2871,7 +2873,8 @@ const PICC_ITEMS = [
             'B. Individual Family Goal Plan within 6 months of enrollment, updated annually'
         ],
         childFields: ['FamilyCenteredAssessment', 'FamilyGoalPlan'],
-        guidance: 'Acceptable assessments include the Life Skills Progression, Baby TALK Family Centered Assessment and FROG. The LSP child portion may be replaced by the ASQ or another child developmental tool.'
+        guidance: 'Acceptable assessments include the Life Skills Progression, Baby TALK Family Centered Assessment and FROG. The LSP child portion may be replaced by the ASQ or another child developmental tool.',
+        forms: [{ label: 'Individual Family Goal Plan', href: 'pi6-family-goal-plan.html?program=PI&item=6' }]
     },
     {
         num: 'PI7', title: 'Referral system and written transition plans',
@@ -2881,7 +2884,8 @@ const PICC_ITEMS = [
             'B. Evidence the referral system is utilised when necessary'
         ],
         childFields: ['TransitionPlan', 'Referral'],
-        guidance: 'Not applicable for families that did not require a referral, but the file should show that determination was made. For a family that exited suddenly, case notes with documented contact attempts substitute for the transition plan.'
+        guidance: 'Not applicable for families that did not require a referral, but the file should show that determination was made. For a family that exited suddenly, case notes with documented contact attempts substitute for the transition plan.',
+        forms: [{ label: 'Transition Plan / Letter', href: 'pfa-item13-transition-letter.html?program=PI&item=7' }]
     },
     {
         num: 'PI8', title: 'Annual Self-Assessment and written CQIP',
@@ -2904,7 +2908,8 @@ const PICC_ITEMS = [
         num: 'PI9', title: 'Staff development and professional development plans',
         requires: 'A written Professional Development Plan for every PI staff member.',
         subs: ['A. Professional Development Plan written for all staff members'],
-        guidance: 'Each plan needs the staff name, plan date and timelines, an assessment of that staff member\u2019s needs, and a description of the in-service or other professional learning the program will provide.'
+        guidance: 'Each plan needs the staff name, plan date and timelines, an assessment of that staff member\u2019s needs, and a description of the in-service or other professional learning the program will provide.',
+        forms: [{ label: 'Individualized PD Plans', href: '/pas/individual-pd-plan.html' }]
     },
     {
         num: 'PI10', title: 'Developmental screening and monitoring documentation',
@@ -4415,24 +4420,25 @@ function renderPiccItem(item, data) {
     }
     if (item.scored === false) status += statusPill('info', 'not scored');
 
-    // Evidence buttons: item-specific pasted link wins, then a known folder, then
-    // the convention folder.
-    /* Evidence lives on our own server now, so these point at the local library
-       rather than SharePoint. The old "Folder" button opened SharePoint and the
-       pasted-link box existed because that was the only way to reach a document;
-       neither is needed once the files are indexed here. */
+    /* The row's buttons are this item's EVIDENCE — one per in-app HTML form we own
+       (open, edit, sign with a stylus, file back), plus any pasted doc link and the
+       library files the index holds (rendered by piccDocsHtml below). The per-row
+       "Library" and "Check in a file" buttons were removed to match the PFA side: the
+       ONE "Open document library" button in the section header browses everything, and
+       evidence is maintained through these forms. */
     var evidence = '';
+    (item.forms || []).forEach(function (f) {
+        evidence += '<a class="picc-btn picc-btn-primary" href="' + String(f.href).replace(/"/g, '&quot;') + '" '
+            + 'target="_blank" rel="noopener" title="Open, edit and sign this evidence form in the app">'
+            + escapeHtml(f.label) + '</a>';
+    });
     (item.docs || []).forEach(function (d) {
         evidence += '<a class="picc-btn" href="' + d.url + '" target="_blank" rel="noopener">' + d.label + '</a>';
     });
-    evidence += '<a class="picc-btn" href="' + libraryHref(item.num, 'PI')
-        + '" target="_blank" rel="noopener" title="Open this item in the document library">Library</a>';
-    // Check-in: a signed or scanned page goes straight back into the item folder.
-    evidence += '<label class="picc-btn" style="cursor:pointer;" title="Add a signed or scanned document to this item">'
-        + 'Check in a file'
-        + '<input type="file" style="display:none;" '
-        + 'accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt" '
-        + 'onchange="uploadEvidence(\'' + item.num + '\',this)"></label>';
+    if (savedLink) {
+        evidence += '<a class="picc-btn picc-btn-primary" href="' + savedLink.replace(/"/g, '&quot;') + '" '
+            + 'target="_blank" rel="noopener" title="Open the current form linked to this item">Open current form</a>';
+    }
 
     // Per-child items jump straight to the roster column that holds the evidence.
     var jumps = childFieldJumps(item);

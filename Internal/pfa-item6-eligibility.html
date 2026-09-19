@@ -165,6 +165,14 @@
 
 var $ = function (id) { return document.getElementById(id); };
 
+/* Program-aware: the weighted eligibility form serves PFA (Item 6) and PI (PI5). The
+   ?program= / ?item= params decide which monitoring folder/item the signed PDF files
+   into. Defaults to PFA Item 6. */
+var QS = new URLSearchParams(location.search);
+var PROGRAM = (QS.get('program') || 'PFA').toUpperCase() === 'PI' ? 'PI' : 'PFA';
+var ITEM = (QS.get('item') || (PROGRAM === 'PI' ? '5' : '6')).replace(/[^0-9]/g, '') || (PROGRAM === 'PI' ? '5' : '6');
+function itemLabel() { return PROGRAM === 'PI' ? 'PI5' : 'Item 6'; }
+
 /* The default weighted criteria: the priority populations named in the ISBE rule
    plus the program's own F/R/P income factor. Weights are a starting rubric the
    director can edit before signing. */
@@ -255,8 +263,8 @@ async function fileForm() {
     ].concat(criteriaRows());
 
     var body = {
-        program: 'PFA',
-        item: '6',
+        program: PROGRAM,
+        item: ITEM,
         formTitle: 'Weighted Eligibility Form',
         year: $('fYear').value,
         rows: rows,
@@ -272,7 +280,7 @@ async function fileForm() {
 
     var btn = $('fileBtn');
     btn.disabled = true; btn.textContent = 'Filing\u2026';
-    setStatus('Filing to the PFA monitoring folder\u2026', '#64748b');
+    setStatus('Filing to the ' + PROGRAM + ' monitoring folder\u2026', '#64748b');
     try {
         var res = await fetch('/api/monitoring-signed-form', {
             method: 'POST',
@@ -289,7 +297,7 @@ async function fileForm() {
     } catch (e) {
         setStatus('\u26a0 ' + e.message, '#b91c1c');
     } finally {
-        btn.disabled = false; btn.textContent = '\u270E Sign & file to Item 6';
+        btn.disabled = false; btn.textContent = '\u270E Sign & file to ' + itemLabel();
     }
 }
 
@@ -301,6 +309,7 @@ function setStatus(text, colour) {
 
 // ── Init ──
 (function () {
+    $('fileBtn').innerHTML = '&#9998; Sign &amp; file to ' + itemLabel();
     var now = new Date();
     var y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
     $('fYear').value = y + '-' + (y + 1);

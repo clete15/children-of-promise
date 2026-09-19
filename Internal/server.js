@@ -2656,7 +2656,12 @@ function officeResolveKey(key) {
    "Item 1 PFA - Waiting List.pdf" parses as Item1.P, because "PFA" begins with
    a letter in exactly the position a sub-item would occupy. */
 function docItemNumberFromFile(fileName) {
-    const m = String(fileName || '').match(/^\s*Item\s*(\d+)\s*(?:([A-Za-z])\s*\))?/i);
+    const name = String(fileName || '');
+    // PFA loose files are "Item N ...". PI/CB loose files (filed by the in-app PI forms)
+    // are "PI N ..." / "CB N ..." so they attribute to the PI checklist keys (PI5, CB2).
+    const pi = name.match(/^\s*(PI|CB)\s*(\d+)(\.[A-Z](?:-[A-Z])?(?![A-Za-z]))?/i);
+    if (pi) return pi[1].toUpperCase() + pi[2] + (pi[3] || '').toUpperCase();
+    const m = name.match(/^\s*Item\s*(\d+)\s*(?:([A-Za-z])\s*\))?/i);
     if (!m) return null;
     return 'Item' + m[1] + (m[2] ? '.' + m[2].toUpperCase() : '');
 }
@@ -4303,11 +4308,14 @@ ELSE
             }
 
             // "Item N - <title> - signed <date>.pdf" so docItemNumberFromFile attributes
-            // it to the item. Sanitised because the title reaches the filesystem.
+            // Filename prefix must match how the indexer attributes loose files to a
+            // checklist item: PFA uses "Item N", PI uses its own "PI N" keys. Getting
+            // this wrong files valid evidence under an item number nothing reads.
             const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
             const stamp = new Date().toISOString().slice(0, 10);
-            const titleNoItem = safe(title).replace(/^Item\s*\d+\s*[-\u2013]\s*/i, '');
-            const base = 'Item ' + itemNum + ' - ' + (titleNoItem || 'Form') + ' - signed ' + stamp;
+            const titleNoItem = safe(title).replace(/^(Item|PI|CB)\s*\d+\s*[-\u2013]\s*/i, '');
+            const prefix = program === 'PFA' ? ('Item ' + itemNum) : ('PI' + itemNum);
+            const base = prefix + ' - ' + (titleNoItem || 'Form') + ' - signed ' + stamp;
             let target = path.join(folderPath, base + '.pdf');
             let n = 2;
             while (fs.existsSync(target) && n < 50) {

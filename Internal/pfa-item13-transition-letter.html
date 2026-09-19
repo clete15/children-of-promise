@@ -128,6 +128,13 @@ var $ = function (id) { return document.getElementById(id); };
 var sigPads = {};
 var STUDENTS = [];
 
+/* Program-aware: the same transition letter serves PFA (Item 13) and PI (PI7). The
+   ?program= and ?item= query params decide which roster to show and which monitoring
+   folder/item the signed PDF files into. Defaults to PFA Item 13. */
+var QS = new URLSearchParams(location.search);
+var PROGRAM = (QS.get('program') || 'PFA').toUpperCase() === 'PI' ? 'PI' : 'PFA';
+var ITEM = (QS.get('item') || (PROGRAM === 'PI' ? '7' : '13')).replace(/[^0-9]/g, '') || (PROGRAM === 'PI' ? '7' : '13');
+
 function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -147,7 +154,7 @@ async function loadChildren() {
         if (!Array.isArray(STUDENTS)) STUDENTS = [];
     } catch (e) { STUDENTS = []; }
     var pfa = STUDENTS.filter(function (s) {
-        return s.PFA_PI_na === 'PFA' && (s.Active === 'Yes' || s.Active === 'YES');
+        return s.PFA_PI_na === PROGRAM && (s.Active === 'Yes' || s.Active === 'YES');
     }).sort(function (a, b) {
         var c = (a.Last_Name || '').localeCompare(b.Last_Name || '');
         return c !== 0 ? c : (a.First_Name || '').localeCompare(b.First_Name || '');
@@ -199,8 +206,8 @@ async function fileForm() {
     var sy = $('schoolYear').textContent.trim();
     var child = $('childName').textContent.trim();
     var body = {
-        program: 'PFA',
-        item: '13',
+        program: PROGRAM,
+        item: ITEM,
         formTitle: 'Transition Letter - ' + (child || 'Child'),
         year: sy,
         rows: [
@@ -236,9 +243,12 @@ async function fileForm() {
     } catch (e) {
         setStatus('\u26a0 ' + e.message, '#b91c1c');
     } finally {
-        btn.disabled = false; btn.textContent = '\u270E Sign & file to Item 13';
+        btn.disabled = false; btn.textContent = fileBtnLabel();
     }
 }
+
+function itemLabel() { return PROGRAM === 'PI' ? 'PI7' : 'Item 13'; }
+function fileBtnLabel() { return '\u270E Sign & file to ' + itemLabel(); }
 
 function setStatus(text, colour) {
     var el = $('status');
@@ -248,6 +258,10 @@ function setStatus(text, colour) {
 
 // ── Init ──
 (function () {
+    // Program-aware labels (PFA Item 13 vs PI PI7).
+    var progName = PROGRAM === 'PI' ? 'Prevention Initiative' : 'PFA';
+    $('fileBtn').innerHTML = '&#9998; Sign &amp; file to ' + itemLabel();
+    var h2 = document.querySelector('.h2'); if (h2) h2.textContent = 'Children of Promise \u2014 ' + progName;
     var now = new Date();
     var y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
     $('schoolYear').textContent = y + '-' + String(y + 1).slice(-2);
