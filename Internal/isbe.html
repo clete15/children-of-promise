@@ -1127,8 +1127,19 @@ function mountSigPad(hostId, studentId, field, role, opts) {
                         dateField: opts.dateField || '' };
 
     const existing = signatureFor(studentId, field, role);
-    if (existing && existing.RelPath) {
-        pad.showExisting('/api/doc-file?path=' + encodeURIComponent(existing.RelPath));
+    /* Prefer the standalone signature image; RelPath is the whole signed form as a PDF,
+       which cannot be drawn on the pad's canvas. And fetch WITH credentials, handing the
+       pad a blob URL — a bare <img src="/api/doc-file?..."> is an unauthenticated GET
+       that comes back 401 and shows blank. */
+    const onFileRel = (existing && existing.SigImagePath) ? existing.SigImagePath
+                    : (existing && existing.RelPath) ? existing.RelPath : '';
+    if (onFileRel) {
+        (function (p, rel) {
+            apiFetch('/api/doc-file?path=' + encodeURIComponent(rel))
+                .then(r => r.ok ? r.blob() : null)
+                .then(b => { if (b) p.showExisting(URL.createObjectURL(b)); })
+                .catch(() => { /* leave the pad empty on failure */ });
+        })(pad, onFileRel);
         pad.setStatus('Signed' + (existing.SignedAt ? ' ' + existing.SignedAt.slice(0, 10) : '')
             + ' \u2014 press Clear to sign again', '#166534');
     } else {

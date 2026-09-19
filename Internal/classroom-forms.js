@@ -264,7 +264,14 @@
                             label: opts.label || '', printedName: opts.printedName || '',
                             dateField: opts.dateField || '' };
         var existing = signatureFor(studentId, field, role);
-        if (existing && existing.RelPath) {
+        /* Prefer the standalone signature IMAGE (SigImagePath). RelPath is the whole
+           signed form as a PDF, and the pad draws its on-file signature into an <img>,
+           which a PDF cannot populate — so pointing the pad at RelPath left it blank.
+           Fall back to RelPath only when there is no image (older rows filed before the
+           image was kept), where it will still fail to render but does no harm. */
+        var onFileRel = (existing && existing.SigImagePath) ? existing.SigImagePath
+                      : (existing && existing.RelPath) ? existing.RelPath : '';
+        if (onFileRel) {
             /* Fetch the on-file signature WITH credentials and hand the pad a blob URL.
                A bare <img src="/api/doc-file?..."> is a plain GET that carries no auth
                header, so the thumbnail came back Unauthorized and showed blank. */
@@ -273,7 +280,7 @@
                     .then(function (r) { return r.ok ? r.blob() : null; })
                     .then(function (b) { if (b) p.showExisting(URL.createObjectURL(b)); })
                     .catch(function () { /* leave the pad empty on failure */ });
-            })(pad, existing.RelPath);
+            })(pad, onFileRel);
             pad.setStatus('Signed' + (existing.SignedAt ? ' ' + existing.SignedAt.slice(0, 10) : '')
                 + ' \u2014 press Clear to sign again', '#166534');
         } else {
@@ -343,10 +350,12 @@
                 return [(d && d.error) || 'the signed document was not filed'];
             }
             var sigs = ctx.getSignatures() || {};
+            var sigImages = d.sigImages || {};
             payload.signatures.forEach(function (s) {
                 sigs[sigKey(studentId, field, s.role)] = {
                     StudentId: String(studentId), FormField: field, Role: s.role,
                     SignedName: s.name, RelPath: d.relPath,
+                    SigImagePath: sigImages[s.role] || '',
                     SignedAt: new Date().toISOString().slice(0, 10)
                 };
             });

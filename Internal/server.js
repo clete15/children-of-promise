@@ -2064,6 +2064,13 @@ function childSignatureEnsureSQL() {
         SignedAt DATETIME,
         CapturedOn NVARCHAR(60)
     );
+/* SigImagePath: the standalone signature JPEG for THIS role, filed beside the PDF.
+   RelPath is the whole signed FORM as a PDF — the compliance artefact — and a PDF
+   cannot be drawn on the signature pad's canvas, so reopening a signed form showed a
+   blank pad. This column points the pad at the drawn signature itself so it can redraw
+   it. Added guarded so it appears on databases created before the column existed. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ChildSignatures' AND COLUMN_NAME='SigImagePath')
+    ALTER TABLE ChildSignatures ADD SigImagePath NVARCHAR(500);
 GO
 `;
 }
@@ -4609,16 +4616,36 @@ DROP TABLE #cf;`;
             const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
             console.log('[SIGNED FORM] ' + pdf.length + ' bytes -> ' + rel);
 
+            /* Also file each role's signature image on its own, beside the PDF. The PDF
+               is the compliance artefact, but it cannot be drawn on the pad's canvas, so
+               reopening a signed form showed a blank pad. A small JPEG per role lets the
+               pad redraw the signature. Best-effort: if an image cannot be written the
+               PDF is still filed, so the row falls back to no thumbnail rather than
+               failing the whole save. */
+            const baseName = path.basename(target, '.pdf');
+            const sigImgRel = {};
+            signatures.forEach(s => {
+                try {
+                    const imgName = baseName + ' - ' + s.role + ' signature.jpg';
+                    const imgTarget = path.join(folder.path, imgName);
+                    fs.writeFileSync(imgTarget, s.jpeg);
+                    sigImgRel[s.role] = path.relative(findDocRoot(), imgTarget).replace(/\\/g, '/');
+                } catch (e) {
+                    console.warn('[SIGNED FORM] could not write ' + s.role + ' signature image: ' + e.message);
+                }
+            });
+
             let sql = childSignatureEnsureSQL();
             signatures.forEach(s => {
+                const img = sigImgRel[s.role] || '';
                 const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} `
                     + `AND FormField=${esc(d.field)} AND Role=${esc(s.role)}`;
                 sql += `IF EXISTS (SELECT 1 FROM ChildSignatures WHERE ${where})
-    UPDATE ChildSignatures SET SignedName=${esc(s.name)},RelPath=${esc(rel)},
+    UPDATE ChildSignatures SET SignedName=${esc(s.name)},RelPath=${esc(rel)},SigImagePath=${esc(img)},
         SignedAt=GETDATE(),CapturedOn=${esc(d.capturedOn)} WHERE ${where}
 ELSE
-    INSERT INTO ChildSignatures (StudentId,SchoolYear,FormField,Role,SignedName,RelPath,SignedAt,CapturedOn)
-    VALUES (${studentId},${esc(year)},${esc(d.field)},${esc(s.role)},${esc(s.name)},${esc(rel)},GETDATE(),${esc(d.capturedOn)});
+    INSERT INTO ChildSignatures (StudentId,SchoolYear,FormField,Role,SignedName,RelPath,SigImagePath,SignedAt,CapturedOn)
+    VALUES (${studentId},${esc(year)},${esc(d.field)},${esc(s.role)},${esc(s.name)},${esc(rel)},${esc(img)},GETDATE(),${esc(d.capturedOn)});
 `;
             });
             const r = runSQL(sql);
@@ -4632,7 +4659,10 @@ ELSE
                 });
             }
             return sendJSON(res, 200, {
-                success: true, relPath: rel, name: path.basename(target), bytes: pdf.length
+                success: true, relPath: rel, name: path.basename(target), bytes: pdf.length,
+                // Per-role signature image paths, so the page can show the just-signed
+                // signature on the pad without a reload.
+                sigImages: sigImgRel
             });
         });
         return;
@@ -4742,7 +4772,7 @@ ELSE
         if (!checkClassroomAuth(req, res)) return;
         const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
         const r = runSQLRows(
-            `SELECT StudentId, FormField, Role, SignedName, RelPath,
+            `SELECT StudentId, FormField, Role, SignedName, RelPath, ISNULL(SigImagePath,'') AS SigImagePath,
                     CONVERT(NVARCHAR(20), SignedAt, 120) AS SignedAt
              FROM ChildSignatures WHERE SchoolYear=${esc(year)}`,
             childSignatureEnsureSQL());
