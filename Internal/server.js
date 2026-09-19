@@ -2089,6 +2089,21 @@ function seedWeightedEligibilityDoc(studentId, opts) {
     const program = String(enroll.PFA_PI_na).toUpperCase() === 'PFA' ? 'PFA' : 'PI';
     const childName = (enroll.First_Name + ' ' + enroll.Last_Name).trim();
 
+    /* Income verification auto-feeds from the child's Proof of Income upload: the person
+       who uploaded it and the date they did. Read from ChildFiles (the same row the
+       Administrative Proof of Income scan writes). Blank when nothing is on file yet. */
+    let incVerifiedBy = '', incVerifiedDate = '';
+    try {
+        const pf = runSQLRows(
+            `SELECT TOP 1 ISNULL(UploadedBy,'') AS UploadedBy, ISNULL(CONVERT(NVARCHAR(20),UploadedAt,101),'') AS UploadedAt
+             FROM ChildFiles WHERE StudentId=${parseInt(studentId)} AND Kind='incomeproof' ORDER BY UploadedAt DESC`,
+            childFileEnsureSQL());
+        if (pf.ok && pf.rows.length) {
+            incVerifiedBy = pf.rows[0].UploadedBy || '';
+            incVerifiedDate = pf.rows[0].UploadedAt || '';
+        }
+    } catch (e) { /* leave blank */ }
+
     const rows = [
         { label: 'Child', value: childName || ('Student ' + studentId) },
         { label: 'Date of birth', value: enroll.Birth_date || '\u2014' },
@@ -2113,21 +2128,15 @@ function seedWeightedEligibilityDoc(studentId, opts) {
 
     const blocks = [
         { heading: 'Weighted eligibility criteria (PICC PI5.A / PI5.B\u2013G)',
-          text: fillBlanksAsNo
-              ? 'Pre-filled from the family\u2019s pre-enrollment submission where one exists; '
-                + 'any criterion not recorded at intake is shown as \u201CNo\u201D. Generated for a '
-                + 'child already enrolled — review and update before relying on it. Points shown are '
-                + 'the same weights used to rank the waiting list.'
-              : 'Pre-filled from the family\u2019s pre-enrollment submission where one exists. '
-                + 'Blank items were not recorded at intake and must be settled by staff before signing. '
-                + 'Boxes shown below reflect the pre-fill; confirm each before this form is signed. '
-                + 'Points shown are the same weights used to rank the waiting list.' },
-        { text: criteriaLines.join('\n') },
+          text: criteriaLines.join('\n') },
         { heading: 'Determination (PICC PI5.H)',
-          text: 'Total weighted points (auto-calculated from the answers above): ' + total + '\n\n'
-              + 'Eligibility determination: ______________________________' },
+          // Every child served is determined eligible, so the determination line is filled.
+          text: 'Total weighted points: ' + total + '\n'
+              + 'Eligibility determination: Eligible' },
         { heading: 'Income verification (PICC PI5.J)',
-          text: 'Income verified by: ____________________________     Date verified: ______________' }
+          // Auto-fed from the Proof of Income upload; blank lines remain if none on file.
+          text: 'Income verified by: ' + (incVerifiedBy || '____________________________')
+              + '     Date verified: ' + (incVerifiedDate || '______________') }
     ];
 
     let pdf;
@@ -2135,16 +2144,11 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         pdf = buildFormPdf({
             title: 'Weighted Eligibility Determination',
             subtitle: 'Children of Promise LLC \u2014 '
-                + (program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative')
-                + (fillBlanksAsNo ? ' \u2014 pre-filled from records' : ' \u2014 pre-filled at enrollment, not yet signed'),
+                + (program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative'),
             rows: rows,
             blocks: blocks,
             signatures: [],
-            footer: (fillBlanksAsNo
-                ? 'Generated for an already-enrolled child on ' + new Date().toLocaleString('en-US')
-                    + '. Unrecorded criteria are shown as \u201CNo\u201D; review before relying on it.'
-                : 'Generated at enrollment on ' + new Date().toLocaleString('en-US')
-                    + '. This is a draft to be reviewed, completed and signed.')
+            footer: 'Children of Promise LLC \u2014 ' + new Date().toLocaleString('en-US')
         });
     } catch (e) {
         console.error('[SEED] could not build weighted eligibility PDF: ' + e.message);

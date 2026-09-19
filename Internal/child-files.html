@@ -464,9 +464,25 @@ function renderAdmin() {
         + CHILD_DOCS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('') + '</tr>';
     var rows = roster.map(function (s) {
         var cells = CHILD_DOCS.map(function (doc) {
+            var file = childDocFile(s.Id, doc.key);
+            /* Behavior Plan and Transition Plan are UPLOAD-ONLY pills: no "on paper"
+               checkbox, because they are documents a monitor opens, not a box to tick.
+               Click the pill to upload; it lights green with a check once a file is on
+               file, exactly like the teacher-side pills. */
+            if (doc.key === 'behaviorplan' || doc.key === 'transitionplan') {
+                var pill = file
+                    ? '<a class="cfg-attached" href="#" style="text-decoration:none;font-weight:600;"'
+                        + ' title="On file: ' + escapeHtml(file.name || 'attached') + ' \u2014 click to open"'
+                        + ' onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
+                        + '\',\'' + escapeHtml(file.name || 'file').replace(/'/g, "\\'") + '\')">\u2713 On file</a>'
+                    : '<label class="cfg-attach" style="font-weight:600;color:#64748b;"'
+                        + ' title="Upload this document into the child\u2019s Administrative folder">\u2795 Upload'
+                        + '<input type="file" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"'
+                        + ' onchange="uploadChildDoc(' + s.Id + ',\'' + doc.key + '\',this)"></label>';
+                return '<td class="cfg-cell' + (file ? ' filed' : '') + '">' + pill + '</td>';
+            }
             var checked = !!(docChecklist[String(s.Id)] || {})[doc.key];
             if (doc.key === 'incomeproof' && !checked && (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1)) checked = true;
-            var file = childDocFile(s.Id, doc.key);
             var cellClass = file ? ' filed' : (checked ? ' paper' : '');
             var box = '<label class="cfg-check" title="Confirm this document is on file (paper copy)">'
                 + '<input type="checkbox"' + (checked ? ' checked' : '')
