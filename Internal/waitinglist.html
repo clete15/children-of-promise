@@ -10,12 +10,18 @@
 
         /* ── TOOLBAR ── */
         .wl-toolbar {
-            /* Left-aligned (not centred), inset 15% from the left so the toolbar and the
-               table below open at the SAME spot as the sub-nav links and the other tabs. */
-            max-width: 1300px;
+            /* Left-aligned (not centred), inset from the left so the toolbar and the
+               table below open at roughly the same spot as the sub-nav links above.
+               Widened from 1300px/15% (which left a 12-column table only ~1000px to
+               work with — exactly its min-width, with zero room to spare, so Status,
+               Notes and the actions column were always pushed into the horizontal
+               scroll). A fixed inset plus a much larger cap gives the table real
+               room on an actual monitor while the horizontal scroll still catches
+               anything narrower. */
+            max-width: 1900px;
             width: 100%;
             margin: 12px 0 0;
-            padding: 0 20px 0 15%;
+            padding: 0 20px 0 40px;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -47,12 +53,14 @@
 
         /* ── TABLE CONTAINER ── */
         .wl-container {
-            /* Capped, LEFT-aligned, inset 15% from the left so the table opens at the same
-               spot as the sub-nav links above it and as the other tabs' tables. On narrower
-               screens it still fills the width and scrolls horizontally. */
-            max-width: 1300px;
+            /* Widened to match .wl-toolbar above (see its comment) — the 1300px cap with
+               a 15%-of-viewport left inset left only ~1000px for a table whose columns
+               (Name & Contact, Children, Risk Factor pills, Notes) genuinely need more
+               than that, so Status/Notes/Actions were always scrolled off. On narrower
+               screens it still fills the width and falls back to horizontal scroll. */
+            max-width: 1900px;
             margin: 10px 0 30px;
-            padding: 0 20px 0 15%;
+            padding: 0 20px 0 40px;
             width: 100%;
             display: flex;
             flex-direction: column;

@@ -2709,20 +2709,23 @@ async function openPermissionSlip(studentId) {
     // The slip belongs to the year being viewed, not necessarily today's year.
     const schoolYear = activeSchoolYear;
 
+    const today = new Date().toISOString().split('T')[0];
+
     document.getElementById('psModalTitle').textContent = 'Permission Slip \u2013 ' + student.First_Name + ' ' + student.Last_Name;
     document.getElementById('psParentNameDisplay').innerHTML = '&nbsp;';
     document.getElementById('psTeacherDisplay').textContent = teacher || '\u00a0';
     document.getElementById('psSchoolYearDisplay').textContent = schoolYear;
 
-    // Clear form fields
+    // Clear form fields. Every date defaults to today, since the slip is normally
+    // signed the day it is filled out — staff can change any of them if not.
     document.getElementById('psParentName').value = '';
     document.getElementById('psSchoolYear').value = schoolYear;
-    document.getElementById('psDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('psDate').value = today;
     document.getElementById('psTeacher').value = teacher;
     document.getElementById('psParentSig').value = '';
-    document.getElementById('psParentSigDate').value = '';
+    document.getElementById('psParentSigDate').value = today;
     document.getElementById('psTeacherSig').value = '';
-    document.getElementById('psTeacherSigDate').value = '';
+    document.getElementById('psTeacherSigDate').value = today;
     document.getElementById('psSavedBadge').style.display = 'none';
 
     // Fresh pads for this child, showing anything already signed.
@@ -2735,23 +2738,38 @@ async function openPermissionSlip(studentId) {
           dateField: 'psTeacherSigDate' });
 
     // Load existing data if saved
+    let hasSavedSlip = false;
     try {
         const res = await apiFetch(yearQS('/api/permission-slip/' + studentId));
         const data = await res.json();
         if (data && data.Id) {
+            hasSavedSlip = true;
             document.getElementById('psParentName').value = data.ParentName || '';
             document.getElementById('psParentNameDisplay').textContent = data.ParentName || '\u00a0';
             document.getElementById('psSchoolYear').value = data.SchoolYear || schoolYear;
             document.getElementById('psSchoolYearDisplay').textContent = data.SchoolYear || schoolYear;
-            document.getElementById('psDate').value = data.SignedDate || '';
+            document.getElementById('psDate').value = data.SignedDate || today;
             document.getElementById('psTeacher').value = data.Teacher || teacher;
             document.getElementById('psTeacherDisplay').textContent = data.Teacher || teacher || '\u00a0';
             document.getElementById('psParentSig').value = data.ParentSignature || '';
-            document.getElementById('psParentSigDate').value = data.ParentSigDate || '';
+            document.getElementById('psParentSigDate').value = data.ParentSigDate || today;
             document.getElementById('psTeacherSig').value = data.TeacherSignature || '';
-            document.getElementById('psTeacherSigDate').value = data.TeacherSigDate || '';
+            document.getElementById('psTeacherSigDate').value = data.TeacherSigDate || today;
         }
     } catch (e) { console.error('Failed to load permission slip', e); }
+
+    // Autofill the parent's name from the pre-enrollment record when there is no
+    // saved slip yet. Whoever actually does pickup can type over it.
+    if (!hasSavedSlip && !document.getElementById('psParentName').value) {
+        try {
+            const pres = await apiFetch('/api/student-parent-name/' + studentId);
+            const pdata = await pres.json();
+            if (pdata && pdata.parentName && !document.getElementById('psParentName').value) {
+                document.getElementById('psParentName').value = pdata.parentName;
+                document.getElementById('psParentNameDisplay').textContent = pdata.parentName;
+            }
+        } catch (e) { /* no name on file — leave blank for staff to type */ }
+    }
 
     document.getElementById('psOverlay').classList.add('open');
 }

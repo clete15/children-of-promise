@@ -4285,6 +4285,39 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         return sendJSON(res, 200, rec);
     }
 
+    /* GET just the parent's name for a student — /api/student-parent-name/:id.
+
+       A teacher filling out the Permission Slip needs a name to autofill, but
+       /api/student-intake/:id (above) is checkAuth-only because it also returns
+       abuse history, mental illness, DCFS involvement, substance abuse, and other
+       intake fields no teacher should see. Rather than loosen that guard, this is a
+       narrow sibling: same PreEnrollment linking rule (stored PreEnrollmentId first,
+       falling back to an exact child name + DOB match), but selects only the
+       parent's name. Guarded by checkClassroomAuth so any signed-in teacher, or the
+       classroom kiosk, can use it. */
+    if (req.method === 'GET' && url.startsWith('/api/student-parent-name/')) {
+        if (!checkClassroomAuth(req, res)) return;
+        const studentId = parseInt(url.split('/')[3]);
+        if (!studentId) return sendJSON(res, 400, { error: 'Student ID required' });
+        const sql = `SELECT TOP 1 ISNULL(p.FirstName,'') AS ParentFirst,ISNULL(p.LastName,'') AS ParentLast
+            FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${studentId}
+            UNION ALL
+            SELECT TOP 1 ISNULL(p.FirstName,'') AS ParentFirst,ISNULL(p.LastName,'') AS ParentLast
+            FROM rptMasterEnrollment e INNER JOIN PreEnrollment p
+                ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date)
+                WHERE e.Id=${studentId} AND e.PreEnrollmentId IS NULL`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        // No leading numeric Id on this query (sqlcmd runs with -h -1, so there is no
+        // header row to skip either) — just take the first real data line.
+        const line = r.data.trim().split('\n')
+            .find(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+        if (!line) return sendJSON(res, 200, { found: false, parentName: '' });
+        const v = line.split('|').map(x => x.trim());
+        const parentName = [v[0], v[1]].filter(Boolean).join(' ');
+        return sendJSON(res, 200, { found: !!parentName, parentName: parentName });
+    }
+
     // PUT update student (internal - protected)
     if (req.method === 'PUT' && url.startsWith('/api/students/')) {
         if (!checkAuth(req, res)) return;

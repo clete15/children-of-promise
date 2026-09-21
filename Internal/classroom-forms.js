@@ -636,16 +636,21 @@
         var teacher = getTeacher(student.RoomNumber);
         var schoolYear = year();
 
+        var today = new Date().toISOString().split('T')[0];
+
         document.getElementById('psModalTitle').textContent = 'Permission Slip \u2013 ' + student.First_Name + ' ' + student.Last_Name;
 
         document.getElementById('psParentName').value = '';
         document.getElementById('psSchoolYear').value = schoolYear;
-        document.getElementById('psDate').value = new Date().toISOString().split('T')[0];
+        // Every date on the slip defaults to today, since it is normally signed the
+        // day it is filled out — staff can change any of them if that is not so
+        // (e.g. filling it out after the fact, or a different pickup date).
+        document.getElementById('psDate').value = today;
         document.getElementById('psTeacher').value = teacher;
         document.getElementById('psParentSig').value = '';
-        document.getElementById('psParentSigDate').value = '';
+        document.getElementById('psParentSigDate').value = today;
         document.getElementById('psTeacherSig').value = '';
-        document.getElementById('psTeacherSigDate').value = '';
+        document.getElementById('psTeacherSigDate').value = today;
         document.getElementById('psSavedBadge').style.display = 'none';
 
         sigPads = {};
@@ -654,20 +659,36 @@
         mountSigPad('psTeacherSigPad', studentId, 'PermissionSlip', 'staff',
             { label: 'Teacher signature', printedName: 'psTeacherSig', dateField: 'psTeacherSigDate' });
 
+        var hasSavedSlip = false;
         try {
             var res = await apiFetch(yearQS('/api/permission-slip/' + studentId));
             var data = await res.json();
             if (data && data.Id) {
+                hasSavedSlip = true;
                 document.getElementById('psParentName').value = data.ParentName || '';
                 document.getElementById('psSchoolYear').value = data.SchoolYear || schoolYear;
-                document.getElementById('psDate').value = data.SignedDate || '';
+                document.getElementById('psDate').value = data.SignedDate || today;
                 document.getElementById('psTeacher').value = data.Teacher || teacher;
                 document.getElementById('psParentSig').value = data.ParentSignature || '';
-                document.getElementById('psParentSigDate').value = data.ParentSigDate || '';
+                document.getElementById('psParentSigDate').value = data.ParentSigDate || today;
                 document.getElementById('psTeacherSig').value = data.TeacherSignature || '';
-                document.getElementById('psTeacherSigDate').value = data.TeacherSigDate || '';
+                document.getElementById('psTeacherSigDate').value = data.TeacherSigDate || today;
             }
         } catch (e) { console.error('Failed to load permission slip', e); }
+
+        // Autofill the parent's name from the pre-enrollment record, but only when
+        // there is no saved slip yet (a saved ParentName, even blank-on-purpose,
+        // is left alone) and the field is still empty. Whoever is actually doing
+        // pickup can always type over it — this just saves typing the common case.
+        if (!hasSavedSlip && !document.getElementById('psParentName').value) {
+            try {
+                var pres = await apiFetch('/api/student-parent-name/' + studentId);
+                var pdata = await pres.json();
+                if (pdata && pdata.parentName && !document.getElementById('psParentName').value) {
+                    document.getElementById('psParentName').value = pdata.parentName;
+                }
+            } catch (e) { /* no name on file — leave blank for staff to type */ }
+        }
 
         document.getElementById('psOverlay').classList.add('open');
         refreshSigPads();
@@ -1316,17 +1337,22 @@
         '<div class="pi-modal-header"><h3 id="psModalTitle">Permission Slip</h3>',
         '<button class="pi-close" onclick="CofpForms.closePermissionSlip()" aria-label="Close">&times;</button></div>',
         '<div class="pi-modal-body">',
-        '<div class="pi-section" style="text-align:center;padding:10px 0 20px;"><h4 style="font-size:1.1rem;font-weight:800;color:#1e3a8a;text-transform:none;letter-spacing:0;border:none;padding:0;margin:0 0 4px;">Children of Promise PFA</h4><div style="font-size:0.95rem;font-weight:700;color:#374151;">Permission to perform screenings</div></div>',
+        '<div class="pi-section" style="text-align:center;padding:4px 0 10px;"><h4 style="font-size:1.1rem;font-weight:800;color:#1e3a8a;text-transform:none;letter-spacing:0;border:none;padding:0;margin:0 0 4px;">Children of Promise PFA</h4><div style="font-size:0.95rem;font-weight:700;color:#374151;">Permission to perform screenings</div></div>',
         '<div class="pi-section"><div class="pi-consent">',
         '<div style="font-size:0.92rem;color:#374151;">I, <input type="text" id="psParentName" class="pi-inline" placeholder="parent name"> consent to <input type="text" id="psTeacher" class="pi-inline pi-inline-italic" placeholder="teacher"> conducting screenings on my child for the <input type="text" id="psSchoolYear" class="pi-inline pi-inline-sm" placeholder="year"> school year using Ages and Stages ASQ and ASE screening instruments.</div>',
-        '<p style="font-size:0.86rem;line-height:1.7;color:#4b5563;margin:16px 0 0;">Screenings will be performed at the beginning, middle, and end of the school year.</p>',
-        '<p style="font-size:0.86rem;line-height:1.7;color:#4b5563;margin:10px 0 0;">Results of the screenings will be shared with the parents along with Teaching Strategies report cards at the middle and end of the school year.</p>',
+        '<p style="font-size:0.86rem;line-height:1.5;color:#4b5563;margin:12px 0 0;">Screenings will be performed at the beginning, middle, and end of the school year.</p>',
+        '<p style="font-size:0.86rem;line-height:1.5;color:#4b5563;margin:8px 0 0;">Results of the screenings will be shared with the parents along with Teaching Strategies report cards at the middle and end of the school year.</p>',
         '</div></div>',
-        '<div class="pi-section" style="margin-top:24px;"><h4>Form Details</h4><div class="pi-grid">',
+        '<div class="pi-section" style="margin-top:14px;"><h4>Form Details</h4><div class="pi-grid">',
         '<div class="pi-field"><label>Date Signed</label><input type="date" id="psDate"></div></div></div>',
+        /* Side by side, not stacked full-width: the parent and teacher signatures are
+           two independent people signing, with nothing that needs to line up between
+           them. Stacked, the two 110px signature pads plus their printed-name rows
+           push the modal well past a laptop screen's height, forcing an inner scroll
+           the moment the modal opens. Side by side halves that section's height. */
         '<div class="pi-section" style="margin-top:20px;"><h4>Signatures</h4><div class="pi-grid">',
-        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="psParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="psParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="psParentSigDate" style="flex:1;" title="Date signed"></div></div>',
-        '<div class="pi-field pi-full"><label>Teacher Signature</label><div id="psTeacherSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="psTeacherSig" placeholder="Printed name" style="flex:2;"><input type="date" id="psTeacherSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
+        '<div class="pi-field"><label>Parent/Guardian Signature</label><div id="psParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="psParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="psParentSigDate" style="flex:1;" title="Date signed"></div></div>',
+        '<div class="pi-field"><label>Teacher Signature</label><div id="psTeacherSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="psTeacherSig" placeholder="Printed name" style="flex:2;"><input type="date" id="psTeacherSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
         '</div>',
         '<div class="pi-modal-footer"><span class="pi-saved-badge" id="psSavedBadge" style="display:none;">&#10003; Saved</span>',
         '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printPermissionSlip()">&#x1F5A8;&#xFE0F; Print</button>',
@@ -1448,13 +1474,18 @@
     var MODAL_CSS = [
         '.pi-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center; }',
         '.pi-overlay.open { display:flex; }',
+        /* max-height stays 90vh so the modal never touches the browser edges, but the
+           permission slip (the most vertically dense of these forms — a consent
+           paragraph plus two full signature pads) is the reason .pi-modal-body and
+           .pi-section padding below were tightened: on a typical laptop screen
+           (~800px tall) it now fits without the inner scroll it needed before. */
         '.pi-modal { background:white;border-radius:12px;width:95%;max-width:800px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.3); }',
-        '.pi-modal-header { display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid #e5e7eb;position:sticky;top:0;background:white;z-index:2;border-radius:12px 12px 0 0; }',
+        '.pi-modal-header { display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid #e5e7eb;position:sticky;top:0;background:white;z-index:2;border-radius:12px 12px 0 0; }',
         '.pi-modal-header h3 { margin:0;font-size:1.1rem;font-weight:700;color:#1e3a8a; }',
         '.pi-modal-header .pi-close { background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;padding:4px 8px;border-radius:4px; }',
         '.pi-modal-header .pi-close:hover { background:#f3f4f6;color:#111; }',
-        '.pi-modal-body { padding:24px; }',
-        '.pi-section { margin-bottom:20px; }',
+        '.pi-modal-body { padding:16px 24px; }',
+        '.pi-section { margin-bottom:14px; }',
         '.pi-section h4 { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin:0 0 10px 0;padding-bottom:6px;border-bottom:1px solid #f3f4f6; }',
         '.pi-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px 16px; }',
         '.pi-grid.three { grid-template-columns:1fr 1fr 1fr; }',
@@ -1469,7 +1500,7 @@
         /* The consent statement sits in its own soft panel so it reads as the formal
            declaration it is, with comfortable padding rather than hugging the edge. */
         '.pi-consent { background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;'
-            + 'padding:20px 24px;line-height:2.6; }',
+            + 'padding:14px 20px;line-height:2.2; }',
         /* Inline fill-in-the-blank inputs that flow WITHIN the sentence. Underlined
            blanks that widen to fit their content (esp. two teacher names). */
         '.pi-inline { display:inline-block;width:170px;max-width:100%;font-size:0.9rem;font-family:inherit;color:#111;'
@@ -1482,7 +1513,7 @@
         '.pi-inline-italic { font-style:italic;width:250px; }',
         '.pi-inline-sm { width:100px; }',
         '.pi-full { grid-column:1/-1; }',
-        '.pi-modal-footer { padding:16px 24px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:white;border-radius:0 0 12px 12px; }',
+        '.pi-modal-footer { padding:12px 24px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:white;border-radius:0 0 12px 12px; }',
         '.pi-btn { padding:8px 18px;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.15s; }',
         '.pi-btn-primary { background:#2563eb;color:white; }',
         '.pi-btn-primary:hover { background:#1d4ed8; }',
