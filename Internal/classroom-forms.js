@@ -288,6 +288,10 @@
             })(pad, onFileRel);
             pad.setStatus('Signed' + (existing.SignedAt ? ' ' + existing.SignedAt.slice(0, 10) : '')
                 + ' \u2014 press Clear to sign again', '#166534');
+        } else if (field === 'PermissionSlip') {
+            // The Permission Slip has no Print button (sign-and-save only, no paper
+            // copy), so the note only mentions the on-screen signature.
+            pad.setStatus('Not signed yet. Hand the screen to the parent to sign, then Save.', '#64748b');
         } else {
             pad.setStatus('Not signed yet. Hand the screen to the parent, or print and scan the '
                 + 'signed sheet into the child\u2019s file.', '#64748b');
@@ -758,12 +762,6 @@
             btn.disabled = false;
             btn.textContent = 'Save Permission Slip';
         }
-    }
-
-    function printPermissionSlip() {
-        document.getElementById('psOverlay').setAttribute('data-printing', '1');
-        window.print();
-        document.getElementById('psOverlay').removeAttribute('data-printing');
     }
 
     // ── Screening Results Shared with Parent (PICC PI10.H) ────────────────────
@@ -1354,8 +1352,9 @@
         '<div class="pi-field"><label>Parent/Guardian Signature</label><div id="psParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="psParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="psParentSigDate" style="flex:1;" title="Date signed"></div></div>',
         '<div class="pi-field"><label>Teacher Signature</label><div id="psTeacherSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="psTeacherSig" placeholder="Printed name" style="flex:2;"><input type="date" id="psTeacherSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
         '</div>',
+        /* No Print button: this form is sign-and-save only, on screen — no paper
+           copy is expected, so nothing to print. */
         '<div class="pi-modal-footer"><span class="pi-saved-badge" id="psSavedBadge" style="display:none;">&#10003; Saved</span>',
-        '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printPermissionSlip()">&#x1F5A8;&#xFE0F; Print</button>',
         '<button class="pi-btn pi-btn-primary" id="psSaveBtn" onclick="CofpForms.savePermissionSlip()">Save Permission Slip</button></div>',
         '</div></div>',
 
@@ -1580,7 +1579,6 @@
         openPermissionSlip: openPermissionSlip,
         savePermissionSlip: savePermissionSlip,
         closePermissionSlip: closePermissionSlip,
-        printPermissionSlip: printPermissionSlip,
         openResultsShared: openResultsShared,
         saveResultsShared: saveResultsShared,
         closeResultsShared: closeResultsShared,
