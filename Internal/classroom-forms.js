@@ -1335,7 +1335,7 @@
         '<div class="pi-modal-header"><h3 id="psModalTitle">Permission Slip</h3>',
         '<button class="pi-close" onclick="CofpForms.closePermissionSlip()" aria-label="Close">&times;</button></div>',
         '<div class="pi-modal-body">',
-        '<div class="pi-section" style="text-align:center;padding:4px 0 10px;"><h4 style="font-size:1.1rem;font-weight:800;color:#1e3a8a;text-transform:none;letter-spacing:0;border:none;padding:0;margin:0 0 4px;">Children of Promise PFA</h4><div style="font-size:0.95rem;font-weight:700;color:#374151;">Permission to perform screenings</div></div>',
+        '<div class="pi-section" style="text-align:center;padding:4px 0 10px;"><h4 style="font-size:1.1rem;font-weight:800;color:#1e3a8a;text-transform:none;letter-spacing:0;border:none;padding:0;margin:0 0 4px;">Children of Promise</h4><div style="font-size:0.95rem;font-weight:700;color:#374151;">Permission to perform screenings</div></div>',
         '<div class="pi-section"><div class="pi-consent">',
         '<div style="font-size:0.92rem;color:#374151;">I, <input type="text" id="psParentName" class="pi-inline" placeholder="parent name"> consent to <input type="text" id="psTeacher" class="pi-inline pi-inline-italic" placeholder="teacher"> conducting screenings on my child for the <input type="text" id="psSchoolYear" class="pi-inline pi-inline-sm" placeholder="year"> school year using Ages and Stages ASQ and ASE screening instruments.</div>',
         '<p style="font-size:0.86rem;line-height:1.5;color:#4b5563;margin:12px 0 0;">Screenings will be performed at the beginning and end of the school year.</p>',
