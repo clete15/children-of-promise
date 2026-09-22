@@ -138,7 +138,13 @@
             // Self-heal: if the backing store is stale (sized while hidden), fit now
             // so this stroke lands under the pen instead of being drawn off-canvas.
             if (needsFit()) fit();
-            canvas.setPointerCapture(e.pointerId);
+            /* Pointer capture keeps a stroke alive when the pen/finger leaves the
+               canvas mid-signature. But on some stylus/tablet stacks setPointerCapture
+               THROWS (a transient or already-released pointer id), and an uncaught
+               throw here aborts the whole handler before a single point is recorded —
+               so the pen silently draws nothing while a mouse works fine. Capture is a
+               nice-to-have, not required to draw, so never let it stop the stroke. */
+            try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* draw anyway */ }
             currentStroke = [pointFrom(e)];
             strokes.push(currentStroke);
             drawn = true;
