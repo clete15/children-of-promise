@@ -342,9 +342,17 @@ async function init() {
 
 // ── ROOM SIDEBAR / NAV ──
 function populateRoomDropdowns() {
-    document.getElementById('roomNumber').innerHTML = classrooms.map(r =>
-        `<option value="${r.RoomNumber}">${r.Room} — (${r.TeacherDescription})</option>`
-    ).join('');
+    // A real, empty placeholder as the first option. Without it the select had no
+    // value matching clearForm()'s reset (''), so a just-cleared New Student form
+    // still SHOWED the first room while submitting an empty RoomNumber - and a child
+    // saved with no room lands in no room bucket, so the roster count never moves and
+    // they are invisible (exactly the "saved but not there" bug). Now an unchosen
+    // room is visibly blank and is caught on save.
+    document.getElementById('roomNumber').innerHTML =
+        '<option value="">-- Select room --</option>'
+        + classrooms.map(r =>
+            `<option value="${r.RoomNumber}">${r.Room} — (${r.TeacherDescription})</option>`
+        ).join('');
 }
 
 function buildRoomNav() {
@@ -718,6 +726,11 @@ async function saveStudent() {
     const firstName = document.getElementById('firstName').value.trim();
     const lastName  = document.getElementById('lastName').value.trim();
     if (!firstName || !lastName) return showNotification('First and last name are required', 'error');
+    // A child with no room lands in no room bucket - the roster count never moves and
+    // they never appear. Require a room so a save can't silently "vanish" a student.
+    if (!document.getElementById('roomNumber').value) {
+        return showNotification('Please choose a Room before saving.', 'error');
+    }
     try {
         const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(buildBody()) });
         const data = await res.json();
