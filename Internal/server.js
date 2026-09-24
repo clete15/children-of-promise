@@ -3813,7 +3813,16 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
 function sqlRows(raw, columns) {
     return sqlCells(raw).map(v => {
         const o = {};
-        columns.forEach((c, i) => { o[c] = v[i] !== undefined ? v[i] : ''; });
+        // sqlcmd prints a SQL NULL as the literal token "NULL". Columns selected
+        // without an ISNULL(...) wrapper therefore reach the client as the STRING
+        // "NULL", which is truthy - so a child with no Birth_date/Start_Date showed
+        // "born NULL" / "enrolled NULL" on the My Classroom card (and similar dates
+        // elsewhere). Normalise the bare NULL token to '' here, at the one place every
+        // /api/students-style row is built, so no page ever has to guard for it.
+        columns.forEach((c, i) => {
+            const cell = v[i];
+            o[c] = (cell === undefined || cell === 'NULL') ? '' : cell;
+        });
         return o;
     });
 }
