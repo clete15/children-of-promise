@@ -599,14 +599,27 @@ function setBenefitsReadOnly(readOnly, s) {
 }
 
 function clearForm() {
-    ['firstName','lastName','birthDate','startDate','cityTown','daysOld','householdIncome','householdSize','homeLanguage']
-        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; })
-    ['monday','tuesday','wednesday','thursday','friday','iep','military','benWIC','benMedicaid','benSNAP','benTANF','proofOfIncome']
-        .forEach(id => document.getElementById(id).checked = false);
-    document.getElementById('active').value = 'Yes';
-    document.getElementById('category').value = '';
-    document.getElementById('pfaPiNa').value = '';
-    document.getElementById('frpFood').value = '';
+    // NB the missing semicolon after the first .forEach used to fuse these two
+    // statements: `})[ 'monday', ... ]` parsed as indexing the first forEach's
+    // return value, so the SECOND array (the checkboxes) never cleared and the
+    // whole function threw partway - which is why New Student kept the previous
+    // child's room, days, pay type and program on screen. Keep both terminated.
+    ['firstName', 'lastName', 'birthDate', 'startDate', 'cityTown', 'daysOld',
+     'householdIncome', 'householdSize', 'homeLanguage', 'frpFood']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'iep', 'military',
+     'benWIC', 'benMedicaid', 'benSNAP', 'benTANF', 'proofOfIncome']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.checked = false; });
+    // Dropdowns back to their empty/default option.
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    setVal('roomNumber', '');   // was never cleared - kept the previous child's room
+    setVal('active', 'Yes');
+    setVal('category', '');
+    setVal('pfaPiNa', '');
+    // Blank the read-only benefits summary spans too, so nothing from the prior
+    // record lingers if the summary card is ever shown.
+    ['benSumPay', 'benSumIncome', 'benSumSize', 'benSumBenefits']
+        .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
 }
 
 function calcDaysOld() {
