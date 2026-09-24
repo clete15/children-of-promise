@@ -313,6 +313,12 @@
                         <button class="btn btn-save" id="btnSaveNew" onclick="saveStudent()" style="display:none;">Save New Student</button>
                         <button class="btn btn-secondary" id="btnParentCode" onclick="generateParentCode()" style="padding:8px 14px;font-size:0.72rem;" title="Generate or view parent portal access code">🔑 Parent Code</button>
                         <button class="btn btn-secondary" id="btnConference" onclick="startConference()" style="padding:8px 14px;font-size:0.72rem;" title="Start a video conference with this student's parent">📹 Conference</button>
+                        <!-- Delete is for a genuine mistake (a duplicate or a test entry), not a
+                             withdrawal - use Active = No for a child who simply left. Centre-admin
+                             only; the server enforces that and also guards against orphaning any
+                             saved records. Pushed to the right so it does not sit under the primary
+                             Update action. -->
+                        <button class="btn btn-secondary" id="btnDelete" onclick="deleteStudent()" style="padding:8px 14px;font-size:0.72rem;margin-left:auto;color:#b91c1c;border-color:#fca5a5;" title="Permanently delete this student record (admins only). For a child who left, set Active to No instead.">🗑 Delete</button>
                     </div>
 
                 </div>
@@ -649,6 +655,8 @@ function startNewStudent() {
     document.getElementById('btnNewStudent').style.display = 'none';
     document.getElementById('btnSaveNew').style.display = '';
     document.getElementById('btnCancel').style.display = '';
+    const del = document.getElementById('btnDelete');
+    if (del) del.style.display = 'none';   // nothing to delete while adding a new child
     document.getElementById('btnPrev').disabled = true;
     document.getElementById('btnNext').disabled = true;
 }
@@ -662,6 +670,8 @@ function cancelNew() {
     document.getElementById('btnNewStudent').style.display = '';
     document.getElementById('btnSaveNew').style.display = 'none';
     document.getElementById('btnCancel').style.display = 'none';
+    const del = document.getElementById('btnDelete');
+    if (del) del.style.display = '';       // back to viewing a record, so Delete returns
     if (window.location.search) history.replaceState(null, '', window.location.pathname);
     sessionStorage.removeItem('enrollFromWaitlist');
     applyFilter();
@@ -757,6 +767,54 @@ async function saveStudent() {
         buildViewSidebar();
         applyFilter();
     } catch (e) { showNotification('Network error', 'error'); }
+}
+
+// ── DELETE STUDENT (admins only; server enforces) ──
+/* Permanently removes the enrollment record. Two-step: a plain confirm first, and
+   if the server reports the child has saved records attached (409 linked-records),
+   a second, blunter confirm that lists them before re-sending with force=1. Delete
+   is by the record's numeric Id, never by name. */
+async function deleteStudent() {
+    if (isNewMode) return;                       // nothing to delete while adding
+    const s = filtered[currentIndex];
+    if (!s || !s.Id) return showNotification('Select a student first', 'error');
+    const who = (s.First_Name + ' ' + s.Last_Name).trim();
+
+    if (!confirm('Permanently delete ' + who + '?\n\n'
+        + 'This removes the enrollment record entirely. For a child who simply left, '
+        + 'set Active to No instead - that keeps their history.\n\nThis cannot be undone.')) return;
+
+    const btn = document.getElementById('btnDelete');
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = 'Deleting...';
+    try {
+        let res = await apiFetch('/api/students/' + s.Id, { method: 'DELETE' });
+        let data = await res.json().catch(() => ({}));
+
+        // Server refused because the child has saved records - confirm harder, then force.
+        if (res.status === 409 && data.error === 'linked-records') {
+            const detail = Object.entries(data.linked || {})
+                .map(([t, n]) => '  - ' + t + ': ' + n).join('\n');
+            if (!confirm(who + ' has ' + data.linkedTotal + ' saved record(s) attached:\n\n'
+                + detail + '\n\nDelete the child AND all of these? This cannot be undone.')) {
+                btn.disabled = false; btn.textContent = orig; return;
+            }
+            res = await apiFetch('/api/students/' + s.Id + '?force=1', { method: 'DELETE' });
+            data = await res.json().catch(() => ({}));
+        }
+
+        if (res.status === 401) { showNotification('Only a centre admin can delete a student.', 'error'); return; }
+        if (!res.ok || !data.success) { showNotification('Delete failed: ' + (data.error || ('HTTP ' + res.status)), 'error'); return; }
+
+        showNotification('Deleted ' + (data.name || who)
+            + (data.deletedLinked ? ' and ' + data.deletedLinked + ' linked record(s)' : ''), 'success');
+        await loadStudents();
+        buildViewSidebar();
+        applyFilter();
+    } catch (e) {
+        showNotification('Network error', 'error');
+    } finally {
+        btn.disabled = false; btn.textContent = orig;
+    }
 }
 
 // ── ENROLL FROM WAITING LIST (?enroll=1) ──

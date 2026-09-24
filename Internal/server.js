@@ -4388,6 +4388,86 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         return;
     }
 
+    /* DELETE a student outright — /api/students/:id.
+
+       There is no soft "withdraw" here; that is what Active='No' (or the transfer
+       flag) is for. This is for a genuine mistake: a duplicate row, or a test entry
+       that should never have existed (e.g. the Keeley Holliday double-save). So it is
+       guarded by checkAuth (centre admin only), keyed by the numeric Id ONLY (never by
+       name - two children can share a name, which is exactly how the duplicate arose),
+       and it is deliberately cautious about linked data.
+
+       None of the child tables (ISBETracking, PermissionSlips, ChildSignatures,
+       ChildDocChecklist, ScreeningScores, ParentInterviews, ParentCodes, and the PICC
+       form tables) declare a foreign key, so deleting the enrollment row would silently
+       ORPHAN any of their rows rather than error. So: count those first. If anything is
+       linked and the caller did not pass ?force=1, REFUSE and return the counts, so the
+       UI can warn "this child has real records". With force=1, delete the child rows in
+       the same batch as the enrollment row, so nothing is left dangling. */
+    if (req.method === 'DELETE' && url.match(/^\/api\/students\/\d+$/)) {
+        if (!checkAuth(req, res)) return;
+        const sid = parseInt(url.split('/')[3]);
+        if (isNaN(sid)) return sendJSON(res, 400, { error: 'Bad student id' });
+        const force = new URLSearchParams(req.url.split('?')[1] || '').get('force') === '1';
+
+        // Confirm the row exists and get the name back for the response/log.
+        const who = runSQLRows(
+            `SELECT ISNULL(First_Name,'') AS First_Name, ISNULL(Last_Name,'') AS Last_Name
+             FROM rptMasterEnrollment WHERE Id=${sid}`);
+        if (!who.ok) return sendJSON(res, 500, { error: who.error });
+        if (!who.rows.length) return sendJSON(res, 404, { error: 'No student with that id.' });
+        const name = (who.rows[0].First_Name + ' ' + who.rows[0].Last_Name).trim();
+
+        // Child tables keyed by StudentId. Kept in one list so the count and the
+        // force-delete cleanup can never drift apart. PICC form tables come from the
+        // shared PI_DOC_FORMS config so a new form type is covered automatically.
+        const childTables = ['ISBETracking', 'PermissionSlips', 'ChildSignatures',
+            'ChildFiles', 'ChildDocChecklist', 'ScreeningScores', 'ParentInterviews',
+            'ParentCodes'];
+        try {
+            Object.values(PI_DOC_FORMS).forEach(cfg => {
+                if (cfg && cfg.table && childTables.indexOf(cfg.table) === -1) childTables.push(cfg.table);
+            });
+        } catch (e) { /* PI_DOC_FORMS optional; core tables still covered */ }
+
+        // Count linked rows per table, ignoring tables that do not exist yet.
+        const counts = {};
+        let linkedTotal = 0;
+        childTables.forEach(t => {
+            const c = runSQLRows(
+                `IF OBJECT_ID('${t}','U') IS NOT NULL
+                     SELECT COUNT(*) AS n FROM ${t} WHERE StudentId=${sid}
+                 ELSE SELECT 0 AS n`);
+            const n = (c.ok && c.rows.length) ? (parseInt(c.rows[0].n) || 0) : 0;
+            if (n > 0) { counts[t] = n; linkedTotal += n; }
+        });
+
+        if (linkedTotal > 0 && !force) {
+            // Refuse: make the caller confirm, and tell them exactly what is attached.
+            return sendJSON(res, 409, {
+                error: 'linked-records',
+                name: name,
+                linked: counts,
+                linkedTotal: linkedTotal,
+                message: name + ' has ' + linkedTotal + ' saved record(s) attached '
+                    + '(' + Object.keys(counts).join(', ') + '). Re-send with force to delete '
+                    + 'the child and those records.'
+            });
+        }
+
+        // Delete child rows first (only from tables that exist), then the enrollment
+        // row, in one batch. @@ROWCOUNT on the final delete confirms the child went.
+        let sql = '';
+        childTables.forEach(t => {
+            sql += `IF OBJECT_ID('${t}','U') IS NOT NULL DELETE FROM ${t} WHERE StudentId=${sid};\n`;
+        });
+        sql += `DELETE FROM rptMasterEnrollment WHERE Id=${sid};\nSELECT @@ROWCOUNT AS Deleted;`;
+        const r = runSQL(sql);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        console.log('[DELETE STUDENT]', sid, name, 'force=' + force, 'linked=' + linkedTotal);
+        return sendJSON(res, 200, { success: true, name: name, deletedLinked: linkedTotal });
+    }
+
     /* POST mark a child transferred out (or undo it) — /api/students/:id/transfer.
 
        A transfer is NOT the same as a plain withdrawal. A withdrawn child flips
