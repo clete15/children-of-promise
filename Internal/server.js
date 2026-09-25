@@ -4168,6 +4168,18 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             console.log('[POST] Saving:', d.firstName, d.lastName);
+            /* Server-side guard against the blank/NULL junk row. The Enrolled Students
+               form validates first name, last name and room before it posts, but that
+               was the ONLY thing stopping a nameless/roomless row - a direct API call
+               (or any future caller) bypassed it, and esc() turns a blank into SQL NULL,
+               so the row saved, matched no room bucket, and vanished from the UI. Refuse
+               here so a child can never be created without at least a name and a room. */
+            const need = ['firstName', 'lastName', 'roomNumber'].filter(
+                k => !String(d[k] == null ? '' : d[k]).trim());
+            if (need.length) {
+                return sendJSON(res, 400, { error: 'Missing required field(s): ' + need.join(', ')
+                    + '. A student needs a first name, last name and room.' });
+            }
             // Auto-calculate F/R/P from the one shared, date-based rule (see computeFrp).
             const frpFood = computeFrp({
                 income: d.householdIncome,
@@ -4189,6 +4201,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
                 SELECT CAST(SCOPE_IDENTITY() AS INT) AS NewId;`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            // A batch error still exits sqlcmd 0 and discards the INSERT; catch it so a
+            // failed save is never reported as success.
+            if (r.sqlError) return sendJSON(res, 500, { error: r.sqlError });
             if (!r.data.includes('rows affected')) return sendJSON(res, 500, { error: 'No rows written: ' + r.data });
 
             /* The child is now officially enrolled off the waiting list, so give them
@@ -4377,11 +4392,22 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             if (d.ccapStartDate !== undefined)    fields.push(`CCAPStartDate=${esc(d.ccapStartDate)}`);
             if (d.homeLanguage !== undefined)     fields.push(`HomeLanguage=${esc(d.homeLanguage)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+            // Never let an update blank a name to NULL - that is how a real child turns
+            // into an unnamed junk row. If firstName/lastName are being set, they must
+            // be non-empty (leaving them out of the body entirely is still fine).
+            if (d.firstName !== undefined && !String(d.firstName).trim())
+                return sendJSON(res, 400, { error: 'First name cannot be blanked.' });
+            if (d.lastName !== undefined && !String(d.lastName).trim())
+                return sendJSON(res, 400, { error: 'Last name cannot be blanked.' });
             const sql = `UPDATE rptMasterEnrollment SET ${fields.join(',')} WHERE First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
             console.log('[PUT SQL]', sql);
             const r = runSQL(sql);
             console.log('[PUT RESULT]', JSON.stringify(r));
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            // A batch error (e.g. a value too long for its column) leaves sqlcmd exit 0
+            // but discards the write - runSQL surfaces it as sqlError. Treat as failure
+            // so a truncated/failed save can't report success.
+            if (r.sqlError) return sendJSON(res, 500, { error: r.sqlError });
             if (!r.data.includes('rows affected')) return sendJSON(res, 500, { error: 'No rows updated: ' + r.data });
             sendJSON(res, 200, { success: true });
         });
@@ -8281,7 +8307,8 @@ ELSE
     // PUT update waitlist status (internal - protected)
     if (req.method === 'PUT' && url.startsWith('/api/waitinglist/')) {
         if (!checkAuth(req, res)) return;
-        const id = parseInt(url.split('/')[3]);
+        const id = parseInt(url.split('/')[3], 10);
+        if (!id) return sendJSON(res, 400, { error: 'Which record? (no id)' });
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const fields = [];
@@ -8289,8 +8316,19 @@ ELSE
             if (d.notes !== undefined) fields.push(`Notes=${esc(d.notes)}`);
             if (d.ageGroup !== undefined) fields.push(`AgeGroup=${esc(d.ageGroup)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
-            const r = runSQL(`UPDATE PreEnrollment SET ${fields.join(',')} WHERE Id=${id}`);
+            /* This used to return {success:true} on r.ok alone - so a bad id, or a value
+               too long for its column (sqlcmd exits 0, discards the write), reported
+               success while changing nothing. That is the mechanism behind a waitlist
+               row that "looks" flipped to Enrolled but never actually changed. Verify:
+               surface a batch error, and confirm a row was actually updated. */
+            const r = runSQL(`UPDATE PreEnrollment SET ${fields.join(',')} WHERE Id=${id};SELECT @@ROWCOUNT AS Updated;`);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            if (r.sqlError) return sendJSON(res, 500, { error: r.sqlError });
+            const m = String(r.data || '').match(/(\d+)/);
+            if (!m || parseInt(m[1], 10) === 0) {
+                return sendJSON(res, 404, { error: 'No pre-enrollment record with id ' + id
+                    + ' was updated. It may have been removed, or the list is stale - reload and retry.' });
+            }
             sendJSON(res, 200, { success: true });
         });
         return;
