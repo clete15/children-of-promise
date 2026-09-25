@@ -172,7 +172,9 @@ function showRoom(idx) {
 
 async function load() {
     try {
-        const res = await apiFetch('/api/reports');
+        // This page uses only byRoomDaily; ask the server for just that section so it
+        // doesn't run the dozen-plus other report queries on every load.
+        const res = await apiFetch('/api/reports?only=byRoomDaily');
         const data = await res.json();
         dailyData = (data && data.byRoomDaily) || [];
         if (!dailyData.length) {

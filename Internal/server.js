@@ -8263,8 +8263,26 @@ ELSE
             // days requested. The projection seats these alongside the enrolled children.
             waitlistChildren: `SELECT p.Id, ISNULL(p.ChildName,'') AS ChildName, ISNULL(CONVERT(NVARCHAR(10),p.ChildBirthDate,120),'') AS BirthDate, ISNULL(p.AgeGroup,'') AS AgeGroup, ISNULL(p.DaysRequested,'') AS DaysRequested, ISNULL(CAST(p.Score AS NVARCHAR),'') AS Score FROM PreEnrollment p WHERE ISNULL(p.WaitlistStatus,'Pending') NOT IN ('Enrolled','Declined')`,
         };
+        /* Each query below is a separate synchronous sqlcmd.exe spawn, and this handler
+           runs them serially on the single Node thread — so a caller that needs only one
+           section still paid for all ~16 process spawns (and blocked every other request
+           for the duration). The two attendance pages hit this endpoint on every load but
+           use only a few sections. `?only=a,b,c` runs just those sections; no param keeps
+           the original behaviour (every section), so existing callers are unaffected.
+           projectedAttendance is derived in Node from three source queries, so asking for
+           it automatically pulls those in. */
+        const onlyParam = new URLSearchParams(req.url.split('?')[1] || '').get('only');
+        let wanted = null;
+        if (onlyParam) {
+            wanted = new Set(onlyParam.split(',').map(s => s.trim()).filter(Boolean));
+            if (wanted.has('projectedAttendance')) {
+                wanted.add('projRooms'); wanted.add('enrolledChildren'); wanted.add('waitlistChildren');
+            }
+        }
+
         const results = {};
         for (const [key, sql] of Object.entries(queries)) {
+            if (wanted && !wanted.has(key)) continue;
             const r = runSQL(sql);
             if (!r.ok) { results[key] = { error: r.error }; continue; }
             results[key] = sqlCells(r.data);
@@ -8279,8 +8297,10 @@ ELSE
            room. Children who do not fit any room are "squeezed out" — which is exactly the
            capacity pressure the director wants to see. Done per weekday, because a child
            only occupies a seat on the days they attend/requested. */
-        results.projectedAttendance = buildProjectedAttendance(
-            results.projRooms, results.enrolledChildren, results.waitlistChildren);
+        if (!wanted || wanted.has('projectedAttendance')) {
+            results.projectedAttendance = buildProjectedAttendance(
+                results.projRooms, results.enrolledChildren, results.waitlistChildren);
+        }
 
         return sendJSON(res, 200, results);
     }

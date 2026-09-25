@@ -198,7 +198,9 @@ function showRoom(idx) {
 
 async function load() {
     try {
-        const res = await apiFetch('/api/reports');
+        // This page uses only the projection; ask for just that section (the server pulls
+        // in its three source queries automatically) instead of the full report set.
+        const res = await apiFetch('/api/reports?only=projectedAttendance');
         const data = await res.json();
         rooms = (data && data.projectedAttendance) || [];
         if (!Array.isArray(rooms) || !rooms.length) {
