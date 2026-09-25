@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parent Portal – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
+        /* Same 15% left inset the other Enrollment-area pages use. */
+        .pp-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px 20px 20px 15%; }
+        .pp-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1000px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        .pp-sidebar { width:240px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;display:flex;flex-direction:column;border-radius:12px 0 0 12px; }
+        .pp-search { padding:10px;border-bottom:1px solid var(--sp-border); }
+        .pp-search input { width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-surface);color:var(--sp-text);font-size:0.85rem; }
+        .pp-list { overflow-y:auto;flex:1;padding:6px 0; }
+        .pp-list button {
+            display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;
+            background:transparent;font-size:0.86rem;font-weight:700;color:var(--sp-text);
+            border-left:3px solid transparent;transition:background 0.15s;
+        }
+        .pp-list button:hover:not(.on) { background:var(--sp-surface); }
+        .pp-list button.on { background:var(--sp-accent-soft);border-left-color:var(--sp-accent);color:var(--sp-accent); }
+        .pp-list .pp-sub { font-size:0.72rem;font-weight:600;color:var(--sp-muted);margin-top:2px; }
+        .pp-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;max-height:calc(100vh - 130px); }
+        .pp-head { padding:12px 20px;border-bottom:1px solid var(--sp-border); }
+        .pp-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
+        .pp-body { overflow-y:auto;flex:1;padding:22px 26px; }
+        .pp-child-name { font-size:1.15rem;font-weight:800;color:var(--sp-text);margin-bottom:2px; }
+        .pp-child-sub { font-size:0.8rem;color:var(--sp-muted);margin-bottom:20px; }
+        .pp-section { border:1px solid var(--sp-border);border-radius:10px;padding:16px 18px;margin-bottom:16px;background:var(--sp-surface-2); }
+        .pp-section h3 { margin:0 0 6px;font-size:0.82rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:var(--sp-text-2); }
+        .pp-section p { margin:0 0 12px;font-size:0.82rem;color:var(--sp-muted);line-height:1.5; }
+        .pp-btn {
+            display:inline-flex;align-items:center;gap:7px;padding:9px 16px;border:1px solid var(--sp-border);
+            border-radius:8px;background:var(--sp-surface);color:var(--sp-text);font-size:0.84rem;font-weight:700;
+            cursor:pointer;transition:background 0.12s,border-color 0.12s;
+        }
+        .pp-btn:hover { background:var(--sp-accent-soft);border-color:var(--sp-accent);color:var(--sp-accent); }
+        .pp-code { font-family:monospace;font-size:1.1rem;font-weight:800;letter-spacing:0.08em;color:var(--sp-accent);
+            background:var(--sp-accent-soft);border-radius:6px;padding:4px 10px;display:inline-block;margin-left:8px; }
+        .pp-soon { display:inline-block;font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;
+            color:var(--sp-muted);border:1px solid var(--sp-border);border-radius:20px;padding:2px 9px;margin-left:8px; }
+        .pp-empty { padding:44px;text-align:center;color:var(--sp-muted);font-size:0.9rem; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Parent Portal &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <div class="header-actions">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/">← Staff Portal</a>
+    </div>
+</header>
+
+<div class="pp-layout">
+    <div class="pp-wrapper">
+        <div class="pp-sidebar">
+            <div class="pp-search">
+                <input type="text" id="ppSearch" placeholder="Search by name…" oninput="renderList()">
+            </div>
+            <div class="pp-list" id="ppList"></div>
+        </div>
+        <div class="pp-card">
+            <div class="pp-head">
+                <div class="pp-title">Parent / Child Portal Setup</div>
+            </div>
+            <div class="pp-body" id="ppBody">
+                <div class="pp-empty">Loading students…</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+/* Parent Portal setup page. This is the staff-side entry point for the child portal a
+   parent uses at childrenofpromisedaycare.com/parent. For each enrolled child it lets a
+   staff member:
+     - generate/view the parent access code (GET/POST /api/parent-codes)
+     - start a video conference with the parent (POST /api/conference)
+   The forms a parent fills out about their child are the next piece to build here; the
+   section for them is present but marked "coming soon" so the shape of the page is set.
+
+   The per-child Parent Code / Conference actions moved here from the Enrolled Students
+   form, where they were two buttons acting on the selected student. Same endpoints. */
+
+let students = [];
+let selectedId = null;
+
+function esc(v) {
+    return String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function selected() {
+    return students.find(s => String(s.Id) === String(selectedId)) || null;
+}
+
+function renderList() {
+    const q = (document.getElementById('ppSearch').value || '').trim().toLowerCase();
+    const box = document.getElementById('ppList');
+    const rows = students.filter(s => {
+        if (!q) return true;
+        return (s.First_Name + ' ' + s.Last_Name).toLowerCase().includes(q);
+    });
+    if (!rows.length) {
+        box.innerHTML = '<div class="pp-empty" style="padding:24px;">No matching students.</div>';
+        return;
+    }
+    box.innerHTML = rows.map(s => {
+        const on = String(s.Id) === String(selectedId) ? ' class="on"' : '';
+        const room = s.Room ? esc(s.Room) : '';
+        return `<button id="ppRow${s.Id}"${on} onclick="selectChild(${JSON.stringify(String(s.Id))})">
+            <div>${esc(s.First_Name)} ${esc(s.Last_Name)}</div>
+            ${room ? `<div class="pp-sub">${room}</div>` : ''}
+        </button>`;
+    }).join('');
+}
+
+function selectChild(id) {
+    selectedId = id;
+    renderList();
+    renderDetail();
+}
+
+function renderDetail() {
+    const s = selected();
+    const body = document.getElementById('ppBody');
+    if (!s) {
+        body.innerHTML = '<div class="pp-empty">Select a child on the left to set up their parent portal.</div>';
+        return;
+    }
+    const room = s.Room ? ` · ${esc(s.Room)}` : '';
+    body.innerHTML = `
+        <div class="pp-child-name">${esc(s.First_Name)} ${esc(s.Last_Name)}</div>
+        <div class="pp-child-sub">Parent portal setup${room}</div>
+
+        <div class="pp-section">
+            <h3>Parent access code</h3>
+            <p>Generate a code the parent enters at <strong>childrenofpromisedaycare.com/parent</strong> to reach
+               their child's portal and sign forms. Generating a new code invalidates the previous one.</p>
+            <button class="pp-btn" onclick="generateParentCode()">🔑 Generate / view code</button>
+        </div>
+
+        <div class="pp-section">
+            <h3>Video conference</h3>
+            <p>Open a private video room and record the link so the parent can join from their portal.</p>
+            <button class="pp-btn" onclick="startConference()">📹 Start conference</button>
+        </div>
+
+        <div class="pp-section">
+            <h3>Parent forms <span class="pp-soon">Coming soon</span></h3>
+            <p>The forms a parent fills out about their child will live here — assign a form, see what's
+               completed, and review submissions.</p>
+        </div>`;
+}
+
+async function generateParentCode() {
+    const s = selected();
+    if (!s || !s.Id) { showNotification('Select a child first', 'error'); return; }
+    try {
+        const existRes = await apiFetch('/api/parent-codes');
+        const codes = await existRes.json();
+        const existing = Array.isArray(codes) ? codes.find(c => String(c.StudentId) === String(s.Id)) : null;
+        if (existing) {
+            const regenerate = confirm(
+                'Parent code for ' + s.First_Name + ' ' + s.Last_Name + ':\n\n' +
+                '    ' + existing.Code + '\n\n' +
+                'Share this with the parent. They go to:\n' +
+                'childrenofpromisedaycare.com/parent\n\n' +
+                'Click OK to generate a NEW code (invalidates the old one)\n' +
+                'Click Cancel to keep the current code.'
+            );
+            if (!regenerate) return;
+        }
+        const res = await apiFetch('/api/parent-codes', {
+            method: 'POST', body: JSON.stringify({ studentId: s.Id })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert(
+                'Parent code for ' + s.First_Name + ' ' + s.Last_Name + ':\n\n' +
+                '    ' + data.code + '\n\n' +
+                'Give this to the parent. They visit:\n' +
+                'childrenofpromisedaycare.com/parent\n' +
+                'and enter the code to sign forms.'
+            );
+        } else {
+            showNotification('Failed to generate code: ' + (data.error || ''), 'error');
+        }
+    } catch (e) { showNotification('Error: ' + e.message, 'error'); }
+}
+
+function startConference() {
+    const s = selected();
+    if (!s || !s.Id) { showNotification('Select a child first', 'error'); return; }
+    const roomName = 'CofP-' + String(s.Last_Name || '').replace(/[^a-zA-Z]/g, '') + '-' + s.Id + '-' + new Date().toISOString().split('T')[0];
+    const meetUrl = 'https://meet.jit.si/' + roomName;
+    apiFetch('/api/conference', {
+        method: 'POST', body: JSON.stringify({ studentId: s.Id, meetUrl: meetUrl })
+    }).then(res => res.json()).then(data => {
+        window.open(meetUrl, '_blank');
+        if (data.success) showNotification('Conference started! Parent can join from their portal.', 'success');
+    }).catch(() => { window.open(meetUrl, '_blank'); });
+}
+
+async function load() {
+    try {
+        const res = await apiFetch('/api/students');
+        const data = await res.json();
+        // /api/students returns active enrolled children; keep only those with a real name.
+        students = (Array.isArray(data) ? data : (data.students || []))
+            .filter(s => s && s.Id && (s.First_Name || s.Last_Name))
+            .sort((a, b) => (a.Last_Name || '').localeCompare(b.Last_Name || '')
+                || (a.First_Name || '').localeCompare(b.First_Name || ''));
+        renderList();
+        renderDetail();
+    } catch (e) {
+        document.getElementById('ppBody').innerHTML =
+            '<div class="pp-empty">Could not load students: ' + esc(e.message) + '</div>';
+        document.getElementById('ppList').innerHTML = '';
+    }
+}
+
+load();
+</script>
+</body>
+</html>
