@@ -716,8 +716,12 @@ async function updateStudent() {
     const btn = document.getElementById('btnUpdate');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
+        // Send the record's stable Id so the server updates exactly this row, not any
+        // child who happens to share the name (the old name-keyed path). The name still
+        // rides in the URL as a fallback for older servers that ignore the Id.
+        const body = Object.assign(buildBody(), { id: s.Id });
         const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
-            method: 'PUT', body: JSON.stringify(buildBody())
+            method: 'PUT', body: JSON.stringify(body)
         });
         const data = await res.json();
         if (data.success) {

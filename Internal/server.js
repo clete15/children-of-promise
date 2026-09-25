@@ -4399,7 +4399,17 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
                 return sendJSON(res, 400, { error: 'First name cannot be blanked.' });
             if (d.lastName !== undefined && !String(d.lastName).trim())
                 return sendJSON(res, 400, { error: 'Last name cannot be blanked.' });
-            const sql = `UPDATE rptMasterEnrollment SET ${fields.join(',')} WHERE First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
+            /* Prefer the stable numeric Id when the caller sends one, and fall back to
+               the name in the URL only when it does not. Keying on First_Name+Last_Name
+               was the last name-keyed write left: two children sharing a name were BOTH
+               updated by one save, and a rename matched on the pre-rename name. The Id
+               targets exactly one row and survives a rename. The name path stays for
+               backward compatibility with any caller that has not been updated yet. */
+            const idNum = parseInt(d.id, 10);
+            const whereClause = idNum
+                ? `Id=${idNum}`
+                : `First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
+            const sql = `UPDATE rptMasterEnrollment SET ${fields.join(',')} WHERE ${whereClause}`;
             console.log('[PUT SQL]', sql);
             const r = runSQL(sql);
             console.log('[PUT RESULT]', JSON.stringify(r));

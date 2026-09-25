@@ -250,6 +250,7 @@ async function saveBenefitRow(i) {
 
     try {
         const body = {
+            id: s.Id,
             publicBenefits: benefits,
             category: newCategory,
             householdIncome: newIncome,
