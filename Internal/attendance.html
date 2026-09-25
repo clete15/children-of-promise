@@ -123,10 +123,15 @@ function esc(v) {
 function renderSidebar() {
     const box = document.getElementById('atSidebar');
     box.innerHTML = dailyData.map((r, i) => {
-        const cap = parseInt(r[1] || 0);
+        const capNum = parseInt(r[1]);
+        const cap = isNaN(capNum) ? '?' : capNum;   // was showing "NaN" for a room with no capacity
+        // byRoomDaily has no single enrolled total - each of Mon..Fri (r[2]..r[6]) is
+        // that day's count. The peak across the week is the closest read on how many
+        // children are enrolled in the room, since every child attends at least one day.
+        const enrolled = Math.max(0, ...[2, 3, 4, 5, 6].map(c => parseInt(r[c]) || 0));
         return `<button id="atRoom${i}" onclick="showRoom(${i})">
             <div>${esc(r[0] || 'Unknown')}</div>
-            <div class="at-room-cap">Capacity ${cap}</div>
+            <div class="at-room-cap">Capacity ${cap} &middot; ${enrolled} enrolled</div>
         </button>`;
     }).join('');
 }
