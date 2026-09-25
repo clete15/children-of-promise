@@ -678,6 +678,82 @@ function cancelNew() {
 }
 
 // ── SAVE / UPDATE ──
+/* Internal controls on record entry. Both Save (new) and Update (edit) run this before
+   sending to the server, so obviously-wrong data never reaches the database. Two tiers:
+   hard errors stop the save outright; soft warnings ask the user to confirm an unusual
+   (but not impossible) value. Everything here is a check on data the user typed — it does
+   NOT change what gets saved, only whether the save proceeds. `body` is buildBody()'s object.
+   Returns true to proceed, false to stop. */
+function validateStudentEntry(body) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    // Parse a YYYY-MM-DD field as a local date (not UTC) so it isn't off by a day.
+    const parseDate = s => {
+        if (!s) return null;
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+        if (!m) return null;
+        const d = new Date(+m[1], +m[2] - 1, +m[3]);
+        return isNaN(d.getTime()) ? null : d;
+    };
+    const bd = parseDate(body.birthDate);
+    const sd = parseDate(body.startDate);
+
+    // ── Hard errors ──
+    if (body.birthDate && !bd) {
+        return (showNotification('Birth date is not a valid date.', 'error'), false);
+    }
+    if (bd) {
+        // A slip like year 0022 or 20222 — reject anything outside a plausible range.
+        const y = bd.getFullYear();
+        if (y < 1990 || y > today.getFullYear()) {
+            return (showNotification('Birth date year ' + y + ' looks wrong — please check it.', 'error'), false);
+        }
+        if (bd > today) {
+            return (showNotification('Birth date is in the future.', 'error'), false);
+        }
+    }
+    if (body.startDate && !sd) {
+        return (showNotification('Start date is not a valid date.', 'error'), false);
+    }
+    if (bd && sd && sd < bd) {
+        return (showNotification('Start date is before the birth date.', 'error'), false);
+    }
+
+    // A child must attend at least one day, or they occupy no seat on any day and never
+    // appear in a room's daily count.
+    const anyDay = body.monday || body.tuesday || body.wednesday || body.thursday || body.friday;
+    if (!anyDay) {
+        return (showNotification('Select at least one attending day (Mon–Fri).', 'error'), false);
+    }
+
+    // Household size, when given, must be a whole number in a sane range.
+    if (body.householdSize !== '' && body.householdSize != null) {
+        const hh = Number(body.householdSize);
+        if (!Number.isFinite(hh) || hh < 1 || hh > 20 || Math.floor(hh) !== hh) {
+            return (showNotification('Household size should be a whole number from 1 to 20.', 'error'), false);
+        }
+    }
+    // Household income, when given, must be a non-negative number.
+    if (body.householdIncome !== '' && body.householdIncome != null) {
+        const inc = Number(body.householdIncome);
+        if (!Number.isFinite(inc) || inc < 0) {
+            return (showNotification('Household income should be a number of 0 or more.', 'error'), false);
+        }
+    }
+
+    // ── Soft warnings (confirm to proceed) ──
+    if (sd) {
+        const twoYears = new Date(today.getFullYear() + 2, today.getMonth(), today.getDate());
+        if (sd > twoYears && !confirm('Start date ' + body.startDate + ' is more than two years away. Save anyway?')) return false;
+        if (sd.getFullYear() < 2015 && !confirm('Start date ' + body.startDate + ' is unusually far in the past. Save anyway?')) return false;
+    }
+    if (body.householdIncome !== '' && body.householdIncome != null) {
+        const inc = Number(body.householdIncome);
+        if (inc > 150000 && !confirm('Annual household income of $' + inc.toLocaleString() + ' is unusually high. Save anyway?')) return false;
+    }
+
+    return true;
+}
+
 function buildBody() {
     const val = id => document.getElementById(id);
     return {
@@ -713,13 +789,14 @@ function buildBody() {
 async function updateStudent() {
     const s = filtered[currentIndex];
     if (!s) return showNotification('No student selected', 'error');
+    // Send the record's stable Id so the server updates exactly this row, not any
+    // child who happens to share the name (the old name-keyed path). The name still
+    // rides in the URL as a fallback for older servers that ignore the Id.
+    const body = Object.assign(buildBody(), { id: s.Id });
+    if (!validateStudentEntry(body)) return;   // internal controls — same checks as a new save
     const btn = document.getElementById('btnUpdate');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
-        // Send the record's stable Id so the server updates exactly this row, not any
-        // child who happens to share the name (the old name-keyed path). The name still
-        // rides in the URL as a fallback for older servers that ignore the Id.
-        const body = Object.assign(buildBody(), { id: s.Id });
         const res = await apiFetch(`/api/students/${encodeURIComponent(s.First_Name)}/${encodeURIComponent(s.Last_Name)}`, {
             method: 'PUT', body: JSON.stringify(body)
         });
@@ -745,8 +822,10 @@ async function saveStudent() {
     if (!document.getElementById('roomNumber').value) {
         return showNotification('Please choose a Room before saving.', 'error');
     }
+    const body = buildBody();
+    if (!validateStudentEntry(body)) return;   // internal controls on the entered data
     try {
-        const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(buildBody()) });
+        const res = await apiFetch('/api/students', { method: 'POST', body: JSON.stringify(body) });
         const data = await res.json();
         if (!data.success) {
             showNotification('Save failed: ' + (data.error || 'Unknown error'), 'error');
