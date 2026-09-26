@@ -110,16 +110,20 @@ function renderList() {
     const box = document.getElementById('ppList');
     const rows = students.filter(s => {
         if (!q) return true;
-        return (s.First_Name + ' ' + s.Last_Name).toLowerCase().includes(q);
+        return ((s.First_Name || '') + ' ' + (s.Last_Name || '')).toLowerCase().includes(q);
     });
     if (!rows.length) {
-        box.innerHTML = '<div class="pp-empty" style="padding:24px;">No matching students.</div>';
+        box.innerHTML = '<div class="pp-empty" style="padding:24px;">' +
+            (students.length ? 'No matching students.' : 'No students found.') + '</div>';
         return;
     }
+    // The child id rides in a data-id attribute and a single delegated listener handles
+    // the click (set up once in load()). Earlier this built an inline onclick with the id
+    // JSON-quoted, which put a double quote inside the double-quoted attribute.
     box.innerHTML = rows.map(s => {
         const on = String(s.Id) === String(selectedId) ? ' class="on"' : '';
         const room = s.Room ? esc(s.Room) : '';
-        return `<button id="ppRow${s.Id}"${on} onclick="selectChild(${JSON.stringify(String(s.Id))})">
+        return `<button type="button" data-id="${esc(s.Id)}"${on}>
             <div>${esc(s.First_Name)} ${esc(s.Last_Name)}</div>
             ${room ? `<div class="pp-sub">${room}</div>` : ''}
         </button>`;
@@ -214,22 +218,39 @@ function startConference() {
 }
 
 async function load() {
+    const body = document.getElementById('ppBody');
     try {
         const res = await apiFetch('/api/students');
+        if (!res.ok) {
+            // 401 = not signed in for this browser session; anything else is a server fault.
+            const msg = res.status === 401
+                ? 'You are not signed in. Open the Staff Portal and sign in, then reload this page.'
+                : 'The server returned an error (' + res.status + ').';
+            body.innerHTML = '<div class="pp-empty">' + esc(msg) + '</div>';
+            return;
+        }
         const data = await res.json();
-        // /api/students returns active enrolled children; keep only those with a real name.
-        students = (Array.isArray(data) ? data : (data.students || []))
+        // /api/students returns an array of enrolled children; keep those with a real name.
+        const list = Array.isArray(data) ? data : (data && Array.isArray(data.students) ? data.students : []);
+        students = list
             .filter(s => s && s.Id && (s.First_Name || s.Last_Name))
-            .sort((a, b) => (a.Last_Name || '').localeCompare(b.Last_Name || '')
-                || (a.First_Name || '').localeCompare(b.First_Name || ''));
+            .sort((a, b) => String(a.Last_Name || '').localeCompare(String(b.Last_Name || ''))
+                || String(a.First_Name || '').localeCompare(String(b.First_Name || '')));
         renderList();
-        renderDetail();
     } catch (e) {
-        document.getElementById('ppBody').innerHTML =
-            '<div class="pp-empty">Could not load students: ' + esc(e.message) + '</div>';
         document.getElementById('ppList').innerHTML = '';
+        body.innerHTML = '<div class="pp-empty">Could not load students: ' + esc(e && e.message ? e.message : e) + '</div>';
+        return;
     }
+    // Always show the detail panel's resting state so the page never sits on "Loading…".
+    renderDetail();
 }
+
+// One delegated click handler for the whole list (buttons carry data-id).
+document.getElementById('ppList').addEventListener('click', function (ev) {
+    const btn = ev.target.closest('button[data-id]');
+    if (btn) selectChild(btn.getAttribute('data-id'));
+});
 
 load();
 </script>
