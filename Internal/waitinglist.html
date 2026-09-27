@@ -21,7 +21,10 @@
             max-width: 1900px;
             width: 100%;
             margin: 12px 0 0;
-            padding: 0 20px 0 40px;
+            /* 15% left inset so the toolbar and the table below open at the same spot as
+               the sub-nav above and the Enrolled Students content — they were starting at
+               a fixed 40px, well to the left of everything else. */
+            padding: 0 20px 0 15%;
             display: flex;
             align-items: center;
             gap: 12px;
@@ -60,7 +63,8 @@
                screens it still fills the width and falls back to horizontal scroll. */
             max-width: 1900px;
             margin: 10px 0 30px;
-            padding: 0 20px 0 40px;
+            /* Same 15% left inset as the toolbar and the sub-nav (was a fixed 40px). */
+            padding: 0 20px 0 15%;
             width: 100%;
             display: flex;
             flex-direction: column;
@@ -88,7 +92,9 @@
         /* ── TABLE ── */
         .wl-table {
             width: 100%;
-            min-width: 1000px;
+            /* Lowered from 1000px: the Score column is gone (folded into Risk Factors)
+               and the columns are tighter, so the table no longer needs as much room. */
+            min-width: 860px;
             border-collapse: collapse;
             background: var(--sp-surface);
             font-size: 0.86rem;
@@ -101,17 +107,17 @@
             z-index: 2;
         }
         .wl-table th {
-            padding: 9px 8px;
+            padding: 8px 6px;
             text-align: left;
-            font-size: 0.74rem;
+            font-size: 0.72rem;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.04em;
             color: var(--text-muted);
             white-space: nowrap;
         }
         .wl-table td {
-            padding: 8px 8px;
+            padding: 6px 6px;
             border-bottom: 1px solid var(--border);
             vertical-align: top;
         }
@@ -121,7 +127,7 @@
         .wl-table tbody tr.row-pending:hover { background: var(--sp-warn-bg); filter: brightness(0.97); }
 
         /* ── NOTES ── */
-        .notes-cell { min-width: 180px; max-width: 220px; height: 100%; }
+        .notes-cell { min-width: 150px; max-width: 180px; height: 100%; }
         .notes-input {
             width: 100%;
             height: calc(100% - 24px);
@@ -177,8 +183,16 @@
         .score-low    { background: var(--sp-good-bg); color: var(--sp-good-fg); }
 
         /* Risk factors listed one per line in a single column, each as its own pill,
-           so a family's flags read down the cell instead of wrapping side to side. */
-        .flag-list { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 200px; }
+           so a family's flags read down the cell instead of wrapping side to side.
+           The score now leads this column as its own chip (see .flag-score), so the
+           separate Score column is gone. */
+        .flag-list { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; max-width: 170px; }
+        /* Score chip at the top of the risk-factor stack. Keeps the score's high/med/low
+           colour coding but folds it into one column. */
+        .flag-score { padding: 2px 9px; border-radius: 20px; font-size: 0.78rem; font-weight: 800; white-space: nowrap; margin-bottom: 1px; }
+        .flag-score.score-high   { background: var(--sp-bad-bg);  color: var(--sp-bad-fg); }
+        .flag-score.score-medium { background: var(--sp-warn-bg); color: var(--sp-warn-fg); }
+        .flag-score.score-low    { background: var(--sp-good-bg); color: var(--sp-good-fg); }
         .flag {
             padding: 2px 8px;
             border-radius: 4px;
@@ -204,10 +218,10 @@
             min-width: 100px;
         }
         .status-select:focus { outline: none; border-color: var(--primary); }
-        /* Wider Program column: the age-group labels ("2-Year Olds", "Before & After")
-           were cramped. Give the program picker and its header more room. */
-        .col-program { min-width: 160px; }
-        select[id^="prog-"] { min-width: 150px; }
+        /* Program column: enough for the age-group labels ("2-Year Olds", "Before &
+           After") without the old excess. */
+        .col-program { min-width: 132px; }
+        select[id^="prog-"] { min-width: 124px; }
 
         .wl-empty {
             text-align: center;
@@ -340,8 +354,7 @@
                     <th>Name &amp; Contact</th>
                     <th>Children</th>
                     <th class="col-program">Program</th>
-                    <th>Score</th>
-                    <th>Risk Factors</th>
+                    <th>Score &amp; Risk Factors</th>
                     <th style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);">Income</th>
                     <th>Submitted</th>
                     <th>Requested Start</th>
@@ -350,7 +363,7 @@
                 </tr>
             </thead>
             <tbody id="wlBody">
-                <tr><td colspan="11" class="wl-empty">Loading…</td></tr>
+                <tr><td colspan="10" class="wl-empty">Loading…</td></tr>
             </tbody>
         </table>
     </div>
@@ -388,7 +401,7 @@ async function load() {
         updateTabCounts();
         renderTable();
     } catch (e) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">Failed to load waiting list.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="10" class="wl-empty">Failed to load waiting list.</td></tr>`;
     }
 }
 
@@ -496,7 +509,7 @@ function renderTable() {
     document.getElementById('wlCount').textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
 
     if (!rows.length) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="11" class="wl-empty">No records found.</td></tr>`;
+        document.getElementById('wlBody').innerHTML = `<tr><td colspan="10" class="wl-empty">No records found.</td></tr>`;
         syncScrollbar();
         return;
     }
@@ -531,8 +544,7 @@ function renderTable() {
             </td>
             <td style="font-size:0.82rem;max-width:140px;">${r.ChildrenInfo || '—'}</td>
             <td>${programSelect(r)}</td>
-            <td><span class="score-badge ${scoreClass}">${score} pts</span></td>
-            <td><div class="flag-list">${flags}</div></td>
+            <td><div class="flag-list"><span class="flag-score ${scoreClass}">${score} pts</span>${flags}</div></td>
             <td style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);font-weight:700;font-size:0.86rem;">${r.HouseholdIncome ? fmtMoney(r.HouseholdIncome) : '—'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td><span class="submitted-date">${reqStart}</span></td>
