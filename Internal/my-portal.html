@@ -239,6 +239,19 @@ function hide(el) {
     }).catch(function () { /* offline → show form */ });
 })();
 
+/* Ask the browser to remember a just-verified credential so it can autofill it next
+   time. Uses the Credential Management API where available (Chrome/Edge, which is what
+   the centre uses); silently does nothing where it is not supported. Storing a credential
+   only enables autofill — it never signs the person in without the Sign In click. */
+function rememberCredential(login, password) {
+    try {
+        if (window.PasswordCredential && navigator.credentials && navigator.credentials.store) {
+            var cred = new PasswordCredential({ id: login, password: password, name: login });
+            navigator.credentials.store(cred).catch(function () { /* user declined / unsupported */ });
+        }
+    } catch (e) { /* API not available in this browser */ }
+}
+
 $('mpSignIn').addEventListener('submit', async e => {
     e.preventDefault();
     const login = $('mpLogin').value.trim();
@@ -265,6 +278,13 @@ $('mpSignIn').addEventListener('submit', async e => {
             $('mpNew').focus();
             return;
         }
+        // Offer to save the password. Because sign-in is an AJAX call on a
+        // preventDefault'd form (never a real navigation), the browser's own
+        // "Save password?" prompt does not fire on its own — so ask it explicitly via
+        // the Credential Management API once the login has actually succeeded. This only
+        // OFFERS to save/autofill; it does NOT sign anyone in automatically. The Sign In
+        // button must still be clicked every visit, which is the point.
+        rememberCredential(login, password);
         location.replace(await destAfterSignIn());
     } catch (ex) {
         show(err, 'err', ex.message || 'Could not sign in.');
@@ -298,6 +318,9 @@ $('mpChange').addEventListener('submit', async e => {
     try {
         await CofpAuth.staffChangePassword(pendingCurrent, next);
         pendingCurrent = '';
+        // Offer to save the NEW password, so the browser autofills the one they just set
+        // rather than the temporary name-initial code they signed in with.
+        rememberCredential($('mpLogin').value.trim(), next);
         show(msg, 'ok', 'Saved. Taking you to your page…');
         const dest = await destAfterSignIn();
         setTimeout(() => location.replace(dest), 700);
