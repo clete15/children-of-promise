@@ -469,6 +469,80 @@
             #printAllContainer[data-printing] .pi-modal { position:static;width:100%;max-width:100%;box-shadow:none;border-radius:0;margin:0; }
             /* Render captured values with the same underline styling as signature/date fields */
             #printAllContainer[data-printing] .print-value { border-bottom:1px solid #9ca3af;min-width:120px;padding:2px 4px;font-weight:600; }
+
+            /* ── Parent Interview as a fillable PAPER form ──
+               When the interview overlay is printed, an admin is producing a blank-with-
+               prefills sheet the family completes by hand at enrollment. So: values that
+               came from pre-enrollment print as clean readable text on an underline, and
+               every other field prints as a blank writing line. The on-screen boxes,
+               tints, upload row and signature canvas are all stripped. */
+            /* Force the writing-line rules and underlines to actually print — browsers
+               drop backgrounds/borders drawn via backgrounds unless colour adjust is on. */
+            #piOverlay[data-printing] .pi-modal,
+            #piOverlay[data-printing] .pi-modal * {
+                -webkit-print-color-adjust:exact;print-color-adjust:exact;
+            }
+            #piOverlay[data-printing] .pi-modal-body { padding:0; }
+            /* Nothing to attach or auto-tick on a blank paper form. */
+            #piOverlay[data-printing] #piScanSection,
+            #piOverlay[data-printing] #piPrefillNote,
+            #piOverlay[data-printing] .doc-note,
+            #piOverlay[data-printing] .pi-repeat-add,
+            #piOverlay[data-printing] .pi-rowdel { display:none !important; }
+            /* Section headings read as form section titles. */
+            #piOverlay[data-printing] .pi-section { margin-bottom:14px;break-inside:avoid; }
+            #piOverlay[data-printing] .pi-section h4 { color:#000;font-size:0.78rem; }
+            #piOverlay[data-printing] .pi-field label { color:#000;font-size:0.72rem; }
+            /* The read-only child header prints as plain text (no grey pill). */
+            #piOverlay[data-printing] .pi-value { background:none;padding:2px 0;min-height:0;font-weight:600; }
+
+            /* Every entry control becomes a hand-writing line: flat, no box, a rule to
+               write on, and enough height for a pen. */
+            #piOverlay[data-printing] .pi-field input[type=text],
+            #piOverlay[data-printing] .pi-field input[type=date],
+            #piOverlay[data-printing] .pi-field select,
+            #piOverlay[data-printing] .pi-repeat td input {
+                border:none;border-bottom:1px solid #6b7280;border-radius:0;
+                background:none;padding:2px 2px;min-height:20px;
+                -webkit-appearance:none;appearance:none;
+                color:#000;font-weight:600;
+            }
+            /* Textareas (goals, concerns, medical history, ...) get several blank lines
+               of writing space, drawn as repeating rules. ~3 lines by default; the
+               longer narrative fields (.pi-full textarea) get a little more. */
+            #piOverlay[data-printing] .pi-field textarea {
+                border:none;border-radius:0;background:none;padding:0;resize:none;
+                color:#000;font-weight:600;min-height:0;height:3.9em;overflow:hidden;
+                background-image:repeating-linear-gradient(
+                    to bottom, transparent 0, transparent calc(1.3em - 1px),
+                    #9ca3af calc(1.3em - 1px), #9ca3af 1.3em);
+                line-height:1.3em;
+            }
+            #piOverlay[data-printing] .pi-full textarea { height:5.2em; }
+            /* A prefilled value prints as text sitting ON the line rather than a blank
+               line — so the parent sees what we already know and only fills the rest. */
+            #piOverlay[data-printing] .pi-prefilled input,
+            #piOverlay[data-printing] .pi-prefilled textarea,
+            #piOverlay[data-printing] .pi-prefilled select { background-image:none;background:none; }
+            /* A select that was NOT prefilled would otherwise print its "— select —"
+               placeholder on the blank line; hide that text so it reads as an empty line
+               for the family to complete. Prefilled selects keep their chosen value. */
+            #piOverlay[data-printing] .pi-field select { color:transparent; }
+            #piOverlay[data-printing] .pi-prefilled select { color:#000; }
+            /* Radios / checkboxes stay as tick boxes — fine on paper. Keep them black. */
+            #piOverlay[data-printing] .pi-opt { color:#000;font-size:0.8rem; }
+            #piOverlay[data-printing] .pi-opt input { -webkit-appearance:auto;appearance:auto; }
+            /* Repeat tables (siblings, doctors, pick-up list) print their column rules. */
+            #piOverlay[data-printing] .pi-repeat th { color:#000; }
+            #piOverlay[data-printing] .pi-repeat td { border-bottom:1px solid #e5e7eb; }
+            /* Signatures: the canvas pad is meaningless on a blank form — replace it with
+               a signature line. The printed-name and date inputs already became lines. */
+            #piOverlay[data-printing] #piParentSigPad,
+            #piOverlay[data-printing] #piStaffSigPad {
+                border:none;border-bottom:1px solid #000;height:2.2em;background:none;
+            }
+            #piOverlay[data-printing] #piParentSigPad *,
+            #piOverlay[data-printing] #piStaffSigPad * { display:none !important; }
         }
     </style>
 </head>
