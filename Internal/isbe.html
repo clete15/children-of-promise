@@ -138,11 +138,12 @@
         tbody tr:nth-child(even) td.cf-teacher { background:color-mix(in srgb, var(--band-teacher) 9%, var(--sp-surface-2)); }
         tbody tr:hover td { background:var(--sp-accent-soft); }
         tbody tr:hover td.cf-teacher { background:var(--band-teacher-hover); }
-        /* A heavier rule where the age group changes (Infant / Infant-Toddler / Toddler /
-           2 Year Olds ...), so the room groups read as bands down this read-only chart.
-           Applied to every cell in the first row of a group so the line runs the full
-           width, including the frozen Student column. */
-        tbody tr.group-start td { border-top:2px solid var(--sp-accent); }
+        /* One clean rule at the BOTTOM of each age group (after the last Infant, the
+           last Infant/Toddler, the last Toddler ...), so the rooms read as bands down
+           this read-only chart. It is a single continuous border-bottom on the last
+           row of the group, so it runs the full width — the frozen Student column
+           included — without fragmenting per cell. */
+        tbody tr.group-end td { border-bottom:2px solid var(--sp-accent); }
 
         /* ── Frozen Student column ──
            The checklist is wider than any screen, so scrolling right used to leave a
@@ -162,9 +163,14 @@
            Backgrounds must be opaque or the scrolling cells show through. */
         th.pin-1, td.pin-1 {
             position:sticky;left:0;z-index:2;background:var(--sp-surface);
-            width:200px;min-width:200px;max-width:200px;white-space:normal;
+            width:220px;min-width:220px;max-width:220px;white-space:normal;
             box-shadow:7px 0 7px -5px rgba(15,23,42,0.13);
         }
+        /* Body name cells stay on ONE line so every row is a uniform height — the
+           "Name – Room" tag used to wrap the longer rooms (Infants / Toddlers) onto a
+           second line and make those rows taller than the rest. Overflow is clipped
+           with an ellipsis; the full name is in the cell's title on hover. */
+        tbody td.pin-1 { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
         td.pin-1 { box-shadow:inset 0 -1px 0 var(--border), 7px 0 7px -5px rgba(15,23,42,0.13); }
         th.pin-1 { border-right:1px solid var(--border); }
         td.pin-1 { border-right:1px solid var(--border); }
@@ -2427,10 +2433,6 @@ function renderRoster() {
 
     tbody.innerHTML = roster.map((s, i) => {
         const t = trackingData[s.Id] || {};
-        // A heavier line where the age group changes (the roster is room-sorted, so a
-        // new room number is a new group: Infant, Infant/Toddler, Toddler, 2 Year Olds…),
-        // so the groups read as bands down the chart. Not on the first row.
-        const groupStart = i > 0 && String(s.RoomNumber) !== String(roster[i - 1].RoomNumber);
         const cells = cols.map(c => {
             const f = c.field;
             const divide = f === firstAdminField ? ' col-divide' : '';
@@ -2525,10 +2527,20 @@ function renderRoster() {
         const roomTag = (activeProgram === 'PI')
             ? ' <span style="font-weight:400;color:var(--sp-muted);">\u2013 ' + getRoom(s.RoomNumber) + '</span>'
             : '';
-        const rowClasses = [transferred ? 'cf-transferred' : '', groupStart ? 'group-start' : '']
+        // Last row of an age group: the next child is in a different room, or this is
+        // the final child. That row carries the single full-width rule at the bottom
+        // of the group.
+        const groupEnd = i === roster.length - 1
+            || String(s.RoomNumber) !== String(roster[i + 1].RoomNumber);
+        const rowClasses = [transferred ? 'cf-transferred' : '', groupEnd ? 'group-end' : '']
             .filter(Boolean).join(' ');
+        // Full "Last, First – Room" in the cell title so it is recoverable on hover if
+        // a long name is clipped by the single-line Student column.
+        const nameTitle = (s.Last_Name + ', ' + s.First_Name
+            + (activeProgram === 'PI' ? ' \u2013 ' + getRoom(s.RoomNumber) : ''))
+            .replace(/"/g, '&quot;');
         return '<tr' + (rowClasses ? ' class="' + rowClasses + '"' : '') + '>'
-            + '<td class="left pin-1" style="font-weight:600;font-size:0.73rem;">'
+            + '<td class="left pin-1" title="' + nameTitle + '" style="font-weight:600;font-size:0.73rem;">'
             + childNameCell(s) + roomTag + transferMarker(s)
             + '</td>' + cells + '</tr>';
     }).join('');
