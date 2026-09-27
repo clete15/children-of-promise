@@ -139,33 +139,38 @@
         tbody tr:hover td { background:var(--sp-accent-soft); }
         tbody tr:hover td.cf-teacher { background:var(--band-teacher-hover); }
 
-        /* ── Frozen Student and Room columns ──
+        /* ── Frozen Student column ──
            The checklist is wider than any screen, so scrolling right used to leave a
-           row of anonymous checkboxes with no way to tell whose they were.
+           row of anonymous checkboxes with no way to tell whose they were. The Student
+           name column stays frozen at the left.
 
-           The second column's offset is measured from the first at render time rather
-           than fixed in CSS: a name like "Moore-Schlesinger, Dalton" is much wider than
-           "Kolb, Mallie", and pinning a width would either truncate a child's name or
-           leave a gap. --sticky-2 is set by syncStickyOffsets().
+           It is pinned to a FIXED width. Without one, `table{width:100%}` lets auto
+           table-layout inflate this underfilled column to absorb the leftover width,
+           opening a wide empty band between the name and the first data column. A fixed
+           width sends that leftover to the data columns instead. Long names wrap within
+           the 200px rather than stretching the column.
 
-           Backgrounds must be opaque or the scrolling cells show through. Borders are
-           drawn with an inset shadow because a collapsed table border belongs to the
-           table, not the cell, and is unreliable on a sticky cell. */
-        th.pin-1, td.pin-1 { position:sticky;left:0;z-index:2;background:var(--sp-surface); }
-        th.pin-2, td.pin-2 { position:sticky;left:var(--sticky-2, 150px);z-index:2;background:var(--sp-surface); }
-        td.pin-1, td.pin-2 { box-shadow:inset 0 -1px 0 var(--border); }
-        /* The rightmost frozen column casts the edge, so the freeze is visible. */
-        th.pin-2, td.pin-2 { border-right:1px solid var(--border); }
-        td.pin-2 { box-shadow:inset 0 -1px 0 var(--border), 7px 0 7px -5px rgba(15,23,42,0.13); }
-        th.pin-2 { box-shadow:7px 0 7px -5px rgba(15,23,42,0.13); }
-        /* Header wins at the top-left corner where both freezes meet. */
-        thead th.pin-1, thead th.pin-2 { z-index:4;background:var(--sp-surface-2); }
+           (There used to be a second frozen column, Room, positioned by a measured
+           --sticky-2 offset. Room was dropped — PFA is all Pre-School and PI shows the
+           room after the name — so the pin-2 machinery and syncStickyOffsets went with it.)
+
+           Backgrounds must be opaque or the scrolling cells show through. */
+        th.pin-1, td.pin-1 {
+            position:sticky;left:0;z-index:2;background:var(--sp-surface);
+            width:200px;min-width:200px;max-width:200px;white-space:normal;
+            box-shadow:7px 0 7px -5px rgba(15,23,42,0.13);
+        }
+        td.pin-1 { box-shadow:inset 0 -1px 0 var(--border), 7px 0 7px -5px rgba(15,23,42,0.13); }
+        th.pin-1 { border-right:1px solid var(--border); }
+        td.pin-1 { border-right:1px solid var(--border); }
+        /* Header wins at the top-left corner. */
+        thead th.pin-1 { z-index:4;background:var(--sp-surface-2); }
         /* Pinned cells must stay OPAQUE (the scrolling cells slide under them), so they
            carry their own striping/hover rather than letting the scrolling-cell rules
            show through. Even rows match the zebra; hover matches the row hover. */
-        tbody tr:nth-child(even) td.pin-1, tbody tr:nth-child(even) td.pin-2 { background:var(--sp-surface-2); }
-        tbody tr:hover td.pin-1, tbody tr:hover td.pin-2 { background:var(--sp-accent-soft); }
-        tr.print-all-row td.pin-1, tr.print-all-row td.pin-2 { background:var(--sp-accent-soft); }
+        tbody tr:nth-child(even) td.pin-1 { background:var(--sp-surface-2); }
+        tbody tr:hover td.pin-1 { background:var(--sp-accent-soft); }
+        tr.print-all-row td.pin-1 { background:var(--sp-accent-soft); }
         input[type=checkbox] { width:auto;accent-color:var(--primary);cursor:pointer; }
 
         /* ── Is there a form behind this tick? ──
@@ -1844,7 +1849,7 @@ function renderRosterHead() {
     // The Room column was dropped: PFA is all Pre-School, and for PI the room now rides
     // after the child's name — so a whole column of "Pre-School"/"Infant" is dead weight.
     let group = '<tr class="isbe-grouprow">'
-        + '<th class="left pin-1 grp-blank" rowspan="2" style="min-width:180px;">Student</th>';
+        + '<th class="left pin-1 grp-blank" rowspan="2">Student</th>';
     if (t.length) {
         group += '<th class="grp grp-teacher" colspan="' + t.length + '" '
             + 'title="Completed by the classroom teacher. These fill in automatically as the '
@@ -2538,30 +2543,7 @@ function renderRoster() {
     // frozen cells in this row can be repainted to match it.
     tbody.innerHTML += '<tr class="print-all-row"><td class="left pin-1" style="font-weight:700;font-size:0.7rem;color:var(--sp-accent);">Print All</td>'
         + printAllCells + '</tr>';
-
-    // Room can only be frozen once the Student column has been laid out and measured.
-    syncStickyOffsets();
 }
-
-/* Puts the Room column exactly where the Student column ends.
-
-   Measured rather than declared: the Student column is sized by the longest name in
-   the roster, which changes with the year, the program and whether a child has a
-   file marker beside their name. A hard-coded offset would show a sliver of the
-   scrolling row through the gap, or cover the start of the room name.
-
-   Called after every roster render and on resize. requestAnimationFrame because a
-   table's column widths are not final in the same frame the rows were written. */
-function syncStickyOffsets() {
-    requestAnimationFrame(function () {
-        const firstTh = document.querySelector('#isbeHead th');
-        if (!firstTh) return;
-        const w = firstTh.getBoundingClientRect().width;
-        if (w > 0) document.documentElement.style.setProperty('--sticky-2', w + 'px');
-    });
-}
-
-window.addEventListener('resize', syncStickyOffsets);
 
 // ── Print All for Column ──
 // Serialize a populated .pi-modal into static HTML with input/textarea/select
