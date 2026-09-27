@@ -4441,6 +4441,42 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         return;
     }
 
+    /* PUT /api/classroom-roster/:id — a teacher updating their own room's roster.
+
+       The broad PUT /api/students above is checkAuth (centre-admin only) because it can
+       change a child's name, income, benefits and eligibility. A classroom teacher needs
+       a much narrower reach: from the My Classroom tab they only move a child's ROOM,
+       ATTENDING DAYS, PROGRAM and ACTIVE flag. So this is a separate, checkClassroomAuth
+       endpoint (any signed-in staff token, like the child forms) that touches ONLY those
+       columns, keyed by the numeric Id. It cannot rename a child or alter their financials
+       — those stay with the centre-admin PUT. */
+    if (req.method === 'PUT' && url.match(/^\/api\/classroom-roster\/\d+$/)) {
+        if (!checkClassroomAuth(req, res)) return;
+        const sid = parseInt(url.split('/')[3], 10);
+        if (!sid) return sendJSON(res, 400, { error: 'Bad student id' });
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const fields = [];
+            if (d.roomNumber !== undefined) fields.push(`RoomNumber=${esc(d.roomNumber)}`);
+            if (d.monday !== undefined)     fields.push(`Monday=${d.monday ? 1 : 0}`);
+            if (d.tuesday !== undefined)    fields.push(`Tuesday=${d.tuesday ? 1 : 0}`);
+            if (d.wednesday !== undefined)  fields.push(`Wednesday=${d.wednesday ? 1 : 0}`);
+            if (d.thursday !== undefined)   fields.push(`Thursday=${d.thursday ? 1 : 0}`);
+            if (d.friday !== undefined)     fields.push(`Friday=${d.friday ? 1 : 0}`);
+            if (d.pfaPiNa !== undefined)    fields.push(`PFA_PI_na=${esc(d.pfaPiNa)}`);
+            if (d.active !== undefined)     fields.push(`Active=${esc(d.active)}`);
+            if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+            const sql = `UPDATE rptMasterEnrollment SET ${fields.join(',')} WHERE Id=${sid}`;
+            console.log('[ROSTER PUT SQL]', sql);
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            if (r.sqlError) return sendJSON(res, 500, { error: r.sqlError });
+            if (!r.data.includes('rows affected')) return sendJSON(res, 404, { error: 'No student with that id.' });
+            sendJSON(res, 200, { success: true });
+        });
+        return;
+    }
+
     /* DELETE a student outright — /api/students/:id.
 
        There is no soft "withdraw" here; that is what Active='No' (or the transfer

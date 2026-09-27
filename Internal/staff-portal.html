@@ -583,6 +583,22 @@
     .cls-alldone, .cls-empty { padding:16px;border-radius:10px;font-size:0.8rem;margin-bottom:18px; }
     .cls-alldone { background:var(--sp-good-bg);color:var(--sp-good-fg);border:1px solid var(--sp-good-br); }
     .cls-empty { background:var(--sp-surface-2);color:var(--sp-muted);border:1px solid var(--sp-border); }
+    /* Editable "Update room roster" table (teacher's per-room roster editor). */
+    .clsr-table { width:100%;border-collapse:collapse;font-size:0.8rem; }
+    .clsr-table thead tr { background:var(--sp-surface-2);border-bottom:2px solid var(--sp-border); }
+    .clsr-table th { padding:7px 6px;text-align:left;font-size:0.64rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--sp-muted); }
+    .clsr-table th.clsr-day, .clsr-table td.clsr-day { text-align:center;width:38px; }
+    .clsr-table td { padding:5px 6px;border-bottom:1px solid var(--sp-border);vertical-align:middle; }
+    .clsr-table tr:last-child td { border-bottom:none; }
+    .clsr-name { font-weight:600;color:var(--sp-text);white-space:nowrap; }
+    .clsr-day-cb { width:auto;accent-color:var(--sp-accent); }
+    .clsr-table select { padding:4px 5px;border:1px solid var(--sp-border-in);border-radius:5px;font-size:0.76rem;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text);width:100%; }
+    .clsr-table select:focus { outline:none;border-color:var(--sp-accent); }
+    .clsr-savecell { text-align:center; }
+    .clsr-save { padding:4px 11px;background:var(--sp-accent);color:#fff;border:none;border-radius:5px;font-size:0.72rem;font-weight:700;cursor:pointer;opacity:0.4; }
+    .clsr-save:not([disabled]) { opacity:1; }
+    .clsr-save[disabled] { cursor:default; }
+
     .cls-cards { display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px; }
     .cls-card { border:1px solid var(--sp-border);border-radius:10px;padding:13px 15px;background:var(--sp-surface); }
     .cls-card-head { display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px; }
@@ -1901,6 +1917,111 @@ function classroomSection(s) {
         + inner + '</div>';
 }
 
+/* Every child in a room, active OR inactive, sorted by name. The editable roster shows
+   all of them (unlike classroomRoster, which is active-only) so a teacher can toggle a
+   child's Active flag without them vanishing from the list the moment it flips. */
+function allRoomStudents(roomNumber) {
+    return CLS_STUDENTS
+        .filter(s => String(s.RoomNumber) === String(roomNumber))
+        .sort(CofpForms.sortByName);
+}
+
+let clsRosterOpen = false;   // is the editable "Update room roster" section expanded
+
+/* Save one editable roster row. Reads the row's controls, PUTs the narrow set of
+   fields through /api/classroom-roster/:id (teacher token accepted), and folds the
+   saved values back into CLS_STUDENTS so a re-render reflects them. */
+async function saveClsRosterRow(sid, btn) {
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    const s = CLS_STUDENTS.find(x => String(x.Id) === String(sid));
+    if (!s) { showNotification('That child is no longer loaded', 'error'); return; }
+    const dayCbs = Array.prototype.slice.call(tr.querySelectorAll('.clsr-day-cb'));
+    const body = {
+        roomNumber: tr.querySelector('.clsr-room').value,
+        monday:    !!(dayCbs.find(c => c.getAttribute('data-day') === '0') || {}).checked,
+        tuesday:   !!(dayCbs.find(c => c.getAttribute('data-day') === '1') || {}).checked,
+        wednesday: !!(dayCbs.find(c => c.getAttribute('data-day') === '2') || {}).checked,
+        thursday:  !!(dayCbs.find(c => c.getAttribute('data-day') === '3') || {}).checked,
+        friday:    !!(dayCbs.find(c => c.getAttribute('data-day') === '4') || {}).checked,
+        pfaPiNa:   tr.querySelector('.clsr-prog').value,
+        active:    tr.querySelector('.clsr-active').value,
+    };
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = '…';
+    try {
+        const res = await myFetch('/api/classroom-roster/' + encodeURIComponent(sid), {
+            method: 'PUT', body: JSON.stringify(body)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success) {
+            // Keep the in-memory record in step so a re-render shows the saved state.
+            Object.assign(s, {
+                RoomNumber: body.roomNumber,
+                Monday: body.monday ? 1 : 0, Tuesday: body.tuesday ? 1 : 0,
+                Wednesday: body.wednesday ? 1 : 0, Thursday: body.thursday ? 1 : 0,
+                Friday: body.friday ? 1 : 0,
+                PFA_PI_na: body.pfaPiNa, Active: body.active,
+            });
+            showNotification(s.First_Name + ' ' + s.Last_Name + ' updated', 'success');
+            btn.textContent = orig; btn.style.opacity = '0.4';
+        } else {
+            showNotification('Update failed: ' + (data.error || ('HTTP ' + res.status)), 'error');
+            btn.disabled = false; btn.textContent = orig;
+        }
+    } catch (e) {
+        showNotification('Network error', 'error');
+        btn.disabled = false; btn.textContent = orig;
+    }
+}
+
+/* The editable room roster — a teacher's version of the Room Roster page, scoped to
+   their own room. Room / attending days / program / active, saved per child through the
+   narrow /api/classroom-roster/:id endpoint (checkClassroomAuth, so a teacher token is
+   accepted). Financial and identity fields are deliberately NOT here — those stay with
+   the centre-admin Enrolled Students form. */
+function rosterEditHtml(roomNumber) {
+    const kids = allRoomStudents(roomNumber);
+    const roomOpts = (window.ROOMS || []).map(r =>
+        '<option value="' + esc(r.RoomNumber) + '">' + esc(r.Room) + '</option>').join('');
+    const dayKeys = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+
+    const rows = kids.map(s => {
+        const days = dayKeys.map((k, di) =>
+            '<td class="clsr-day"><input type="checkbox" class="clsr-day-cb" data-day="' + di
+            + '" ' + (isTruthy(s[k]) ? 'checked' : '') + '></td>').join('');
+        const prog = String(s.PFA_PI_na || '');
+        const progOpts = ['', 'PFA', 'PI', 'INCCRA'].map(p =>
+            '<option value="' + p + '"' + (p === prog ? ' selected' : '') + '>' + (p || '--') + '</option>').join('');
+        const act = isTruthy(s.Active) ? 'Yes' : 'No';
+        return '<tr data-sid="' + esc(s.Id) + '">'
+            + '<td class="clsr-name">' + esc(s.Last_Name + ', ' + s.First_Name) + '</td>'
+            + '<td><select class="clsr-room">' + roomOpts + '</select></td>'
+            + days
+            + '<td><select class="clsr-prog">' + progOpts + '</select></td>'
+            + '<td><select class="clsr-active">'
+                + '<option value="Yes"' + (act === 'Yes' ? ' selected' : '') + '>Yes</option>'
+                + '<option value="No"' + (act === 'No' ? ' selected' : '') + '>No</option></select></td>'
+            + '<td class="clsr-savecell"><button type="button" class="clsr-save" data-sid="' + esc(s.Id) + '" disabled>Save</button></td>'
+            + '</tr>';
+    }).join('');
+
+    const body = kids.length
+        ? '<table class="clsr-table"><thead><tr>'
+            + '<th class="clsr-name">Student</th><th>Room</th>'
+            + dayLabels.map(d => '<th class="clsr-day">' + d + '</th>').join('')
+            + '<th>Program</th><th>Active</th><th></th></tr></thead>'
+            + '<tbody>' + rows + '</tbody></table>'
+        : '<div class="cls-empty">No children in this room.</div>';
+
+    return '<div class="cls-batch clsr-wrap' + (clsRosterOpen ? ' open' : '') + '">'
+        + '<button type="button" class="cls-batch-head" id="clsRosterToggle" '
+        + 'aria-expanded="' + (clsRosterOpen ? 'true' : 'false') + '">'
+        + '<span class="cls-batch-caret">\u25B8</span> Update room roster</button>'
+        + '<div class="cls-batch-body"' + (clsRosterOpen ? '' : ' style="display:none;"') + '>'
+        + body + '</div></div>';
+}
+
 /* The rendered checklist once the data is in. Kept apart from classroomSection so
    renderClassroomPanel can rebuild just this without touching the loading/error
    wrapper logic. */
@@ -1929,7 +2050,8 @@ function classroomChecklistHtml(rooms) {
     const cols = CofpForms.COLUMNS;
 
     if (!roster.length) {
-        return pick + '<div class="cls-empty">No active PFA or PI children in this classroom.</div>';
+        return pick + rosterEditHtml(activeClsRoom)
+            + '<div class="cls-empty">No active PFA or PI children in this classroom.</div>';
     }
 
     // Batch actions first: a teacher works a whole task at a time.
@@ -2044,7 +2166,7 @@ function classroomChecklistHtml(rooms) {
             + '<div class="cls-chips">' + chipsWithWeighted + '</div></div>';
     }).join('');
 
-    return pick + batchBlock + '<div class="cls-cards">' + cards + '</div>';
+    return pick + rosterEditHtml(activeClsRoom) + batchBlock + '<div class="cls-cards">' + cards + '</div>';
 }
 
 /* Wire the classroom panel's controls after each render: the room picker, the chip
@@ -2110,6 +2232,37 @@ function wireClassroom() {
             outToggle.setAttribute('aria-expanded', clsOutstandingOpen ? 'true' : 'false');
         });
     }
+
+    // Collapse / expand the editable "Update room roster" section.
+    const rosterToggle = document.getElementById('clsRosterToggle');
+    if (rosterToggle) {
+        rosterToggle.addEventListener('click', () => {
+            clsRosterOpen = !clsRosterOpen;
+            const card = rosterToggle.closest('.cls-batch');
+            const body = card && card.querySelector('.cls-batch-body');
+            if (card) card.classList.toggle('open', clsRosterOpen);
+            if (body) body.style.display = clsRosterOpen ? '' : 'none';
+            rosterToggle.setAttribute('aria-expanded', clsRosterOpen ? 'true' : 'false');
+        });
+    }
+
+    // Editable roster: any change to a row's controls enables that row's Save button.
+    document.querySelectorAll('#sppanel_classroom .clsr-table tr[data-sid]').forEach(tr => {
+        const save = tr.querySelector('.clsr-save');
+        if (!save) return;
+        tr.querySelectorAll('.clsr-room, .clsr-prog, .clsr-active, .clsr-day-cb').forEach(ctrl => {
+            ctrl.addEventListener('change', () => { save.disabled = false; save.style.opacity = '1'; });
+        });
+        save.addEventListener('click', () => saveClsRosterRow(save.getAttribute('data-sid'), save));
+    });
+
+    // The room <select> options are built from the ROOMS list; set each row's current room.
+    document.querySelectorAll('#sppanel_classroom .clsr-table tr[data-sid]').forEach(tr => {
+        const sid = tr.getAttribute('data-sid');
+        const s = CLS_STUDENTS.find(x => String(x.Id) === String(sid));
+        const sel = tr.querySelector('.clsr-room');
+        if (s && sel) sel.value = String(s.RoomNumber || '');
+    });
 }
 
 /* ── Forms ── their plan and the forms that belong to them. */
