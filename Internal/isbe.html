@@ -1030,7 +1030,7 @@
                 Check in a file for this child
                 <input type="file" style="display:none;" id="cfilesUpload"
                        accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt"
-                       onchange="uploadChildFile(this)">
+                       onchange="uploadChildFileToLibrary(this)">
             </label>
             <button class="pi-btn pi-btn-primary" onclick="closeChildFiles()">Close</button>
         </div>
@@ -5489,7 +5489,11 @@ function closeChildFiles() {
    there is one way in and one place it lands. The child's name is prepended to the
    filename when it is not already there, because the filename is the only thing
    tying the file to the child. */
-function uploadChildFile(input) {
+/* NOTE: named distinctly from the shared uploadChildFile(studentId,field,kind,file)
+   helper above. Both used to be called uploadChildFile; the later declaration won in
+   hoisting and silently replaced the shared helper, breaking every scan/report/
+   interview upload (they got this 1-arg version, which returns undefined). */
+function uploadChildFileToLibrary(input) {
     var file = input.files && input.files[0];
     if (!file || !currentChildFilesId) return;
     var s = students.find(function (x) { return String(x.Id) === String(currentChildFilesId); });
