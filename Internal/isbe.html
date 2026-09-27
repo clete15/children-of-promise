@@ -3289,9 +3289,14 @@ function piNameKey(s) {
    "<First Last> - Parent Interview Form.pdf"; take everything before the first
    " - ", falling back to the whole stem if there is no dash. */
 function piNameFromFile(fileName) {
-    const stem = fileName.replace(/\.[^.]+$/, '');       // drop extension
-    const dash = stem.indexOf(' - ');
-    return (dash >= 0 ? stem.slice(0, dash) : stem).trim();
+    let stem = fileName.replace(/\.[^.]+$/, '');         // drop extension
+    /* The separator is the dash before "Parent Interview Form", not an internal
+       hyphen in a surname like "Gunter-Foster-Sullivan". So cut specifically at a
+       dash that is followed (allowing a missing space) by "Parent Interview",
+       then belt-and-braces strip any leftover "Parent Interview Form". */
+    stem = stem.replace(/\s*-\s*parent\s*interview\s*form.*$/i, '');
+    stem = stem.replace(/\s*parent\s*interview\s*form.*$/i, '');
+    return stem.trim();
 }
 
 /* Match a "First Last" string to an active PI child. Returns the student or null.
