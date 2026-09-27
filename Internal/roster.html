@@ -6,56 +6,46 @@
     <title>Room Roster – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
-        .rr-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px; }
-        .rr-wrapper { display:flex;max-height:calc(100vh - 130px); }
-        .rr-sidebar { width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
-        .rr-sidebar button { display:block;width:100%;text-align:left;padding:10px 16px;border:none;cursor:pointer;background:transparent;transition:background 0.15s; }
-        .rr-sidebar button.active { background:rgba(255,255,255,0.2); }
-        .rr-sidebar button:hover:not(.active) { background:rgba(255,255,255,0.1); }
-        .rr-sidebar button div { font-size:0.82rem;font-weight:700;color:white; }
-        .rr-card { background:white;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
-        .rr-header { padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px; }
-        .rr-title { font-size:1rem;font-weight:800;color:var(--text); }
-        .rr-teacher { font-size:0.75rem;color:var(--danger);font-weight:600;flex:1; }
-        .rr-toggle { display:flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;color:var(--text-muted);cursor:pointer;white-space:nowrap; }
-        .rr-toggle input { width:auto;accent-color:var(--primary); }
-        .rr-gear { background:none;border:none;cursor:pointer;font-size:1.2rem;padding:4px 8px;border-radius:6px;transition:background 0.15s; }
-        .rr-gear:hover { background:#f1f5f9; }
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; margin: 0; }
+        /* Themed to match the other Enrollment Management pages: 15% left inset, theme
+           surfaces, dark-mode aware. (Was a fixed blue gradient with hardcoded white.) */
+        .rr-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px 20px 20px 15%; }
+        .rr-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:960px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        .rr-sidebar { width:190px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .rr-sidebar button { display:block;width:100%;text-align:left;padding:10px 16px;border:none;border-left:3px solid transparent;cursor:pointer;background:transparent;transition:background 0.15s,border-color 0.15s; }
+        .rr-sidebar button.active { background:var(--sp-accent-soft);border-left-color:var(--sp-accent); }
+        .rr-sidebar button.active div { color:var(--sp-accent); }
+        .rr-sidebar button:hover:not(.active) { background:var(--sp-surface); }
+        .rr-sidebar button div { font-size:0.82rem;font-weight:700;color:var(--sp-text); }
+        .rr-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;max-height:calc(100vh - 130px); }
+        .rr-header { padding:14px 20px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;gap:16px; }
+        .rr-title { font-size:1rem;font-weight:800;color:var(--sp-text); }
+        .rr-teacher { font-size:0.75rem;color:var(--sp-accent);font-weight:600;flex:1; }
+        .rr-toggle { display:flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;color:var(--sp-muted);cursor:pointer;white-space:nowrap; }
+        .rr-toggle input { width:auto;accent-color:var(--sp-accent); }
         .rr-grid { overflow:auto; }
 
-        /* Room settings panel */
-        .rr-settings { display:none;padding:16px 20px;border-bottom:1px solid var(--border);background:#f8fafc; }
-        .rr-settings-head { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px; }
-        .rr-settings-title { font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
-        .btn-mini { padding:5px 12px;background:var(--primary);color:white;border:none;border-radius:5px;font-size:0.72rem;font-weight:700;cursor:pointer; }
-        .rr-settings table { width:100%;border-collapse:collapse;font-size:0.8rem; }
-        .rr-settings th { padding:6px 8px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--text-muted); }
-        .rr-settings input { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;background:#fff;color:#1e293b; }
-        /* Explicit dark-on-white so the option text is readable regardless of theme. */
-        .rr-settings select { width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:4px;font-size:0.78rem;font-family:inherit;background:#fff;color:#1e293b; }
-        .rr-settings select option { color:#1e293b;background:#fff; }
-
         /* Roster table */
-        .rr-grid table { border-collapse:collapse;font-size:0.78rem; }
-        .rr-grid thead tr { border-bottom:2px solid var(--border);position:sticky;top:0;z-index:1;background:white; }
-        .rr-grid th { padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted); }
+        .rr-grid table { border-collapse:collapse;font-size:0.8rem;width:100%; }
+        .rr-grid thead tr { border-bottom:2px solid var(--sp-border);position:sticky;top:0;z-index:1;background:var(--sp-surface-2); }
+        .rr-grid th { padding:8px 6px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--sp-muted); }
         .rr-grid th.student { padding:8px 12px;text-align:left;min-width:140px;max-width:180px; }
         .rr-grid th.day { text-align:center;width:38px; }
-        .rr-grid tbody tr { border-bottom:1px solid var(--border); }
-        .rr-grid tbody tr:hover { background:#f8fafc; }
+        .rr-grid tbody tr { border-bottom:1px solid var(--sp-border); }
+        .rr-grid tbody tr:hover { background:var(--sp-surface-2); }
         .rr-grid td { padding:5px 6px; }
         .rr-grid td.day { padding:7px 8px;text-align:center; }
-        .rr-grid td.day input { width:auto;accent-color:var(--primary); }
+        .rr-grid td.day input { width:auto;accent-color:var(--sp-accent); }
         .rr-grid td.student { padding:7px 12px;max-width:180px;overflow:hidden;text-overflow:ellipsis; }
-        .rr-name { font-weight:600;color:var(--text);white-space:nowrap; }
-        .rr-age { font-size:0.68rem;color:var(--text-muted); }
-        .rr-grid select { padding:2px 3px;border:1px solid var(--border);border-radius:3px;font-size:0.72rem;color:var(--text);background:white;width:100%; }
-        .btn-row-save { padding:3px 8px;background:var(--primary);color:white;border:none;border-radius:3px;font-size:0.7rem;font-weight:700;cursor:pointer;opacity:0.3; }
-        .rr-grid tfoot tr { background:#f8fafc;border-top:2px solid var(--border); }
-        .rr-total-label { padding:7px 12px;font-size:0.65rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:0.05em; }
-        .rr-total { padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--primary); }
-        .rr-empty { padding:24px;color:var(--text-muted);font-size:0.88rem; }
+        .rr-name { font-weight:600;color:var(--sp-text);white-space:nowrap; }
+        .rr-age { font-size:0.68rem;color:var(--sp-muted); }
+        .rr-grid select { padding:3px 4px;border:1px solid var(--sp-border-in);border-radius:4px;font-size:0.74rem;color:var(--sp-text);background:var(--sp-field-bg);width:100%; }
+        .btn-row-save { padding:3px 8px;background:var(--sp-accent);color:white;border:none;border-radius:4px;font-size:0.7rem;font-weight:700;cursor:pointer;opacity:0.3; }
+        .btn-row-save:not([disabled]) { opacity:1; }
+        .rr-grid tfoot tr { background:var(--sp-surface-2);border-top:2px solid var(--sp-border); }
+        .rr-total-label { padding:7px 12px;font-size:0.65rem;font-weight:700;color:var(--sp-accent);text-transform:uppercase;letter-spacing:0.05em; }
+        .rr-total { padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--sp-accent); }
+        .rr-empty { padding:24px;color:var(--sp-muted);font-size:0.88rem; }
     </style>
 </head>
 <body>
@@ -68,11 +58,15 @@
             <p>Room Roster &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="/staff/">← Staff Portal</a>
+    <div class="header-actions">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/">← Staff Portal</a>
+    </div>
 </header>
 
-<!-- Shared Enrollment Management sub-nav (see ems.html for the note). Room Roster now
-     lives here, after Benefits & Eligibility, rather than as its own dashboard card. -->
+<!-- Shared Enrollment Management sub-nav (see ems.html for the note). The room
+     definitions + teacher assignment chart split off into Classrooms & Staffing;
+     this page is now the per-room student roster only. -->
 <style>
     .em-subnav {
         display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
@@ -94,6 +88,7 @@
         <a href="/staff/attendance.html">Attendance</a>
         <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
         <a href="/staff/roster.html" class="on" aria-current="page">Room Roster</a>
+        <a href="/staff/rooms.html">Classrooms &amp; Staffing</a>
     </nav>
 </div>
 
@@ -109,37 +104,6 @@
                     <input type="checkbox" id="rosterActiveOnly" checked onchange="renderRosterRoom()">
                     Active only
                 </label>
-                <button class="rr-gear" onclick="toggleRoomSettings()" title="Room Settings">⚙️</button>
-            </div>
-
-            <div class="rr-settings" id="rosterSettingsPanel">
-                <div class="rr-settings-head">
-                    <div class="rr-settings-title">Room Settings</div>
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn-mini" id="setSaveAll" onclick="saveAllRooms()" disabled>Save All Changes</button>
-                        <button class="btn-mini" onclick="addNewRoom()">+ Add Room</button>
-                    </div>
-                </div>
-                <!-- Center-wide, not per-room: one person oversees everything grant-related.
-                     Stored in SiteSettings under GrantDirector and read wherever the
-                     grant director's name is needed. -->
-                <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
-                    <label for="setDirector" style="font-size:0.8rem;font-weight:700;color:var(--text-muted);">Director (grant oversight)</label>
-                    <input type="text" id="setDirector" placeholder="Director name" style="min-width:220px;" oninput="markDirectorChanged()">
-                    <button class="btn-row-save" id="setDirectorSave" onclick="saveDirector()" disabled>Save</button>
-                </div>
-                <table>
-                    <thead><tr style="border-bottom:1px solid var(--border);">
-                        <th style="width:40px;">#</th>
-                        <th>Room Name</th>
-                        <th>Teacher 1</th>
-                        <th>Teacher 2</th>
-                        <th style="width:70px;">Capacity</th>
-                        <th style="width:150px;">Age Range</th>
-                        <th style="width:50px;text-align:center;">Save</th>
-                    </tr></thead>
-                    <tbody id="rosterSettingsBody"></tbody>
-                </table>
             </div>
 
             <div class="rr-grid" id="rosterStudentGrid"></div>
@@ -152,28 +116,10 @@
 <script>
 let rosterStudents = [];
 let activeRosterRoomNum = null;
-// Staff list, for the Room Settings teacher pickers. Loaded alongside the rest.
-let rosterStaff = [];
-
-async function loadRosterStaff() {
-    try {
-        const res = await apiFetch('/api/staff');
-        if (res.ok) {
-            const data = await res.json();
-            rosterStaff = Array.isArray(data)
-                ? data.filter(s => String(s.Name || '').trim() && !/^new teacher$/i.test(s.Name))
-                : [];
-        }
-    } catch (e) { rosterStaff = []; }   // pickers fall back to a plain text field
-}
 
 async function init() {
-    await Promise.all([loadClassrooms(), loadStudents(), loadRosterStaff()]);
+    await Promise.all([loadClassrooms(), loadStudents()]);
     buildRoster();
-    // Deep link: ?settings=1 opens the room settings panel (used by the portal Settings card).
-    if (new URLSearchParams(window.location.search).get('settings') === '1') {
-        toggleRoomSettings();
-    }
 }
 
 // ── SIDEBAR ──
@@ -365,252 +311,6 @@ async function saveRosterRow(i) {
     } finally {
         btn.textContent = 'Save';
     }
-}
-
-// ── ROOM SETTINGS ──
-function toggleRoomSettings() {
-    const panel = document.getElementById('rosterSettingsPanel');
-    if (panel.style.display === 'block') {
-        panel.style.display = 'none';
-    } else {
-        panel.style.display = 'block';
-        renderSettings();
-        loadDirector();
-    }
-}
-
-// ── DIRECTOR (center-wide, SiteSettings key "GrantDirector") ──
-// One person oversees everything grant-related, so this is a single site value
-// rather than a per-room column. Defaults to Megan Nooney until changed.
-const DIRECTOR_KEY = 'GrantDirector';
-const DIRECTOR_DEFAULT = 'Megan Nooney';
-let directorDirty = false;
-
-async function loadDirector() {
-    const input = document.getElementById('setDirector');
-    if (!input) return;
-    try {
-        const res = await apiFetch('/api/site-settings');
-        const data = res.ok ? await res.json() : {};
-        input.value = (data && data[DIRECTOR_KEY]) || DIRECTOR_DEFAULT;
-    } catch (e) {
-        input.value = DIRECTOR_DEFAULT;
-    }
-    directorDirty = false;
-    const btn = document.getElementById('setDirectorSave');
-    if (btn) { btn.disabled = true; btn.style.opacity = ''; }
-}
-
-function markDirectorChanged() {
-    directorDirty = true;
-    const btn = document.getElementById('setDirectorSave');
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-    const all = document.getElementById('setSaveAll');
-    if (all) { all.disabled = false; all.style.opacity = '1'; }
-}
-
-async function saveDirector() {
-    const input = document.getElementById('setDirector');
-    if (!input) return;
-    const value = input.value.trim();
-    try {
-        const res = await apiFetch('/api/site-settings', {
-            method: 'POST',
-            body: JSON.stringify({ key: DIRECTOR_KEY, value })
-        });
-        const data = await res.json();
-        if (data.success) {
-            showNotification('Director saved', 'success');
-            directorDirty = false;
-            const btn = document.getElementById('setDirectorSave');
-            if (btn) { btn.disabled = true; btn.style.opacity = ''; }
-            return true;
-        }
-        showNotification('Save failed: ' + (data.error || ''), 'error');
-        return false;
-    } catch (e) {
-        showNotification('Network error', 'error');
-        return false;
-    }
-}
-
-// Escapes a value for use inside an HTML attribute.
-function attr(v) {
-    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-}
-
-/* Split a stored TeacherDescription into up to two names for the two pickers. Existing
-   values use "/" or "&" or "," as separators (e.g. "Sue / Paige", "Tara & Sue"), and
-   may carry a "(pt)" note — kept as part of the name so nothing is silently dropped. */
-function splitTeachers(desc) {
-    const parts = String(desc || '').split(/\s*[\/&,]\s*/).map(s => s.trim()).filter(Boolean);
-    return [parts[0] || '', parts[1] || ''];
-}
-
-/* A dropdown of staff names, with `selected` pre-chosen. Falls back to a plain text
-   input if the staff list could not be loaded, so the field is never unusable. If the
-   stored name is not in the staff list (a legacy label like "Tara"), it is added as its
-   own option so it stays selected rather than vanishing. */
-function teacherSelect(id, selected, i) {
-    if (!rosterStaff.length) {
-        return `<input type="text" id="${id}" value="${attr(selected)}" placeholder="Teacher name" oninput="markSettingsChanged(${i})">`;
-    }
-    const names = rosterStaff.map(s => s.Name);
-    if (selected && !names.includes(selected)) names.unshift(selected);   // keep an unknown legacy value
-    const opts = ['<option value="">— none —</option>'].concat(
-        names.map(n => `<option value="${attr(n)}"${n === selected ? ' selected' : ''}>${attr(n)}</option>`)
-    ).join('');
-    return `<select id="${id}" onchange="markSettingsChanged(${i})">${opts}</select>`;
-}
-
-function renderSettings() {
-    // A full repaint pulls every field from the database, so any unsaved edits are
-    // gone once we do it — reset the dirty tracking to match what's on screen.
-    dirtyRooms = new Set();
-    const all = document.getElementById('setSaveAll');
-    if (all) { all.disabled = true; all.style.opacity = ''; }
-    const tbody = document.getElementById('rosterSettingsBody');
-    if (!classrooms.length) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-muted);">No classrooms loaded.</td></tr>';
-        return;
-    }
-    tbody.innerHTML = classrooms.map((r, i) => {
-        const [t1, t2] = splitTeachers(r.TeacherDescription);
-        return `
-        <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:6px 8px;font-weight:700;color:var(--text-muted);">${r.RoomNumber}</td>
-            <td style="padding:6px 8px;"><input type="text" id="setRoom${i}" value="${attr(r.Room)}" oninput="markSettingsChanged(${i})"></td>
-            <td style="padding:6px 8px;">${teacherSelect('setTeacher1_' + i, t1, i)}</td>
-            <td style="padding:6px 8px;">${teacherSelect('setTeacher2_' + i, t2, i)}</td>
-            <td style="padding:6px 8px;"><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" oninput="markSettingsChanged(${i})"></td>
-            <td style="padding:6px 8px;"><input type="text" id="setAge${i}" value="${attr(r.AgeRange)}" oninput="markSettingsChanged(${i})"></td>
-            <td style="padding:6px 8px;text-align:center;">
-                <button class="btn-row-save" id="setSave${i}" onclick="saveRoom(${i})" disabled>Save</button>
-            </td>
-        </tr>`;
-    }).join('');
-}
-
-// Rows the user has edited but not yet saved. Kept so that saving one row (or
-// reloading the table) never silently discards edits typed into the others.
-let dirtyRooms = new Set();
-
-function markSettingsChanged(i) {
-    dirtyRooms.add(i);
-    const btn = document.getElementById(`setSave${i}`);
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
-    const all = document.getElementById('setSaveAll');
-    if (all) { all.disabled = false; all.style.opacity = '1'; }
-}
-
-async function addNewRoom() {
-    // Adding a room reloads and repaints the whole table, which would drop unsaved
-    // edits in the existing rows. Offer to save them first rather than lose them.
-    if (dirtyRooms.size || directorDirty) {
-        if (confirm('You have unsaved changes. Save them before adding a new room?')) {
-            await saveAllRooms();
-        }
-    }
-    const nextNum = classrooms.length ? Math.max(...classrooms.map(r => parseInt(r.RoomNumber) || 0)) + 1 : 1;
-    const name = prompt('Room name (e.g., "Pre-School 3"):');
-    if (!name) return;
-    const teacher = prompt('Teacher description (e.g., "Ms. Smith"):') || '';
-    try {
-        const res = await apiFetch('/api/classrooms', {
-            method: 'POST',
-            body: JSON.stringify({ roomNumber: nextNum, room: name, teacher: teacher, capacity: 10, ageRange: '' })
-        });
-        const data = await res.json();
-        if (data.success) {
-            showNotification(`Room "${name}" added`, 'success');
-            await loadClassrooms();
-            renderSettings();
-            buildRoster();
-        } else {
-            showNotification('Failed: ' + (data.error || ''), 'error');
-        }
-    } catch (e) { showNotification('Network error', 'error'); }
-}
-
-/* Read one row's live input values into a plain object. The two teacher pickers
-   combine into the single TeacherDescription, joined by " / " (the format the
-   permission-slip autofill and the rest of the app already read). */
-function readRoomRow(i) {
-    const t1 = (document.getElementById(`setTeacher1_${i}`).value || '').trim();
-    const t2 = (document.getElementById(`setTeacher2_${i}`).value || '').trim();
-    return {
-        room:     document.getElementById(`setRoom${i}`).value.trim(),
-        teacher:  [t1, t2].filter(Boolean).join(' / '),
-        capacity: document.getElementById(`setCap${i}`).value,
-        ageRange: document.getElementById(`setAge${i}`).value.trim()
-    };
-}
-
-/* PUT one row and, on success, fold the saved values straight into the in-memory
-   classrooms[i]. This deliberately does NOT reload + re-render the whole table:
-   re-rendering repaints every row from the database and so wipes out edits the
-   user has typed into other rows but not saved yet. Returns true on success. */
-async function putRoom(i) {
-    const r = classrooms[i];
-    const vals = readRoomRow(i);
-    try {
-        const res = await apiFetch(`/api/classrooms/${r.RoomNumber}`, {
-            method: 'PUT',
-            body: JSON.stringify(vals)
-        });
-        const data = await res.json();
-        if (data.success) {
-            // Keep the in-memory record in step with what was just saved, so the
-            // sidebar/roster reflect it without a full reload.
-            r.Room = vals.room;
-            r.TeacherDescription = vals.teacher;
-            r.DCFSCapacity = vals.capacity;
-            r.AgeRange = vals.ageRange;
-            dirtyRooms.delete(i);
-            const btn = document.getElementById(`setSave${i}`);
-            if (btn) { btn.disabled = true; btn.style.opacity = ''; }
-            return true;
-        }
-        showNotification('Update failed: ' + (data.error || ''), 'error');
-        return false;
-    } catch (e) {
-        showNotification('Network error', 'error');
-        return false;
-    }
-}
-
-async function saveRoom(i) {
-    const ok = await putRoom(i);
-    if (ok) {
-        showNotification(`Room ${classrooms[i].RoomNumber} updated`, 'success');
-        if (!dirtyRooms.size) {
-            const all = document.getElementById('setSaveAll');
-            if (all) { all.disabled = true; all.style.opacity = ''; }
-        }
-        buildRoster();   // refresh the sidebar names/counts; leaves the settings inputs intact
-    }
-}
-
-/* Save every row the user has touched, in one click. Rows are saved sequentially so
-   one failure is reported without stopping the rest, and the table is only rebuilt
-   once everything is done — never mid-batch, which is what used to lose edits. */
-async function saveAllRooms() {
-    const rows = Array.from(dirtyRooms).sort((a, b) => a - b);
-    if (!rows.length && !directorDirty) return;
-    let saved = 0, failed = 0;
-    for (const i of rows) {
-        const ok = await putRoom(i);
-        ok ? saved++ : failed++;
-    }
-    // The center-wide director rides along so one click commits everything on the panel.
-    if (directorDirty) { (await saveDirector()) ? saved++ : failed++; }
-    if (saved) showNotification(`Saved ${saved} change${saved === 1 ? '' : 's'}`
-        + (failed ? `, ${failed} failed` : ''), failed ? 'error' : 'success');
-    if (!dirtyRooms.size) {
-        const all = document.getElementById('setSaveAll');
-        if (all) { all.disabled = true; all.style.opacity = ''; }
-    }
-    buildRoster();
 }
 
 init();

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Classrooms &amp; Staffing – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; margin: 0; }
+        /* Same 15% left inset the other Enrollment-area pages use, so it opens in line
+           with the sub-nav and Enrolled Students. */
+        .rs-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px 20px 20px 15%; }
+        .rs-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;max-width:1000px;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.12);max-height:calc(100vh - 130px); }
+        .rs-head { padding:14px 20px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap; }
+        .rs-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
+        .rs-body { overflow:auto;flex:1;padding:20px 24px; }
+
+        .rs-director { display:flex;align-items:center;gap:10px;margin-bottom:18px;flex-wrap:wrap; }
+        .rs-director label { font-size:0.8rem;font-weight:700;color:var(--sp-text-2); }
+        .rs-director input { min-width:220px;padding:7px 9px;border:1px solid var(--sp-border-in);border-radius:6px;font-size:0.85rem;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text); }
+
+        .rs-table { width:100%;border-collapse:collapse;font-size:0.84rem; }
+        .rs-table thead tr { background:var(--sp-surface-2);border-bottom:2px solid var(--sp-border); }
+        .rs-table th { padding:8px 8px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--sp-muted); }
+        .rs-table td { padding:6px 8px;border-bottom:1px solid var(--sp-border);vertical-align:middle; }
+        .rs-table tbody tr:hover { background:var(--sp-surface-2); }
+        .rs-table input, .rs-table select {
+            width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--sp-border-in);border-radius:5px;
+            font-size:0.82rem;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text);
+        }
+        .rs-table input:focus, .rs-table select:focus { outline:none;border-color:var(--sp-accent); }
+        .rs-num { font-weight:700;color:var(--sp-muted); }
+
+        .rs-btn { padding:6px 14px;background:var(--sp-accent);color:#fff;border:none;border-radius:6px;font-size:0.76rem;font-weight:700;cursor:pointer; }
+        .rs-btn:hover { filter:brightness(1.05); }
+        .rs-btn[disabled] { opacity:0.4;cursor:default; }
+        .rs-btn-plain { background:var(--sp-surface-2);color:var(--sp-text-2);border:1px solid var(--sp-border); }
+        .btn-row-save { padding:4px 10px;background:var(--sp-accent);color:#fff;border:none;border-radius:5px;font-size:0.72rem;font-weight:700;cursor:pointer;opacity:0.4; }
+        .btn-row-save:not([disabled]) { opacity:1; }
+        .rs-empty { padding:24px;color:var(--sp-muted);font-size:0.88rem;text-align:center; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Classrooms &amp; Staffing &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <div class="header-actions">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/">← Staff Portal</a>
+    </div>
+</header>
+
+<!-- Shared Enrollment Management sub-nav (see ems.html for the note). -->
+<style>
+    .em-subnav { display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:1400px;margin:0;padding:10px 20px 0 15%; }
+    .em-subnav a {
+        font-size:0.9rem;font-weight:700;text-decoration:none;color:var(--sp-text-2);
+        padding:8px 15px;border-radius:8px 8px 0 0;border-bottom:3px solid transparent;
+        transition:color 0.12s,background 0.12s,border-color 0.12s;
+    }
+    .em-subnav a:hover { color:var(--sp-text);background:var(--sp-surface-2); }
+    .em-subnav a.on { color:var(--sp-accent);border-bottom-color:var(--sp-accent); }
+    .em-subnav-wrap { border-bottom:1.5px solid var(--sp-border); }
+</style>
+<div class="em-subnav-wrap">
+    <nav class="em-subnav" aria-label="Enrollment management">
+        <a href="/staff/waitinglist.html">Waiting List</a>
+        <a href="/staff/ems.html">Enrolled Students</a>
+        <a href="/staff/attendance.html">Attendance</a>
+        <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
+        <a href="/staff/roster.html">Room Roster</a>
+        <a href="/staff/rooms.html" class="on" aria-current="page">Classrooms &amp; Staffing</a>
+    </nav>
+</div>
+
+<div class="rs-layout">
+    <div class="rs-card">
+        <div class="rs-head">
+            <div class="rs-title">Classrooms &amp; Staffing</div>
+            <div style="display:flex;gap:8px;">
+                <button class="rs-btn" id="setSaveAll" onclick="saveAllRooms()" disabled>Save All Changes</button>
+                <button class="rs-btn rs-btn-plain" onclick="addNewRoom()">+ Add Room</button>
+            </div>
+        </div>
+        <div class="rs-body">
+            <!-- Center-wide, not per-room: one person oversees everything grant-related.
+                 Stored in SiteSettings under GrantDirector. -->
+            <div class="rs-director">
+                <label for="setDirector">Director (grant oversight)</label>
+                <input type="text" id="setDirector" placeholder="Director name" oninput="markDirectorChanged()">
+                <button class="btn-row-save" id="setDirectorSave" onclick="saveDirector()" disabled>Save</button>
+            </div>
+
+            <table class="rs-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px;">#</th>
+                        <th>Room Name</th>
+                        <th>Teacher 1</th>
+                        <th>Teacher 2</th>
+                        <th style="width:80px;">Capacity</th>
+                        <th style="width:150px;">Age Range</th>
+                        <th style="width:56px;text-align:center;">Save</th>
+                    </tr>
+                </thead>
+                <tbody id="roomsBody"><tr><td colspan="7" class="rs-empty">Loading…</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+/* Classrooms & Staffing — the room definitions and teacher assignment chart. Split out
+   of the Room Roster page (roster.html), which now shows only the per-room student list.
+   This page owns: room name, up to two teachers, DCFS capacity, age range, and the
+   centre-wide grant director. All of it saves through /api/classrooms and /api/site-settings. */
+
+let roomsStaff = [];   // staff list for the teacher pickers
+
+async function loadRoomsStaff() {
+    try {
+        const res = await apiFetch('/api/staff');
+        if (res.ok) {
+            const data = await res.json();
+            roomsStaff = Array.isArray(data)
+                ? data.filter(s => String(s.Name || '').trim() && !/^new teacher$/i.test(s.Name))
+                : [];
+        }
+    } catch (e) { roomsStaff = []; }   // pickers fall back to a plain text field
+}
+
+async function init() {
+    await Promise.all([loadClassrooms(), loadRoomsStaff()]);
+    renderSettings();
+    loadDirector();
+}
+
+function attr(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
+/* Split a stored TeacherDescription into up to two names. Existing values use "/", "&"
+   or "," as separators and may carry a "(pt)" note — kept as part of the name. */
+function splitTeachers(desc) {
+    const parts = String(desc || '').split(/\s*[\/&,]\s*/).map(s => s.trim()).filter(Boolean);
+    return [parts[0] || '', parts[1] || ''];
+}
+
+/* A dropdown of staff names, `selected` pre-chosen. Falls back to a text input if the
+   staff list didn't load. An unknown legacy name is added as its own option so it stays
+   selected rather than vanishing. */
+function teacherSelect(id, selected, i) {
+    if (!roomsStaff.length) {
+        return `<input type="text" id="${id}" value="${attr(selected)}" placeholder="Teacher name" oninput="markSettingsChanged(${i})">`;
+    }
+    const names = roomsStaff.map(s => s.Name);
+    if (selected && !names.includes(selected)) names.unshift(selected);
+    const opts = ['<option value="">— none —</option>'].concat(
+        names.map(n => `<option value="${attr(n)}"${n === selected ? ' selected' : ''}>${attr(n)}</option>`)
+    ).join('');
+    return `<select id="${id}" onchange="markSettingsChanged(${i})">${opts}</select>`;
+}
+
+function renderSettings() {
+    dirtyRooms = new Set();
+    const all = document.getElementById('setSaveAll');
+    if (all) all.disabled = true;
+    const tbody = document.getElementById('roomsBody');
+    if (!classrooms.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="rs-empty">No classrooms loaded.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = classrooms.map((r, i) => {
+        const [t1, t2] = splitTeachers(r.TeacherDescription);
+        return `<tr>
+            <td class="rs-num">${r.RoomNumber}</td>
+            <td><input type="text" id="setRoom${i}" value="${attr(r.Room)}" oninput="markSettingsChanged(${i})"></td>
+            <td>${teacherSelect('setTeacher1_' + i, t1, i)}</td>
+            <td>${teacherSelect('setTeacher2_' + i, t2, i)}</td>
+            <td><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" oninput="markSettingsChanged(${i})"></td>
+            <td><input type="text" id="setAge${i}" value="${attr(r.AgeRange)}" oninput="markSettingsChanged(${i})"></td>
+            <td style="text-align:center;"><button class="btn-row-save" id="setSave${i}" onclick="saveRoom(${i})" disabled>Save</button></td>
+        </tr>`;
+    }).join('');
+}
+
+// Rows edited but not yet saved, so saving one row never discards edits in others.
+let dirtyRooms = new Set();
+
+function markSettingsChanged(i) {
+    dirtyRooms.add(i);
+    const btn = document.getElementById(`setSave${i}`);
+    if (btn) btn.disabled = false;
+    const all = document.getElementById('setSaveAll');
+    if (all) all.disabled = false;
+}
+
+async function addNewRoom() {
+    if (dirtyRooms.size || directorDirty) {
+        if (confirm('You have unsaved changes. Save them before adding a new room?')) {
+            await saveAllRooms();
+        }
+    }
+    const nextNum = classrooms.length ? Math.max(...classrooms.map(r => parseInt(r.RoomNumber) || 0)) + 1 : 1;
+    const name = prompt('Room name (e.g., "Pre-School 3"):');
+    if (!name) return;
+    const teacher = prompt('Teacher description (e.g., "Ms. Smith"):') || '';
+    try {
+        const res = await apiFetch('/api/classrooms', {
+            method: 'POST',
+            body: JSON.stringify({ roomNumber: nextNum, room: name, teacher: teacher, capacity: 10, ageRange: '' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showNotification(`Room "${name}" added`, 'success');
+            await loadClassrooms();
+            renderSettings();
+        } else {
+            showNotification('Failed: ' + (data.error || ''), 'error');
+        }
+    } catch (e) { showNotification('Network error', 'error'); }
+}
+
+function readRoomRow(i) {
+    const t1 = (document.getElementById(`setTeacher1_${i}`).value || '').trim();
+    const t2 = (document.getElementById(`setTeacher2_${i}`).value || '').trim();
+    return {
+        room:     document.getElementById(`setRoom${i}`).value.trim(),
+        teacher:  [t1, t2].filter(Boolean).join(' / '),
+        capacity: document.getElementById(`setCap${i}`).value,
+        ageRange: document.getElementById(`setAge${i}`).value.trim()
+    };
+}
+
+async function putRoom(i) {
+    const r = classrooms[i];
+    const vals = readRoomRow(i);
+    try {
+        const res = await apiFetch(`/api/classrooms/${r.RoomNumber}`, { method: 'PUT', body: JSON.stringify(vals) });
+        const data = await res.json();
+        if (data.success) {
+            r.Room = vals.room; r.TeacherDescription = vals.teacher;
+            r.DCFSCapacity = vals.capacity; r.AgeRange = vals.ageRange;
+            dirtyRooms.delete(i);
+            const btn = document.getElementById(`setSave${i}`);
+            if (btn) btn.disabled = true;
+            return true;
+        }
+        showNotification('Update failed: ' + (data.error || ''), 'error');
+        return false;
+    } catch (e) { showNotification('Network error', 'error'); return false; }
+}
+
+async function saveRoom(i) {
+    const ok = await putRoom(i);
+    if (ok) {
+        showNotification(`Room ${classrooms[i].RoomNumber} updated`, 'success');
+        if (!dirtyRooms.size) { const all = document.getElementById('setSaveAll'); if (all) all.disabled = true; }
+    }
+}
+
+async function saveAllRooms() {
+    const rows = Array.from(dirtyRooms).sort((a, b) => a - b);
+    if (!rows.length && !directorDirty) return;
+    let saved = 0, failed = 0;
+    for (const i of rows) { (await putRoom(i)) ? saved++ : failed++; }
+    if (directorDirty) { (await saveDirector()) ? saved++ : failed++; }
+    if (saved) showNotification(`Saved ${saved} change${saved === 1 ? '' : 's'}` + (failed ? `, ${failed} failed` : ''), failed ? 'error' : 'success');
+    if (!dirtyRooms.size) { const all = document.getElementById('setSaveAll'); if (all) all.disabled = true; }
+}
+
+// ── DIRECTOR (centre-wide, SiteSettings key "GrantDirector") ──
+const DIRECTOR_KEY = 'GrantDirector';
+const DIRECTOR_DEFAULT = 'Megan Nooney';
+let directorDirty = false;
+
+async function loadDirector() {
+    const input = document.getElementById('setDirector');
+    if (!input) return;
+    try {
+        const res = await apiFetch('/api/site-settings');
+        const data = res.ok ? await res.json() : {};
+        input.value = (data && data[DIRECTOR_KEY]) || DIRECTOR_DEFAULT;
+    } catch (e) { input.value = DIRECTOR_DEFAULT; }
+    directorDirty = false;
+    const btn = document.getElementById('setDirectorSave');
+    if (btn) btn.disabled = true;
+}
+
+function markDirectorChanged() {
+    directorDirty = true;
+    const btn = document.getElementById('setDirectorSave');
+    if (btn) btn.disabled = false;
+    const all = document.getElementById('setSaveAll');
+    if (all) all.disabled = false;
+}
+
+async function saveDirector() {
+    const input = document.getElementById('setDirector');
+    if (!input) return false;
+    const value = input.value.trim();
+    try {
+        const res = await apiFetch('/api/site-settings', { method: 'POST', body: JSON.stringify({ key: DIRECTOR_KEY, value }) });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('Director saved', 'success');
+            directorDirty = false;
+            const btn = document.getElementById('setDirectorSave');
+            if (btn) btn.disabled = true;
+            return true;
+        }
+        showNotification('Save failed: ' + (data.error || ''), 'error');
+        return false;
+    } catch (e) { showNotification('Network error', 'error'); return false; }
+}
+
+init();
+</script>
+</body>
+</html>
