@@ -600,6 +600,22 @@
             <button class="pi-close" onclick="closeInterview()" aria-label="Close">&times;</button>
         </div>
         <div class="pi-modal-body">
+            <!-- Attach a signed/scanned paper Parent Interview Form. This is the path for
+                 returning families who pre-date the online form: the scan IS the evidence,
+                 so uploading it files the PDF in the child's folder and ticks the column. -->
+            <div class="pi-section" id="piScanSection">
+                <h4>Signed / Scanned Form on File</h4>
+                <div class="doc-note">
+                    For a paper Parent Interview Form the family filled out and signed, attach the
+                    scan (PDF or a clear photo). It is filed in the child&rsquo;s folder and marks
+                    the Parent Interview column complete &mdash; no need to re-type the fields below.
+                </div>
+                <div class="cls-upload-row">
+                    <input type="file" id="piScanFile" accept=".pdf,.jpg,.jpeg,.png">
+                    <button type="button" class="pi-btn pi-btn-primary" id="piScanBtn" onclick="uploadInterviewScan()">Upload signed form</button>
+                    <span id="piScanStatus" class="cls-upload-status"></span>
+                </div>
+            </div>
             <!-- Pre-filled child/enrollment info -->
             <div class="pi-section">
                 <h4>Child Information</h4>
@@ -2704,6 +2720,15 @@ async function openInterview(studentId) {
 
     loadIntakeRecord(studentId);
 
+    // Show whether a signed/scanned paper form is already on file for this child, and
+    // clear any file left selected from a previous open.
+    var scanFileInput = document.getElementById('piScanFile');
+    if (scanFileInput) scanFileInput.value = '';
+    var existingScan = ChildForms.fileFor(studentId, 'ParentInterview', 'interviewform');
+    setUploadStatus('piScanStatus', existingScan
+        ? { on: true, name: existingScan.name, relPath: existingScan.relPath }
+        : null, 'No signed form on file yet.');
+
     document.getElementById('piOverlay').classList.add('open');
 }
 
@@ -3092,12 +3117,16 @@ function escUpload(s) {
 /* Upload one child evidence file (parent questionnaire or report card) into the
    child's folder via /api/child-file-upload. Multipart, so credentials are attached
    by hand and Content-Type is left for the browser to set its own boundary. */
-async function uploadChildFile(studentId, field, kind, file) {
+async function uploadChildFile(studentId, field, kind, file, extraDate) {
     var form = new FormData();
     form.append('file', file, file.name);
+    // A scanned interview form carries the date the family signed, so the roster's
+    // Parent Interview cell reads that date rather than the day it was scanned in.
+    var dateQS = /^\d{4}-\d{2}-\d{2}$/.test(String(extraDate || ''))
+        ? '&date=' + encodeURIComponent(extraDate) : '';
     var res = await fetch('/api/child-file-upload?studentId=' + encodeURIComponent(studentId)
         + '&field=' + encodeURIComponent(field) + '&kind=' + encodeURIComponent(kind)
-        + '&year=' + encodeURIComponent(activeSchoolYear),
+        + '&year=' + encodeURIComponent(activeSchoolYear) + dateQS,
         { method: 'POST',
           headers: (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
           body: form });
@@ -3217,6 +3246,46 @@ async function uploadReportCard() {
         if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Upload report card'; }
+    }
+}
+
+/* Attach a signed/scanned paper Parent Interview Form for the child open in the modal.
+   Files the scan in the child's folder, ticks the Parent Interview column, and seeds a
+   ParentInterviews row so the roster reads the cell as evidence on file. The interview
+   date comes from the modal's Interview Date field so the cell shows the date the family
+   signed, not the day it was scanned. */
+async function uploadInterviewScan() {
+    if (!currentInterviewStudentId) return;
+    var input = document.getElementById('piScanFile');
+    var statusEl = document.getElementById('piScanStatus');
+    if (!input || !input.files || !input.files.length) {
+        if (statusEl) { statusEl.textContent = 'Choose a file first.'; statusEl.style.color = '#b91c1c'; }
+        return;
+    }
+    var file = input.files[0];
+    if (file.size > 15 * 1024 * 1024) {
+        if (statusEl) { statusEl.textContent = 'That is over 15 MB. A PDF is usually much smaller.'; statusEl.style.color = '#b91c1c'; }
+        return;
+    }
+    var btn = document.getElementById('piScanBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Uploading\u2026'; }
+    if (statusEl) { statusEl.textContent = 'Uploading\u2026'; statusEl.style.color = '#64748b'; }
+    var dateField = document.getElementById('piDate');
+    var signedDate = dateField ? dateField.value : '';
+    try {
+        var d = await uploadChildFile(currentInterviewStudentId, 'ParentInterview', 'interviewform', file, signedDate);
+        ChildForms.markFile(currentInterviewStudentId, 'ParentInterview', 'interviewform', d.relPath, d.name);
+        // The scan is the whole requirement, so reflect the tick and evidence locally
+        // without waiting for a reload.
+        if (!trackingData[currentInterviewStudentId]) trackingData[currentInterviewStudentId] = {};
+        trackingData[currentInterviewStudentId].ParentInterview = 1;
+        ChildForms.mark(currentInterviewStudentId, 'ParentInterview', signedDate || new Date().toISOString().slice(0, 10));
+        setUploadStatus('piScanStatus', { on: true, name: d.name, relPath: d.relPath }, '');
+        refreshActiveView();
+    } catch (e) {
+        if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Upload signed form'; }
     }
 }
 

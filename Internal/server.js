@@ -5195,7 +5195,8 @@ ELSE
             if (!ISBE_TRACKING_COLUMNS.includes(field)) {
                 return sendJSON(res, 400, { error: 'Unknown form: ' + field });
             }
-            // A questionnaire belongs to a screening column; a report to a report column.
+            // A questionnaire belongs to a screening column; a report to a report column;
+            // a scanned interview form to the ParentInterview column.
             const SCREENING = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
             const REPORTS = ['MidYearReport', 'EndYearReport'];
             if (kind === 'questionnaire' && SCREENING.indexOf(field) === -1) {
@@ -5204,7 +5205,13 @@ ELSE
             if (kind === 'report' && REPORTS.indexOf(field) === -1) {
                 return sendJSON(res, 400, { error: 'A report card attaches to a report-card column.' });
             }
-            if (kind !== 'questionnaire' && kind !== 'report') {
+            // A returning family who pre-dates the online form still hands in the paper
+            // Parent Interview Form; the scan IS the evidence, so it attaches to the
+            // ParentInterview column and ticks it (see below). kind 'interviewform'.
+            if (kind === 'interviewform' && field !== 'ParentInterview') {
+                return sendJSON(res, 400, { error: 'A scanned interview form attaches to the Parent Interview column.' });
+            }
+            if (kind !== 'questionnaire' && kind !== 'report' && kind !== 'interviewform') {
                 return sendJSON(res, 400, { error: 'Unknown upload kind.' });
             }
         } else if (!CHILD_DOC_KEYS[kind]) {
@@ -5270,7 +5277,8 @@ ELSE
                 const LABELS = {
                     BegASQ: 'Beginning ASQ-3 questionnaire', EndASQ: 'End ASQ-3 questionnaire',
                     BegASE: 'Beginning ASQ SE-2 questionnaire', EndASE: 'End ASQ SE-2 questionnaire',
-                    MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card'
+                    MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card',
+                    ParentInterview: 'Parent Interview Form'
                 };
                 const label = isChildDoc ? (CHILD_DOC_KEYS[kind] || kind) : (LABELS[field] || field);
                 const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
@@ -5307,6 +5315,24 @@ ELSE
 `;
                 // A report card is the whole requirement, so filing it ticks the box.
                 if (kind === 'report') sql += trackingTickSQL(studentId, year, field);
+                /* A scanned Parent Interview Form is the whole requirement too: the signed
+                   paper form is the compliance evidence. Tick the ParentInterview flag AND
+                   seed a ParentInterviews row so /api/child-forms reads the cell as evidence
+                   on file (it keys on a non-empty InterviewDate). The interview date the
+                   family signed is passed as ?date=; today is a safe fallback. The row is
+                   only created if one does not already exist, so re-uploading a corrected
+                   scan never clobbers a typed-in electronic interview for the same year. */
+                if (kind === 'interviewform') {
+                    const interviewDate = /^\d{4}-\d{2}-\d{2}$/.test(String(qs.get('date') || ''))
+                        ? qs.get('date') : new Date().toISOString().slice(0, 10);
+                    sql = parentInterviewEnsureSQL() + sql
+                        + `\nIF NOT EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(year)})
+    INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,Notes)
+    VALUES (${studentId},${esc(year)},${esc(interviewDate)},${esc('Scanned paper Parent Interview Form filed ' + stamp + '.')});
+ELSE
+    UPDATE ParentInterviews SET InterviewDate=CASE WHEN ISNULL(InterviewDate,'')='' THEN ${esc(interviewDate)} ELSE InterviewDate END WHERE StudentId=${studentId} AND SchoolYear=${esc(year)};\n`
+                        + trackingTickSQL(studentId, year, field);
+                }
                 // Proof of income also lives on the enrollment record; a scan here is the
                 // real evidence, so mark the flag and remember the file so the roster's
                 // ProofOfIncome column and the dashboard counts agree with this grid.
