@@ -971,7 +971,7 @@
         var existingQ = ChildForms().fileFor(studentId, scrField, 'questionnaire');
         setUploadStatus('scrQuestStatus', existingQ
             ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
-            : null, 'No questionnaire on file yet.');
+            : null, 'Optional \u2014 no questionnaire on file.');
 
         try {
             var res = await apiFetch(yearQS('/api/screening/' + studentId + '?type=' + encodeURIComponent(type) + '&period=' + encodeURIComponent(period)));
@@ -1123,10 +1123,9 @@
         };
     }
 
-    /* Attach the parent's completed questionnaire for the screening currently open.
-       Files into the child's folder and marks the cell so it turns green without a
-       reload. This is one of the two artefacts a screening needs; the other is the
-       scored, signed summary above. */
+    /* Attach a parent's completed questionnaire for the screening currently open.
+       OPTIONAL: the teacher-scored summary already completes the screening; this just
+       files the questionnaire into the child's folder if the family did one. */
     async function uploadScreeningQuestionnaire() {
         if (!currentScrStudentId) return;
         var field = screeningField(currentScrType, currentScrPeriod);
@@ -1454,11 +1453,12 @@
         '<div class="pi-field"><label>Questionnaire Interval</label><input type="text" id="scrInterval" placeholder="e.g. 36 month, 48 month"></div>',
         '<div class="pi-field"><label>Referral Made?</label><select id="scrReferral"><option value="No">No</option><option value="Yes">Yes</option></select></div>',
         '<div class="pi-field pi-full"><label>Notes / Follow-up</label><textarea id="scrNotes" placeholder="Any concerns, referral details, follow-up actions..."></textarea></div></div></div>',
-        // The parent fills the paper questionnaire; the teacher scores it above. Both
-        // are required evidence, so the completed questionnaire is scanned/photographed
-        // and attached here. It files straight into the child\u2019s folder.
-        '<div class="pi-section"><h4>Parent\u2019s Completed Questionnaire</h4>',
-        '<div class="doc-note">The parent\u2019s filled-in Ages &amp; Stages questionnaire is required alongside the scores. Attach a scan or a clear photo (PDF or image). It is filed in the child\u2019s folder.</div>',
+        // Optional. The teacher-scored summary above completes the screening on its
+        // own (staff-administered). If a parent filled in a paper questionnaire, it can
+        // be scanned/photographed and attached here for the child\u2019s folder, but it
+        // is not required.
+        '<div class="pi-section"><h4>Parent\u2019s Completed Questionnaire (optional)</h4>',
+        '<div class="doc-note">Optional. The scored summary above completes the screening on its own. If a parent completed an Ages &amp; Stages questionnaire, you can attach the scan or a clear photo (PDF or image) to keep it in the child\u2019s folder &mdash; but it is not required.</div>',
         '<div class="cls-upload-row"><input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">',
         '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload questionnaire</button>',
         '<span id="scrQuestStatus" class="cls-upload-status"></span></div></div>',

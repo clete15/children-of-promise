@@ -163,20 +163,24 @@
        direction.
 
        Two columns are special:
-         - A screening (ASQ/ASE) is 'form' only when BOTH the scored summary and the
-           parent questionnaire upload are present. With one of the two it is
-           'partial' — real progress, but not a file that would pass review, so it is
-           not done. Nothing there but a tick is 'tick-only'.
+         - A screening (ASQ/ASE) is 'form' (complete) once the TEACHER-SCORED summary
+           is on file. The screening is staff-administered and the scored result is
+           what PI10 documents (see the compliance steering: PI10 requires the
+           screening on file + parent permission + results shared, NOT a parent-
+           completed questionnaire). A parent questionnaire upload is optional best
+           practice: if present it also counts as complete, but its absence never holds
+           a screening back. Nothing there but a tick is 'tick-only'.
          - A report card is 'form' when its scan is uploaded, else tick-only/none. */
     function state(studentId, field, ticked) {
         if (!isBacked(field)) return ticked ? 'tick' : 'none';
         if (loadState !== 'ready') return ticked ? 'unknown' : 'none';
 
         if (isScreening(field)) {
+            // Teacher-scored summary OR a parent questionnaire on file completes it.
+            // (Scored alone is the normal, streamlined path.)
             var scored = hasForm(studentId, field);
             var quest = hasFile(studentId, field, 'questionnaire');
-            if (scored && quest) return 'form';
-            if (scored || quest) return 'partial';
+            if (scored || quest) return 'form';
             return ticked ? 'tick-only' : 'none';
         }
         if (isReport(field)) {
@@ -217,8 +221,8 @@
                 var st = state(s.Id, f, !!t[f]);
                 if (st === 'tick-only') { anyUnbacked = true; anyMissing = true; }
                 else if (st === 'none') anyMissing = true;
-                // A screening with only one of its two artefacts, or any other
-                // half-done backed field: real progress, but not a passing file.
+                // 'partial' is retained for any future half-done backed field; screenings
+                // no longer produce it (scored summary alone completes them).
                 else if (st === 'partial') anyMissing = true;
             });
             if (anyUnbacked) out.unbacked.push(s);

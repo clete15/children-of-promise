@@ -1038,8 +1038,8 @@
                 </div>
             </div>
             <div class="pi-section">
-                <h4>Parent&rsquo;s Completed Questionnaire</h4>
-                <div class="doc-note">The parent&rsquo;s filled-in Ages &amp; Stages questionnaire is required alongside the scores. Attach a scan or a clear photo (PDF or image). It is filed in the child&rsquo;s folder.</div>
+                <h4>Parent&rsquo;s Completed Questionnaire (optional)</h4>
+                <div class="doc-note">Optional. The scored summary above completes the screening on its own. If a parent filled in an Ages &amp; Stages questionnaire, you can attach the scan or a clear photo (PDF or image) to keep it in the child&rsquo;s folder &mdash; but it is not required.</div>
                 <div class="cls-upload-row">
                     <input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">
                     <button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="uploadScreeningQuestionnaire()">Upload questionnaire</button>
@@ -1519,8 +1519,8 @@ async function init() {
             // Which forms exist, so a tick with nothing behind it is visible as
             // such from the first render rather than after an interaction.
             ChildForms.load(activeSchoolYear, apiFetch),
-            // Uploaded evidence (parent questionnaires, report-card scans) — required
-            // for a screening's two-part completion and for the report-card columns.
+            // Uploaded evidence: optional parent questionnaires (best practice) and the
+            // required report-card scans.
             ChildForms.loadFiles(activeSchoolYear, apiFetch),
             loadSignatures(activeSchoolYear),
             // Which children have a weighted-eligibility form on disk (Child Files), so
@@ -1805,8 +1805,8 @@ const COLUMNS = [
     { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Pre-fills from the pre-enrollment record; print the pre-filled form for the family to complete at enrollment, then save. Completed by admin at enrollment.' },
     { field: 'ProofOfIncome', label: 'Proof of<br>Income', title: 'Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.' },
     { field: 'EnterSIS', label: 'Enter<br>into SIS', title: 'Enter student into the ISBE Student Information System (SIS) before beginning screenings.' },
-    { field: 'BegASQ', teacher: true, label: 'Beg ASQ', title: 'Administer the ASQ-3 developmental screening at the beginning of the school year. Parent completes the questionnaire; teacher scores it.' },
-    { field: 'BegASE', teacher: true, label: 'Beg ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the beginning of the school year. Parent completes; teacher scores and reviews results.' },
+    { field: 'BegASQ', teacher: true, label: 'Beg ASQ', title: 'Administer and score the ASQ-3 developmental screening at the beginning of the school year. Teacher-administered; the scored summary completes it. A parent-completed questionnaire is optional.' },
+    { field: 'BegASE', teacher: true, label: 'Beg ASE', title: 'Administer and score the ASQ:SE-2 social-emotional screening at the beginning of the school year. Teacher-administered; the scored summary completes it. A parent-completed questionnaire is optional.' },
     { field: 'MidYearReport', teacher: true, label: 'Mid Year<br>Report Card', title: 'Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.' },
     { field: 'EndASQ', teacher: true, label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.' },
     { field: 'EndASE', teacher: true, label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.' },
@@ -3588,7 +3588,7 @@ async function openScreening(studentId, type, period) {
     var existingQ = ChildForms.fileFor(studentId, scrField, 'questionnaire');
     setUploadStatus('scrQuestStatus', existingQ
         ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
-        : null, 'No questionnaire on file yet.');
+        : null, 'Optional \u2014 no questionnaire on file.');
 
     // Load existing data
     try {
@@ -4446,9 +4446,9 @@ function beginningScreeningStatus(program) {
         const lateOne = isLateEnrollee(s, activeSchoolYear);
         ['BegASQ', 'BegASE'].forEach(field => {
             const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
-            // A screening is done only when BOTH halves are on file (parent
-            // questionnaire + teacher's scored form); ChildForms.isDone enforces that,
-            // so a bare tick no longer counts the batch as complete.
+            // A screening is done once the teacher's scored summary is on file
+            // (staff-administered; the parent questionnaire is optional). ChildForms.isDone
+            // enforces that, so a bare tick still does not count the batch as complete.
             const done = ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field]);
             if (lateOne) {
                 if (done) return;

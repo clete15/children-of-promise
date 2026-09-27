@@ -2093,15 +2093,9 @@ function classroomChecklistHtml(rooms) {
                 ? '<span class="cls-paper" title="Ticked, but nothing is saved here. '
                   + 'If it was done on paper that is fine; otherwise open the form.">on paper?</span>'
                 : '';
-            // A screening needs two things — the parent questionnaire upload and the
-            // scored, signed summary. When only one is in, say which is still missing.
-            if (st === 'partial' && ChildForms.isScreening(col.field)) {
-                const haveQ = ChildForms.hasFile(s.Id, col.field, 'questionnaire');
-                const haveScored = ChildForms.hasForm(s.Id, col.field);
-                const need = !haveQ ? 'needs questionnaire' : !haveScored ? 'needs scoring' : 'in progress';
-                extra += '<span class="cls-partial" title="One of the two required items is still '
-                    + 'missing for this screening.">' + need + '</span>';
-            }
+            // A screening completes on the teacher-scored summary alone (staff-
+            // administered; see compliance steering). No "needs questionnaire" state —
+            // the parent questionnaire is optional best practice, not required.
             let action = '';
             if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
                 const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';
