@@ -475,6 +475,10 @@
              (Clete); the server also enforces checkITAdmin on /api/deploy. Pulls the latest
              code from GitHub; server.js changes still need a Restart afterward. -->
         <button type="button" class="header-theme-btn" id="hdrDeploy" style="display:none;" title="Pull the latest code from GitHub. Page/script changes take effect on reload; server.js changes need a Restart.">🚀 Deploy</button>
+        <!-- Bulk import of scanned paper Parent Interview Forms. Matches each file to a
+             PI child by name and files it in the child's folder, ticking the column.
+             A once-a-year batch job, so it lives in the header rather than the roster. -->
+        <button type="button" class="header-theme-btn" id="hdrImportPI" onclick="openBulkInterviewImport()" title="Upload many scanned Parent Interview Forms at once. Each is matched to a PI child by the file name.">📥 Import Interviews</button>
     </div>
 </header>
 
@@ -783,6 +787,37 @@
         <div class="pi-modal-footer">
             <span class="pi-saved-badge" id="psSavedBadge" style="display:none;">&#10003; Saved</span>
             <button class="pi-btn pi-btn-primary" id="psSaveBtn" onclick="savePermissionSlip()">Save Permission Slip</button>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Parent Interview Import Modal -->
+<div class="pi-overlay" id="piImportOverlay">
+    <div class="pi-modal">
+        <div class="pi-modal-header">
+            <h3>Import Scanned Parent Interview Forms</h3>
+            <button class="pi-close" onclick="closeBulkInterviewImport()" aria-label="Close">&times;</button>
+        </div>
+        <div class="pi-modal-body">
+            <div class="pi-section">
+                <div class="doc-note">
+                    Choose the scanned Parent Interview Form PDFs. Each file is matched to a PI child
+                    by the name in the file (e.g. &ldquo;Kaidyn McClanahan - Parent Interview Form.pdf&rdquo;).
+                    Matched files are filed in the child&rsquo;s folder and tick the Parent Interview column.
+                    Files that don&rsquo;t match an active PI child are skipped &mdash; nothing is filed for them.
+                </div>
+                <div class="cls-upload-row">
+                    <input type="file" id="piImportFiles" accept=".pdf,.jpg,.jpeg,.png" multiple onchange="previewBulkInterviewImport()">
+                </div>
+            </div>
+            <div class="pi-section" id="piImportPreviewSection" style="display:none;">
+                <h4>Matches</h4>
+                <div id="piImportPreview"></div>
+            </div>
+        </div>
+        <div class="pi-modal-footer">
+            <span class="pi-saved-badge" id="piImportBadge" style="display:none;">&#10003; Done</span>
+            <button class="pi-btn pi-btn-primary" id="piImportBtn" onclick="runBulkInterviewImport()" disabled>Import matched forms</button>
         </div>
     </div>
 </div>
@@ -3235,6 +3270,136 @@ function printInterview() {
     document.getElementById('piOverlay').setAttribute('data-printing', '1');
     window.print();
     document.getElementById('piOverlay').removeAttribute('data-printing');
+}
+
+// ── Bulk Parent Interview Import ──
+
+// The matches computed by previewBulkInterviewImport(), used by runBulkInterviewImport().
+let piImportMatches = [];
+
+/* Loose key for name matching: lowercase, drop everything but a-z0-9. So
+   "Lei'Lani Stickles" and "LeiLani Stickels"... still differ (Stickels vs Stickles),
+   which is why we match on first name + last name separately and also try a
+   first-name-only fallback within the same surname bucket. */
+function piNameKey(s) {
+    return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/* Pull the "First Last" portion out of a scan file name. The convention is
+   "<First Last> - Parent Interview Form.pdf"; take everything before the first
+   " - ", falling back to the whole stem if there is no dash. */
+function piNameFromFile(fileName) {
+    const stem = fileName.replace(/\.[^.]+$/, '');       // drop extension
+    const dash = stem.indexOf(' - ');
+    return (dash >= 0 ? stem.slice(0, dash) : stem).trim();
+}
+
+/* Match a "First Last" string to an active PI child. Returns the student or null.
+   Strategy: build a normalized key from the child's First+Last and compare to the
+   file's normalized key; if none matches exactly, try matching the last token as a
+   surname and the rest as the first name, tolerant of punctuation. */
+function piMatchChild(nameStr) {
+    const pi = students.filter(s => String(s.PFA_PI_na).toUpperCase() === 'PI'
+        && (String(s.Active).toLowerCase() === 'yes'));
+    const fileKey = piNameKey(nameStr);
+    // Exact normalized "firstlast".
+    let hit = pi.filter(s => piNameKey(s.First_Name + s.Last_Name) === fileKey);
+    if (hit.length === 1) return hit[0];
+    // Split the file name into first / last on whitespace and compare each part,
+    // which handles a middle name or initial in the file that the record lacks.
+    const parts = nameStr.trim().split(/\s+/);
+    if (parts.length >= 2) {
+        const fileLast = piNameKey(parts[parts.length - 1]);
+        const fileFirst = piNameKey(parts.slice(0, parts.length - 1).join(''));
+        hit = pi.filter(s => piNameKey(s.Last_Name) === fileLast && piNameKey(s.First_Name) === fileFirst);
+        if (hit.length === 1) return hit[0];
+        // First name alone within the surname bucket (covers Stickels/Stickles typo).
+        const sameLast = pi.filter(s => piNameKey(s.Last_Name).slice(0, 5) === fileLast.slice(0, 5));
+        const byFirst = sameLast.filter(s => piNameKey(s.First_Name) === fileFirst);
+        if (byFirst.length === 1) return byFirst[0];
+    }
+    return null;
+}
+
+function openBulkInterviewImport() {
+    piImportMatches = [];
+    document.getElementById('piImportFiles').value = '';
+    document.getElementById('piImportPreview').innerHTML = '';
+    document.getElementById('piImportPreviewSection').style.display = 'none';
+    document.getElementById('piImportBadge').style.display = 'none';
+    document.getElementById('piImportBtn').disabled = true;
+    document.getElementById('piImportBtn').textContent = 'Import matched forms';
+    document.getElementById('piImportOverlay').classList.add('open');
+}
+
+function closeBulkInterviewImport() {
+    document.getElementById('piImportOverlay').classList.remove('open');
+}
+
+/* Build the filename->child preview table. Each row is { file, name, student|null }. */
+function previewBulkInterviewImport() {
+    const input = document.getElementById('piImportFiles');
+    const files = input && input.files ? Array.prototype.slice.call(input.files) : [];
+    piImportMatches = files.map(f => {
+        const name = piNameFromFile(f.name);
+        return { file: f, name: name, student: piMatchChild(name) };
+    });
+
+    const rowHtml = piImportMatches.map((m, i) => {
+        const matched = !!m.student;
+        const who = matched ? (m.student.Last_Name + ', ' + m.student.First_Name + ' (#' + m.student.Id + ')')
+            : '<span style="color:#b91c1c;">No active PI child &mdash; will skip</span>';
+        return '<tr>'
+            + '<td style="padding:4px 8px;font-size:0.8rem;">' + piEsc(m.file.name) + '</td>'
+            + '<td style="padding:4px 8px;font-size:0.8rem;">' + (matched ? '\u2192 ' : '') + who + '</td>'
+            + '<td id="piImportStatus_' + i + '" style="padding:4px 8px;font-size:0.8rem;color:#64748b;"></td>'
+            + '</tr>';
+    }).join('');
+
+    const matchedCount = piImportMatches.filter(m => m.student).length;
+    const skipCount = piImportMatches.length - matchedCount;
+    document.getElementById('piImportPreview').innerHTML =
+        '<div style="font-size:0.8rem;margin-bottom:8px;color:#374151;"><strong>' + matchedCount + '</strong> matched'
+        + (skipCount ? ', <strong>' + skipCount + '</strong> will be skipped' : '') + '.</div>'
+        + '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr><th style="text-align:left;padding:4px 8px;font-size:0.68rem;color:#6b7280;text-transform:uppercase;">File</th>'
+        + '<th style="text-align:left;padding:4px 8px;font-size:0.68rem;color:#6b7280;text-transform:uppercase;">Child</th>'
+        + '<th style="text-align:left;padding:4px 8px;font-size:0.68rem;color:#6b7280;text-transform:uppercase;">Status</th></tr></thead>'
+        + '<tbody>' + rowHtml + '</tbody></table>';
+    document.getElementById('piImportPreviewSection').style.display = 'block';
+    document.getElementById('piImportBtn').disabled = matchedCount === 0;
+}
+
+/* Upload every matched file in turn, updating its row status. Reuses the same
+   per-child upload the single modal uses, so filing, the ChildFiles row, the seeded
+   ParentInterviews row and the ticked flag are all identical. */
+async function runBulkInterviewImport() {
+    const btn = document.getElementById('piImportBtn');
+    btn.disabled = true;
+    let done = 0, failed = 0;
+    for (let i = 0; i < piImportMatches.length; i++) {
+        const m = piImportMatches[i];
+        const cell = document.getElementById('piImportStatus_' + i);
+        if (!m.student) { if (cell) { cell.textContent = 'Skipped'; cell.style.color = '#9ca3af'; } continue; }
+        if (cell) { cell.textContent = 'Uploading\u2026'; cell.style.color = '#64748b'; }
+        try {
+            const d = await uploadChildFile(m.student.Id, 'ParentInterview', 'interviewform', m.file);
+            ChildForms.markFile(m.student.Id, 'ParentInterview', 'interviewform', d.relPath, d.name);
+            if (!trackingData[m.student.Id]) trackingData[m.student.Id] = {};
+            trackingData[m.student.Id].ParentInterview = 1;
+            ChildForms.mark(m.student.Id, 'ParentInterview', new Date().toISOString().slice(0, 10));
+            if (cell) { cell.textContent = '\u2713 Filed'; cell.style.color = '#166534'; }
+            done++;
+        } catch (e) {
+            if (cell) { cell.textContent = '\u26a0 ' + e.message; cell.style.color = '#b91c1c'; }
+            failed++;
+        }
+    }
+    refreshActiveView();
+    document.getElementById('piImportBadge').textContent = '\u2713 ' + done + ' filed'
+        + (failed ? ', ' + failed + ' failed' : '');
+    document.getElementById('piImportBadge').style.display = 'inline-flex';
+    btn.textContent = 'Done';
 }
 
 // ── Permission Slip Modal ──
@@ -5859,6 +6024,9 @@ document.getElementById('docOverlay').addEventListener('click', function(e) {
 document.getElementById('rcOverlay').addEventListener('click', function(e) {
     if (e.target === this) closeReportUpload();
 });
+document.getElementById('piImportOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeBulkInterviewImport();
+});
 
 // Close modals on Escape key
 document.addEventListener('keydown', function(e) {
@@ -5868,6 +6036,7 @@ document.addEventListener('keydown', function(e) {
         else if (document.getElementById('scrOverlay').classList.contains('open')) closeScreening();
         else if (document.getElementById('psOverlay').classList.contains('open')) closePermissionSlip();
         else if (document.getElementById('piOverlay').classList.contains('open')) closeInterview();
+        else if (document.getElementById('piImportOverlay').classList.contains('open')) closeBulkInterviewImport();
     }
 });
 
