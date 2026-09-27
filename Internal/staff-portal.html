@@ -1836,11 +1836,17 @@ function credentialsSection(s) {
    Room names on a staff record are the exact dimClassrooms names, so an exact
    match is right; an unmatched name is shown but cannot be opened. */
 function myClassrooms(s) {
-    /* Admins (Clete & Megan) see EVERY room, not just their own assignment, because
-       they work across the whole centre. Everyone else sees only the rooms on their
-       own record. The per-child view and forms are identical either way — this only
-       widens which rooms the picker offers. */
-    if (isAdmin() && Array.isArray(ROOMS) && ROOMS.length) {
+    /* The picker follows the SELECTED staff member: their primary classroom first
+       (Classroom), then their secondary (SecondaryClassroom, shown "(part time)").
+       Primacy is positional — Classroom is primary — so listing it first also makes
+       the picker default to it.
+
+       The exception is an admin (Clete & Megan) looking at THEIR OWN record: they work
+       across the whole centre, so their own page offers every room. When an admin
+       selects a teacher, though, the picker shows that teacher's rooms — otherwise you
+       could never see which room a given teacher is actually assigned to. */
+    const viewingOwn = !!(WHO && current && String(WHO.staffId) === String(current.Id));
+    if (isAdmin() && viewingOwn && Array.isArray(ROOMS) && ROOMS.length) {
         return ROOMS
             .slice()
             .sort((a, b) => (parseInt(a.RoomNumber) || 9999) - (parseInt(b.RoomNumber) || 9999))
@@ -3064,6 +3070,10 @@ async function load() {
         current = STAFF.find(s => String(s.Id) === String(sel.value)) || STAFF[0];
         sel.addEventListener('change', () => {
             current = STAFF.find(s => String(s.Id) === String(sel.value));
+            // New person, new room list — clear the sticky room so the classroom picker
+            // re-defaults to this staff member's primary classroom instead of keeping
+            // whatever room the previous person had selected.
+            activeClsRoom = null;
             render();
             loadFiles(current.Id);
         });
