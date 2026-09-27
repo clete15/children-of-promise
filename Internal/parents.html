@@ -64,6 +64,9 @@
     <div class="pp-wrapper">
         <div class="pp-sidebar">
             <div class="pp-search">
+                <select id="ppRoomFilter" onchange="renderList()" style="width:100%;box-sizing:border-box;margin-bottom:8px;padding:8px 10px;border:1px solid var(--sp-border);border-radius:8px;background:var(--sp-surface);color:var(--sp-text);font-size:0.85rem;">
+                    <option value="">All rooms</option>
+                </select>
                 <input type="text" id="ppSearch" placeholder="Search by name…" oninput="renderList()">
             </div>
             <div class="pp-list" id="ppList"></div>
@@ -124,10 +127,30 @@ function selected() {
     return ppStudents.find(s => String(s.Id) === String(selectedId)) || null;
 }
 
+/* Fill the room filter from the rooms actually present in the roster, in the order the
+   students arrive (already sorted by room number in load()), so there are no empty rooms
+   in the picker and no separate classrooms fetch. */
+function buildRoomFilter() {
+    const sel = document.getElementById('ppRoomFilter');
+    if (!sel) return;
+    const seen = [];
+    ppStudents.forEach(s => {
+        const room = (s.Room || '').trim();
+        if (room && seen.indexOf(room) === -1) seen.push(room);
+    });
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All rooms</option>'
+        + seen.map(r => `<option value="${esc(r)}">${esc(r)}</option>`).join('');
+    // Keep the selection if it's still a valid room.
+    if (seen.indexOf(current) !== -1) sel.value = current;
+}
+
 function renderList() {
     const q = (document.getElementById('ppSearch').value || '').trim().toLowerCase();
+    const roomFilter = (document.getElementById('ppRoomFilter').value || '').trim();
     const box = document.getElementById('ppList');
     const rows = ppStudents.filter(s => {
+        if (roomFilter && (s.Room || '').trim() !== roomFilter) return false;
         if (!q) return true;
         return ((s.First_Name || '') + ' ' + (s.Last_Name || '')).toLowerCase().includes(q);
     });
@@ -255,6 +278,7 @@ async function load() {
             .filter(s => s && s.Id && (s.First_Name || s.Last_Name))
             .sort((a, b) => String(a.Last_Name || '').localeCompare(String(b.Last_Name || ''))
                 || String(a.First_Name || '').localeCompare(String(b.First_Name || '')));
+        buildRoomFilter();
         renderList();
     } catch (e) {
         document.getElementById('ppList').innerHTML = '';
