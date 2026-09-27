@@ -6,25 +6,36 @@
     <title>ISBE PFA/PI Management – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+        /* Themed to match the Enrollment Management pages (was a fixed blue gradient with
+           translucent-white sidebar). Surfaces, borders and text follow the --sp-* tokens
+           so light/dark both work. */
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
         .isbe-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
-        .isbe-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1100px; }
-        .isbe-sidebar { width:160px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
-        .isbe-sidebar button { display:block;width:100%;text-align:left;padding:14px 16px;border:none;cursor:pointer;background:transparent;transition:background 0.15s; }
-        .isbe-sidebar button.active { background:rgba(255,255,255,0.2); }
-        .isbe-sidebar button:hover:not(.active) { background:rgba(255,255,255,0.1); }
-        .isbe-sidebar button div { font-size:0.82rem;font-weight:700;color:white; }
-        .isbe-sidebar button span { font-size:0.68rem;color:rgba(255,255,255,0.6); }
-        .isbe-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px); }
+        .isbe-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1100px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        .isbe-sidebar { width:164px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .isbe-sidebar button { display:block;width:100%;text-align:left;padding:13px 16px;border:none;border-left:3px solid transparent;cursor:pointer;background:transparent;transition:background 0.15s,border-color 0.15s; }
+        .isbe-sidebar button.active { background:var(--sp-accent-soft);border-left-color:var(--sp-accent); }
+        .isbe-sidebar button.active div { color:var(--sp-accent); }
+        .isbe-sidebar button:hover:not(.active) { background:var(--sp-surface); }
+        .isbe-sidebar button div { font-size:0.82rem;font-weight:700;color:var(--sp-text); }
+        .isbe-sidebar button span { font-size:0.68rem;color:var(--sp-muted); }
+        .isbe-sidebar .isbe-sub { display:block;font-size:0.62rem;color:var(--sp-quiet);margin-top:2px; }
+        /* PFA ⇄ PI program toggle at the top of the sidebar. */
+        .isbe-progtoggle { display:flex;margin:6px 12px 10px;border:1px solid var(--sp-border);border-radius:8px;overflow:hidden; }
+        .isbe-prog { flex:1;border:none;background:var(--sp-surface);color:var(--sp-text-2);cursor:pointer;
+            font-size:0.8rem;font-weight:800;padding:7px 0;transition:background 0.12s,color 0.12s; }
+        .isbe-prog:hover:not(.on) { background:var(--sp-surface-2); }
+        .isbe-prog.on { background:var(--sp-accent);color:#fff; }
+        .isbe-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;max-height:calc(100vh - 130px); }
         /* Child Files checklist grid */
         .cf-grid { border-collapse:collapse;width:100%;font-size:0.78rem; }
-        .cf-grid th, .cf-grid td { border:1px solid #e5e7eb;padding:6px 8px;text-align:center; }
-        .cf-grid thead th { background:#1e3a8a;color:#fff;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.03em;position:sticky;top:0; }
-        .cf-grid th.cf-name, .cf-grid td.cf-name { text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:0;background:#fff; }
-        .cf-grid thead th.cf-name { background:#1e3a8a; }
-        .cf-grid td.cf-room { text-align:left;color:#64748b;white-space:nowrap; }
-        .cf-grid tr:nth-child(even) td { background:#f8fafc; }
-        .cf-grid tr:nth-child(even) td.cf-name { background:#f8fafc; }
+        .cf-grid th, .cf-grid td { border:1px solid var(--sp-border);padding:6px 8px;text-align:center; }
+        .cf-grid thead th { background:var(--sp-surface-2);color:var(--sp-text);font-size:0.66rem;text-transform:uppercase;letter-spacing:0.03em;position:sticky;top:0; }
+        .cf-grid th.cf-name, .cf-grid td.cf-name { text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:0;background:var(--sp-surface); }
+        .cf-grid thead th.cf-name { background:var(--sp-surface-2); }
+        .cf-grid td.cf-room { text-align:left;color:var(--sp-muted);white-space:nowrap; }
+        .cf-grid tr:nth-child(even) td { background:var(--sp-surface-2); }
+        .cf-grid tr:nth-child(even) td.cf-name { background:var(--sp-surface-2); }
         .cf-cell { min-width:70px; }
         .cf-cell.cf-filed { background:#dcfce7 !important; }   /* scan attached: filed evidence */
         .cf-cell.cf-paper { background:#fef3c7 !important; }   /* checked only: on paper, no scan */
@@ -42,7 +53,7 @@
            forms a stacking context, so the header cells' own z-index is resolved
            inside this row: leaving the row at 1 let the frozen Student and Room cells
            scroll up over the header. */
-        thead tr { background:#f8fafc;position:sticky;z-index:3; }
+        thead tr { background:var(--sp-surface-2);position:sticky;z-index:3; }
         /* Two-tier header: the group banners on top, the column labels below them.
            The label row sticks just under the group row rather than both at 0. */
         thead tr.isbe-grouprow { top:0; }
@@ -57,29 +68,29 @@
         th.col-teacher, th.col-admin { min-width:78px; }
 
         /* Classroom-card / Admin roster toggle tabs. */
-        .rg-tab { padding:7px 14px;border:1px solid var(--border);background:#fff;cursor:pointer;
-                  font-size:0.78rem;font-weight:700;color:#64748b;border-radius:8px;margin-right:6px; }
-        .rg-tab:hover { color:#334155; }
-        .rg-tab.active { color:#1e3a8a;background:#eef2ff;border-color:#93c5fd; }
+        .rg-tab { padding:7px 14px;border:1px solid var(--sp-border);background:var(--sp-surface);cursor:pointer;
+                  font-size:0.78rem;font-weight:700;color:var(--sp-muted);border-radius:8px;margin-right:6px; }
+        .rg-tab:hover { color:var(--sp-text); }
+        .rg-tab.active { color:var(--sp-accent);background:var(--sp-accent-soft);border-color:var(--sp-accent); }
 
         /* ── Teacher / Admin group banners ── */
         th.grp { font-size:0.64rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
                  padding:5px 6px;border-bottom:1px solid var(--border); }
-        th.grp-teacher { color:#166534;background:#ecfdf3; }
-        th.grp-admin   { color:#3730a3;background:#eef2ff; }
+        th.grp-teacher { color:var(--sp-good-fg);background:var(--sp-good-bg); }
+        th.grp-admin   { color:var(--sp-warn-fg);background:var(--sp-warn-bg); }
         th.grp-note { display:block;font-size:0.52rem;font-weight:600;letter-spacing:0.02em;
-                      text-transform:none;color:#15803d;opacity:0.85;margin-top:1px; }
-        th.grp-blank { background:#f8fafc; }
+                      text-transform:none;color:var(--sp-good-fg);opacity:0.85;margin-top:1px; }
+        th.grp-blank { background:var(--sp-surface-2); }
         /* The line dividing the two groups, carried down every row by .col-divide. */
         th.grp-divide, th.col-divide, td.col-divide { border-left:2px solid #c7d2fe; }
         /* A faint tint so each group reads as a band even mid-scroll. */
-        th.col-teacher { background:#f4fdf7; }
-        th.col-admin   { background:#f6f7ff; }
+        th.col-teacher { background:var(--sp-good-bg); }
+        th.col-admin   { background:var(--sp-warn-bg); }
 
         /* Teacher cells are read-only on the roster (entered in the classroom card).
            The band tint carries down the body; the pill shows only when on file. */
-        td.cf-teacher { background:#f9fefb; }
-        tbody tr:hover td.cf-teacher { background:#f0fbf4; }
+        td.cf-teacher { background:var(--sp-good-bg); }
+        tbody tr:hover td.cf-teacher { background:var(--sp-good-bg); }
         .cf-pill { display:inline-block;font-size:0.6rem;font-weight:800;letter-spacing:0.02em;
                    color:#166534;background:#dcfce7;border:1px solid #bbf7d0;border-radius:999px;
                    padding:1px 8px;white-space:nowrap;text-decoration:none;font-family:inherit;
@@ -91,7 +102,7 @@
         .cf-pill-upload:hover { filter:brightness(0.97); }
         td { padding:5px 6px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:14px; }
-        tr:hover { background:#f8fafc; }
+        tr:hover { background:var(--sp-surface-2); }
 
         /* ── Frozen Student and Room columns ──
            The checklist is wider than any screen, so scrolling right used to leave a
@@ -105,18 +116,18 @@
            Backgrounds must be opaque or the scrolling cells show through. Borders are
            drawn with an inset shadow because a collapsed table border belongs to the
            table, not the cell, and is unreliable on a sticky cell. */
-        th.pin-1, td.pin-1 { position:sticky;left:0;z-index:2;background:white; }
-        th.pin-2, td.pin-2 { position:sticky;left:var(--sticky-2, 150px);z-index:2;background:white; }
+        th.pin-1, td.pin-1 { position:sticky;left:0;z-index:2;background:var(--sp-surface); }
+        th.pin-2, td.pin-2 { position:sticky;left:var(--sticky-2, 150px);z-index:2;background:var(--sp-surface); }
         td.pin-1, td.pin-2 { box-shadow:inset 0 -1px 0 var(--border); }
         /* The rightmost frozen column casts the edge, so the freeze is visible. */
         th.pin-2, td.pin-2 { border-right:1px solid var(--border); }
         td.pin-2 { box-shadow:inset 0 -1px 0 var(--border), 7px 0 7px -5px rgba(15,23,42,0.13); }
         th.pin-2 { box-shadow:7px 0 7px -5px rgba(15,23,42,0.13); }
         /* Header wins at the top-left corner where both freezes meet. */
-        thead th.pin-1, thead th.pin-2 { z-index:4;background:#f8fafc; }
+        thead th.pin-1, thead th.pin-2 { z-index:4;background:var(--sp-surface-2); }
         /* Hover and the Print All row have to be repainted onto the opaque cells. */
-        tbody tr:hover td.pin-1, tbody tr:hover td.pin-2 { background:#f8fafc; }
-        tr.print-all-row td.pin-1, tr.print-all-row td.pin-2 { background:#f0f7ff; }
+        tbody tr:hover td.pin-1, tbody tr:hover td.pin-2 { background:var(--sp-surface-2); }
+        tr.print-all-row td.pin-1, tr.print-all-row td.pin-2 { background:var(--sp-accent-soft); }
         input[type=checkbox] { width:auto;accent-color:var(--primary);cursor:pointer; }
 
         /* ── Is there a form behind this tick? ──
@@ -401,7 +412,10 @@
             <p>PFA / PI Management &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="/staff/">← Staff Portal</a>
+    <div class="header-actions">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/">← Staff Portal</a>
+    </div>
 </header>
 
 <div class="isbe-layout">
@@ -409,45 +423,37 @@
 
         <!-- LEFT SIDEBAR -->
         <div class="isbe-sidebar">
+            <!-- One PFA ⇄ PI toggle at the top instead of duplicating every view per
+                 program. It flips the active program; the Roster / Compliance / Child
+                 Files views below all follow it. -->
+            <div class="isbe-progtoggle">
+                <button type="button" id="progPFA" class="isbe-prog on" onclick="setProgramProgram('PFA')">PFA</button>
+                <button type="button" id="progPI" class="isbe-prog" onclick="setProgramProgram('PI')">PI</button>
+            </div>
             <!-- Opens on the work outstanding for the year in view, so the first
                  thing the director sees is what to do rather than a grid to audit. -->
-            <button id="btnStartYear" onclick="setProgram('startYear')">
+            <button id="btnStartYear" onclick="setView('startYear')">
                 <div>🚦 What Needs<br>Doing</div>
                 <span id="startYearCount"></span>
             </button>
-            <!-- "My Classroom" used to sit here. It is now a teacher's own tab on
-                 My Page (staff-portal.html), which is where teachers work, so it was
-                 removed from this director-facing compliance page. -->
-            <button class="active" id="btnPFA" onclick="setProgram('PFA')">
-                <div>📋 PFA Roster</div>
-                <span id="pfaCount"></span>
+            <button class="active" id="btnRoster" onclick="setView('roster')">
+                <div>📋 <span id="rosterProgLabel">PFA</span> Roster</div>
+                <span id="rosterCount"></span>
             </button>
-            <button id="btnPI" onclick="setProgram('PI')">
-                <div>📋 PI Roster</div>
-                <span id="piCount"></span>
-            </button>
-            <button id="btnPFACompliance" onclick="setProgram('pfaCompliance')">
-                <div>✅ PFA<br>Compliance</div>
-                <span style="font-size:0.62rem;color:rgba(255,255,255,0.5);">Site-level</span>
-            </button>
-            <button id="btnPICompliance" onclick="setProgram('piCompliance')">
-                <div>✅ PI<br>Compliance</div>
-                <span style="font-size:0.62rem;color:rgba(255,255,255,0.5);">Site-level</span>
+            <button id="btnCompliance" onclick="setView('compliance')">
+                <div>✅ <span id="complianceProgLabel">PFA</span><br>Compliance</div>
+                <span class="isbe-sub">Site-level</span>
             </button>
             <!-- Per-child file document checklists (compliance Item 2 / PI5). A grid of
                  the required documents per child; each is checked off or has a scan
                  attached into the child's folder. -->
-            <button id="btnPFAChildFiles" onclick="setProgram('pfaChildFiles')">
-                <div>🗂️ PFA<br>Child Files</div>
-                <span id="pfaChildFilesCount" style="font-size:0.62rem;color:rgba(255,255,255,0.5);"></span>
+            <button id="btnChildFiles" onclick="setView('childFiles')">
+                <div>🗂️ <span id="childFilesProgLabel">PFA</span><br>Child Files</div>
+                <span class="isbe-sub"></span>
             </button>
-            <button id="btnPIChildFiles" onclick="setProgram('piChildFiles')">
-                <div>🗂️ PI<br>Child Files</div>
-                <span id="piChildFilesCount" style="font-size:0.62rem;color:rgba(255,255,255,0.5);"></span>
-            </button>
-            <!-- Last, so the two Compliance panels sit together. Follow-up is an
-                 exception report that is usually empty, not a place to start. -->
-            <button id="btnFollowUp" onclick="setProgram('followUp')">
+            <!-- Last. Follow-up is an exception report that is usually empty, not a place
+                 to start. It spans both programs, so it is not affected by the toggle. -->
+            <button id="btnFollowUp" onclick="setView('followUp')">
                 <div>🔎 Screening<br>Follow-Up</div>
                 <span id="followUpCount"></span>
             </button>
@@ -1015,6 +1021,39 @@ if (!window.ChildForms) {
     };
 }
 
+/* Light/dark theme. Self-contained here rather than loaded from app.js, because app.js
+   also declares top-level `let students`/`let classrooms` which would collide with this
+   page's globals of the same name and kill the whole script. Same localStorage key
+   (copStaffTheme) as the rest of the staff app, so the choice carries across pages. */
+(function () {
+    var KEY = 'copStaffTheme';
+    function apply(dark) {
+        document.body.classList.toggle('sp-dark', !!dark);
+        var btn = document.getElementById('spTheme');
+        if (btn) {
+            btn.textContent = dark ? '\u2600 Light mode' : '\u263e Dark mode';
+            btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+        }
+    }
+    function prefersDark() {
+        try { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+        catch (e) { return false; }
+    }
+    function init() {
+        var saved = null;
+        try { saved = localStorage.getItem(KEY); } catch (e) {}
+        apply(saved === null ? prefersDark() : saved === 'dark');
+        var btn = document.getElementById('spTheme');
+        if (btn) btn.addEventListener('click', function () {
+            var dark = !document.body.classList.contains('sp-dark');
+            apply(dark);
+            try { localStorage.setItem(KEY, dark ? 'dark' : 'light'); } catch (e) {}
+        });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+    else init();
+})();
+
 let students = [];
 let classrooms = [];
 let trackingData = {};
@@ -1090,9 +1129,7 @@ async function setSchoolYear(year) {
     }
     updateFollowUpCount();
     updateStartYearCount();
-    if (activeProgram === 'PFA' || activeProgram === 'PI') renderRoster();
-    else if (activeProgram === 'followUp') renderFollowUp();
-    else if (activeProgram === 'startYear') renderStartYear();
+    refreshActiveView();
 }
 /* ── Signatures ────────────────────────────────────────────────────────────
    signatures['<studentId>|<Field>|<role>'] = { SignedName, RelPath, SignedAt }
@@ -1303,20 +1340,30 @@ async function init() {
             }
         } catch (e) { /* summary is additive; roster still works without it */ }
         // Update counts
-        const pfaCount = students.filter(s => s.PFA_PI_na === 'PFA' && (s.Active === 'Yes' || s.Active === 'YES')).length;
-        const piCount = students.filter(s => s.PFA_PI_na === 'PI' && (s.Active === 'Yes' || s.Active === 'YES')).length;
-        document.getElementById('pfaCount').textContent = pfaCount + ' students';
-        document.getElementById('piCount').textContent = piCount + ' students';
+        updateRosterCount();
         updateFollowUpCount();
         updateStartYearCount();
-        // Deep link into one of the director-facing views. Falls through to the
-        // default PFA roster for anything unrecognised. (The old view=classroom
-        // deep link is gone — My Classroom now lives on My Page.)
+        /* Deep link. Accepts the new ?program=PFA|PI and ?view=roster|compliance|
+           childFiles|followUp|startYear, and still understands the OLD merged strings
+           (?view=PFA, pfaCompliance, piChildFiles, …) so existing bookmarks keep working. */
         const params = new URLSearchParams(location.search);
-        const wanted = params.get('view');
-        const VIEWS = ['startYear', 'followUp', 'PFA', 'PI', 'pfaCompliance', 'piCompliance'];
-        if (wanted && VIEWS.indexOf(wanted) !== -1) setProgram(wanted);
-        else renderRoster();
+        const wantedProgram = (params.get('program') || '').toUpperCase();
+        if (wantedProgram === 'PFA' || wantedProgram === 'PI') setProgramProgram(wantedProgram);
+        const legacy = params.get('view');
+        const LEGACY_MAP = {
+            'PFA': ['PFA', 'roster'], 'PI': ['PI', 'roster'],
+            'pfaCompliance': ['PFA', 'compliance'], 'piCompliance': ['PI', 'compliance'],
+            'pfaChildFiles': ['PFA', 'childFiles'], 'piChildFiles': ['PI', 'childFiles'],
+            'startYear': [null, 'startYear'], 'followUp': [null, 'followUp'],
+            'roster': [null, 'roster'], 'compliance': [null, 'compliance'], 'childFiles': [null, 'childFiles'],
+        };
+        if (legacy && LEGACY_MAP[legacy]) {
+            const [p, v] = LEGACY_MAP[legacy];
+            if (p) setProgramProgram(p);
+            setView(v);
+        } else {
+            renderActiveView();
+        }
     } catch(e) {
         console.error('[INIT ERROR]', e);
         document.getElementById('isbeBody').innerHTML = '<tr><td colspan="' + (COLUMNS.length + 2) + '" style="color:red;padding:20px;">Error loading data: ' + e.message + '</td></tr>';
@@ -1333,23 +1380,71 @@ function getRoom(roomNum) {
 // looking at My Classroom or What Needs Doing, so a just-saved form appeared to
 // do nothing.
 function refreshActiveView() {
-    if (activeProgram === 'startYear') renderStartYear();
-    else if (activeProgram === 'followUp') renderFollowUp();
-    else if (activeProgram === 'PFA' || activeProgram === 'PI') renderRoster();
+    if (activeView === 'startYear') renderStartYear();
+    else if (activeView === 'followUp') renderFollowUp();
+    else if (activeView === 'roster') renderRoster();
+    else if (activeView === 'childFiles') renderChildFilesGrid(activeProgram);
+    else if (activeView === 'compliance') loadCompliance(activeProgram === 'PFA' ? 'pfaCompliance' : 'piCompliance');
     updateFollowUpCount();
     updateStartYearCount();
 }
 
-function setProgram(prog) {
-    activeProgram = prog;
-    document.getElementById('btnPFA').classList.toggle('active', prog === 'PFA');
-    document.getElementById('btnPI').classList.toggle('active', prog === 'PI');
-    document.getElementById('btnPFACompliance').classList.toggle('active', prog === 'pfaCompliance');
-    document.getElementById('btnPICompliance').classList.toggle('active', prog === 'piCompliance');
-    document.getElementById('btnFollowUp').classList.toggle('active', prog === 'followUp');
-    document.getElementById('btnStartYear').classList.toggle('active', prog === 'startYear');
-    document.getElementById('btnPFAChildFiles').classList.toggle('active', prog === 'pfaChildFiles');
-    document.getElementById('btnPIChildFiles').classList.toggle('active', prog === 'piChildFiles');
+/* Program (PFA/PI) and view (roster/compliance/childFiles/followUp/startYear) are now
+   two independent axes instead of one merged string. activeProgram stays STRICTLY
+   'PFA'/'PI' (onRoster, visibleColumns, libraryHref, the reload branches all depend on
+   that); activeView says which panel is on screen. The old setProgram('pfaCompliance')
+   style calls are gone — the PFA⇄PI toggle sets the program, the sidebar buttons set the
+   view, and both re-render through renderActiveView(). */
+let activeView = 'roster';   // roster | compliance | childFiles | followUp | startYear
+
+// The PFA⇄PI toggle. Keeps whatever view is open, just flips which program it shows.
+function setProgramProgram(p) {
+    if (p !== 'PFA' && p !== 'PI') return;
+    activeProgram = p;
+    document.getElementById('progPFA').classList.toggle('on', p === 'PFA');
+    document.getElementById('progPI').classList.toggle('on', p === 'PI');
+    // The program label appears inside the Roster / Compliance / Child Files buttons.
+    ['rosterProgLabel', 'complianceProgLabel', 'childFilesProgLabel'].forEach(id => {
+        const el = document.getElementById(id); if (el) el.textContent = p;
+    });
+    updateRosterCount();
+    renderActiveView();
+}
+
+// The sidebar view buttons. Screening Follow-Up spans both programs; the others follow
+// the PFA⇄PI toggle.
+function setView(v) {
+    activeView = v;
+    renderActiveView();
+}
+
+/* Backward-compatible shim for the old merged setProgram('pfaCompliance') style calls
+   still made from the compliance/license panels ("open CB2", "Child file checklist",
+   "Screening follow-up" jump links). Translates the legacy string into the new
+   (program, view) pair. New code should call setProgramProgram / setView directly. */
+function setProgram(legacy) {
+    const MAP = {
+        'PFA': ['PFA', 'roster'], 'PI': ['PI', 'roster'],
+        'pfaCompliance': ['PFA', 'compliance'], 'piCompliance': ['PI', 'compliance'],
+        'pfaChildFiles': ['PFA', 'childFiles'], 'piChildFiles': ['PI', 'childFiles'],
+        'startYear': [null, 'startYear'], 'followUp': [null, 'followUp'],
+    };
+    const m = MAP[legacy];
+    if (!m) return;
+    if (m[0]) setProgramProgram(m[0]);
+    setView(m[1]);
+}
+
+/* Shows the right panel for (activeProgram, activeView) and renders it. This replaces
+   the old setProgram switch. */
+function renderActiveView() {
+    const v = activeView, prog = activeProgram;
+    // Sidebar active state.
+    document.getElementById('btnStartYear').classList.toggle('active', v === 'startYear');
+    document.getElementById('btnRoster').classList.toggle('active', v === 'roster');
+    document.getElementById('btnCompliance').classList.toggle('active', v === 'compliance');
+    document.getElementById('btnChildFiles').classList.toggle('active', v === 'childFiles');
+    document.getElementById('btnFollowUp').classList.toggle('active', v === 'followUp');
 
     const grid = document.getElementById('isbeRosterGrid');
     const compliance = document.getElementById('compliancePanel');
@@ -1357,33 +1452,34 @@ function setProgram(prog) {
     const startYear = document.getElementById('startYearPanel');
     const childFiles = document.getElementById('childFilesPanel');
     [grid, compliance, followUp, startYear, childFiles].forEach(el => { el.style.display = 'none'; });
-    // The classroom/admin column toggle belongs only to the PI/PFA roster views.
+    // The classroom/admin column toggle belongs only to the roster view.
     var rgt = document.getElementById('rgToggle');
-    if (rgt) rgt.style.display = (prog === 'PFA' || prog === 'PI') ? '' : 'none';
+    if (rgt) rgt.style.display = (v === 'roster') ? '' : 'none';
 
-    if (prog === 'pfaChildFiles' || prog === 'piChildFiles') {
-        var cfProg = prog === 'pfaChildFiles' ? 'PFA' : 'PI';
-        document.getElementById('isbeTitle').textContent = cfProg + ' Child Files';
-        document.getElementById('isbeCount').textContent = '';
+    const title = document.getElementById('isbeTitle');
+    const count = document.getElementById('isbeCount');
+    if (v === 'childFiles') {
+        title.textContent = prog + ' Child Files';
+        count.textContent = '';
         childFiles.style.display = 'block';
-        renderChildFilesGrid(cfProg);
-    } else if (prog === 'pfaCompliance' || prog === 'piCompliance') {
-        document.getElementById('isbeTitle').textContent = prog === 'pfaCompliance' ? 'PFA Compliance' : 'PI Compliance';
-        document.getElementById('isbeCount').textContent = '';
+        renderChildFilesGrid(prog);
+    } else if (v === 'compliance') {
+        title.textContent = prog + ' Compliance';
+        count.textContent = '';
         compliance.style.display = 'block';
-        loadCompliance(prog);
-    } else if (prog === 'followUp') {
-        document.getElementById('isbeTitle').textContent = 'Screening Follow-Up';
-        document.getElementById('isbeCount').textContent = '';
+        loadCompliance(prog === 'PFA' ? 'pfaCompliance' : 'piCompliance');
+    } else if (v === 'followUp') {
+        title.textContent = 'Screening Follow-Up';
+        count.textContent = '';
         followUp.style.display = 'block';
         renderFollowUp();
-    } else if (prog === 'startYear') {
-        document.getElementById('isbeTitle').textContent = 'What Needs Doing';
-        document.getElementById('isbeCount').textContent = '';
+    } else if (v === 'startYear') {
+        title.textContent = 'What Needs Doing';
+        count.textContent = '';
         startYear.style.display = 'block';
         renderStartYear();
     } else {
-        document.getElementById('isbeTitle').textContent = prog + ' Roster';
+        title.textContent = prog + ' Roster';
         grid.style.display = 'block';
         renderRoster();
     }
@@ -1417,6 +1513,16 @@ function updateFollowUpCount() {
     const open = items.filter(i => String(i.rec.ReferralMade).toLowerCase() !== 'yes').length;
     const el = document.getElementById('followUpCount');
     if (el) el.textContent = items.length ? (open + ' need action') : 'none open';
+}
+
+// The Roster button's count now reflects the ACTIVE program (the PFA⇄PI toggle), since
+// there is one Roster button instead of separate PFA/PI ones.
+function updateRosterCount() {
+    const el = document.getElementById('rosterCount');
+    if (!el) return;
+    const n = students.filter(s => s.PFA_PI_na === activeProgram
+        && (s.Active === 'Yes' || s.Active === 'YES')).length;
+    el.textContent = n + ' students';
 }
 
 function renderFollowUp() {
@@ -1765,7 +1871,7 @@ function getRoomName(roomNumber) {
    this year's work), and does not copy scans (each year's scan is its own evidence).
    Staff still confirm each carried-forward checkmark. */
 async function carryForwardChildDocs() {
-    var program = document.getElementById('btnPFAChildFiles').classList.contains('active') ? 'PFA' : 'PI';
+    var program = activeProgram;
     var status = document.getElementById('cfCarryStatus');
     if (!confirm('Copy last year\u2019s checked documents into ' + activeSchoolYear + ' for returning '
         + program + ' children?\n\nThis only fills documents not already marked this year, and does not '
@@ -1845,8 +1951,7 @@ async function uploadChildDoc(studentId, docKey, input) {
         if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
         // Reflect the new file in the index so the cell shows attached without a reload.
         if (window.ChildForms && ChildForms.markFile) ChildForms.markFile(studentId, 'ChildDoc', docKey, d.relPath, d.name);
-        var active = document.getElementById('btnPFAChildFiles').classList.contains('active') ? 'PFA' : 'PI';
-        renderChildFilesGrid(active);
+        renderChildFilesGrid(activeProgram);
     } catch (e) { alert('Upload failed: ' + e.message); }
 }
 
