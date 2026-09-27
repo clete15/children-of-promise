@@ -38,6 +38,18 @@
         .at-legend > div { display:flex;align-items:center;gap:7px;font-size:0.8rem;color:var(--sp-text-2); }
         .at-swatch { width:15px;height:15px;border-radius:3px; }
         .at-empty { padding:40px;text-align:center;color:var(--sp-muted);font-size:0.9rem; }
+        /* Actual / Projected toggle in the card header. */
+        .at-toggle { display:inline-flex;border:1px solid var(--sp-border);border-radius:8px;overflow:hidden; }
+        .at-tab {
+            border:none;background:var(--sp-surface);color:var(--sp-text-2);cursor:pointer;
+            font-size:0.78rem;font-weight:700;padding:6px 14px;transition:background 0.12s,color 0.12s;
+        }
+        .at-tab:hover:not(.on) { background:var(--sp-surface-2); }
+        .at-tab.on { background:var(--sp-accent);color:#fff; }
+        /* Projected-view extras (folded in from the old projected page). */
+        .at-note { margin-top:14px;font-size:0.76rem;color:var(--sp-muted);text-align:center;line-height:1.5; }
+        .at-over-flag { color:var(--sp-bad-fg);font-weight:800; }
+        .at-count .at-over-n { color:var(--sp-bad-fg);font-weight:800; }
     </style>
 </head>
 <body>
@@ -82,8 +94,7 @@
         <a href="/staff/waitinglist.html">Waiting List</a>
         <a href="/staff/ems.html">Enrolled Students</a>
         <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
-        <a href="/staff/attendance.html" class="on" aria-current="page">Actual Attendance</a>
-        <a href="/staff/attendance-projected.html">Projected Attendance</a>
+        <a href="/staff/attendance.html" class="on" aria-current="page">Attendance</a>
     </nav>
 </div>
 
@@ -91,8 +102,12 @@
     <div class="at-wrapper">
         <div class="at-sidebar" id="atSidebar"></div>
         <div class="at-card">
-            <div class="at-head">
-                <div class="at-title">Actual Attendance by Room</div>
+            <div class="at-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                <div class="at-title" id="atTitle">Actual Attendance by Room</div>
+                <div class="at-toggle" role="tablist" aria-label="Attendance view">
+                    <button type="button" id="atTabActual" class="at-tab on" role="tab" aria-selected="true" onclick="setView('actual')">Actual</button>
+                    <button type="button" id="atTabProjected" class="at-tab" role="tab" aria-selected="false" onclick="setView('projected')">Projected</button>
+                </div>
             </div>
             <div class="at-body" id="atBody">
                 <div class="at-empty">Loading…</div>
@@ -104,56 +119,98 @@
 <script src="app.js"></script>
 <script src="/staff/auth.js"></script>
 <script>
-/* Actual attendance by room — the enrolled children only. Same data source
-   (/api/reports -> byRoomDaily): each row is [roomName, capacity, Mon, Tue, Wed, Thu, Fri]
-   of daily counts, derived from each enrolled child's attending days. The Projected
-   Attendance page (attendance-projected.html) layers the waiting list on top of these
-   numbers. This view only reads and charts the actual counts. */
+/* Attendance by room — one page, two views the header toggle switches between:
+
+     Actual    — enrolled children only. Data: /api/reports -> byRoomDaily. Each row is
+                 [roomName, capacity, Mon..Fri] of daily counts from each enrolled child's
+                 attending days.
+     Projected — enrolled + the whole waiting list, re-seated youngest-first up the age
+                 ladder. Data: /api/reports -> projectedAttendance, one row PER ROOM:
+                 { roomNumber, room, capacity, occupancy:[Mon..Fri], overflow:[5] }.
+
+   These were two separate pages (attendance.html / attendance-projected.html); they are
+   merged here so the sub-nav has a single Attendance entry. Each view loads its own report
+   section lazily the first time it is shown, then is cached for instant re-toggling. The
+   sidebar and chart are shared; only the per-row shape and the legend/notes differ. */
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const CHART_H = 220;
-let dailyData = [];
+
+let view = 'actual';                 // 'actual' | 'projected'
 let activeRoom = 0;
+const cache = { actual: null, projected: null };   // null = not yet loaded
 
 function esc(v) {
     return String(v == null ? '' : v)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
+function n(v) { return parseInt(v, 10) || 0; }
+
+/* Normalise both report shapes to one internal per-room row so the sidebar and chart
+   render identically regardless of view:
+     { room, capacity, counts:[5], overflow:[5] }  (overflow all-zero for the actual view) */
+function actualRows(byRoomDaily) {
+    return (byRoomDaily || []).map(r => ({
+        room: r[0] || 'Unknown',
+        capacity: parseInt(r[1]),                       // may be NaN — shown as '?'
+        counts: [2, 3, 4, 5, 6].map(c => n(r[c])),
+        overflow: [0, 0, 0, 0, 0],
+    }));
+}
+function projectedRows(projectedAttendance) {
+    return (projectedAttendance || []).map(r => ({
+        room: r.room || 'Unknown',
+        capacity: n(r.capacity),
+        counts: (r.occupancy || []).map(n),
+        overflow: (r.overflow || [0, 0, 0, 0, 0]).map(n),
+    }));
+}
+
+function rows() { return cache[view] || []; }
 
 function renderSidebar() {
     const box = document.getElementById('atSidebar');
-    box.innerHTML = dailyData.map((r, i) => {
-        const capNum = parseInt(r[1]);
-        const cap = isNaN(capNum) ? '?' : capNum;   // was showing "NaN" for a room with no capacity
-        // byRoomDaily has no single enrolled total - each of Mon..Fri (r[2]..r[6]) is
-        // that day's count. The peak across the week is the closest read on how many
-        // children are enrolled in the room, since every child attends at least one day.
-        const enrolled = Math.max(0, ...[2, 3, 4, 5, 6].map(c => parseInt(r[c]) || 0));
+    box.innerHTML = rows().map((r, i) => {
+        const cap = isNaN(r.capacity) ? '?' : r.capacity;
+        // Peak across the week is the closest read on how many children the room holds,
+        // since every child attends at least one day.
+        const enrolled = Math.max(0, ...r.counts);
+        const over = Math.max(0, ...r.overflow);
+        const note = view === 'projected'
+            ? `Capacity ${cap}${over ? ' · ' + over + ' over' : ''}`
+            : `Capacity ${cap} &middot; ${enrolled} enrolled`;
         return `<button id="atRoom${i}" onclick="showRoom(${i})">
-            <div>${esc(r[0] || 'Unknown')}</div>
-            <div class="at-room-cap">Capacity ${cap} &middot; ${enrolled} enrolled</div>
+            <div>${esc(r.room)}</div>
+            <div class="at-room-cap">${note}</div>
         </button>`;
     }).join('');
 }
 
 function showRoom(idx) {
     activeRoom = idx;
-    dailyData.forEach((_, i) => {
+    rows().forEach((_, i) => {
         const btn = document.getElementById('atRoom' + i);
         if (btn) btn.classList.toggle('on', i === idx);
     });
 
-    const r = dailyData[idx];
-    const room = r[0] || 'Unknown';
-    const capacity = Math.max(parseInt(r[1] || 1), 1);
-    const counts = [2, 3, 4, 5, 6].map(c => parseInt(r[c] || 0));
+    const r = rows()[idx];
+    if (!r) return;
+    const room = r.room;
+    const capacity = Math.max(isNaN(r.capacity) ? 1 : r.capacity, 1);
+    let anyOver = false;
 
     const cols = DAYS.map((day, i) => {
-        const count = counts[i];
-        const over = count > capacity;
+        const count = r.counts[i] || 0;
+        const over = r.overflow[i] || 0;
+        // Actual: over is "count exceeds capacity". Projected: over is the ladder overflow.
+        const isOver = view === 'projected' ? over > 0 : count > capacity;
+        if (isOver) anyOver = true;
         const fillH = Math.round(Math.min(count / capacity, 1) * CHART_H);
-        return `<div class="at-col${over ? ' at-over' : ''}">
-            <div class="at-count">${count}/${capacity}</div>
+        const countLabel = (view === 'projected' && over)
+            ? `${count}/${capacity}<br><span class="at-over-n">+${over} over</span>`
+            : `${count}/${capacity}`;
+        return `<div class="at-col${isOver ? ' at-over' : ''}">
+            <div class="at-count">${countLabel}</div>
             <div class="at-bar-track" style="height:${CHART_H}px;">
                 <div class="at-bar-fill" style="height:${fillH}px;"></div>
             </div>
@@ -161,35 +218,82 @@ function showRoom(idx) {
         </div>`;
     }).join('');
 
+    const fillLabel = view === 'projected' ? 'Projected (youngest-first fill)' : 'Enrolled (actual)';
+    const legend = `<div class="at-legend">
+        <div><span class="at-swatch" style="background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);"></span> Capacity (${capacity})</div>
+        <div><span class="at-swatch" style="background:var(--sp-accent);"></span> ${fillLabel}</div>
+    </div>`;
+
+    const note = (view === 'projected' && anyOver)
+        ? '<div class="at-note"><span class="at-over-flag">Over capacity — the age ladder cannot seat everyone on the flagged days. This only shows on Pre-School, the last room; the overflow are the oldest children.</span></div>'
+        : '';
+
     document.getElementById('atBody').innerHTML = `
         <div class="at-room-name">${esc(room)}</div>
         <div class="at-chart" style="height:${CHART_H + 56}px;">${cols}</div>
-        <div class="at-legend">
-            <div><span class="at-swatch" style="background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br);"></span> Capacity (${capacity})</div>
-            <div><span class="at-swatch" style="background:var(--sp-accent);"></span> Enrolled (actual)</div>
-        </div>`;
+        ${legend}${note}`;
 }
 
-async function load() {
+/* Lazily fetch a view's data the first time it's shown, then render. Each view asks the
+   server for only its own report section (see /api/reports?only=). */
+async function loadView() {
+    const body = document.getElementById('atBody');
+    if (cache[view]) { renderCurrent(); return; }
+    body.innerHTML = '<div class="at-empty">Loading…</div>';
+    document.getElementById('atSidebar').innerHTML = '';
     try {
-        // This page uses only byRoomDaily; ask the server for just that section so it
-        // doesn't run the dozen-plus other report queries on every load.
-        const res = await apiFetch('/api/reports?only=byRoomDaily');
-        const data = await res.json();
-        dailyData = (data && data.byRoomDaily) || [];
-        if (!dailyData.length) {
-            document.getElementById('atBody').innerHTML = '<div class="at-empty">No attendance data yet.</div>';
-            return;
+        if (view === 'actual') {
+            const res = await apiFetch('/api/reports?only=byRoomDaily');
+            const data = await res.json();
+            cache.actual = actualRows(data && data.byRoomDaily);
+        } else {
+            const res = await apiFetch('/api/reports?only=projectedAttendance');
+            const data = await res.json();
+            cache.projected = projectedRows(data && data.projectedAttendance);
         }
-        renderSidebar();
-        showRoom(0);
     } catch (e) {
-        document.getElementById('atBody').innerHTML =
-            '<div class="at-empty">Could not load attendance: ' + esc(e.message) + '</div>';
+        body.innerHTML = '<div class="at-empty">Could not load attendance: ' + esc(e && e.message ? e.message : e) + '</div>';
+        return;
     }
+    renderCurrent();
 }
 
-load();
+function renderCurrent() {
+    const list = rows();
+    if (!list.length) {
+        document.getElementById('atSidebar').innerHTML = '';
+        document.getElementById('atBody').innerHTML = view === 'projected'
+            ? '<div class="at-empty">No projection data yet. Add rooms and waiting-list entries first.</div>'
+            : '<div class="at-empty">No attendance data yet.</div>';
+        return;
+    }
+    if (activeRoom >= list.length) activeRoom = 0;
+    renderSidebar();
+    showRoom(activeRoom);
+}
+
+function setView(v) {
+    if (v === view) return;
+    view = v;
+    activeRoom = 0;
+    document.getElementById('atTitle').textContent =
+        (v === 'projected' ? 'Projected' : 'Actual') + ' Attendance by Room';
+    const actualTab = document.getElementById('atTabActual');
+    const projTab = document.getElementById('atTabProjected');
+    actualTab.classList.toggle('on', v === 'actual');
+    actualTab.setAttribute('aria-selected', String(v === 'actual'));
+    projTab.classList.toggle('on', v === 'projected');
+    projTab.setAttribute('aria-selected', String(v === 'projected'));
+    loadView();
+}
+
+// Allow a direct link to the projected view (e.g. the old projected page redirects here
+// with #projected). Default is the actual view.
+if ((location.hash || '').toLowerCase().indexOf('projected') !== -1) {
+    setView('projected');
+} else {
+    loadView();
+}
 </script>
 </body>
 </html>
