@@ -183,7 +183,7 @@ function renderBenefitsRoom() {
         <thead><tr>
             <th class="left">Student</th>
             <th style="width:75px;" title="Pay Type: Paid (full tuition), CCAP (IL Child Care Assistance Program - 225% FPL), Half Price, Free (staff/scholarship), Foster (DCFS ward)">Pay</th>
-            <th style="width:60px;" title="Annual gross household income before deductions">Income</th>
+            <th style="width:80px;" title="Annual gross household income before deductions">Income</th>
             <th style="width:30px;" title="Number of people living in the household">HH</th>
             ${BENEFIT_KEYS.map(b => `<th style="width:42px;">${b}</th>`).join('')}
             <th style="width:36px;">Save</th>
@@ -196,7 +196,7 @@ function renderBenefitsRoom() {
             return `<tr>
                 <td class="name">${s.Last_Name}, ${s.First_Name}</td>
                 <td><select id="benPay_${i}" onchange="markBenefitChanged(${i})">${payOpts}</select></td>
-                <td><input type="number" id="benIncome_${i}" value="${income || ''}" onchange="markBenefitChanged(${i})" style="width:60px;"></td>
+                <td><input type="number" id="benIncome_${i}" value="${income || ''}" onchange="markBenefitChanged(${i})" style="width:80px;"></td>
                 <td><input type="number" id="benHH_${i}" value="${hhSize || ''}" min="1" max="15" onchange="markBenefitChanged(${i})" style="width:36px;"></td>
                 ${BENEFIT_KEYS.map(b => `<td class="ctr">
                     <input type="checkbox" id="ben_${i}_${b}" ${ben.includes(b) ? 'checked' : ''} onchange="markBenefitChanged(${i})">
