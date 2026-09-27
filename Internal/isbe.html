@@ -1779,7 +1779,14 @@ function renderFollowUp() {
    from the Prevention Initiative Compliance Checklist and have no PFA counterpart. */
 const COLUMNS = [
     { field: 'PermissionSlip', teacher: true, label: 'Permission<br>Slip', title: 'Parent signs consent form allowing ASQ and ASE developmental screenings to be performed on their child for the school year.' },
-    { field: 'ParentInterview', teacher: true, label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Complete at enrollment or beginning of year.' },
+    /* Weighted Eligibility and Parent Interview lead the ADMIN group, in the order the
+       office actually collects them at a first enrollment: the weighted-eligibility form
+       is auto-created when the child is enrolled (so it comes first), and the Parent
+       Interview is the first thing staff sit down and complete with the family. Parent
+       Interview is therefore an ADMIN duty (no teacher flag) and opens/saves/prints from
+       this page. It used to be a teacher column filled from the classroom card. */
+    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', title: 'Weighted eligibility form with income verification, dated on or before enrollment, retained in the child\u2019s file. Auto-created when the child is enrolled; pre-fills from the pre-enrollment record. Required for PFA (priority/weighted enrollment) and PI.' },
+    { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Pre-fills from the pre-enrollment record; print the pre-filled form for the family to complete at enrollment, then save. Completed by admin at enrollment.' },
     { field: 'ProofOfIncome', label: 'Proof of<br>Income', title: 'Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.' },
     { field: 'EnterSIS', label: 'Enter<br>into SIS', title: 'Enter student into the ISBE Student Information System (SIS) before beginning screenings.' },
     { field: 'BegASQ', teacher: true, label: 'Beg ASQ', title: 'Administer the ASQ-3 developmental screening at the beginning of the school year. Parent completes the questionnaire; teacher scores it.' },
@@ -1788,12 +1795,8 @@ const COLUMNS = [
     { field: 'EndASQ', teacher: true, label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.' },
     { field: 'EndASE', teacher: true, label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.' },
     { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card', title: 'Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.' },
-    /* Weighted Eligibility applies to BOTH programs. ISBE publishes a PFA/PFAE Weighted
-       Eligibility Form (the priority/weighted enrollment system: at-risk first, then
-       families under 4x poverty, then others) as well as the PI eligibility form, with
-       income verification within 6 months of enrollment retained in the child's file.
-       So it is not PI-only — no `programs` restriction. */
-    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', title: 'Weighted eligibility form with income verification, dated on or before enrollment, retained in the child\u2019s file. Required for PFA (priority/weighted enrollment) and PI. Pre-fills from the pre-enrollment record.' },
+    /* (Weighted Eligibility now leads the admin group above — it applies to BOTH programs,
+       so it carries no `programs` restriction.) */
     { field: 'ScreeningResultsShared', label: 'Results<br>Shared', docForm: 'screeningResultsShared', programs: ['PI'], title: 'PICC PI10.H - documentation that developmental screening results were shared with the parent or guardian.' },
     { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment', docForm: 'familyAssessment', programs: ['PI'], title: 'PICC PI6.A - published, research-based Family Centered Assessment conducted within 6 months of enrollment (LSP, Baby TALK, FROG).' },
     { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan', docForm: 'familyGoalPlan', programs: ['PI'], title: 'PICC PI6.B - Individual Family Goal Plan developed within 6 months of enrollment and updated annually thereafter.' },
@@ -2565,6 +2568,19 @@ function renderRoster() {
                     ? '<span class="cf-pill" title="' + label + ' is on file \u2014 filled out in Child Files (Administrative).">\u2713 on file</span>'
                     : '<span class="cf-pill" style="opacity:0.6;" title="Not on file yet. Fill it out in Child Files (Administrative).">not on file</span>';
                 return '<td class="' + ('cf-doc' + divide).trim() + '">' + cell + '</td>';
+            }
+
+            // Parent Interview is an ADMIN duty done from this page: a checkbox that
+            // reflects/toggles the tracking bit, plus a [form] link that opens the
+            // pre-filling interview modal (open → review → Print the pre-filled blank
+            // for the family, or fill and save). Moved here from the classroom card.
+            if (f === 'ParentInterview') {
+                const cc = [cellClass(s, f), divide.trim()].filter(Boolean).join(' ');
+                return '<td' + (cc ? ' class="' + cc + '"' : '') + '>'
+                    + checkBox(s, f)
+                    + formLink('openInterview(' + s.Id + ')',
+                        'Open the Parent Interview \u2014 pre-fills from pre-enrollment; print it blank for the family, or fill and save')
+                    + '</td>';
             }
 
             // The rest are editable checkboxes / document links (unchanged).

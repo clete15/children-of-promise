@@ -210,7 +210,8 @@
     // view and Print All agree on which forms exist and which field each maps to.
     var COLUMNS = [
         { field: 'PermissionSlip', teacher: true, label: 'Permission<br>Slip' },
-        { field: 'ParentInterview', teacher: true, label: 'Parent<br>Interview' },
+        // Parent Interview moved OFF the classroom card: it is an admin duty completed
+        // (and printed) from the ISBE roster's admin columns, not by the teacher here.
         { field: 'BegASQ', teacher: true, label: 'Beg ASQ' },
         { field: 'BegASE', teacher: true, label: 'Beg ASE' },
         { field: 'MidYearReport', teacher: true, label: 'Mid Year<br>Report Card' },
@@ -226,7 +227,7 @@
     // A column has a form behind it when opening it produces a modal. Mid/End year
     // report cards are tick-only, so they are deliberately excluded.
     function columnHasForm(field) {
-        return field === 'PermissionSlip' || field === 'ParentInterview'
+        return field === 'PermissionSlip'
             || field === 'ScreeningResultsShared'
             || SCREENING_FIELDS.indexOf(field) !== -1;
     }
