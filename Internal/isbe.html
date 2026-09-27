@@ -171,7 +171,12 @@
            second line and make those rows taller than the rest. Overflow is clipped
            with an ellipsis; the full name is in the cell's title on hover. */
         tbody td.pin-1 { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        td.pin-1 { box-shadow:inset 0 -1px 0 var(--border), 7px 0 7px -5px rgba(15,23,42,0.13); }
+        /* Only the right-edge drop shadow that lifts the frozen column off the scrolling
+           grid. The old inset bottom-border (inset 0 -1px 0 var(--border)) drew a light
+           1px line under every name cell — in dark mode that read as a thick white rule
+           between students. Dropped: the data cells' own border-bottom is the row
+           separator, and the blue group-end rule still spans the Student column. */
+        td.pin-1 { box-shadow:7px 0 7px -5px rgba(15,23,42,0.13); }
         th.pin-1 { border-right:1px solid var(--border); }
         td.pin-1 { border-right:1px solid var(--border); }
         /* Header wins at the top-left corner. */
