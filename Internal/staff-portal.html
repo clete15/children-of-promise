@@ -2128,16 +2128,9 @@ function classroomChecklistHtml(rooms) {
                 : '<span class="' + cls + '">' + inner + '</span>';
         }).join('');
 
-        /* Weighted Eligibility pill. Not a checklist column (it is a document seeded into
-           the child's Administrative folder, not a tracked form), so it is appended after
-           the column chips. Highlighted when the form exists on disk; clicking opens it.
-           A child with no form yet shows a plain, non-highlighted pill. */
-        const weRel = CLS_WEIGHTED[s.Id] || CLS_WEIGHTED[String(s.Id)];
-        const weChip = weRel
-            ? '<a href="#" class="cls-chip cls-chip-done" data-act="' + esc('weighted|' + weRel)
-                + '" title="Weighted eligibility form is on file \u2014 click to open">\u2713 Weighted Eligibility</a>'
-            : '<span class="cls-chip" title="No weighted eligibility form on file yet">Weighted Eligibility</span>';
-        const chipsWithWeighted = chips + weChip;
+        /* Weighted Eligibility is no longer shown here — it is an admin document,
+           tracked on the ISBE admin roster's Weighted Eligibility column, not a teacher
+           duty on the classroom card. (Its click handler and data load remain harmless.) */
 
         const outstanding = cols.filter(col =>
             !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
@@ -2161,7 +2154,7 @@ function classroomChecklistHtml(rooms) {
             + '<div><div class="cls-name">' + esc(s.Last_Name + ', ' + s.First_Name) + progTag + '</div>'
             + (meta ? '<div class="cls-meta">' + meta + '</div>' : '') + '</div>'
             + status + '</div>'
-            + '<div class="cls-chips">' + chipsWithWeighted + '</div></div>';
+            + '<div class="cls-chips">' + chips + '</div></div>';
     }).join('');
 
     return pick + rosterEditHtml(activeClsRoom) + batchBlock + '<div class="cls-cards">' + cards + '</div>';

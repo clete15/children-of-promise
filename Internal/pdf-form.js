@@ -150,6 +150,9 @@ const BODY = PAGE.width - MARGIN * 2;
      title, subtitle,
      rows:    [{ label, value }]                 label/value pairs
      blocks:  [{ heading, text }]                wrapped paragraphs
+              [{ heading, items:[{label, answer, applies}] }]  a checklist: one line
+                                                 per item, answer right-aligned,
+                                                 applicable (applies:true) items bold
      signatures: [{ label, name, date, jpeg }]   jpeg is a Buffer
      footer                                      one line repeated on every page
    }
@@ -215,9 +218,51 @@ function buildFormPdf(spec) {
         y -= 2;
     });
 
-    // ── Paragraph blocks ──
+    /* Draws one text at the left margin and another right-aligned to the body's right
+       edge, on the same baseline. Used for a criterion + its Yes/No answer so the
+       answers line up in a scannable column down the right side. */
+    function rowLR(left, right, size, bold, indent) {
+        const rightW = textWidth(right, size, bold);
+        ops.push('BT /' + (bold ? 'F2' : 'F1') + ' ' + size + ' Tf '
+            + (MARGIN + (indent || 0)) + ' ' + (y - size) + ' Td (' + pdfString(left) + ') Tj ET');
+        ops.push('BT /' + (bold ? 'F2' : 'F1') + ' ' + size + ' Tf '
+            + (PAGE.width - MARGIN - rightW) + ' ' + (y - size) + ' Td (' + pdfString(right) + ') Tj ET');
+        y -= size * 1.35;
+    }
+
+    // ── Blocks ──
+    // Two shapes:
+    //   { heading, text }              wrapped paragraph(s)  (original)
+    //   { heading, items:[{label, answer, applies}] }  a checklist: one line per
+    //     item, the answer right-aligned in its own column, applicable items bold so
+    //     what actually counts stands out from the sea of "No".
     (spec.blocks || []).forEach(b => {
         if (!b) return;
+        if (Array.isArray(b.items)) {
+            need(30);
+            y -= 8;
+            if (b.heading) line(b.heading, 11, true);
+            y -= 2;
+            b.items.forEach(it => {
+                need(15);
+                const mark = it.applies ? '[X] ' : '';           // a leading tick for a Yes
+                const left = mark + (it.label || '');
+                // A label too wide for the answer column is truncated with an ellipsis
+                // rather than colliding with the answer — one clean line per item.
+                const answer = it.answer || '';
+                const maxLeft = BODY - textWidth(answer, 10, false) - 16;
+                let shown = left;
+                if (textWidth(shown, 10, !!it.applies) > maxLeft) {
+                    while (shown.length > 1 && textWidth(shown + '\u2026', 10, !!it.applies) > maxLeft) {
+                        shown = shown.slice(0, -1);
+                    }
+                    shown += '\u2026';
+                }
+                rowLR(shown, answer, 10, !!it.applies);
+            });
+            y -= 4;
+            return;
+        }
         need(40);
         y -= 8;
         if (b.heading) line(b.heading, 11, true);

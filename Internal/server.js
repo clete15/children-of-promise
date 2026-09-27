@@ -1951,36 +1951,50 @@ function hasBenefit(str, name) {
     return new RegExp('\\b' + name + '\\b', 'i').test(String(str || ''));
 }
 const SEEDED_WEIGHTED_CRITERIA = [
-    { label: 'Experiencing homelessness', picc: 'PI5.D', points: 50, from: (i) => i.Homeless },
-    { label: 'Youth in Care (foster) or adopted', picc: 'PI5.E', points: 50, from: (i, e) => i.FosterAdopted || (String(e.Category || '') === 'Foster' ? 'Yes' : '') },
-    { label: 'Enrolled in Early Intervention with an identified delay', picc: 'PI5.B', points: 5, from: (i) => i.EarlyIntervention },
-    { label: 'Has an IEP', picc: 'PI5.B', points: 5, from: (i, e) => i.IEP || e.IEP },
-    { label: 'Screening indicated a delay but no current Early Intervention referral', picc: 'PI5.C', points: 5, from: (i) => i.ScreeningDelayNoEi },
-    { label: 'Family income at or below 50% of the federal poverty level', picc: 'PI5.F', points: 5, from: (i) => i.IncomeBelow50Fpl },
-    { label: 'Family income eligible for CCAP (225% FPL)', points: 5, from: (i, e) => (isCcapEligibleByIncome(i.HouseholdIncome || e.HouseholdIncome, i.HouseholdSize || e.HouseholdSize) ? 'Yes' : 'No') },
-    { label: 'Lives in a child-care desert (Belleville, Dupo, Cahokia Heights)', points: 5, from: (i, e) => (isChildDesertCity(i.City || e.City_Town) ? 'Yes' : 'No') },
-    { label: 'Parent or caregiver is an English language learner', picc: 'PI5.G', points: 5, from: (i) => i.ParentEll },
-    { label: 'Primary language in the home is not English', points: 5, from: (i) => i.NonEnglishHome },
-    // One criterion PER public benefit, each worth 5 (up to 20 combined).
-    { label: 'Receiving WIC', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'WIC') ? 'Yes' : 'No') },
-    { label: 'Receiving Medicaid', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'Medicaid') ? 'Yes' : 'No') },
-    { label: 'Receiving SNAP', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'SNAP') ? 'Yes' : 'No') },
-    { label: 'Receiving TANF', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'TANF') ? 'Yes' : 'No') },
-    { label: 'Receiving Brightpoint childcare subsidy', points: 5, from: (i) => i.BrightpointSubsidy },
-    { label: 'No prior formal early-learning program', points: 5, from: (i) => (seededYesNoOrBlank(i.PriorEarlyLearning) === 'No' ? 'Yes' : (seededYesNoOrBlank(i.PriorEarlyLearning) === 'Yes' ? 'No' : '')) },
-    { label: 'Abuse or domestic violence history', points: 5, from: (i) => i.AbuseHistory },
-    { label: 'Mental illness in the home', points: 5, from: (i) => i.MentalIllness },
-    { label: 'DCFS involvement', points: 5, from: (i) => i.DcfsInvolvement },
-    { label: 'Substance abuse in the home', points: 5, from: (i) => i.SubstanceAbuse },
-    { label: 'Child cared for by someone other than a parent', points: 5, from: (i) => i.CaregiverOther },
-    { label: 'Death in the immediate family', points: 5, from: (i) => i.FamilyDeath },
-    { label: 'Low birth weight or failure to thrive', points: 5, from: (i) => i.LowBirthWeight },
-    { label: 'Parent incarcerated', points: 5, from: (i) => i.ParentIncarcerated },
-    { label: 'Teen parent', points: 5, from: (i) => i.TeenParent },
-    { label: 'Parent without a high school diploma', points: 5, from: (i) => i.NoHSDiploma },
-    { label: 'Child or parent born outside the United States', points: 5, from: (i) => i.BornOutsideUS },
-    { label: 'Active military family', points: 5, from: (i, e) => i.ActiveMilitary || seededYesNoOrBlank(e.Military) },
-    { label: 'Single-parent household', points: 3, from: (i) => (String(i.LivingSituation || '') === 'Single Parent' ? 'Yes' : '') }
+    // `group` tags cluster the criteria into labeled sections on the generated PDF so
+    // the document reads as a few scannable groups rather than one long list.
+    { group: 'auto', label: 'Experiencing homelessness', picc: 'PI5.D', points: 50, from: (i) => i.Homeless },
+    { group: 'auto', label: 'Youth in Care (foster) or adopted', picc: 'PI5.E', points: 50, from: (i, e) => i.FosterAdopted || (String(e.Category || '') === 'Foster' ? 'Yes' : '') },
+    { group: 'dev', label: 'Enrolled in Early Intervention with an identified delay', picc: 'PI5.B', points: 5, from: (i) => i.EarlyIntervention },
+    { group: 'dev', label: 'Has an IEP', picc: 'PI5.B', points: 5, from: (i, e) => i.IEP || e.IEP },
+    { group: 'dev', label: 'Screening indicated a delay but no current Early Intervention referral', picc: 'PI5.C', points: 5, from: (i) => i.ScreeningDelayNoEi },
+    { group: 'dev', label: 'Low birth weight or failure to thrive', points: 5, from: (i) => i.LowBirthWeight },
+    { group: 'income', label: 'Family income at or below 50% of the federal poverty level', picc: 'PI5.F', points: 5, from: (i) => i.IncomeBelow50Fpl },
+    { group: 'income', label: 'Family income eligible for CCAP (225% FPL)', points: 5, from: (i, e) => (isCcapEligibleByIncome(i.HouseholdIncome || e.HouseholdIncome, i.HouseholdSize || e.HouseholdSize) ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving WIC', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'WIC') ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving Medicaid', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'Medicaid') ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving SNAP', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'SNAP') ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving TANF', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'TANF') ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving Brightpoint childcare subsidy', points: 5, from: (i) => i.BrightpointSubsidy },
+    { group: 'lang', label: 'Parent or caregiver is an English language learner', picc: 'PI5.G', points: 5, from: (i) => i.ParentEll },
+    { group: 'lang', label: 'Primary language in the home is not English', points: 5, from: (i) => i.NonEnglishHome },
+    { group: 'lang', label: 'Child or parent born outside the United States', points: 5, from: (i) => i.BornOutsideUS },
+    { group: 'family', label: 'Single-parent household', points: 3, from: (i) => (String(i.LivingSituation || '') === 'Single Parent' ? 'Yes' : '') },
+    { group: 'family', label: 'Teen parent', points: 5, from: (i) => i.TeenParent },
+    { group: 'family', label: 'Parent without a high school diploma', points: 5, from: (i) => i.NoHSDiploma },
+    { group: 'family', label: 'Parent incarcerated', points: 5, from: (i) => i.ParentIncarcerated },
+    { group: 'family', label: 'Active military family', points: 5, from: (i, e) => i.ActiveMilitary || seededYesNoOrBlank(e.Military) },
+    { group: 'family', label: 'Child cared for by someone other than a parent', points: 5, from: (i) => i.CaregiverOther },
+    { group: 'family', label: 'No prior formal early-learning program', points: 5, from: (i) => (seededYesNoOrBlank(i.PriorEarlyLearning) === 'No' ? 'Yes' : (seededYesNoOrBlank(i.PriorEarlyLearning) === 'Yes' ? 'No' : '')) },
+    { group: 'family', label: 'Lives in a child-care desert (Belleville, Dupo, Cahokia Heights)', points: 5, from: (i, e) => (isChildDesertCity(i.City || e.City_Town) ? 'Yes' : 'No') },
+    { group: 'trauma', label: 'Abuse or domestic violence history', points: 5, from: (i) => i.AbuseHistory },
+    { group: 'trauma', label: 'Mental illness in the home', points: 5, from: (i) => i.MentalIllness },
+    { group: 'trauma', label: 'DCFS involvement', points: 5, from: (i) => i.DcfsInvolvement },
+    { group: 'trauma', label: 'Substance abuse in the home', points: 5, from: (i) => i.SubstanceAbuse },
+    { group: 'trauma', label: 'Death in the immediate family', points: 5, from: (i) => i.FamilyDeath }
+];
+
+/* Section headings for the grouped criteria, in the order they print. Any criterion
+   whose group is missing here falls into a final "Other factors" catch-all, so adding
+   a criterion without a group can never silently drop it from the document. */
+const WEIGHTED_CRITERIA_GROUPS = [
+    ['auto', 'Automatic eligibility (50 points each)'],
+    ['dev', 'Developmental & health'],
+    ['income', 'Income & public benefits'],
+    ['lang', 'Language & country of origin'],
+    ['family', 'Family & household'],
+    ['trauma', 'Adverse experiences in the home'],
+    ['other', 'Other factors']
 ];
 
 /* The total weighted points for a child, summing the points of every criterion whose
@@ -2113,22 +2127,36 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         { label: 'Household income', value: (intake.HouseholdIncome || enroll.HouseholdIncome || '\u2014') }
     ];
 
-    // Each criterion shows its answer AND its point weight, and a Yes adds those points
-    // to the running total — the same total the waiting list ranks by.
+    /* Each criterion becomes a checklist item under its group heading: label + point
+       weight on the left, the Yes/No answer right-aligned, applicable ones bold so the
+       factors that actually drive eligibility stand out. A Yes adds its points to the
+       running total — the same total the waiting list ranks by. */
     let total = 0;
-    const criteriaLines = SEEDED_WEIGHTED_CRITERIA.map(c => {
+    const itemsByGroup = {};
+    SEEDED_WEIGHTED_CRITERIA.forEach(c => {
         let ans = '';
         try { ans = seededYesNoOrBlank(c.from(intake, enroll)); } catch (e) { ans = ''; }
         if (!ans && fillBlanksAsNo) ans = 'No';
-        if (ans === 'Yes') total += (c.points || 0);
-        const box = ans === 'Yes' ? '[X] Yes' : ans === 'No' ? '[ ] Yes   [X] No' : '[ ] Yes   [ ] No';
+        const applies = ans === 'Yes';
+        if (applies) total += (c.points || 0);
         const pts = '(' + (c.points || 0) + ' pt' + ((c.points || 0) === 1 ? '' : 's') + ')';
-        return (c.picc ? '(' + c.picc + ') ' : '') + c.label + '  ' + pts + '  \u2014  ' + box;
+        const label = (c.picc ? '(' + c.picc + ') ' : '') + c.label + '  ' + pts;
+        const answer = ans === 'Yes' ? '[X] Yes' : ans === 'No' ? 'No' : '(not recorded)';
+        const g = c.group || 'other';
+        (itemsByGroup[g] = itemsByGroup[g] || []).push({ label: label, answer: answer, applies: applies });
     });
+
+    // One checklist block per group, in the defined order; empty groups are skipped.
+    const criteriaBlocks = WEIGHTED_CRITERIA_GROUPS
+        .filter(([key]) => (itemsByGroup[key] || []).length)
+        .map(([key, heading]) => ({ heading: heading, items: itemsByGroup[key] }));
 
     const blocks = [
         { heading: 'Weighted eligibility criteria (PICC PI5.A / PI5.B\u2013G)',
-          text: criteriaLines.join('\n') },
+          text: 'Applicable factors are ticked and shown in bold. Pre-filled from the '
+              + 'family\u2019s pre-enrollment submission; any criterion not recorded at intake '
+              + 'is shown as \u201cNo\u201d. Review and update before relying on it.' },
+        ...criteriaBlocks,
         { heading: 'Determination (PICC PI5.H)',
           // Every child served is determined eligible, so the determination line is filled.
           text: 'Total weighted points: ' + total + '\n'
