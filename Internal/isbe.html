@@ -138,6 +138,11 @@
         tbody tr:nth-child(even) td.cf-teacher { background:color-mix(in srgb, var(--band-teacher) 9%, var(--sp-surface-2)); }
         tbody tr:hover td { background:var(--sp-accent-soft); }
         tbody tr:hover td.cf-teacher { background:var(--band-teacher-hover); }
+        /* A heavier rule where the age group changes (Infant / Infant-Toddler / Toddler /
+           2 Year Olds ...), so the room groups read as bands down this read-only chart.
+           Applied to every cell in the first row of a group so the line runs the full
+           width, including the frozen Student column. */
+        tbody tr.group-start td { border-top:2px solid var(--sp-accent); }
 
         /* ── Frozen Student column ──
            The checklist is wider than any screen, so scrolling right used to leave a
@@ -2420,8 +2425,12 @@ function renderRoster() {
     const tbody = document.getElementById('isbeBody');
     if (!roster.length) { tbody.innerHTML = '<tr><td colspan="' + span + '" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
 
-    tbody.innerHTML = roster.map(s => {
+    tbody.innerHTML = roster.map((s, i) => {
         const t = trackingData[s.Id] || {};
+        // A heavier line where the age group changes (the roster is room-sorted, so a
+        // new room number is a new group: Infant, Infant/Toddler, Toddler, 2 Year Olds…),
+        // so the groups read as bands down the chart. Not on the first row.
+        const groupStart = i > 0 && String(s.RoomNumber) !== String(roster[i - 1].RoomNumber);
         const cells = cols.map(c => {
             const f = c.field;
             const divide = f === firstAdminField ? ' col-divide' : '';
@@ -2516,7 +2525,9 @@ function renderRoster() {
         const roomTag = (activeProgram === 'PI')
             ? ' <span style="font-weight:400;color:var(--sp-muted);">\u2013 ' + getRoom(s.RoomNumber) + '</span>'
             : '';
-        return '<tr' + (transferred ? ' class="cf-transferred"' : '') + '>'
+        const rowClasses = [transferred ? 'cf-transferred' : '', groupStart ? 'group-start' : '']
+            .filter(Boolean).join(' ');
+        return '<tr' + (rowClasses ? ' class="' + rowClasses + '"' : '') + '>'
             + '<td class="left pin-1" style="font-weight:600;font-size:0.73rem;">'
             + childNameCell(s) + roomTag + transferMarker(s)
             + '</td>' + cells + '</tr>';
