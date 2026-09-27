@@ -150,11 +150,14 @@ function n(v) { return parseInt(v, 10) || 0; }
    render identically regardless of view:
      { room, capacity, counts:[5], overflow:[5] }  (overflow all-zero for the actual view) */
 function actualRows(byRoomDaily) {
+    // Columns: [Room, Capacity, Mon..Fri, Type, PfaPi]. Type/PfaPi drive the PI/PFA badge.
     return (byRoomDaily || []).map(r => ({
         room: r[0] || 'Unknown',
         capacity: parseInt(r[1]),                       // may be NaN — shown as '?'
         counts: [2, 3, 4, 5, 6].map(c => n(r[c])),
         overflow: [0, 0, 0, 0, 0],
+        type: (r[7] || '').toString().trim().toUpperCase(),   // PI | PFA | INCCRA | (blank)
+        pfaPi: n(r[8]),                                        // active PI/PFA kids in the room
     }));
 }
 function projectedRows(projectedAttendance) {
@@ -163,6 +166,8 @@ function projectedRows(projectedAttendance) {
         capacity: n(r.capacity),
         counts: (r.occupancy || []).map(n),
         overflow: (r.overflow || [0, 0, 0, 0, 0]).map(n),
+        type: '',        // the projection re-seats kids, so a per-room PI/PFA count isn't meaningful here
+        pfaPi: 0,
     }));
 }
 
@@ -179,9 +184,19 @@ function renderSidebar() {
         const note = view === 'projected'
             ? `Capacity ${cap}${over ? ' · ' + over + ' over' : ''}`
             : `Capacity ${cap} &middot; ${enrolled} enrolled`;
+        // PI/PFA count line (actual view only). Green when the room itself is a PI or PFA
+        // room — those children belong there. Red otherwise (INCCRA or n/a), which flags a
+        // PI/PFA child sitting in a room that isn't theirs.
+        let badge = '';
+        if (view === 'actual' && r.pfaPi > 0) {
+            const roomIsPfaPi = (r.type === 'PI' || r.type === 'PFA');
+            const color = roomIsPfaPi ? 'var(--sp-good-fg, #16a34a)' : 'var(--sp-bad-fg, #dc2626)';
+            badge = `<div class="at-room-cap" style="color:${color};font-weight:700;">${r.pfaPi} PI/PFA</div>`;
+        }
         return `<button id="atRoom${i}" onclick="showRoom(${i})">
             <div>${esc(r.room)}</div>
             <div class="at-room-cap">${note}</div>
+            ${badge}
         </button>`;
     }).join('');
 }
