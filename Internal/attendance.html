@@ -163,14 +163,19 @@ function actualRows(byRoomDaily) {
     }));
 }
 function projectedRows(projectedAttendance) {
-    return (projectedAttendance || []).map(r => ({
-        room: r.room || 'Unknown',
-        capacity: n(r.capacity),
-        counts: (r.occupancy || []).map(n),
-        overflow: (r.overflow || [0, 0, 0, 0, 0]).map(n),
-        type: '',        // the projection re-seats kids, so a per-room PI/PFA count isn't meaningful here
-        pfaPi: 0,
-    }));
+    return (projectedAttendance || []).map(r => {
+        // pfaPi is a per-day array of PI/PFA children seated in this room by the projection;
+        // take the weekly peak, matching how the enrolled count is read in the actual view.
+        const pfaPiDays = (r.pfaPi || [0, 0, 0, 0, 0]).map(n);
+        return {
+            room: r.room || 'Unknown',
+            capacity: n(r.capacity),
+            counts: (r.occupancy || []).map(n),
+            overflow: (r.overflow || [0, 0, 0, 0, 0]).map(n),
+            type: (r.type || '').toString().trim().toUpperCase(),
+            pfaPi: Math.max(0, ...pfaPiDays),
+        };
+    });
 }
 
 function rows() { return cache[view] || []; }
@@ -186,11 +191,12 @@ function renderSidebar() {
         const note = view === 'projected'
             ? `Capacity ${cap}${over ? ' · ' + over + ' over' : ''}`
             : `Capacity ${cap} &middot; ${enrolled} enrolled`;
-        // PI/PFA count line (actual view only). Green when the room itself is a PI or PFA
-        // room — those children belong there. Red otherwise (INCCRA or n/a), which flags a
-        // PI/PFA child sitting in a room that isn't theirs.
+        // PI/PFA count line, in BOTH views. Actual = PI/PFA children currently in the room.
+        // Projected = where they'd land once the whole waiting list is seated. Green when the
+        // room itself is a PI or PFA room (those children belong there); red otherwise
+        // (INCCRA or n/a), flagging a PI/PFA child sitting in a room that isn't theirs.
         let badge = '';
-        if (view === 'actual' && r.pfaPi > 0) {
+        if (r.pfaPi > 0) {
             const roomIsPfaPi = (r.type === 'PI' || r.type === 'PFA');
             const color = roomIsPfaPi ? 'var(--sp-good-fg, #16a34a)' : 'var(--sp-bad-fg, #dc2626)';
             badge = `<div class="at-room-cap" style="color:${color};font-weight:700;">${r.pfaPi} PI/PFA</div>`;

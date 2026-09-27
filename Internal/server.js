@@ -3706,7 +3706,8 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     roomRows.forEach(r => {
         const num = parseInt(r[0], 10);
         if (!num) return;
-        roomByNum[num] = { roomNumber: num, room: r[1] || ('Room ' + num), capacity: parseInt(r[2], 10) || 0 };
+        roomByNum[num] = { roomNumber: num, room: r[1] || ('Room ' + num), capacity: parseInt(r[2], 10) || 0,
+                           type: String(r[3] || '').trim() };
     });
 
     // Which rooms are "in scope" for the projection at all (the ladder + the standalones).
@@ -3724,31 +3725,40 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     (Array.isArray(enrolledRows) ? enrolledRows : []).forEach(e => {
         const roomNum = parseInt(e[5], 10);
         if (!inScope.has(roomNum)) return; // in a room the projection does not cover
+        const prog = String(e[11] || '').trim().toUpperCase();
         const kid = {
             age: ageInDays(e[3], e[4]),
             days: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
+            // Whether this child counts toward a room's PI/PFA tally in the projection.
+            pfaPi: (prog === 'PI' || prog === 'PFA'),
         };
         if (PROJ_STANDALONE_ROOMS.indexOf(roomNum) !== -1) { standaloneKids.push(kid); return; }
-        const isPFA = String(e[11] || '').trim().toUpperCase() === 'PFA';
+        const isPFA = prog === 'PFA';
         (isPFA ? pfaKids : ladderKids).push(kid);
     });
     (Array.isArray(waitlistRows) ? waitlistRows : []).forEach(w => {
         const group = String(w[3] || '').trim();
         // Before & After (AgeGroup 'ba') is standalone; the Pre-School program ('3-5') is PFA
         // and goes straight to Pre-School; everything else feeds the age ladder.
-        const kid = { age: ageInDays(w[2], 0), days: parseRequestedDays(w[4]) };
+        // A waiting-list child has no PI/PFA designation yet UNLESS they applied for the PFA
+        // preschool program ('3-5'), so only those count toward the PI/PFA tally.
+        const isPFA = group === '3-5';
+        const kid = { age: ageInDays(w[2], 0), days: parseRequestedDays(w[4]), pfaPi: isPFA };
         if (group === 'ba') { standaloneKids.push(kid); return; }
-        (group === '3-5' ? pfaKids : ladderKids).push(kid);
+        (isPFA ? pfaKids : ladderKids).push(kid);
     });
 
     // Seat one pool of children into an ordered list of rooms, youngest-first, per weekday.
     // Overflow past the last room is charged to that last room's overflow[]. `preFilled`, when
     // supplied, is a per-room [5]-day count of seats already taken (by the PFA pass) so the
     // ladder only uses the seats that remain.
-    function seat(roomNums, kids, preFilled) {
+    // `preFilledPfaPi`, like `preFilled`, is a per-room [5]-day count — of PI/PFA children
+    // the PFA pass already seated — so a room's pfaPi tally includes them.
+    function seat(roomNums, kids, preFilled, preFilledPfaPi) {
         const chain = roomNums.filter(n => roomByNum[n]).map(n => ({
             roomNumber: n, room: roomByNum[n].room, capacity: roomByNum[n].capacity,
-            occupancy: [0, 0, 0, 0, 0], overflow: [0, 0, 0, 0, 0],
+            type: roomByNum[n].type,
+            occupancy: [0, 0, 0, 0, 0], overflow: [0, 0, 0, 0, 0], pfaPi: [0, 0, 0, 0, 0],
         }));
         if (!chain.length) return chain;
         kids.sort((a, b) => a.age - b.age); // youngest first
@@ -3758,16 +3768,19 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
                 const taken = (preFilled && preFilled[r.roomNumber]) ? preFilled[r.roomNumber][d] : 0;
                 return Math.max(r.capacity - taken, 0);
             });
-            // Reflect the pre-filled PFA children in this room's shown occupancy.
+            // Reflect the pre-filled PFA children in this room's shown occupancy + PI/PFA tally.
             chain.forEach(r => {
                 const taken = (preFilled && preFilled[r.roomNumber]) ? preFilled[r.roomNumber][d] : 0;
                 r.occupancy[d] += taken;
+                const takenPfaPi = (preFilledPfaPi && preFilledPfaPi[r.roomNumber]) ? preFilledPfaPi[r.roomNumber][d] : 0;
+                r.pfaPi[d] += takenPfaPi;
             });
             kids.forEach(k => {
                 if (!k.days[d]) return; // not present this day
                 const idx = free.findIndex(f => f > 0);
                 if (idx === -1) { chain[chain.length - 1].overflow[d]++; return; }
                 free[idx]--; chain[idx].occupancy[d]++;
+                if (k.pfaPi) chain[idx].pfaPi[d]++;   // count PI/PFA kids where they land
             });
         }
         return chain;
@@ -3778,15 +3791,19 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     // ladder pass only sees the remainder.
     const preschool = roomByNum[PROJ_PRESCHOOL_ROOM];
     const pfaFilled = { [PROJ_PRESCHOOL_ROOM]: [0, 0, 0, 0, 0] };
+    // Of the PFA children seated in Pre-School, how many count toward its PI/PFA tally
+    // (all of them — PFA is a PI/PFA program), tracked per day so the ladder pass can add it in.
+    const pfaFilledPfaPi = { [PROJ_PRESCHOOL_ROOM]: [0, 0, 0, 0, 0] };
     let pfaOverflow = [0, 0, 0, 0, 0];
     if (preschool) {
         for (let d = 0; d < 5; d++) {
-            let seated = 0;
+            let seated = 0, seatedPfaPi = 0;
             pfaKids.forEach(k => {
                 if (!k.days[d]) return;
-                if (seated < preschool.capacity) { seated++; } else { pfaOverflow[d]++; }
+                if (seated < preschool.capacity) { seated++; if (k.pfaPi) seatedPfaPi++; } else { pfaOverflow[d]++; }
             });
             pfaFilled[PROJ_PRESCHOOL_ROOM][d] = seated;
+            pfaFilledPfaPi[PROJ_PRESCHOOL_ROOM][d] = seatedPfaPi;
         }
     } else {
         // No Pre-School room defined — fall back to letting PFA kids climb the ladder.
@@ -3795,7 +3812,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
 
     const roomsOut = {};
     // Pass 2 — the age ladder fills every room, using only the Pre-School seats PFA left free.
-    seat(PROJ_LADDER_ROOMS, ladderKids, pfaFilled).forEach(r => { roomsOut[r.roomNumber] = r; });
+    seat(PROJ_LADDER_ROOMS, ladderKids, pfaFilled, pfaFilledPfaPi).forEach(r => { roomsOut[r.roomNumber] = r; });
     // Fold PFA overflow into Pre-School's overflow (both are "couldn't be seated in Pre-School").
     if (roomsOut[PROJ_PRESCHOOL_ROOM]) {
         for (let d = 0; d < 5; d++) roomsOut[PROJ_PRESCHOOL_ROOM].overflow[d] += pfaOverflow[d];
@@ -8259,7 +8276,7 @@ ELSE
             // The rooms themselves (number, name, capacity), in youngest-first order.
             // The projection fills these seats by age, so it needs every room — including
             // empty ones — and their DCFS capacity.
-            projRooms:     `SELECT r.RoomNumber, r.Room, r.DCFSCapacity FROM dimClassrooms r ORDER BY ${ROOM_AGE_ORDER}`,
+            projRooms:     `SELECT r.RoomNumber, r.Room, r.DCFSCapacity, ISNULL(r.Type,'') AS Type FROM dimClassrooms r ORDER BY ${ROOM_AGE_ORDER}`,
             // One row per ACTIVE enrolled child: age (birth date), current room, and the
             // days they attend. The projection sorts these youngest-first and seats them.
             enrolledChildren: `SELECT e.Id, e.First_Name, e.Last_Name, ISNULL(CONVERT(NVARCHAR(10),e.Birth_date,120),'') AS BirthDate, ISNULL(e.Days_Old,0) AS DaysOld, ISNULL(e.RoomNumber,0) AS RoomNumber, ISNULL(e.Monday,0) AS Mon, ISNULL(e.Tuesday,0) AS Tue, ISNULL(e.Wednesday,0) AS Wed, ISNULL(e.Thursday,0) AS Thu, ISNULL(e.Friday,0) AS Fri, ISNULL(e.PFA_PI_na,'') AS Program FROM rptMasterEnrollment e WHERE e.Active='Yes' OR e.Active='YES'`,
