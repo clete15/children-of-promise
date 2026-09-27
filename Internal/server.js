@@ -5808,23 +5808,39 @@ ELSE
             }
 
             // Get pre-enrollment data if available
+            /* Full pre-enrollment record for the rich Parent Interview prefill, matched
+               the SAME reliable way /api/student-intake does — the stored PreEnrollmentId
+               link first, then an exact child name + DOB match for children enrolled
+               before the link existed. The old LIKE-on-first-name match could pull the
+               wrong family; a code maps to one child, so the match must too. Returns the
+               field names the shared prefill reads (ParentFirst/Last, contact, income,
+               household, and the risk factors the family themselves reported at intake). */
             let preEnroll = {};
-            const peSql = `SELECT TOP 1 FirstName,LastName,Phone,Email,Address,City,Zip,
-                ISNULL(Homeless,'') AS Homeless,ISNULL(FosterAdopted,'') AS FosterAdopted,
-                ISNULL(NonEnglishHome,'') AS NonEnglishHome,ISNULL(ActiveMilitary,'') AS ActiveMilitary,
-                ISNULL(TeenParent,'') AS TeenParent,ISNULL(LivingSituation,'') AS LivingSituation,
-                ISNULL(IEP,'') AS IEP,ISNULL(EarlyIntervention,'') AS EarlyIntervention,
-                ISNULL(ChildName,'') AS ChildName,ISNULL(ChildBirthDate,'') AS ChildBirthDate
-                FROM PreEnrollment WHERE
-                (ChildName LIKE '%'+${esc(student.First_Name)}+'%' OR FirstName=${esc(student.First_Name)})
-                ORDER BY Id DESC`;
+            const flat = col => `REPLACE(REPLACE(ISNULL(${col},''),CHAR(13),' '),CHAR(10),' ')`;
+            const peCols = `ISNULL(p.FirstName,'') AS ParentFirst,ISNULL(p.LastName,'') AS ParentLast,`
+                + `ISNULL(p.Phone,'') AS Phone,ISNULL(p.Email,'') AS Email,ISNULL(p.Address,'') AS Address,`
+                + `ISNULL(p.City,'') AS City,ISNULL(p.Zip,'') AS Zip,`
+                + `ISNULL(p.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(p.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,`
+                + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,`
+                + `ISNULL(p.Homeless,'') AS Homeless,ISNULL(p.FosterAdopted,'') AS FosterAdopted,ISNULL(p.IEP,'') AS IEP,`
+                + `ISNULL(p.EarlyIntervention,'') AS EarlyIntervention,ISNULL(p.AbuseHistory,'') AS AbuseHistory,`
+                + `ISNULL(p.MentalIllness,'') AS MentalIllness,ISNULL(p.DcfsInvolvement,'') AS DcfsInvolvement,`
+                + `ISNULL(p.SubstanceAbuse,'') AS SubstanceAbuse,ISNULL(p.FamilyDeath,'') AS FamilyDeath,`
+                + `ISNULL(p.ParentIncarcerated,'') AS ParentIncarcerated,ISNULL(p.TeenParent,'') AS TeenParent,`
+                + `ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,`
+                + `ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,${flat('p.LivingSituation')} AS LivingSituation,`
+                + `${flat('p.Notes')} AS Notes,ISNULL(p.ChildName,'') AS ChildName,ISNULL(p.ChildBirthDate,'') AS ChildBirthDate`;
+            const peKeys = ['ParentFirst','ParentLast','Phone','Email','Address','City','Zip','HouseholdIncome','HouseholdSize','PublicBenefits','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','FamilyDeath','ParentIncarcerated','TeenParent','BornOutsideUS','NonEnglishHome','ActiveMilitary','LivingSituation','Notes','ChildName','ChildBirthDate'];
+            const peSql = `SELECT TOP 1 ${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${parseInt(student.Id)}
+                UNION ALL
+                SELECT TOP 1 ${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date) WHERE e.Id=${parseInt(student.Id)} AND e.PreEnrollmentId IS NULL`;
             const peRes = runSQL(peSql);
             if (peRes.ok) {
-                const peLines = peRes.data.trim().split('\n')
-                    .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
-                if (peLines.length) {
-                    const pv = peLines[0].split('|').map(x => x.trim());
-                    preEnroll = { FirstName:pv[0],LastName:pv[1],Phone:pv[2],Email:pv[3],Address:pv[4],City:pv[5],Zip:pv[6],Homeless:pv[7],FosterAdopted:pv[8],NonEnglishHome:pv[9],ActiveMilitary:pv[10],TeenParent:pv[11],LivingSituation:pv[12],IEP:pv[13],EarlyIntervention:pv[14],ChildName:pv[15],ChildBirthDate:pv[16] };
+                const peLine = peRes.data.trim().split('\n')
+                    .find(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
+                if (peLine) {
+                    const pv = peLine.split('|').map(x => x.trim());
+                    peKeys.forEach((k, i) => { preEnroll[k] = pv[i] || ''; });
                 }
             }
 
@@ -5884,6 +5900,19 @@ ELSE
                 // esc() handles the quote escaping, so this must stay raw or the
                 // stored JSON ends up double-escaped and unparseable.
                 const jsonData = JSON.stringify(data);
+                /* The parent portal now posts the SAME rich schema the admin form uses,
+                   so `data` is keyed by schema id. Map the summary/PICC columns the
+                   ISBE roster reads from those ids (parentGoals, parentConcerns,
+                   childStrengths, additionalNotes), and derive the PI5.L/PI5.M language
+                   fields from the Parent 1 language/translator answers. */
+                const summary = {
+                    goals: data.parentGoals || '',
+                    concerns: data.parentConcerns || '',
+                    strengths: data.childStrengths || '',
+                    notes: data.additionalNotes || '',
+                    prefLang: data.parent1Language || '',
+                    translatorNeeded: data.parent1Translator || ''
+                };
                 const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
                     CREATE TABLE ParentInterviews (
                         Id INT IDENTITY(1,1) PRIMARY KEY,StudentId INT NOT NULL,
@@ -5892,15 +5921,18 @@ ELSE
                         Notes NVARCHAR(MAX),CreatedAt DATETIME DEFAULT GETDATE(),UpdatedAt DATETIME DEFAULT GETDATE()
                     );
                     IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='FormData') ALTER TABLE ParentInterviews ADD FormData NVARCHAR(MAX);
+                    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='PreferredLanguage') ALTER TABLE ParentInterviews ADD PreferredLanguage NVARCHAR(100);
+                    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='TranslatorNeeded') ALTER TABLE ParentInterviews ADD TranslatorNeeded NVARCHAR(20);
+                    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='TranslatorArrangements') ALTER TABLE ParentInterviews ADD TranslatorArrangements NVARCHAR(MAX);
                     /* Parent now signs with a stylus, so ParentSignature holds an image data
                        URL, not a typed name — widen the original 200-char column, once. */
                     IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='ParentSignature' AND CHARACTER_MAXIMUM_LENGTH <> -1)
                         ALTER TABLE ParentInterviews ALTER COLUMN ParentSignature NVARCHAR(MAX);
                     ${schoolYearColumnSQL('ParentInterviews')}
                     IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)})
-                        UPDATE ParentInterviews SET InterviewDate=${esc(data.signDate||'')},ParentGoals=${esc(data.goals||'')},ParentConcerns=${esc(data.behaviors||'')},ChildStrengths=${esc(data.describeChild||'')},ParentSignature=${esc(data.parentSignature||'')},FormData=${esc(jsonData)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)}
+                        UPDATE ParentInterviews SET InterviewDate=${esc(data.signDate||'')},ParentGoals=${esc(summary.goals)},ParentConcerns=${esc(summary.concerns)},ChildStrengths=${esc(summary.strengths)},Notes=${esc(summary.notes)},PreferredLanguage=${esc(summary.prefLang)},TranslatorNeeded=${esc(summary.translatorNeeded)},ParentSignature=${esc(data.parentSignature||'')},FormData=${esc(jsonData)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)}
                     ELSE
-                        INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,FormData) VALUES (${studentId},${esc(formYear)},${esc(data.signDate||'')},${esc(data.goals||'')},${esc(data.behaviors||'')},${esc(data.describeChild||'')},${esc(data.parentSignature||'')},${esc(jsonData)});
+                        INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,Notes,PreferredLanguage,TranslatorNeeded,ParentSignature,FormData) VALUES (${studentId},${esc(formYear)},${esc(data.signDate||'')},${esc(summary.goals)},${esc(summary.concerns)},${esc(summary.strengths)},${esc(summary.notes)},${esc(summary.prefLang)},${esc(summary.translatorNeeded)},${esc(data.parentSignature||'')},${esc(jsonData)});
 `
                     + trackingTickSQL(studentId, formYear, 'ParentInterview');
                 const r = runSQL(sql);

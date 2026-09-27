@@ -80,6 +80,56 @@
         .success-msg { text-align:center; padding:20px; color:var(--success); font-weight:700; font-size:0.9rem; }
 
         @media (max-width:480px) { .p-row { grid-template-columns:1fr; } }
+
+        /* ── Shared rich Parent Interview form (pi-interview-schema.js) ──
+           The schema renderer emits .pi-section / .pi-grid / .pi-field / .pi-yesno /
+           .pi-radio-row / .pi-check-grid / .pi-repeat markup with pf_* ids. These are
+           the light-theme styles for the parent portal (white card), written for
+           readability: dark text on white inputs, clear labels, comfortable spacing —
+           the issues that made the admin dark-theme version hard to read do not apply
+           here because every control is explicitly light. */
+        .pi-intro { font-size:0.82rem; line-height:1.6; color:#374151; background:#f0f9ff;
+            border:1px solid #bae6fd; border-radius:8px; padding:12px 14px; margin-bottom:18px; }
+        .pi-section { margin-bottom:20px; }
+        .pi-section h4 { font-size:0.8rem; font-weight:800; text-transform:uppercase; letter-spacing:0.04em;
+            color:#1e3a8a; margin:0 0 12px 0; padding-bottom:6px; border-bottom:2px solid #e0e7ff; }
+        .pi-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
+        .pi-grid.three { grid-template-columns:1fr 1fr 1fr; }
+        .pi-field { display:flex; flex-direction:column; gap:4px; min-width:0; }
+        .pi-field label { font-size:0.72rem; font-weight:600; color:#475569; }
+        .pi-field .pi-value { font-size:0.85rem; font-weight:600; color:#111; padding:7px 10px;
+            background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; min-height:20px; }
+        .pi-field input[type=text], .pi-field input[type=date], .pi-field textarea, .pi-field select {
+            width:100%; box-sizing:border-box; font-size:0.9rem; padding:9px 11px; border:1px solid #cbd5e1;
+            border-radius:6px; font-family:inherit; background:#fff; color:#111; }
+        .pi-field textarea { min-height:64px; resize:vertical; line-height:1.4; }
+        .pi-field select { appearance:auto; -webkit-appearance:auto; }
+        .pi-field input:focus, .pi-field textarea:focus, .pi-field select:focus {
+            outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
+        .pi-full { grid-column:1/-1; }
+        /* Yes/No and radio groups: readable, tappable options that wrap cleanly. */
+        .pi-yesno { display:flex; gap:18px; padding:4px 0; }
+        .pi-radio-row, .pi-check-grid { display:flex; flex-wrap:wrap; gap:8px 18px; padding:4px 0; }
+        .pi-check-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; }
+        .pi-opt { display:inline-flex; align-items:center; gap:7px; font-size:0.86rem; color:#1e293b; cursor:pointer; line-height:1.3; }
+        .pi-opt input { margin:0; width:16px; height:16px; accent-color:#2563eb; flex:0 0 auto; }
+        /* A prefilled field gets a soft tint so the family sees what we already have. */
+        .pi-prefilled input, .pi-prefilled textarea, .pi-prefilled select,
+        .pi-prefilled .pi-radio-row, .pi-prefilled .pi-yesno, .pi-prefilled .pi-check-grid { background:#eff6ff; }
+        .pi-prefilled > label::after { content:' \2022 from your pre-enrollment'; font-weight:600; color:#2563eb; font-size:0.62rem; }
+        /* Repeat tables (siblings, doctors, pick-up list). */
+        .pi-repeat table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+        .pi-repeat th { text-align:left; font-size:0.68rem; font-weight:700; color:#475569;
+            text-transform:uppercase; letter-spacing:0.03em; padding:2px 6px; }
+        .pi-repeat td { padding:3px 6px; }
+        .pi-repeat td input { width:100%; box-sizing:border-box; font-size:0.85rem; padding:7px 9px;
+            border:1px solid #cbd5e1; border-radius:6px; font-family:inherit; }
+        .pi-rowdel { background:none; border:none; color:#dc2626; cursor:pointer; font-size:1.1rem; padding:0 6px; line-height:1; }
+        .pi-repeat-add { margin-top:6px; font-size:0.78rem; font-weight:700; color:#2563eb; background:none;
+            border:1px dashed #93c5fd; border-radius:6px; padding:7px 13px; cursor:pointer; }
+        @media (max-width:480px) {
+            .pi-grid, .pi-grid.three, .pi-check-grid { grid-template-columns:1fr; }
+        }
     </style>
 </head>
 <body>
@@ -176,279 +226,26 @@
         </div>
         <div class="p-modal-body">
 
-            <!-- Section 1: Basic Info -->
-            <div class="p-section">
-                <h4>Interview Information</h4>
-                <div class="p-row">
-                    <div class="p-field"><label>Person Interviewed</label><input type="text" id="pi_personInterviewed"></div>
-                    <div class="p-field"><label>Relationship to Child</label><select id="pi_relationship"><option value="">-- Select --</option><option>Mother</option><option>Father</option><option>Grandmother</option><option>Grandfather</option><option>Guardian</option><option>Foster Parent</option><option>Other</option></select></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Child's Full Name</label><div class="p-static" id="pi_childName"></div></div>
-                    <div class="p-field"><label>Date of Birth</label><div class="p-static" id="pi_childDOB"></div></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Name child likes to be called</label><input type="text" id="pi_nickname"></div>
-                    <div class="p-field"><label>How did you hear about this program?</label><input type="text" id="pi_howHeard"></div>
+            <div class="pi-intro">
+                Please review each section and fill in what you can. Some answers are
+                already filled in from your pre-enrollment form &mdash; check them and
+                correct anything that has changed. When you are done, sign at the bottom.
+            </div>
+
+            <!-- Read-only child header -->
+            <div class="pi-section">
+                <h4>Child Information</h4>
+                <div class="pi-grid three">
+                    <div class="pi-field"><label>Child Name</label><div class="pi-value" id="piChildName"></div></div>
+                    <div class="pi-field"><label>Date of Birth</label><div class="pi-value" id="piDOB"></div></div>
+                    <div class="pi-field"><label>Classroom</label><div class="pi-value" id="piRoom"></div></div>
                 </div>
             </div>
 
-            <!-- Section 2: Parent 1 -->
-            <div class="p-section">
-                <h4>Parent/Guardian 1</h4>
-                <div class="p-row">
-                    <div class="p-field"><label>Name</label><input type="text" id="pi_p1Name"></div>
-                    <div class="p-field"><label>Date of Birth</label><input type="date" id="pi_p1DOB"></div>
-                </div>
-                <div class="p-field"><label>Address</label><input type="text" id="pi_p1Address"></div>
-                <div class="p-row">
-                    <div class="p-field"><label>City</label><input type="text" id="pi_p1City"></div>
-                    <div class="p-field"><label>State</label><input type="text" id="pi_p1State" value="IL"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>ZIP</label><input type="text" id="pi_p1Zip"></div>
-                    <div class="p-field"><label>Phone</label><input type="text" id="pi_p1Phone"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Email</label><input type="text" id="pi_p1Email"></div>
-                    <div class="p-field"><label>Marital Status</label><select id="pi_p1Marital"><option value="">-- Select --</option><option>Single</option><option>Married</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Language Spoken in Home</label><input type="text" id="pi_p1Language" value="English"></div>
-                    <div class="p-field"><label>Translator Needed?</label><select id="pi_p1Translator"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Highest Grade Completed</label><input type="text" id="pi_p1Education"></div>
-                    <div class="p-field"><label>Place of Employment</label><input type="text" id="pi_p1Employer"></div>
-                </div>
-            </div>
-
-            <!-- Section 3: Parent 2 -->
-            <div class="p-section">
-                <h4>Parent/Guardian 2 (if applicable)</h4>
-                <div class="p-row">
-                    <div class="p-field"><label>Name</label><input type="text" id="pi_p2Name"></div>
-                    <div class="p-field"><label>Date of Birth</label><input type="date" id="pi_p2DOB"></div>
-                </div>
-                <div class="p-field"><label>Address</label><input type="text" id="pi_p2Address"></div>
-                <div class="p-row">
-                    <div class="p-field"><label>City</label><input type="text" id="pi_p2City"></div>
-                    <div class="p-field"><label>State</label><input type="text" id="pi_p2State"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>ZIP</label><input type="text" id="pi_p2Zip"></div>
-                    <div class="p-field"><label>Phone</label><input type="text" id="pi_p2Phone"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Email</label><input type="text" id="pi_p2Email"></div>
-                    <div class="p-field"><label>Marital Status</label><select id="pi_p2Marital"><option value="">-- Select --</option><option>Single</option><option>Married</option><option>Divorced</option><option>Separated</option><option>Widowed</option></select></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Language Spoken in Home</label><input type="text" id="pi_p2Language"></div>
-                    <div class="p-field"><label>Place of Employment</label><input type="text" id="pi_p2Employer"></div>
-                </div>
-            </div>
-
-            <!-- Section 4: Child Lives With / Siblings -->
-            <div class="p-section">
-                <h4>Household</h4>
-                <div class="p-field"><label>Child Lives With</label><select id="pi_livesWith"><option value="Parent(s)">Parent(s)</option><option value="Foster parent(s)">Foster parent(s) or legal guardian(s)</option><option value="Other">Other (specify below)</option></select></div>
-                <div class="p-field"><label>If other, names:</label><input type="text" id="pi_livesWithOther"></div>
-                <div class="p-field"><label>List Siblings (names and dates of birth)</label><textarea id="pi_siblings" placeholder="e.g. Ashlyn, 03/04/2021&#10;Bradley, 09/12/2019"></textarea></div>
-                <div class="p-field"><label>Are any siblings having academic difficulty or trouble in school?</label><textarea id="pi_siblingAcademic" placeholder="If yes, explain..."></textarea></div>
-            </div>
-
-            <!-- Section 5: Medical History -->
-            <div class="p-section">
-                <h4>Child's Medical History</h4>
-                <div class="p-field"><label>Was there anything unusual about the pregnancy/delivery or serious health problems at birth?</label><textarea id="pi_birthComplications" placeholder="If yes, explain..."></textarea></div>
-                <div class="p-row">
-                    <div class="p-field"><label>Length of Pregnancy</label><input type="text" id="pi_pregnancyLength" placeholder="e.g. 36 weeks"></div>
-                    <div class="p-field"><label>Weight at Birth</label><input type="text" id="pi_birthWeight" placeholder="e.g. 6 lbs"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Current Weight</label><input type="text" id="pi_currentWeight"></div>
-                    <div class="p-field"><label>Current Height</label><input type="text" id="pi_currentHeight"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Feeding difficulties as infant?</label><select id="pi_feedingDifficulty"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                    <div class="p-field"><label>Was child on a respirator?</label><select id="pi_respirator"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                </div>
-                <div class="p-field"><label>Is your child experiencing health issues? (chronic or terminal)</label><textarea id="pi_healthIssues" placeholder="If yes, explain..."></textarea></div>
-                <div class="p-field"><label>Does your child have a diagnosed disability?</label><textarea id="pi_disability" placeholder="If yes, explain..."></textarea></div>
-                <div class="p-row">
-                    <div class="p-field"><label>Referral to Child & Family Connections?</label><select id="pi_referralCFC"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                    <div class="p-field"><label>Taking any medication?</label><select id="pi_medication"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                </div>
-                <div class="p-field"><label>What medication(s) and why?</label><input type="text" id="pi_medicationDetail"></div>
-                <div class="p-field"><label>Surgeries (list with date and hospital)</label><textarea id="pi_surgeries" placeholder="e.g. Intussusception surgery, 2-24, Barnes Jewish"></textarea></div>
-                <div class="p-field"><label>Doctor Name, Clinic, Phone</label><input type="text" id="pi_doctor" placeholder="e.g. Dr. Murry, OSCE, 618-257-2550"></div>
-            </div>
-
-            <!-- Section 6: Health Checklist -->
-            <div class="p-section">
-                <h4>Health Concerns (check any that apply)</h4>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:0.8rem;">
-                    <label><input type="checkbox" id="pi_hc_thumb"> Thumb sucking</label>
-                    <label><input type="checkbox" id="pi_hc_indigestion"> Frequent indigestion</label>
-                    <label><input type="checkbox" id="pi_hc_nailBiting"> Nail biting</label>
-                    <label><input type="checkbox" id="pi_hc_constipation"> Frequent constipation</label>
-                    <label><input type="checkbox" id="pi_hc_epilepsy"> Epilepsy</label>
-                    <label><input type="checkbox" id="pi_hc_diarrhea"> Frequent diarrhea</label>
-                    <label><input type="checkbox" id="pi_hc_heart"> Heart trouble</label>
-                    <label><input type="checkbox" id="pi_hc_vomiting"> Vomiting</label>
-                    <label><input type="checkbox" id="pi_hc_overtired"> Overtired</label>
-                    <label><input type="checkbox" id="pi_hc_fevers"> Frequent fevers</label>
-                    <label><input type="checkbox" id="pi_hc_appetite"> Lack of appetite</label>
-                    <label><input type="checkbox" id="pi_hc_sinus"> Sinus trouble</label>
-                    <label><input type="checkbox" id="pi_hc_overweight"> Overweight</label>
-                    <label><input type="checkbox" id="pi_hc_noseBleeding"> Nose bleeding</label>
-                    <label><input type="checkbox" id="pi_hc_underweight"> Underweight</label>
-                    <label><input type="checkbox" id="pi_hc_rashes"> Rashes</label>
-                    <label><input type="checkbox" id="pi_hc_headache"> Frequent headache</label>
-                    <label><input type="checkbox" id="pi_hc_earInfections"> Frequent ear infections</label>
-                    <label><input type="checkbox" id="pi_hc_nightmares"> Nightmares</label>
-                    <label><input type="checkbox" id="pi_hc_nightTerrors"> Night terrors</label>
-                    <label><input type="checkbox" id="pi_hc_asthma"> Asthma</label>
-                    <label><input type="checkbox" id="pi_hc_communicable"> Communicable diseases</label>
-                </div>
-                <div class="p-field" style="margin-top:8px;"><label>Allergies (explain)</label><input type="text" id="pi_allergies"></div>
-                <div class="p-field"><label>Hearing test date &amp; result</label><input type="text" id="pi_hearingTest" placeholder="e.g. 12/14/24, Pass, Dr. Visit"></div>
-                <div class="p-field"><label>Vision test date &amp; result</label><input type="text" id="pi_visionTest" placeholder="e.g. 12/14/24, Pass, Dr. Visit"></div>
-                <div class="p-field"><label>Developmental concern diagnosed?</label><input type="text" id="pi_devConcern" placeholder="If yes, describe..."></div>
-                <div class="p-field"><label>Therapy services child has received (therapist, agency, phone)</label><textarea id="pi_therapy"></textarea></div>
-            </div>
-
-            <!-- Section 7: Social History -->
-            <div class="p-section">
-                <h4>Social History</h4>
-                <div class="p-field"><label>Please describe your child</label><textarea id="pi_describeChild" placeholder="Personality, temperament, interests..."></textarea></div>
-                <div class="p-row">
-                    <div class="p-field"><label>Attends child care or in-home care?</label><select id="pi_childCare"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                    <div class="p-field"><label>Where?</label><input type="text" id="pi_childCareWhere"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Opportunities to play with other children?</label><select id="pi_playOpportunities"><option value="Yes">Yes</option><option value="No">No</option></select></div>
-                    <div class="p-field"><label>Where?</label><input type="text" id="pi_playWhere"></div>
-                </div>
-                <div class="p-field"><label>Has family experienced alcohol or drug abuse?</label><input type="text" id="pi_substanceAbuse" placeholder="If yes, explain..."></div>
-                <div class="p-field"><label>Has child been exposed to stress, trauma, or violence?</label><input type="text" id="pi_trauma" placeholder="If yes, explain..."></div>
-                <div class="p-field"><label>Currently receiving DCFS services?</label><select id="pi_dcfs"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                <div class="p-field"><label>Primary caregivers have chronic/terminal illness or disability?</label><input type="text" id="pi_caregiverIllness" placeholder="If yes, explain..."></div>
-                <div class="p-row">
-                    <div class="p-field"><label>Age of mother at birth of first child</label><input type="number" id="pi_motherAge"></div>
-                    <div class="p-field"><label>Age of father at birth of first child</label><input type="number" id="pi_fatherAge"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Family recently immigrated?</label><select id="pi_immigrated"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                    <div class="p-field"><label>Caregivers on active military duty?</label><select id="pi_military"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Caregivers incarcerated?</label><select id="pi_incarcerated"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                    <div class="p-field"><label>Death in immediate family?</label><select id="pi_familyDeath"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                </div>
-                <div class="p-field"><label>If yes to above, explain:</label><input type="text" id="pi_socialExplain"></div>
-                <div class="p-field"><label>Opportunities to socialize with family and friends?</label><input type="text" id="pi_socialize"></div>
-                <div class="p-field"><label>Receiving services from another agency?</label><input type="text" id="pi_otherAgency" placeholder="If yes, which agency..."></div>
-            </div>
-
-            <!-- Section 8: Daily Life -->
-            <div class="p-section">
-                <h4>Daily Life &amp; Routines</h4>
-                <div class="p-field"><label>What are your child's most enjoyable activities?</label><textarea id="pi_activities"></textarea></div>
-                <div class="p-field"><label>What do you enjoy doing as a family?</label><textarea id="pi_familyActivities"></textarea></div>
-                <div class="p-field"><label>What frightens your child?</label><input type="text" id="pi_fears"></div>
-                <div class="p-field"><label>What do you do to comfort your child?</label><input type="text" id="pi_comfort"></div>
-                <div class="p-field"><label>When transitioning between activities, how does your child respond?</label><input type="text" id="pi_transitions"></div>
-                <div class="p-field"><label>What is a typical day like for you and your family?</label><textarea id="pi_typicalDay"></textarea></div>
-                <div class="p-row">
-                    <div class="p-field"><label>Development similar to peers?</label><select id="pi_devSimilar"><option value="Yes">Yes</option><option value="No">No</option></select></div>
-                    <div class="p-field"><label>Noticed any regression?</label><select id="pi_regression"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                </div>
-                <div class="p-field"><label>Eating/snacking schedule</label><input type="text" id="pi_eatingSchedule" placeholder="e.g. Breakfast, snack, lunch, dinner, snack"></div>
-                <div class="p-field"><label>Sleeping/napping schedule</label><input type="text" id="pi_sleepSchedule" placeholder="e.g. 2 naps, 4pm to 1y, one in morning/2pm"></div>
-                <div class="p-field"><label>Does your child have behaviors that concern you?</label><textarea id="pi_behaviors" placeholder="If yes, explain..."></textarea></div>
-                <div class="p-field"><label>Special information or instructions for program staff</label><textarea id="pi_specialInstructions"></textarea></div>
-            </div>
-
-            <!-- Section 9: Pregnancy (if applicable) -->
-            <div class="p-section">
-                <h4>Current Pregnancy (if applicable)</h4>
-                <div class="p-row">
-                    <div class="p-field"><label>Currently pregnant?</label><select id="pi_pregnant"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                    <div class="p-field"><label>Estimated delivery date</label><input type="date" id="pi_dueDate"></div>
-                </div>
-                <div class="p-row">
-                    <div class="p-field"><label>Difficulties with pregnancy?</label><select id="pi_pregDifficulties"><option value="No">No</option><option value="Yes">Yes</option></select></div>
-                    <div class="p-field"><label>Date of last exam</label><input type="date" id="pi_lastExam"></div>
-                </div>
-            </div>
-
-            <!-- Section 10: Household Information -->
-            <div class="p-section">
-                <h4>Household Information</h4>
-                <div class="p-row">
-                    <div class="p-field"><label>Transportation available?</label><select id="pi_transportation"><option value="Yes">Yes</option><option value="No">No</option></select></div>
-                    <div class="p-field"><label>Times family moved in past year</label><input type="number" id="pi_moveCount" min="0"></div>
-                </div>
-                <div class="p-field"><label>Current living situation</label><select id="pi_livingSituation">
-                    <option value="Normal">My family has a fixed, regular, adequate nighttime residence</option>
-                    <option value="Shared housing">Shares housing due to hardship</option>
-                    <option value="Motel/hotel">Lives in motel, hotel, or camping grounds</option>
-                    <option value="Emergency/transitional">Emergency or transitional housing</option>
-                    <option value="Not designed for housing">Nighttime residence not designed for sleeping</option>
-                    <option value="Car/park/abandoned">Lives in car, park, public space, or abandoned building</option>
-                    <option value="Foster care">Child is awaiting foster care placement</option>
-                    <option value="Unaccompanied youth">Unaccompanied youth</option>
-                </select></div>
-                <div class="p-field"><label>Household structure</label><select id="pi_householdStructure">
-                    <option value="">-- Select --</option>
-                    <option value="Both parents">Both parents at home</option>
-                    <option value="Single parent">Single parent at home</option>
-                    <option value="Grandparent">Adult other than parent (grandparent) also in home</option>
-                    <option value="Shared custody">Shared custody (part time with mom/part time with dad)</option>
-                    <option value="Teen parent">Teen parent lives with parents</option>
-                    <option value="Other">Other situation</option>
-                </select></div>
-            </div>
-
-            <!-- Section 11: Significant people -->
-            <div class="p-section">
-                <h4>Significant People &amp; Nutrition</h4>
-                <div class="p-field"><label>List significant people in your child's life</label><input type="text" id="pi_significantPeople" placeholder="e.g. Mom, Dad, his sister"></div>
-                <div class="p-row">
-                    <div class="p-field"><label>Does everyone get enough to eat?</label><select id="pi_enoughFood"><option value="Yes">Yes</option><option value="No">No</option></select></div>
-                    <div class="p-field"><label>Access to fresh food/fruits/vegetables?</label><select id="pi_freshFood"><option value="Yes">Yes</option><option value="No">No</option></select></div>
-                </div>
-            </div>
-
-            <!-- Section 12: Goals -->
-            <div class="p-section">
-                <h4>Goals &amp; Dreams</h4>
-                <div class="p-field"><label>What are your dreams or goals for your child's future?</label><textarea id="pi_goals" placeholder="Share your hopes for your child..."></textarea></div>
-                <div class="p-field"><label>Please provide any other information that will help us serve you and your family better.</label><textarea id="pi_otherInfo"></textarea></div>
-            </div>
-
-            <!-- Section 13: Authorized Pick-Up -->
-            <div class="p-section">
-                <h4>Authorized Pick-Up List</h4>
-                <p style="font-size:0.75rem;color:#6b7280;margin-bottom:8px;">List people authorized to pick up your child (other than parents).</p>
-                <div class="p-row">
-                    <div class="p-field"><label>1. Name</label><input type="text" id="pi_pickup1Name"></div>
-                    <div class="p-field"><label>Phone</label><input type="text" id="pi_pickup1Phone"></div>
-                </div>
-                <div class="p-field"><label>Relationship</label><input type="text" id="pi_pickup1Rel"></div>
-                <div class="p-row">
-                    <div class="p-field"><label>2. Name</label><input type="text" id="pi_pickup2Name"></div>
-                    <div class="p-field"><label>Phone</label><input type="text" id="pi_pickup2Phone"></div>
-                </div>
-                <div class="p-field"><label>Relationship</label><input type="text" id="pi_pickup2Rel"></div>
-                <div class="p-row">
-                    <div class="p-field"><label>3. Name</label><input type="text" id="pi_pickup3Name"></div>
-                    <div class="p-field"><label>Phone</label><input type="text" id="pi_pickup3Phone"></div>
-                </div>
-                <div class="p-field"><label>Relationship</label><input type="text" id="pi_pickup3Rel"></div>
-            </div>
+            <!-- The full Prevention Initiative Parent Interview, rendered from the shared
+                 schema (pi-interview-schema.js) into this container. Same ~100 fields the
+                 admin sees, so the detail needed to enter the child into SIS is captured. -->
+            <div id="piFormSections"></div>
 
             <!-- Signature -->
             <div class="p-section">
@@ -471,10 +268,16 @@
 
 <script src="/staff/auth.js"></script>
 <script src="/staff/sign-pad.js"></script>
+<!-- The shared Parent Interview schema + render/serialize/prefill engine, the SAME
+     one the ISBE admin roster uses, so the parent fills out the identical rich form. -->
+<script src="/staff/pi-interview-schema.js"></script>
 <script>
 let parentStudent = null;
 let parentCode = '';
 let trackingStatus = {};
+// A saved interview for this child/year, if the login returned one, so a returning
+// parent edits rather than restarts. Null until/unless populated.
+let parentInterviewSaved = null;
 
 async function parentLogin() {
     const code = document.getElementById('codeInput').value.trim().toUpperCase();
@@ -643,38 +446,74 @@ async function submitPermissionSlip() {
 let preEnrollData = {};
 
 function prefillInterview() {
-    // Pre-fill from student data
-    document.getElementById('pi_childName').textContent = parentStudent.First_Name + ' ' + parentStudent.Last_Name;
-    document.getElementById('pi_childDOB').textContent = parentStudent.Birth_date || '';
+    // Render the full shared schema form fresh into #piFormSections, then fill the
+    // read-only child header and prefill from enrollment + pre-enrollment.
+    renderInterviewForm();
+
+    document.getElementById('piChildName').textContent = parentStudent.First_Name + ' ' + parentStudent.Last_Name;
+    document.getElementById('piDOB').textContent = parentStudent.Birth_date || '\u2014';
+    document.getElementById('piRoom').textContent = (parentStudent.Room || '') || '\u2014';
+
+    // Always-known bits from the child record.
+    piSetFieldValue('childFullName', parentStudent.First_Name + ' ' + parentStudent.Last_Name);
+    piSetFieldValue('childDob', parentStudent.Birth_date || '');
+
+    var yes = function (v) { return ['yes', 'y', 'true', '1'].indexOf(String(v == null ? '' : v).trim().toLowerCase()) !== -1; };
+    var pe = preEnrollData || {};
+
+    // Parent 1 contact, from the pre-enrollment submission.
+    var parentName = [pe.ParentFirst, pe.ParentLast].filter(Boolean).join(' ');
+    if (parentName) { piPrefill('parent1Name', parentName); piPrefill('personInterviewed', parentName); }
+    if (pe.Phone) piPrefill('parent1Phone', pe.Phone);
+    if (pe.Email) piPrefill('parent1Email', pe.Email);
+    if (pe.Address) piPrefill('parent1Address', pe.Address);
+    if (pe.City) piPrefill('parent1City', pe.City);
+    else if (parentStudent.City_Town) piPrefill('parent1City', parentStudent.City_Town);
+    if (pe.Zip) piPrefill('parent1Zip', pe.Zip);
+
+    // Household / income — pre-enrollment first, then enrollment.
+    if (pe.HouseholdIncome) piPrefill('income', pe.HouseholdIncome);
+    else if (parentStudent.HouseholdIncome) piPrefill('income', parentStudent.HouseholdIncome);
+    if (pe.HouseholdSize) piPrefill('householdSize', pe.HouseholdSize);
+    else if (parentStudent.HouseholdSize) piPrefill('householdSize', parentStudent.HouseholdSize);
+    if (pe.LivingSituation) piPrefill('livingSituationNote', pe.LivingSituation);
+
+    // Public benefits string -> the program checkboxes.
+    var benefits = (pe.PublicBenefits || parentStudent.PublicBenefits || '').toLowerCase();
+    if (benefits) {
+        var progs = [];
+        if (benefits.indexOf('wic') !== -1) progs.push('WIC');
+        if (benefits.indexOf('medicaid') !== -1) progs.push('Medicaid');
+        if (benefits.indexOf('snap') !== -1) progs.push('SNAP');
+        if (benefits.indexOf('tanf') !== -1) progs.push('TANF');
+        if (benefits.indexOf('ccap') !== -1) progs.push('CCAP');
+        if (progs.length) piPrefillGroup('publicPrograms', progs);
+    }
+
+    // The risk factors the FAMILY reported at pre-enrollment -> the matching Yes/No
+    // fields, so they confirm rather than re-enter. (The family is the source of this,
+    // so surfacing it back to them is appropriate.)
+    if (yes(pe.IEP) || parentStudent.IEP === 'Yes') piPrefill('disabilityYN', 'Yes');
+    if (yes(pe.FosterAdopted) || parentStudent.Category === 'Foster') piPrefill('childLivesWith', 'foster');
+    if (yes(pe.SubstanceAbuse)) piPrefill('drugAlcohol', 'Yes');
+    if (yes(pe.AbuseHistory)) piPrefill('trauma', 'Yes');
+    if (yes(pe.DcfsInvolvement)) piPrefill('dcfs', 'Yes');
+    if (yes(pe.MentalIllness)) piPrefill('caregiverIllness', 'Yes');
+    if (yes(pe.FamilyDeath)) piPrefill('familyDeath', 'Yes');
+    if (yes(pe.ParentIncarcerated)) piPrefill('incarcerated', 'Yes');
+    if (yes(pe.ActiveMilitary) || parentStudent.Military === 'Yes') piPrefill('activeMilitary', 'Yes');
+    if (yes(pe.BornOutsideUS)) piPrefill('immigrated', 'Yes');
+    if (yes(pe.Homeless)) piPrefill('livingSituation', 'shares');
+    if (yes(pe.TeenParent)) piPrefill('householdStructure', 'teenParent');
+    if (pe.Notes) piPrefill('additionalNotes', pe.Notes);
+
+    // Load any interview already saved this year on top, so a returning parent edits
+    // rather than starts over. A saved answer wins over a prefill.
+    if (parentInterviewSaved && parentInterviewSaved.FormData) {
+        try { loadInterviewForm(JSON.parse(parentInterviewSaved.FormData)); } catch (e) { /* ignore */ }
+    }
+
     document.getElementById('pi_signDate').value = new Date().toISOString().split('T')[0];
-
-    // Pre-fill from pre-enrollment data
-    var pe = preEnrollData;
-    if (pe.FirstName) {
-        document.getElementById('pi_p1Name').value = pe.FirstName + ' ' + (pe.LastName || '');
-        document.getElementById('pi_personInterviewed').value = pe.FirstName + ' ' + (pe.LastName || '');
-    }
-    if (pe.Address) document.getElementById('pi_p1Address').value = pe.Address;
-    if (pe.City) document.getElementById('pi_p1City').value = pe.City;
-    if (pe.Zip) document.getElementById('pi_p1Zip').value = pe.Zip;
-    if (pe.Phone) document.getElementById('pi_p1Phone').value = pe.Phone;
-    if (pe.Email) document.getElementById('pi_p1Email').value = pe.Email;
-    if (pe.NonEnglishHome === 'Yes') document.getElementById('pi_p1Language').value = '';
-    if (pe.LivingSituation) {
-        var ls = document.getElementById('pi_livingSituation');
-        for (var i = 0; i < ls.options.length; i++) {
-            if (ls.options[i].value.toLowerCase().indexOf(pe.LivingSituation.toLowerCase()) >= 0) {
-                ls.selectedIndex = i; break;
-            }
-        }
-    }
-    if (pe.FosterAdopted === 'Yes') document.getElementById('pi_livesWith').value = 'Foster parent(s)';
-    if (pe.ActiveMilitary === 'Yes' || parentStudent.Military === 'Yes') document.getElementById('pi_military').value = 'Yes';
-
-    // Pre-fill from enrollment data
-    if (parentStudent.City_Town) document.getElementById('pi_p1City').value = parentStudent.City_Town;
-    if (parentStudent.IEP === 'Yes') document.getElementById('pi_disability').value = 'IEP on file';
-
     resetParentSigPad('piSigPad');
 }
 
@@ -686,128 +525,12 @@ async function submitInterview() {
     var btn = document.getElementById('piSubmitBtn');
     btn.disabled = true; btn.textContent = 'Submitting...';
 
-    // Gather all form data
-    var formData = {
-        personInterviewed: document.getElementById('pi_personInterviewed').value,
-        relationship: document.getElementById('pi_relationship').value,
-        nickname: document.getElementById('pi_nickname').value,
-        howHeard: document.getElementById('pi_howHeard').value,
-        // Parent 1
-        p1Name: document.getElementById('pi_p1Name').value,
-        p1DOB: document.getElementById('pi_p1DOB').value,
-        p1Address: document.getElementById('pi_p1Address').value,
-        p1City: document.getElementById('pi_p1City').value,
-        p1State: document.getElementById('pi_p1State').value,
-        p1Zip: document.getElementById('pi_p1Zip').value,
-        p1Phone: document.getElementById('pi_p1Phone').value,
-        p1Email: document.getElementById('pi_p1Email').value,
-        p1Marital: document.getElementById('pi_p1Marital').value,
-        p1Language: document.getElementById('pi_p1Language').value,
-        p1Translator: document.getElementById('pi_p1Translator').value,
-        p1Education: document.getElementById('pi_p1Education').value,
-        p1Employer: document.getElementById('pi_p1Employer').value,
-        // Parent 2
-        p2Name: document.getElementById('pi_p2Name').value,
-        p2DOB: document.getElementById('pi_p2DOB').value,
-        p2Address: document.getElementById('pi_p2Address').value,
-        p2City: document.getElementById('pi_p2City').value,
-        p2State: document.getElementById('pi_p2State').value,
-        p2Zip: document.getElementById('pi_p2Zip').value,
-        p2Phone: document.getElementById('pi_p2Phone').value,
-        p2Email: document.getElementById('pi_p2Email').value,
-        p2Marital: document.getElementById('pi_p2Marital').value,
-        p2Language: document.getElementById('pi_p2Language').value,
-        p2Employer: document.getElementById('pi_p2Employer').value,
-        // Household
-        livesWith: document.getElementById('pi_livesWith').value,
-        livesWithOther: document.getElementById('pi_livesWithOther').value,
-        siblings: document.getElementById('pi_siblings').value,
-        siblingAcademic: document.getElementById('pi_siblingAcademic').value,
-        // Medical
-        birthComplications: document.getElementById('pi_birthComplications').value,
-        pregnancyLength: document.getElementById('pi_pregnancyLength').value,
-        birthWeight: document.getElementById('pi_birthWeight').value,
-        currentWeight: document.getElementById('pi_currentWeight').value,
-        currentHeight: document.getElementById('pi_currentHeight').value,
-        feedingDifficulty: document.getElementById('pi_feedingDifficulty').value,
-        respirator: document.getElementById('pi_respirator').value,
-        healthIssues: document.getElementById('pi_healthIssues').value,
-        disability: document.getElementById('pi_disability').value,
-        referralCFC: document.getElementById('pi_referralCFC').value,
-        medication: document.getElementById('pi_medication').value,
-        medicationDetail: document.getElementById('pi_medicationDetail').value,
-        surgeries: document.getElementById('pi_surgeries').value,
-        doctor: document.getElementById('pi_doctor').value,
-        // Health checklist
-        healthChecklist: getHealthChecklist(),
-        allergies: document.getElementById('pi_allergies').value,
-        hearingTest: document.getElementById('pi_hearingTest').value,
-        visionTest: document.getElementById('pi_visionTest').value,
-        devConcern: document.getElementById('pi_devConcern').value,
-        therapy: document.getElementById('pi_therapy').value,
-        // Social
-        describeChild: document.getElementById('pi_describeChild').value,
-        childCare: document.getElementById('pi_childCare').value,
-        childCareWhere: document.getElementById('pi_childCareWhere').value,
-        playOpportunities: document.getElementById('pi_playOpportunities').value,
-        playWhere: document.getElementById('pi_playWhere').value,
-        substanceAbuse: document.getElementById('pi_substanceAbuse').value,
-        trauma: document.getElementById('pi_trauma').value,
-        dcfs: document.getElementById('pi_dcfs').value,
-        caregiverIllness: document.getElementById('pi_caregiverIllness').value,
-        motherAge: document.getElementById('pi_motherAge').value,
-        fatherAge: document.getElementById('pi_fatherAge').value,
-        immigrated: document.getElementById('pi_immigrated').value,
-        military: document.getElementById('pi_military').value,
-        incarcerated: document.getElementById('pi_incarcerated').value,
-        familyDeath: document.getElementById('pi_familyDeath').value,
-        socialExplain: document.getElementById('pi_socialExplain').value,
-        socialize: document.getElementById('pi_socialize').value,
-        otherAgency: document.getElementById('pi_otherAgency').value,
-        // Daily life
-        activities: document.getElementById('pi_activities').value,
-        familyActivities: document.getElementById('pi_familyActivities').value,
-        fears: document.getElementById('pi_fears').value,
-        comfort: document.getElementById('pi_comfort').value,
-        transitions: document.getElementById('pi_transitions').value,
-        typicalDay: document.getElementById('pi_typicalDay').value,
-        devSimilar: document.getElementById('pi_devSimilar').value,
-        regression: document.getElementById('pi_regression').value,
-        eatingSchedule: document.getElementById('pi_eatingSchedule').value,
-        sleepSchedule: document.getElementById('pi_sleepSchedule').value,
-        behaviors: document.getElementById('pi_behaviors').value,
-        specialInstructions: document.getElementById('pi_specialInstructions').value,
-        // Pregnancy
-        pregnant: document.getElementById('pi_pregnant').value,
-        dueDate: document.getElementById('pi_dueDate').value,
-        pregDifficulties: document.getElementById('pi_pregDifficulties').value,
-        lastExam: document.getElementById('pi_lastExam').value,
-        // Household info
-        transportation: document.getElementById('pi_transportation').value,
-        moveCount: document.getElementById('pi_moveCount').value,
-        livingSituation: document.getElementById('pi_livingSituation').value,
-        householdStructure: document.getElementById('pi_householdStructure').value,
-        // Significant people
-        significantPeople: document.getElementById('pi_significantPeople').value,
-        enoughFood: document.getElementById('pi_enoughFood').value,
-        freshFood: document.getElementById('pi_freshFood').value,
-        // Goals
-        goals: document.getElementById('pi_goals').value,
-        otherInfo: document.getElementById('pi_otherInfo').value,
-        // Pickup
-        pickup1Name: document.getElementById('pi_pickup1Name').value,
-        pickup1Phone: document.getElementById('pi_pickup1Phone').value,
-        pickup1Rel: document.getElementById('pi_pickup1Rel').value,
-        pickup2Name: document.getElementById('pi_pickup2Name').value,
-        pickup2Phone: document.getElementById('pi_pickup2Phone').value,
-        pickup2Rel: document.getElementById('pi_pickup2Rel').value,
-        pickup3Name: document.getElementById('pi_pickup3Name').value,
-        pickup3Phone: document.getElementById('pi_pickup3Phone').value,
-        pickup3Rel: document.getElementById('pi_pickup3Rel').value,
-        // Signature
-        parentSignature: sig,
-        signDate: document.getElementById('pi_signDate').value
-    };
+    // The whole form, serialized from the shared schema (keyed by schema id), plus the
+    // signature and date. The server stores this object as FormData JSON and maps the
+    // summary columns from it, so the admin roster reads exactly what the parent saved.
+    var formData = serializeInterviewForm();
+    formData.parentSignature = sig;
+    formData.signDate = document.getElementById('pi_signDate').value;
 
     try {
         var res = await fetch('/api/parent-portal/sign', {
@@ -828,15 +551,6 @@ async function submitInterview() {
         } else { alert('Error: ' + (data.error || 'Unknown error')); }
     } catch (e) { alert('Error: ' + e.message); }
     finally { btn.disabled = false; btn.textContent = 'Sign & Submit'; }
-}
-
-function getHealthChecklist() {
-    var items = ['thumb','indigestion','nailBiting','constipation','epilepsy','diarrhea','heart','vomiting','overtired','fevers','appetite','sinus','overweight','noseBleeding','underweight','rashes','headache','earInfections','nightmares','nightTerrors','asthma','communicable'];
-    var checked = [];
-    items.forEach(function(item) {
-        if (document.getElementById('pi_hc_' + item).checked) checked.push(item);
-    });
-    return checked.join(',');
 }
 
 // Close on Escape
