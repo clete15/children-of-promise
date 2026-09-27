@@ -4842,8 +4842,13 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
 
         // Field, table, date column, and any extra WHERE. Year is already validated
         // to \d{4}-\d{4} by resolveSchoolYear, so it is safe inside the quoted SQL.
+        /* [field, table, dateCol, extraWhere, anyYear]. anyYear=true means the form
+           is a once-per-child artefact, not a per-year one, so it counts as on file in
+           EVERY year's roster — a Parent Interview done once should show green whatever
+           year is in view. Everything else is legitimately per-year (a permission slip
+           and screenings are redone each year), so they stay filtered to `year`. */
         const sources = [
-            ['ParentInterview', 'ParentInterviews', 'InterviewDate', ''],
+            ['ParentInterview', 'ParentInterviews', 'InterviewDate', '', true],
             ['PermissionSlip', 'PermissionSlips', 'SignedDate', ''],
             ['BegASQ', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ-3'' AND Period=''Beginning''"],
             ['EndASQ', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ-3'' AND Period=''End''"],
@@ -4868,13 +4873,17 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             + `IF OBJECT_ID('tempdb..#cf') IS NOT NULL DROP TABLE #cf;
 CREATE TABLE #cf (Field NVARCHAR(60), StudentId INT, Dt NVARCHAR(40));
 `;
-        sources.forEach(([field, table, dateCol, extra]) => {
+        sources.forEach(([field, table, dateCol, extra, anyYear]) => {
             const dateExpr = dateCol ? `ISNULL(CAST(${dateCol} AS NVARCHAR(40)),'''')` : `''''`;
             // Quotes are doubled once, because these strings are read by SQL Server
             // one level deep inside EXEC. Doubling twice makes the year literal
             // '' + 2026-2027 + '' and the batch fails to parse.
+            // A once-per-child form (anyYear) is not filtered by year, so it reports as
+            // on file in whatever year the roster is showing; a child can have at most
+            // one, so no year filter is needed to disambiguate.
+            const whereClause = anyYear ? (extra ? `WHERE 1=1${extra}` : '') : `WHERE SchoolYear=''${year}''${extra}`;
             sql += `IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='${table}')
-    EXEC('INSERT INTO #cf (Field,StudentId,Dt) SELECT ''${field}'', StudentId, ${dateExpr} FROM ${table} WHERE SchoolYear=''${year}''${extra}');
+    EXEC('INSERT INTO #cf (Field,StudentId,Dt) SELECT ''${field}'', StudentId, ${dateExpr} FROM ${table} ${whereClause}');
 `;
         });
         // MAX picks a date over a blank one where a child somehow has two rows.
