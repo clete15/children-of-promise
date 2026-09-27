@@ -10,12 +10,18 @@
            translucent-white sidebar). Surfaces, borders and text follow the --sp-* tokens
            so light/dark both work. */
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
-        .isbe-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
-        .isbe-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1100px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
-        .isbe-sidebar { width:164px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
-        .isbe-sidebar button { display:block;width:100%;text-align:left;padding:13px 16px;border:none;border-left:3px solid transparent;cursor:pointer;background:transparent;transition:background 0.15s,border-color 0.15s; }
-        .isbe-sidebar button.active { background:var(--sp-accent-soft);border-left-color:var(--sp-accent); }
-        .isbe-sidebar button.active div { color:var(--sp-accent); }
+        .isbe-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px 28px; }
+        /* Wider than before (was 1100px) so the teacher-autofills grid has real room and
+           can breathe with more per-column padding. A trimmer sidebar reclaims the space. */
+        .isbe-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1500px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        .isbe-sidebar { width:150px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .isbe-sidebar button { display:block;width:100%;text-align:left;padding:13px 14px;border:none;border-left:4px solid transparent;cursor:pointer;background:transparent;transition:background 0.15s,border-color 0.15s; }
+        /* Selected view: a clear accent fill + a bold 4px accent bar + accent-colored,
+           slightly larger label, so which tab is active reads at a glance in both themes
+           (the old faint accent-soft wash was hard to tell apart from the sidebar). */
+        .isbe-sidebar button.active { background:color-mix(in srgb, var(--sp-accent) 16%, var(--sp-surface));border-left-color:var(--sp-accent);box-shadow:inset 0 0 0 1px color-mix(in srgb, var(--sp-accent) 22%, transparent); }
+        .isbe-sidebar button.active div { color:var(--sp-accent);font-size:0.84rem; }
+        .isbe-sidebar button.active span { color:var(--sp-accent);opacity:0.85; }
         .isbe-sidebar button:hover:not(.active) { background:var(--sp-surface); }
         .isbe-sidebar button div { font-size:0.82rem;font-weight:700;color:var(--sp-text); }
         .isbe-sidebar button span { font-size:0.68rem;color:var(--sp-muted); }
@@ -61,13 +67,13 @@
         thead tr.isbe-colrow { border-bottom:2px solid var(--sp-border); }
         /* Column labels: a touch larger and higher-contrast than before — they were
            washing out against the group band. */
-        th { padding:8px 7px;text-align:center;font-size:0.64rem;font-weight:700;letter-spacing:0.03em;color:var(--sp-text-2);white-space:nowrap;cursor:help;line-height:1.25; }
-        th.left { text-align:left;padding-left:14px; }
+        th { padding:10px 12px;text-align:center;font-size:0.64rem;font-weight:700;letter-spacing:0.03em;color:var(--sp-text-2);white-space:nowrap;cursor:help;line-height:1.25; }
+        th.left { text-align:left;padding-left:16px; }
         /* Give each checklist column a comfortable minimum. With table width:100%, a
            program that fits (PFA) stretches its columns to fill the card with no dead
            space on the right; a program that doesn't (PI, many columns) overflows and
            the grid scrolls horizontally. Student/Room are excluded — they are fixed. */
-        th.col-teacher, th.col-admin { min-width:78px; }
+        th.col-teacher, th.col-admin { min-width:96px; }
 
         /* Classroom-card / Admin roster toggle tabs. */
         .rg-tab { padding:7px 14px;border:1px solid var(--sp-border);background:var(--sp-surface);cursor:pointer;
@@ -122,8 +128,8 @@
            take rather than a done state. */
         .cf-pill-upload { color:var(--sp-accent);background:var(--sp-accent-soft);border-color:var(--sp-accent); }
         .cf-pill-upload:hover { filter:brightness(1.05); }
-        td { padding:6px 7px;border-bottom:1px solid var(--sp-border);text-align:center;white-space:nowrap; }
-        td.left { text-align:left;padding-left:14px; }
+        td { padding:8px 12px;border-bottom:1px solid var(--sp-border);text-align:center;white-space:nowrap; }
+        td.left { text-align:left;padding-left:16px; }
         /* Subtle zebra striping so the eye tracks a child's row across a wide grid.
            Even rows get a faint surface-2 wash; the frozen name/room columns and the
            teacher band override with their own opaque backgrounds (below), so striping
@@ -391,11 +397,13 @@
         .lic-fields input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
 
         /* School year picker in the roster header */
-        .year-picker { margin-left:auto;display:flex;align-items:center;gap:7px;flex-shrink:0; }
-        .year-picker label { font-size:0.7rem;font-weight:600;color:#6b7280;white-space:nowrap; }
-        .year-picker select { padding:4px 8px;border:1px solid #d1d5db;border-radius:6px;font-size:0.76rem;font-family:inherit;background:white; }
-        .year-picker select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
-        .year-prior { font-size:0.64rem;font-weight:700;color:#92400e;background:#fffbeb;padding:3px 8px;border-radius:10px;white-space:nowrap; }
+        .year-picker { margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0; }
+        .year-picker label { font-size:0.72rem;font-weight:700;color:var(--sp-text-2);white-space:nowrap; }
+        /* Themed so the picker is legible in dark mode (was white-on-dark with a grey
+           label). Bigger hit area and clear border. */
+        .year-picker select { padding:7px 12px;border:1px solid var(--sp-border-in);border-radius:7px;font-size:0.82rem;font-weight:600;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text);cursor:pointer; }
+        .year-picker select:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
+        .year-prior { font-size:0.64rem;font-weight:700;color:var(--sp-warn-fg);background:var(--sp-warn-bg);padding:3px 8px;border-radius:10px;white-space:nowrap; }
 
         /* Print All container is hidden on screen; only used to build the print job */
         #printAllContainer { display:none; }
@@ -1483,6 +1491,7 @@ function setProgramProgram(p) {
         const el = document.getElementById(id); if (el) el.textContent = p;
     });
     updateRosterCount();
+    updateStartYearCount();   // the What Needs Doing count follows the selected program
     renderActiveView();
 }
 
@@ -1801,11 +1810,12 @@ function renderRosterHead() {
     const parts = partitionedColumns();
     const t = parts.teacher, a = parts.admin;
 
-    // Top tier: two group banners spanning their columns. The Student/Room pins carry
-    // an empty banner cell each so the two rows line up over the frozen columns.
+    // Top tier: two group banners spanning their columns. The Student pin carries an
+    // empty banner cell so the two rows line up over the frozen column.
+    // The Room column was dropped: PFA is all Pre-School, and for PI the room now rides
+    // after the child's name — so a whole column of "Pre-School"/"Infant" is dead weight.
     let group = '<tr class="isbe-grouprow">'
-        + '<th class="left pin-1 grp-blank" rowspan="2" style="min-width:120px;">Student</th>'
-        + '<th class="pin-2 grp-blank" rowspan="2" style="width:80px;">Room</th>';
+        + '<th class="left pin-1 grp-blank" rowspan="2" style="min-width:180px;">Student</th>';
     if (t.length) {
         group += '<th class="grp grp-teacher" colspan="' + t.length + '" '
             + 'title="Completed by the classroom teacher. These fill in automatically as the '
@@ -2467,11 +2477,15 @@ function renderRoster() {
             return td + box + '</td>';
         }).join('');
         const transferred = isTransferred(s);
+        // Room column is gone. For PI the room rides after the name (children span
+        // several rooms); PFA is all Pre-School so its room is left off entirely.
+        const roomTag = (activeProgram === 'PI')
+            ? ' <span style="font-weight:400;color:var(--sp-muted);">\u2013 ' + getRoom(s.RoomNumber) + '</span>'
+            : '';
         return '<tr' + (transferred ? ' class="cf-transferred"' : '') + '>'
             + '<td class="left pin-1" style="font-weight:600;font-size:0.73rem;">'
-            + childNameCell(s) + transferMarker(s)
-            + '</td><td class="pin-2" style="font-size:0.7rem;color:var(--text-muted);">'
-            + getRoom(s.RoomNumber) + '</td>' + cells + '</tr>';
+            + childNameCell(s) + roomTag + transferMarker(s)
+            + '</td>' + cells + '</tr>';
     }).join('');
 
     // "Print All" footer row, one cell per column that can produce a form. Same
@@ -2493,8 +2507,8 @@ function renderRoster() {
     }).join('');
     // Uses the existing .print-all-row class rather than an inline background, so the
     // frozen cells in this row can be repainted to match it.
-    tbody.innerHTML += '<tr class="print-all-row"><td class="left pin-1" style="font-weight:700;font-size:0.7rem;color:#2563eb;">Print All</td>'
-        + '<td class="pin-2"></td>' + printAllCells + '</tr>';
+    tbody.innerHTML += '<tr class="print-all-row"><td class="left pin-1" style="font-weight:700;font-size:0.7rem;color:var(--sp-accent);">Print All</td>'
+        + printAllCells + '</tr>';
 
     // Room can only be frozen once the Student column has been laid out and measured.
     syncStickyOffsets();
@@ -4485,8 +4499,9 @@ async function renderStartYearPicc() {
 function updateStartYearCount() {
     const el = document.getElementById('startYearCount');
     if (!el) return;
-    const n = outstandingByTask('PFA').reduce((a, t) => a + t.missing.length, 0)
-        + outstandingByTask('PI').reduce((a, t) => a + t.missing.length, 0);
+    // Scoped to the selected program (the PFA⇄PI toggle), not the sum of both, so the
+    // count matches what the What Needs Doing panel actually shows for that program.
+    const n = outstandingByTask(activeProgram).reduce((a, t) => a + t.missing.length, 0);
     el.textContent = n ? n + ' outstanding' : 'all clear';
 }
 
