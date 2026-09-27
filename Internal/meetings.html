@@ -127,13 +127,41 @@
                 <a href="/staff/pas.html">PAS Compliance →</a>
             </div>
             <div class="pas-body">
-                <p style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">
-                    Every meeting we have to be able to evidence, in one place. Each entry
-                    carries a type, so administrative meetings, staff meetings and family
-                    meetings live in the same register without being mixed up when a monitor
-                    asks for one of them. Records that pre-date the type field are shown as
-                    Administrative, which is what they were.
-                </p>
+                <div style="font-size:0.85rem;color:#64748b;margin-bottom:14px;">
+                    <div style="font-weight:800;color:#1e3a8a;margin-bottom:6px;">Required meetings &amp; how often</div>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.82rem;max-width:720px;">
+                        <thead>
+                            <tr style="text-align:left;color:#475569;border-bottom:1.5px solid #e2e8f0;">
+                                <th style="padding:5px 10px 5px 0;font-weight:700;">Type</th>
+                                <th style="padding:5px 10px;font-weight:700;">Required frequency</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr style="border-bottom:1px solid #eef2f7;">
+                                <td style="padding:5px 10px 5px 0;font-weight:700;color:#1e3a8a;">Administrative</td>
+                                <td style="padding:5px 10px;">Monthly</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eef2f7;">
+                                <td style="padding:5px 10px 5px 0;font-weight:700;color:#1e3a8a;">Staff</td>
+                                <td style="padding:5px 10px;">Monthly — minutes with action plans (staff handbook 12.3)</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eef2f7;">
+                                <td style="padding:5px 10px 5px 0;font-weight:700;color:#1e3a8a;">Team / Classroom</td>
+                                <td style="padding:5px 10px;">Quarterly</td>
+                            </tr>
+                            <tr style="border-bottom:1px solid #eef2f7;">
+                                <td style="padding:5px 10px 5px 0;font-weight:700;color:#1e3a8a;">Family / Parent</td>
+                                <td style="padding:5px 10px;">Twice per year</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:5px 10px 5px 0;font-weight:700;color:#1e3a8a;">Community Partner</td>
+                                <td style="padding:5px 10px;">Annually</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p style="margin:8px 0 0;">Log each held meeting below under its type so the whole register can be
+                       evidenced in one place when a monitor asks. Entries with no type recorded are shown as Administrative.</p>
+                </div>
 
                 <div class="section-title">Meeting Log</div>
                 <div class="mtg-panel">
@@ -156,8 +184,12 @@
                                 <div id="mtgDateWas" style="font-size:0.68rem;color:#b45309;margin-top:3px;display:none;"></div>
                             </div>
                             <div>
-                                <label for="mtgTime">Time</label>
-                                <input type="text" id="mtgTime" placeholder="e.g. 11:00 AM – 1:00 PM">
+                                <label>Time</label>
+                                <div style="display:flex;align-items:center;gap:6px;">
+                                    <input type="time" id="mtgTimeStart" style="flex:1;" aria-label="Start time">
+                                    <span style="color:#94a3b8;font-size:0.8rem;">to</span>
+                                    <input type="time" id="mtgTimeEnd" style="flex:1;" aria-label="End time">
+                                </div>
                             </div>
                             <div>
                                 <label for="mtgType">Type</label>

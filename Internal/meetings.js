@@ -180,9 +180,47 @@ function fillTypeOptions(selected) {
         + '>' + escHtml(t) + '</option>').join('');
 }
 
+/* The Time field is two <input type="time"> pickers (start / end) whose native value
+   is 24-hour "HH:MM". The record still stores a human display string like
+   "11:00 AM – 1:00 PM" (unchanged, so older records and the table read the same), so
+   these two helpers convert between the two forms. */
+
+// "HH:MM" (24h, from the picker) -> "h:MM AM/PM" for display. '' -> ''.
+function time24ToDisplay(v) {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '').trim());
+    if (!m) return '';
+    let h = parseInt(m[1], 10);
+    const min = m[2];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12; if (h === 0) h = 12;
+    return h + ':' + min + ' ' + ampm;
+}
+
+// "h:MM AM/PM" (or "HH:MM") -> "HH:MM" for the picker. Unparseable -> ''.
+function displayToTime24(v) {
+    const s = String(v || '').trim();
+    let m = /^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/.exec(s);
+    if (m) {
+        let h = parseInt(m[1], 10) % 12;
+        if (/[Pp]/.test(m[3])) h += 12;
+        return String(h).padStart(2, '0') + ':' + m[2];
+    }
+    m = /^(\d{1,2}):(\d{2})$/.exec(s);   // already 24h
+    if (m) return String(parseInt(m[1], 10)).padStart(2, '0') + ':' + m[2];
+    return '';
+}
+
+// Split a stored "start – end" (en dash or hyphen) display string into its two halves.
+function splitTimeRange(v) {
+    const parts = String(v || '').split(/\s*[\u2013\u2014-]\s*/);
+    return { start: (parts[0] || '').trim(), end: (parts[1] || '').trim() };
+}
+
 function setFormFields(m) {
     document.getElementById('mtgDate').value = m ? isoOf(m) : '';
-    document.getElementById('mtgTime').value = m ? (m.time || '') : '';
+    const range = splitTimeRange(m ? (m.time || '') : '');
+    document.getElementById('mtgTimeStart').value = displayToTime24(range.start);
+    document.getElementById('mtgTimeEnd').value = displayToTime24(range.end);
     document.getElementById('mtgAttendees').value = m ? (m.attendees || '') : '';
     document.getElementById('mtgTopic').value = m ? (m.topic || '') : '';
     document.getElementById('mtgNotes').value = m ? (m.notes || '') : '';
@@ -302,7 +340,12 @@ async function loadMeetings() {
    never shows an edit that was not stored. */
 async function saveMeetingForm() {
     const iso = document.getElementById('mtgDate').value;
-    const time = document.getElementById('mtgTime').value.trim();
+    // Build the stored display string from the two time pickers. Either side may be
+    // blank; "start – end" when both are set, a single time when only one is.
+    const startDisp = time24ToDisplay(document.getElementById('mtgTimeStart').value);
+    const endDisp = time24ToDisplay(document.getElementById('mtgTimeEnd').value);
+    const time = (startDisp && endDisp) ? (startDisp + ' \u2013 ' + endDisp)
+        : (startDisp || endDisp || '');
     const type = document.getElementById('mtgType').value;
     const attendees = document.getElementById('mtgAttendees').value.trim();
     const topic = document.getElementById('mtgTopic').value.trim();
