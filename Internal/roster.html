@@ -71,6 +71,32 @@
     <a class="header-back" href="/staff/">← Staff Portal</a>
 </header>
 
+<!-- Shared Enrollment Management sub-nav (see ems.html for the note). Room Roster now
+     lives here, after Benefits & Eligibility, rather than as its own dashboard card. -->
+<style>
+    .em-subnav {
+        display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
+        max-width: 1400px; margin: 0; padding: 10px 20px 0 15%;
+    }
+    .em-subnav a {
+        font-size: 0.9rem; font-weight: 700; text-decoration: none; color: var(--sp-text-2);
+        padding: 8px 15px; border-radius: 8px 8px 0 0; border-bottom: 3px solid transparent;
+        transition: color 0.12s, background 0.12s, border-color 0.12s;
+    }
+    .em-subnav a:hover { color: var(--sp-text); background: var(--sp-surface-2); }
+    .em-subnav a.on { color: var(--sp-accent); border-bottom-color: var(--sp-accent); }
+    .em-subnav-wrap { border-bottom: 1.5px solid var(--sp-border); }
+</style>
+<div class="em-subnav-wrap">
+    <nav class="em-subnav" aria-label="Enrollment management">
+        <a href="/staff/waitinglist.html">Waiting List</a>
+        <a href="/staff/ems.html">Enrolled Students</a>
+        <a href="/staff/attendance.html">Attendance</a>
+        <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
+        <a href="/staff/roster.html" class="on" aria-current="page">Room Roster</a>
+    </nav>
+</div>
+
 <div class="rr-layout">
     <div class="rr-wrapper">
         <div class="rr-sidebar" id="rosterSidebar"></div>
