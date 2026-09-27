@@ -5464,14 +5464,14 @@ SELECT @@ROWCOUNT AS Copied;`;
             ? `SchoolYear < ${esc(priorTo)} ORDER BY SchoolYear DESC`
             : `SchoolYear=${esc(year)}`;
         const sql = parentInterviewEnsureSQL()
-            + `SELECT ${priorTo ? 'TOP 1 ' : ''}Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')} FROM ParentInterviews WHERE StudentId=${studentId} AND ${whereYear}`;
+            + `SELECT ${priorTo ? 'TOP 1 ' : ''}Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')},${txCol('FormData')} FROM ParentInterviews WHERE StudentId=${studentId} AND ${whereYear}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
             .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()))
             .map(l => {
                 const v = l.split('|').map(x => x.trim());
-                return { Id:v[0], StudentId:v[1], InterviewDate:v[2], ParentGoals:txDecode(v[3]), ParentConcerns:txDecode(v[4]), ChildStrengths:txDecode(v[5]), ParentSignature:txDecode(v[6]), StaffSignature:txDecode(v[7]), Notes:txDecode(v[8]), PreferredLanguage:txDecode(v[9]), TranslatorNeeded:txDecode(v[10]), TranslatorArrangements:txDecode(v[11]) };
+                return { Id:v[0], StudentId:v[1], InterviewDate:v[2], ParentGoals:txDecode(v[3]), ParentConcerns:txDecode(v[4]), ChildStrengths:txDecode(v[5]), ParentSignature:txDecode(v[6]), StaffSignature:txDecode(v[7]), Notes:txDecode(v[8]), PreferredLanguage:txDecode(v[9]), TranslatorNeeded:txDecode(v[10]), TranslatorArrangements:txDecode(v[11]), FormData:txDecode(v[12]) };
             });
         return sendJSON(res, 200, rows.length ? rows[0] : null);
     }
@@ -5483,12 +5483,16 @@ SELECT @@ROWCOUNT AS Copied;`;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const year = resolveSchoolYear(d.year);
+            // The whole form arrives as an object; store it as a JSON string. esc()
+            // adds the SQL quoting, so JSON.stringify must stay raw here or the stored
+            // JSON ends up double-escaped and unparseable (same rule as parent-portal/sign).
+            const formDataJson = d.formData ? JSON.stringify(d.formData) : '';
             const sql = parentInterviewEnsureSQL()
                 + isbeTrackingEnsureSQL()
                 + `IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(year)})
-                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},PreferredLanguage=${esc(d.preferredLanguage)},TranslatorNeeded=${esc(d.translatorNeeded)},TranslatorArrangements=${esc(d.translatorArrangements)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}
+                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},PreferredLanguage=${esc(d.preferredLanguage)},TranslatorNeeded=${esc(d.translatorNeeded)},TranslatorArrangements=${esc(d.translatorArrangements)},FormData=${esc(formDataJson)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}
                 ELSE
-                    INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,StaffSignature,Notes,PreferredLanguage,TranslatorNeeded,TranslatorArrangements) VALUES (${studentId},${esc(year)},${esc(d.interviewDate)},${esc(d.parentGoals)},${esc(d.parentConcerns)},${esc(d.childStrengths)},${esc(d.parentSignature)},${esc(d.staffSignature)},${esc(d.notes)},${esc(d.preferredLanguage)},${esc(d.translatorNeeded)},${esc(d.translatorArrangements)});
+                    INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,StaffSignature,Notes,PreferredLanguage,TranslatorNeeded,TranslatorArrangements,FormData) VALUES (${studentId},${esc(year)},${esc(d.interviewDate)},${esc(d.parentGoals)},${esc(d.parentConcerns)},${esc(d.childStrengths)},${esc(d.parentSignature)},${esc(d.staffSignature)},${esc(d.notes)},${esc(d.preferredLanguage)},${esc(d.translatorNeeded)},${esc(d.translatorArrangements)},${esc(formDataJson)});
 `
                 + trackingTickSQL(studentId, year, 'ParentInterview');
             const r = runSQL(sql);
