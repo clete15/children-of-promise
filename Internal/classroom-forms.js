@@ -474,6 +474,22 @@
         } catch (e) { console.error('Failed to load interview', e); }
 
         loadIntakeRecord(studentId);
+
+        /* If a signed Parent Interview Form is already on file for this child, there is
+           nothing to sign — hide the signature pads and show a short note instead. "On
+           file" means either a scanned paper form was imported (a ChildFiles
+           'interviewform' record) or the form was signed in-app before (a filed
+           signature with a document behind it). Print still shows the filed copy. */
+        var cf = ChildForms();
+        var hasScan = cf && cf.fileFor && cf.fileFor(studentId, 'ParentInterview', 'interviewform');
+        var sig = signatureFor(studentId, 'ParentInterview', 'parent');
+        var hasSignedPdf = !!(sig && (sig.RelPath || sig.SigImagePath));
+        var alreadyOnFile = !!hasScan || hasSignedPdf;
+        var sigSection = document.getElementById('piSigSection');
+        var signedNote = document.getElementById('piSignedNote');
+        if (sigSection) sigSection.style.display = alreadyOnFile ? 'none' : '';
+        if (signedNote) signedNote.style.display = alreadyOnFile ? '' : 'none';
+
         document.getElementById('piOverlay').classList.add('open');
         refreshSigPads();
     }
@@ -1322,9 +1338,16 @@
         '<div class="pi-grid"><div class="pi-field"><label>Preferred Language</label><input type="text" id="piPreferredLanguage" placeholder="e.g. English, Spanish"></div>',
         '<div class="pi-field"><label>Translator Needed for the Interview</label><select id="piTranslatorNeeded"><option value="">&mdash; select &mdash;</option><option value="No">No &ndash; interview conducted in the family\'s preferred language</option><option value="Yes">Yes</option></select></div>',
         '<div class="pi-field pi-full"><label>Translator Arrangements / Accommodations Provided</label><textarea id="piTranslatorArrangements" placeholder="Who translated and how it was arranged, or state that none was needed and why."></textarea></div></div></div>',
-        '<div class="pi-section"><h4>Signatures</h4><div class="pi-grid">',
-        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="piParentSigPad"></div><input type="text" id="piParentSig" placeholder="Printed name" style="margin-top:7px;"></div>',
-        '<div class="pi-field pi-full"><label>Staff Signature</label><div id="piStaffSigPad"></div><input type="text" id="piStaffSig" placeholder="Printed name" style="margin-top:7px;"></div></div></div>',
+        // Side by side, not stacked full-width — same reasoning as the permission slip:
+        // two independent people signing, nothing that needs to line up between them,
+        // and stacking pushes the modal past a laptop's height. The whole section is
+        // hidden by openInterview() when a signed form is already on file for the child
+        // (there is nothing to collect), and a short note stands in its place.
+        '<div class="pi-section" id="piSignedNote" style="display:none;"><h4>Signed Form on File</h4>',
+        '<div class="doc-note">A signed Parent Interview Form is already on file for this child. Use Print to view the filed copy; there is nothing left to sign.</div></div>',
+        '<div class="pi-section" id="piSigSection"><h4>Signatures</h4><div class="pi-grid">',
+        '<div class="pi-field"><label>Parent/Guardian Signature</label><div id="piParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="piParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="piParentSigDate" style="flex:1;" title="Date signed"></div></div>',
+        '<div class="pi-field"><label>Staff Signature</label><div id="piStaffSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="piStaffSig" placeholder="Printed name" style="flex:2;"><input type="date" id="piStaffSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
         '</div>',
         '<div class="pi-modal-footer"><span class="pi-saved-badge" id="piSavedBadge" style="display:none;">&#10003; Saved</span>',
         '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printInterview()">&#x1F5A8;&#xFE0F; Print</button>',
