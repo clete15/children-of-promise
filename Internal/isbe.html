@@ -58,8 +58,10 @@
            The label row sticks just under the group row rather than both at 0. */
         thead tr.isbe-grouprow { top:0; }
         thead tr.isbe-colrow { top:26px; }
-        thead tr.isbe-colrow { border-bottom:2px solid var(--border); }
-        th { padding:7px 6px;text-align:center;font-size:0.6rem;font-weight:700;letter-spacing:0.04em;color:var(--text-muted);white-space:nowrap;cursor:help; }
+        thead tr.isbe-colrow { border-bottom:2px solid var(--sp-border); }
+        /* Column labels: a touch larger and higher-contrast than before — they were
+           washing out against the group band. */
+        th { padding:8px 7px;text-align:center;font-size:0.64rem;font-weight:700;letter-spacing:0.03em;color:var(--sp-text-2);white-space:nowrap;cursor:help;line-height:1.25; }
         th.left { text-align:left;padding-left:14px; }
         /* Give each checklist column a comfortable minimum. With table width:100%, a
            program that fits (PFA) stretches its columns to fill the card with no dead
@@ -73,36 +75,63 @@
         .rg-tab:hover { color:var(--sp-text); }
         .rg-tab.active { color:var(--sp-accent);background:var(--sp-accent-soft);border-color:var(--sp-accent); }
 
-        /* ── Teacher / Admin group banners ── */
-        th.grp { font-size:0.64rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;
-                 padding:5px 6px;border-bottom:1px solid var(--border); }
-        th.grp-teacher { color:var(--sp-good-fg);background:var(--sp-good-bg); }
-        th.grp-admin   { color:var(--sp-warn-fg);background:var(--sp-warn-bg); }
-        th.grp-note { display:block;font-size:0.52rem;font-weight:600;letter-spacing:0.02em;
-                      text-transform:none;color:var(--sp-good-fg);opacity:0.85;margin-top:1px; }
-        th.grp-blank { background:var(--sp-surface-2); }
-        /* The line dividing the two groups, carried down every row by .col-divide. */
-        th.grp-divide, th.col-divide, td.col-divide { border-left:2px solid #c7d2fe; }
-        /* A faint tint so each group reads as a band even mid-scroll. */
-        th.col-teacher { background:var(--sp-good-bg); }
-        th.col-admin   { background:var(--sp-warn-bg); }
+        /* ── Teacher / Admin group bands ──
+           Design: the GROUP BANNER carries the colour (a solid header cell with a bold
+           top accent bar and clear label). The COLUMN BODY carries only a whisper-faint
+           tint via a colour-mix, so a whole column doesn't turn into a wall of green/indigo
+           (which is what happened in dark mode). Emerald = Teacher, indigo = Admin.
 
-        /* Teacher cells are read-only on the roster (entered in the classroom card).
-           The band tint carries down the body; the pill shows only when on file. */
-        td.cf-teacher { background:var(--sp-good-bg); }
-        tbody tr:hover td.cf-teacher { background:var(--sp-good-bg); }
+           These per-band colours are defined once here (both themes) rather than reusing
+           the heavy --sp-good/warn tokens, which are meant for pills, not full columns. */
+        .isbe-grid {
+            --band-teacher: #10b981;   /* emerald */
+            --band-admin:   #6366f1;   /* indigo  */
+            /* Body tint: the band colour at ~7% over the surface — a hint, not a fill. */
+            --band-teacher-tint: color-mix(in srgb, var(--band-teacher) 7%, var(--sp-surface));
+            --band-admin-tint:   color-mix(in srgb, var(--band-admin)   7%, var(--sp-surface));
+            --band-teacher-hover: color-mix(in srgb, var(--band-teacher) 13%, var(--sp-surface));
+            --band-admin-hover:   color-mix(in srgb, var(--band-admin)   13%, var(--sp-surface));
+        }
+        th.grp { font-size:0.66rem;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;
+                 padding:7px 8px;border-bottom:1px solid var(--sp-border);color:#fff; }
+        th.grp-teacher { background:var(--band-teacher);border-top:3px solid color-mix(in srgb, var(--band-teacher) 70%, #000); }
+        th.grp-admin   { background:var(--band-admin);border-top:3px solid color-mix(in srgb, var(--band-admin) 70%, #000); }
+        th.grp-note { display:block;font-size:0.54rem;font-weight:600;letter-spacing:0.02em;
+                      text-transform:none;color:rgba(255,255,255,0.85);margin-top:2px; }
+        th.grp-blank { background:var(--sp-surface-2);border-bottom:1px solid var(--sp-border); }
+        /* The line dividing the two groups, carried down every row by .col-divide. */
+        th.grp-divide, th.col-divide, td.col-divide { border-left:2px solid var(--sp-border-in); }
+        /* Column labels sit on a slightly deeper tint of their band so the header reads as
+           one banded block, while the body cells below stay a whisper. */
+        th.col-teacher { background:color-mix(in srgb, var(--band-teacher) 14%, var(--sp-surface-2));color:var(--sp-text); }
+        th.col-admin   { background:color-mix(in srgb, var(--band-admin)   14%, var(--sp-surface-2));color:var(--sp-text); }
+
+        /* Teacher cells are read-only on the roster (entered in the classroom card), so
+           the whole Teacher band carries a faint emerald wash — a visual "hands off, this
+           fills itself in" cue. Admin columns stay on the plain surface; their identity
+           comes from the indigo group banner + the divider line, not a body fill (a solid
+           column fill was what made the old dark-mode grid unreadable). */
+        td.cf-teacher { background:var(--band-teacher-tint); }
+        tbody tr:hover td.cf-teacher { background:var(--band-teacher-hover); }
         .cf-pill { display:inline-block;font-size:0.6rem;font-weight:800;letter-spacing:0.02em;
-                   color:#166534;background:#dcfce7;border:1px solid #bbf7d0;border-radius:999px;
+                   color:var(--sp-good-fg);background:var(--sp-good-bg);border:1px solid var(--sp-good-br);border-radius:999px;
                    padding:1px 8px;white-space:nowrap;text-decoration:none;font-family:inherit;
                    line-height:1.4;cursor:pointer; }
-        a.cf-pill:hover { filter:brightness(0.97); }
+        a.cf-pill:hover { filter:brightness(1.05); }
         /* The "upload" state — blue, so an empty proof-of-income reads as an action to
            take rather than a done state. */
-        .cf-pill-upload { color:#1d4ed8;background:#dbeafe;border-color:#bfdbfe; }
-        .cf-pill-upload:hover { filter:brightness(0.97); }
-        td { padding:5px 6px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap; }
+        .cf-pill-upload { color:var(--sp-accent);background:var(--sp-accent-soft);border-color:var(--sp-accent); }
+        .cf-pill-upload:hover { filter:brightness(1.05); }
+        td { padding:6px 7px;border-bottom:1px solid var(--sp-border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:14px; }
-        tr:hover { background:var(--sp-surface-2); }
+        /* Subtle zebra striping so the eye tracks a child's row across a wide grid.
+           Even rows get a faint surface-2 wash; the frozen name/room columns and the
+           teacher band override with their own opaque backgrounds (below), so striping
+           never bleeds through the pinned cells. */
+        tbody tr:nth-child(even) td { background:var(--sp-surface-2); }
+        tbody tr:nth-child(even) td.cf-teacher { background:color-mix(in srgb, var(--band-teacher) 9%, var(--sp-surface-2)); }
+        tbody tr:hover td { background:var(--sp-accent-soft); }
+        tbody tr:hover td.cf-teacher { background:var(--band-teacher-hover); }
 
         /* ── Frozen Student and Room columns ──
            The checklist is wider than any screen, so scrolling right used to leave a
@@ -125,8 +154,11 @@
         th.pin-2 { box-shadow:7px 0 7px -5px rgba(15,23,42,0.13); }
         /* Header wins at the top-left corner where both freezes meet. */
         thead th.pin-1, thead th.pin-2 { z-index:4;background:var(--sp-surface-2); }
-        /* Hover and the Print All row have to be repainted onto the opaque cells. */
-        tbody tr:hover td.pin-1, tbody tr:hover td.pin-2 { background:var(--sp-surface-2); }
+        /* Pinned cells must stay OPAQUE (the scrolling cells slide under them), so they
+           carry their own striping/hover rather than letting the scrolling-cell rules
+           show through. Even rows match the zebra; hover matches the row hover. */
+        tbody tr:nth-child(even) td.pin-1, tbody tr:nth-child(even) td.pin-2 { background:var(--sp-surface-2); }
+        tbody tr:hover td.pin-1, tbody tr:hover td.pin-2 { background:var(--sp-accent-soft); }
         tr.print-all-row td.pin-1, tr.print-all-row td.pin-2 { background:var(--sp-accent-soft); }
         input[type=checkbox] { width:auto;accent-color:var(--primary);cursor:pointer; }
 
@@ -170,16 +202,16 @@
         .scr-meta { display:flex;flex-wrap:wrap;gap:3px;justify-content:center;margin-top:2px;line-height:1.2; }
         .scr-date { font-size:0.58rem;color:var(--text-muted);white-space:nowrap; }
         .scr-flag { font-size:0.55rem;font-weight:700;padding:1px 4px;border-radius:6px;white-space:nowrap; }
-        .scr-flag.concern  { background:#fef2f2;color:#b91c1c; }
-        .scr-flag.monitor  { background:#fffbeb;color:#b45309; }
-        .scr-flag.referred { background:#eff6ff;color:#1d4ed8; }
-        .scr-flag.dl-ok      { background:#f0fdf4;color:#15803d; }
-        .scr-flag.dl-due     { background:#fffbeb;color:#b45309; }
+        .scr-flag.concern  { background:var(--sp-bad-bg);color:var(--sp-bad-fg); }
+        .scr-flag.monitor  { background:var(--sp-warn-bg);color:var(--sp-warn-fg); }
+        .scr-flag.referred { background:var(--sp-accent-soft);color:var(--sp-accent); }
+        .scr-flag.dl-ok      { background:var(--sp-good-bg);color:var(--sp-good-fg); }
+        .scr-flag.dl-due     { background:var(--sp-warn-bg);color:var(--sp-warn-fg); }
         .scr-flag.dl-late,
-        .scr-flag.dl-overdue { background:#fef2f2;color:#b91c1c; }
+        .scr-flag.dl-overdue { background:var(--sp-bad-bg);color:var(--sp-bad-fg); }
 
         /* Print All row */
-        tr.print-all-row { background:#f0f7ff;border-top:2px solid #2563eb; }
+        tr.print-all-row { background:var(--sp-accent-soft);border-top:2px solid var(--sp-accent); }
         tr.print-all-row td { padding:8px 6px; }
 
         /* Parent Interview Modal */
