@@ -8,6 +8,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Page — Children of Promise</title>
 <link rel="stylesheet" href="styles.css">
+<!-- Pre-paint theme: set the dark class on <html> synchronously, before first paint, so
+     a dark-mode user never sees a flash of the light background. app.js sets the body
+     class and wires the toggle later. -->
+<script>
+    (function () {
+        try {
+            var s = localStorage.getItem('copStaffTheme');
+            var dark = s === null
+                ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                : s === 'dark';
+            if (dark) document.documentElement.classList.add('sp-dark');
+        } catch (e) {}
+    })();
+</script>
 <style>
     /* ── Colours as variables, so dark mode is a change of values rather than a
        second copy of every rule.
@@ -40,7 +54,10 @@
         --sp-bad-bg:  #fef2f2;  --sp-bad-br:  #fca5a5;  --sp-bad-fg:  #991b1b;
         --sp-pill-bg: #f8fafc;
     }
-    body.sp-dark {
+    /* html.sp-dark is set by the pre-paint <head> script so the dark background is
+       correct on first paint (no light→dark flash); body.sp-dark is set later by the
+       theme toggle in app.js. Both select the same dark token block. */
+    body.sp-dark, html.sp-dark {
         --sp-bg: #0f172a;
         --sp-surface: #1a2235;
         --sp-surface-2: #212b41;
@@ -261,9 +278,9 @@
     .sp-formgroup-isbe     { --grp: #2563eb; }   /* ISBE — blue (the grant/regulatory one) */
     .sp-formgroup-gateways { --grp: #7c3aed; }   /* Gateways — violet (your credential) */
     .sp-formgroup-pas      { --grp: #0d9488; }   /* ExceleRate/PAS — teal (quality rating) */
-    body.sp-dark .sp-formgroup-isbe     { --grp: #7ea6ff; }
-    body.sp-dark .sp-formgroup-gateways { --grp: #b794f6; }
-    body.sp-dark .sp-formgroup-pas      { --grp: #4fd1c5; }
+    body.sp-dark .sp-formgroup-isbe,     html.sp-dark .sp-formgroup-isbe     { --grp: #7ea6ff; }
+    body.sp-dark .sp-formgroup-gateways, html.sp-dark .sp-formgroup-gateways { --grp: #b794f6; }
+    body.sp-dark .sp-formgroup-pas,      html.sp-dark .sp-formgroup-pas      { --grp: #4fd1c5; }
     .sp-links { display: flex; flex-wrap: wrap; gap: 9px; }
     .sp-link {
         display: block; flex: 1 1 220px; min-width: 200px; text-decoration: none;

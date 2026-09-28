@@ -245,6 +245,9 @@ function prefersDark() {
 
 function applyTheme(dark) {
     document.body.classList.toggle('sp-dark', !!dark);
+    // Keep <html> in step with <body>. A pre-paint <head> script sets html.sp-dark to
+    // avoid a light→dark flash; toggling must clear it too or light mode would stay dark.
+    document.documentElement.classList.toggle('sp-dark', !!dark);
     const btn = document.getElementById('spTheme');
     if (btn) {
         // Names what clicking does, not what is currently on.
