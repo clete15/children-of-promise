@@ -683,12 +683,12 @@
                     page (Administrative tab) — it covers every enrolled child and is the source of truth for this grid.
                 </p>
                 <p style="font-size:0.72rem;color:#6b7280;margin-bottom:10px;">
-                    <span style="display:inline-block;width:12px;height:12px;background:#dcfce7;border:1px solid #86efac;vertical-align:middle;"></span>
-                    Scan filed (a monitor can open it here) &nbsp;&nbsp;
-                    <span style="display:inline-block;width:12px;height:12px;background:#fef3c7;border:1px solid #fcd34d;vertical-align:middle;"></span>
-                    Checked as on paper (no scan) &nbsp;&nbsp;
-                    <span style="display:inline-block;width:12px;height:12px;background:#fff;border:1px solid #e5e7eb;vertical-align:middle;"></span>
-                    Nothing on file
+                    <span class="cf-pill">&#10003; on file</span>
+                    Completed in Child Files (click to open a filed scan) &nbsp;&nbsp;
+                    <span class="cf-pill cf-pill-missing">&#10007; missing</span>
+                    Required, not yet on file &nbsp;&nbsp;
+                    <span class="cf-pill" style="opacity:0.55;">n/a</span>
+                    Only required where applicable (Behavior / Transition plan)
                 </p>
                 <div id="childFilesBody"></div>
             </div>
@@ -2056,35 +2056,45 @@ async function renderChildFilesGrid(program) {
         + CHILD_DOCS.map(function (d) { return '<th class="cf-doc">' + escapeHtml(d.label) + '</th>'; }).join('')
         + '</tr>';
 
+    // Behavior and transition plans are "only required where applicable", so their
+    // absence is not a compliance gap — they never show the red missing pill.
+    var OPTIONAL_DOCS = { behaviorplan: true, transitionplan: true };
+
     var rows = roster.map(function (s) {
         var cells = CHILD_DOCS.map(function (doc) {
             var checked = !!(docChecklist[String(s.Id)] || {})[doc.key];
             // Proof of income is also tracked on the enrollment record; reflect that
             // legacy flag so a child marked there shows as on-file here without a
-            // separate checklist row. (Saving here writes both, keeping them in step.)
+            // separate checklist row.
             if (doc.key === 'incomeproof' && !checked
                 && (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1)) {
                 checked = true;
             }
             var file = childDocFile(s.Id, doc.key);
-            /* Three states, matching the "ticked, no form saved" distinction used on the
-               roster: a scan attached is the strongest evidence (green "filed"); a checked
-               box with no scan is "on paper" (amber) — a monitor cannot open it here; and
-               nothing is blank. */
-            var cellClass = file ? ' cf-filed' : (checked ? ' cf-paper' : '');
-            /* READ-ONLY here. This grid is a PI/PFA monitoring VIEW of the child-document
-               checklist; the editable source of truth is the "Administrative Files" card
-               on the staff dashboard (admin-files.html), which covers every child. So the
-               checkbox is disabled and there is no attach control — a filed scan can still
-               be opened, but nothing is changed from this page. */
-            var box = '<label class="cf-check" title="Read-only here \u2014 edit on the Administrative Files card">'
-                + '<input type="checkbox" disabled' + (checked ? ' checked' : '') + '></label>';
-            var attach = file
-                ? '<a class="cf-attached" href="#" title="Filed: ' + escapeHtml(file.name || 'attached')
-                    + ' \u2014 click to open" onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
-                    + '\',\'' + escapeHtml(file.name || 'file').replace(/'/g, "\\'") + '\',true)">\uD83D\uDCCE</a>'
-                : '';
-            return '<td class="cf-cell' + cellClass + '">' + box + attach + '</td>';
+            var onFile = !!file || checked;   // a scan or a confirmed checkbox both count
+
+            /* READ-ONLY monitoring VIEW. The editable source of truth is the Child Files
+               page (Administrative tab). Here each cell is just a status pill:
+                 • on file  -> green "✓ on file" (click to open the scan if one is filed)
+                 • missing  -> red "✗ missing" for required docs; a neutral "n/a" pill for
+                              Behavior/Transition plans, which are only required where
+                              applicable and so are never a red gap. */
+            var cell;
+            if (onFile) {
+                cell = file
+                    ? '<a class="cf-pill" href="#" title="On file: ' + escapeHtml(file.name || 'attached')
+                        + ' \u2014 click to open" onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
+                        + '\',\'' + escapeHtml(file.name || 'file').replace(/'/g, "\\'") + '\',true)">\u2713 on file</a>'
+                    : '<span class="cf-pill" title="Marked on file in Child Files (Administrative).">\u2713 on file</span>';
+            } else if (OPTIONAL_DOCS[doc.key]) {
+                cell = '<span class="cf-pill" style="opacity:0.55;" '
+                    + 'title="Only required where applicable. Not on file for this child.">n/a</span>';
+            } else {
+                cell = '<span class="cf-pill cf-pill-missing" '
+                    + 'title="Not on file yet. Collect and attach it in Child Files (Administrative).">\u2717 missing</span>';
+            }
+            var cellClass = file ? ' cf-filed' : '';
+            return '<td class="cf-cell' + cellClass + '">' + cell + '</td>';
         }).join('');
         return '<tr><td class="cf-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + '</td>'
             + '<td class="cf-room">' + escapeHtml(getRoomName(s.RoomNumber)) + '</td>' + cells + '</tr>';
