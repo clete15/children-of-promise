@@ -128,6 +128,9 @@
            take rather than a done state. */
         .cf-pill-upload { color:var(--sp-accent);background:var(--sp-accent-soft);border-color:var(--sp-accent); }
         .cf-pill-upload:hover { filter:brightness(1.05); }
+        /* The "missing" state — red, for a read-only status pill that is not yet on file
+           (e.g. Proof of Income, which is collected in Child Files, not here). */
+        .cf-pill-missing { color:var(--sp-bad-fg);background:var(--sp-bad-bg);border-color:var(--sp-bad-br); }
         td { padding:8px 12px;border-bottom:1px solid var(--sp-border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:16px; }
         /* Subtle zebra striping so the eye tracks a child's row across a wide grid.
@@ -2412,27 +2415,30 @@ function weightedEligibilityCell(student) {
     return '<span class="cf-pill" style="opacity:0.6;" title="No weighted eligibility form on file yet. Create it in Child Files.">not on file</span>';
 }
 
-/* Proof of Income is a document, not a tick: it is uploaded (pay stub, tax return,
-   benefits letter) and lives on the enrollment record (ProofOfIncomeUploaded /
-   ProofOfIncomeFile). So instead of a checkbox the roster shows ONE pill:
-     • nothing on file  -> a blue "upload" pill that opens a file picker
-     • on file          -> a green "on file" pill that opens the stored document
-   Both go through the existing /api/upload/income and /api/download/income routes,
-   which key on the child's First|Last name. */
+/* Proof of Income on the roster is a READ-ONLY status pill, fed from Child Files →
+   Administrative (which writes ProofOfIncomeUploaded, and files the scan). It is not
+   edited here — collecting/attaching the document happens in Child Files. Two states:
+     • on file      -> green "✓ on file" (click to open the stored document if present)
+     • not on file  -> red "✗ on file"
+   This matches how Weighted Eligibility reflects Child Files rather than being editable
+   on the roster. */
 function proofOfIncomeCell(student) {
     const uploaded = String(student.ProofOfIncomeUploaded) === '1'
         || student.ProofOfIncomeUploaded === 1 || student.ProofOfIncomeUploaded === true;
-    if (uploaded && student.ProofOfIncomeFile) {
-        return '<a class="cf-pill" href="/api/download/income/'
-            + encodeURIComponent(student.ProofOfIncomeFile) + '" target="_blank" rel="noopener" '
-            + 'title="Proof of income is on file — click to open it. Upload a newer one to replace it.">'
-            + '\u2713 on file</a>';
+    if (uploaded) {
+        // Green pill; if the actual file name is known, make it open the document.
+        if (student.ProofOfIncomeFile) {
+            return '<a class="cf-pill" href="/api/download/income/'
+                + encodeURIComponent(student.ProofOfIncomeFile) + '" target="_blank" rel="noopener" '
+                + 'title="Proof of income is on file (from Child Files) — click to open. Manage it in Child Files → Administrative.">'
+                + '\u2713 on file</a>';
+        }
+        return '<span class="cf-pill" title="Proof of income is on file (from Child Files). Manage it in Child Files → Administrative.">\u2713 on file</span>';
     }
-    // Not uploaded yet — a pill that triggers a hidden file input scoped to this child.
-    return '<button type="button" class="cf-pill cf-pill-upload" '
-        + 'onclick="uploadIncome(' + student.Id + ')" '
-        + 'title="No proof of income on file yet — click to upload a pay stub, tax return, or benefits letter.">'
-        + '\u2b06 upload</button>';
+    // Not on file — a red pill. Read-only: collect it in Child Files → Administrative.
+    return '<span class="cf-pill cf-pill-missing" '
+        + 'title="No proof of income on file yet. Collect and attach it in Child Files → Administrative.">'
+        + '\u2717 on file</span>';
 }
 
 /* Upload a proof-of-income document for one child. Opens a file picker, POSTs the

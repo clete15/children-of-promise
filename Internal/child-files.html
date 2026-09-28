@@ -145,8 +145,8 @@
             <h2>🗂️ Child Files</h2>
             <div class="cf-lead">Every enrolled child's documents. Two subsets: classroom forms teachers own, and the administrative records required for everyone.</div>
             <div class="cf-tabs">
-                <button class="cf-tab active" id="tabTeacher" onclick="showTab('teacher')">📋 Teacher</button>
-                <button class="cf-tab" id="tabAdmin" onclick="showTab('admin')">🗂️ Administrative</button>
+                <button class="cf-tab active" id="tabAdmin" onclick="showTab('admin')">🗂️ Administrative</button>
+                <button class="cf-tab" id="tabTeacher" onclick="showTab('teacher')">📋 Teacher</button>
             </div>
         </div>
 
@@ -158,7 +158,7 @@
         </div>
 
         <!-- TEACHER subset -->
-        <div class="cf-view active" id="viewTeacher">
+        <div class="cf-view" id="viewTeacher">
             <div class="cf-note">
                 Open a form to complete and sign it on screen. Signed copies are filed into the child's
                 <strong>Teacher</strong> folder. Report cards are uploaded. Anyone can help keep these current.
@@ -167,7 +167,7 @@
         </div>
 
         <!-- ADMINISTRATIVE subset -->
-        <div class="cf-view" id="viewAdmin">
+        <div class="cf-view active" id="viewAdmin">
             <div class="cf-note">
                 Check a box when a document is on file, or attach a scan — scans are filed into the child's
                 <strong>Administrative</strong> folder. Anyone can help keep these up to date.
@@ -241,7 +241,7 @@
 var students = [];
 var classrooms = [];
 var activeYear = '';
-var activeTab = 'teacher';
+var activeTab = 'admin';   // Administrative is the default (leftmost) subset.
 var activeRoom = 'all';
 
 // Teacher-subset state
@@ -281,8 +281,10 @@ var CHILD_DOCS = [
     { key: 'hearing', label: 'Hearing' },
     { key: 'emergency', label: 'Emergency / Release' },
     { key: 'incomeproof', label: 'Proof of Income' },
-    { key: 'behaviorplan', label: 'Behavior Plan*' },
-    { key: 'transitionplan', label: 'Transition Plan*' }
+    // The Transition Plan is the fillable form in DOC_FORM_COLS below (with Referral),
+    // so the old upload-only 'transitionplan' column was a confusing duplicate and is
+    // removed. Behavior Plan stays here as an upload/checkbox item.
+    { key: 'behaviorplan', label: 'Behavior Plan*' }
 ];
 
 /* PICC document forms shown on the Administrative tab as green "on file" pills,
@@ -756,8 +758,11 @@ async function init() {
         return;
     }
     buildRoomPicker();
-    // Teacher is the default open subset.
-    await loadTeacher();
+    // Administrative is the default open subset (the leftmost tab). The room picker
+    // only applies to the Teacher grid, so it starts hidden.
+    var roomWrap = document.getElementById('tfRoomWrap');
+    if (roomWrap) roomWrap.style.display = 'none';
+    await loadAdmin();
 }
 
 init();
