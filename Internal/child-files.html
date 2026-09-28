@@ -6,65 +6,86 @@
     <title>Child Files – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
     <style>
-        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
-        .cf-layout { padding:20px;max-width:1200px;margin:0 auto; }
-        .cf-shell { background:white;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);overflow:hidden; }
-        .cf-top { padding:14px 20px 0;border-bottom:1px solid var(--border); }
-        .cf-top h2 { font-size:1.05rem;font-weight:800;color:var(--text);margin:0 0 4px; }
-        .cf-top .cf-lead { font-size:0.72rem;color:var(--text-muted);margin-bottom:12px; }
+        /* Themed to match the staff / EMS pages: surfaces, borders and text follow the
+           shared --sp-* tokens so it reads the same in light AND dark mode, instead of
+           the old white card on a blue gradient. */
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
+        .cf-layout { padding:20px;max-width:1300px;margin:0 auto; }
+        .cf-shell { background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.12);overflow:hidden; }
+
+        /* ── Room sidebar (matches the EMS / attendance pages) ──
+           A left column of rooms; clicking one filters the grid/cards to that room.
+           The count line shows enrolled + how many children still have outstanding
+           documents, so a director sees at a glance which rooms need chasing. */
+        .cf-wrap { display:flex;align-items:stretch; }
+        .cf-sidebar { width:190px;flex-shrink:0;background:var(--sp-surface-2);border-right:1px solid var(--sp-border);
+            overflow-y:auto;padding:8px 0;max-height:calc(100vh - 250px); }
+        .cf-sidebar button { display:block;width:100%;text-align:left;padding:10px 14px;border:none;
+            border-left:3px solid transparent;cursor:pointer;background:transparent;transition:background 0.15s,border-color 0.15s; }
+        .cf-sidebar button.active { background:var(--sp-accent-soft);border-left-color:var(--sp-accent); }
+        .cf-sidebar button.active .cf-room { color:var(--sp-accent); }
+        .cf-sidebar button:hover:not(.active) { background:var(--sp-surface); }
+        .cf-room { font-size:0.8rem;font-weight:700;color:var(--sp-text); }
+        .cf-room-count { font-size:0.66rem;color:var(--sp-muted);margin-top:2px; }
+        .cf-room-count .cf-need { color:var(--sp-warn-fg);font-weight:700; }
+        .cf-room-count .cf-alldone { color:var(--sp-good-fg);font-weight:700; }
+        .cf-main { flex:1;min-width:0; }
+        .cf-top { padding:14px 20px 0;border-bottom:1px solid var(--sp-border); }
+        .cf-top h2 { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin:0 0 4px; }
+        .cf-top .cf-lead { font-size:0.72rem;color:var(--sp-muted);margin-bottom:12px; }
         /* Teacher / Administrative subset tabs */
         .cf-tabs { display:flex;gap:4px; }
         .cf-tab { padding:9px 18px;border:none;background:transparent;cursor:pointer;font-size:0.82rem;
-            font-weight:700;color:#64748b;border-bottom:3px solid transparent;transition:color 0.15s,border-color 0.15s; }
-        .cf-tab:hover { color:#334155; }
-        .cf-tab.active { color:#1e3a8a;border-bottom-color:#2563eb; }
+            font-weight:700;color:var(--sp-muted);border-bottom:3px solid transparent;transition:color 0.15s,border-color 0.15s; }
+        .cf-tab:hover { color:var(--sp-text); }
+        .cf-tab.active { color:var(--sp-accent);border-bottom-color:var(--sp-accent); }
 
-        .cf-controls { padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--border); }
-        .cf-controls label { font-size:0.72rem;color:var(--text-muted); }
-        .cf-controls select { padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:0.8rem; }
-        .cf-note { padding:10px 20px;font-size:0.74rem;color:#6b7280;border-bottom:1px solid var(--border);line-height:1.6; }
+        .cf-controls { padding:12px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-bottom:1px solid var(--sp-border); }
+        .cf-controls label { font-size:0.72rem;color:var(--sp-muted); }
+        .cf-controls select { padding:5px 8px;border:1px solid var(--sp-border);border-radius:6px;font-size:0.8rem;background:var(--sp-field-bg);color:var(--sp-text); }
+        .cf-note { padding:10px 20px;font-size:0.74rem;color:var(--sp-muted);border-bottom:1px solid var(--sp-border);line-height:1.6; }
         .cf-legend span.key { display:inline-block;width:12px;height:12px;vertical-align:middle;margin-right:2px; }
         .cf-view { display:none; }
         .cf-view.active { display:block; }
         .cf-body { overflow:auto;max-height:calc(100vh - 280px); }
-        .cf-empty, .cf-loading { padding:28px;text-align:center;color:#94a3b8;font-size:0.85rem; }
+        .cf-empty, .cf-loading { padding:28px;text-align:center;color:var(--sp-muted);font-size:0.85rem; }
 
         /* ── Administrative checklist grid (reuses ISBE cf-grid styling) ── */
         .cfg { border-collapse:collapse;width:100%;font-size:0.78rem; }
-        .cfg th, .cfg td { border:1px solid #e5e7eb;padding:6px 8px;text-align:center; }
-        .cfg thead th { background:#1e3a8a;color:#fff;font-size:0.66rem;text-transform:uppercase;letter-spacing:0.03em;position:sticky;top:0;z-index:2; }
-        .cfg th.cfg-name, .cfg td.cfg-name { text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1; }
-        .cfg thead th.cfg-name { background:#1e3a8a;z-index:3; }
-        .cfg td.cfg-room { text-align:left;color:#64748b;white-space:nowrap; }
-        .cfg tr:nth-child(even) td { background:#f8fafc; }
-        .cfg tr:nth-child(even) td.cfg-name { background:#f8fafc; }
-        .cfg .cfg-prog { font-size:0.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-left:6px; }
+        .cfg th, .cfg td { border:1px solid var(--sp-border);padding:6px 8px;text-align:center;color:var(--sp-text); }
+        .cfg thead th { background:var(--sp-surface-2);color:var(--sp-text);font-size:0.66rem;text-transform:uppercase;letter-spacing:0.03em;position:sticky;top:0;z-index:2; }
+        .cfg th.cfg-name, .cfg td.cfg-name { text-align:left;font-weight:600;white-space:nowrap;position:sticky;left:0;background:var(--sp-surface);z-index:1; }
+        .cfg thead th.cfg-name { background:var(--sp-surface-2);z-index:3; }
+        .cfg td.cfg-room { text-align:left;color:var(--sp-muted);white-space:nowrap; }
+        .cfg tr:nth-child(even) td { background:var(--sp-surface-2); }
+        .cfg tr:nth-child(even) td.cfg-name { background:var(--sp-surface-2); }
+        .cfg .cfg-prog { font-size:0.6rem;font-weight:700;color:var(--sp-muted);text-transform:uppercase;margin-left:6px; }
         .cfg-cell { min-width:74px; }
-        .cfg-cell.filed { background:#dcfce7 !important; }
-        .cfg-cell.paper { background:#fef3c7 !important; }
+        .cfg-cell.filed { background:var(--sp-good-bg) !important; }
+        .cfg-cell.paper { background:var(--sp-warn-bg) !important; }
         .cfg-check input { width:16px;height:16px;accent-color:#16a34a;cursor:pointer;vertical-align:middle; }
         .cfg-attach, .cfg-attached { display:inline-block;margin-left:6px;cursor:pointer;text-decoration:none;font-size:0.9rem; }
         .cfg-attach:hover { opacity:0.7; }
-        .cfg-attached { color:#16a34a; }
+        .cfg-attached { color:var(--sp-good-fg); }
 
         /* ── Teacher forms cards ── */
-        .tf-child { border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fff; }
+        .tf-child { border:1px solid var(--sp-border);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:var(--sp-surface); }
         .tf-child-top { display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:10px; }
-        .tf-child-name { font-size:0.95rem;font-weight:800;color:#1e293b; }
-        .tf-child-meta { font-size:0.72rem;color:#94a3b8; }
-        .tf-prog { font-size:0.6rem;font-weight:800;color:#2563eb;text-transform:uppercase;background:#eff6ff;padding:1px 6px;border-radius:8px; }
-        .tf-out { margin-left:auto;font-size:0.72rem;color:#b45309;font-weight:700; }
-        .tf-out.done { color:#166534; }
+        .tf-child-name { font-size:0.95rem;font-weight:800;color:var(--sp-text); }
+        .tf-child-meta { font-size:0.72rem;color:var(--sp-muted); }
+        .tf-prog { font-size:0.6rem;font-weight:800;color:var(--sp-accent);text-transform:uppercase;background:var(--sp-accent-soft);padding:1px 6px;border-radius:8px; }
+        .tf-out { margin-left:auto;font-size:0.72rem;color:var(--sp-warn-fg);font-weight:700; }
+        .tf-out.done { color:var(--sp-good-fg); }
         .tf-chips { display:flex;flex-wrap:wrap;gap:8px; }
         .tf-chip { display:inline-flex;align-items:center;gap:6px;font-size:0.74rem;font-weight:600;
-            padding:6px 12px;border:1px solid #cbd5e1;border-radius:20px;color:#334155;background:#f8fafc;
+            padding:6px 12px;border:1px solid var(--sp-border);border-radius:20px;color:var(--sp-text-2);background:var(--sp-surface-2);
             text-decoration:none;cursor:pointer;transition:background 0.15s,border-color 0.15s; }
-        a.tf-chip:hover { background:#eef2ff;border-color:#93c5fd; }
-        .tf-chip.done { background:#dcfce7;border-color:#86efac;color:#166534; }
+        a.tf-chip:hover { background:var(--sp-accent-soft);border-color:var(--sp-accent); }
+        .tf-chip.done { background:var(--sp-good-bg);border-color:var(--sp-good-br);color:var(--sp-good-fg); }
         span.tf-chip { cursor:default; }
-        .tf-flag { font-size:0.62rem;font-weight:700;color:#b45309;background:#fef3c7;padding:1px 6px;border-radius:8px; }
+        .tf-flag { font-size:0.62rem;font-weight:700;color:var(--sp-warn-fg);background:var(--sp-warn-bg);padding:1px 6px;border-radius:8px; }
         .tf-roomgroup-title { font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;
-            color:#64748b;margin:14px 2px 8px; }
+            color:var(--sp-muted);margin:14px 2px 8px; }
         .cf-actions { padding:0 20px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap; }
 
         /* Admin "on file" pills for the PICC document forms (Transition Plan, Referral).
@@ -151,12 +172,15 @@
         </div>
 
         <div class="cf-controls">
-            <span id="tfRoomWrap"><label for="tfRoom">Room</label>
-                <select id="tfRoom" onchange="setRoom(this.value)"></select></span>
             <span><label for="cfYear">School year</label>
                 <select id="cfYear" onchange="setYear(this.value)"></select></span>
         </div>
 
+      <div class="cf-wrap">
+        <!-- Room sidebar (shared by both tabs). Built by buildRoomSidebar(). -->
+        <div class="cf-sidebar" id="cfSidebar"></div>
+
+        <div class="cf-main">
         <!-- TEACHER subset -->
         <div class="cf-view" id="viewTeacher">
             <div class="cf-note">
@@ -202,8 +226,10 @@
             </div>
             <div class="cf-body" id="afBody"><div class="cf-loading">Loading…</div></div>
         </div>
-    </div>
-</div>
+        </div><!-- /.cf-main -->
+      </div><!-- /.cf-wrap -->
+    </div><!-- /.cf-shell -->
+</div><!-- /.cf-layout -->
 
 <!-- PICC document form modal (Transition Plan, Referral). Shared shell rendered by
      pi-forms.js — the Administrative pills open these here now, moved off the roster. -->
@@ -368,15 +394,54 @@ function buildYearPicker() {
     activeYear = cur;
     activeSchoolYear = cur;   // keep the pi-forms.js alias in step with the picker
 }
-function buildRoomPicker() {
-    var sel = document.getElementById('tfRoom');
+/* ── Room sidebar ──
+   One button per room that has enrolled children, plus an "All rooms" option at the
+   top. Each button shows the room name and a count line: "N enrolled · M need docs",
+   where "need docs" is the number of children in that room still missing at least one
+   Administrative document (the director's chasing list). When a room is fully filed it
+   reads "all done" in green instead. Clicking a room filters both subsets to it. */
+function roomNeedsDocs(s) {
+    // True if this child is missing any Administrative document. Mirrors the checkbox /
+    // file logic in renderAdmin so the sidebar count matches the grid exactly.
+    return CHILD_DOCS.some(function (doc) {
+        var file = childDocFile(s.Id, doc.key);
+        if (file) return false;                       // a scan is on file
+        if (doc.key === 'behaviorplan' || doc.key === 'transitionplan') return true; // upload-only, no file = missing
+        var checked = !!(docChecklist[String(s.Id)] || {})[doc.key];
+        if (doc.key === 'incomeproof' && !checked && (s.ProofOfIncomeUploaded === '1' || s.ProofOfIncomeUploaded === 1)) checked = true;
+        return !checked;
+    });
+}
+function buildRoomSidebar() {
+    var el = document.getElementById('cfSidebar');
+    if (!el) return;
     var withKids = {};
     activeRoster().forEach(function (s) { withKids[s.RoomNumber] = true; });
     var rooms = (classrooms || []).filter(function (r) { return withKids[r.RoomNumber]; });
-    sel.innerHTML = '<option value="all">All rooms</option>'
-        + rooms.map(function (r) {
-            return '<option value="' + escapeHtml(String(r.RoomNumber)) + '">' + escapeHtml(r.Room || ('Room ' + r.RoomNumber)) + '</option>';
-        }).join('');
+
+    var totalEnrolled = activeRoster().length;
+    var totalNeed = activeRoster().filter(roomNeedsDocs).length;
+
+    function countLine(enrolled, need) {
+        var right = need
+            ? '<span class="cf-need">' + need + ' need docs</span>'
+            : '<span class="cf-alldone">all done</span>';
+        return '<div class="cf-room-count">' + enrolled + ' enrolled \u00b7 ' + right + '</div>';
+    }
+    function btn(value, name, enrolled, need) {
+        return '<button class="' + (String(activeRoom) === String(value) ? 'active' : '') + '"'
+            + ' onclick="setRoom(\'' + escapeHtml(String(value)).replace(/'/g, "\\'") + '\')">'
+            + '<div class="cf-room">' + escapeHtml(name) + '</div>'
+            + countLine(enrolled, need) + '</button>';
+    }
+
+    var html = btn('all', 'All rooms', totalEnrolled, totalNeed);
+    rooms.forEach(function (r) {
+        var kids = roomRoster(r.RoomNumber);
+        var need = kids.filter(roomNeedsDocs).length;
+        html += btn(r.RoomNumber, r.Room || ('Room ' + r.RoomNumber), kids.length, need);
+    });
+    el.innerHTML = html;
 }
 
 // ── Tab switching ──
@@ -386,8 +451,6 @@ function showTab(which) {
     document.getElementById('tabAdmin').classList.toggle('active', which === 'admin');
     document.getElementById('viewTeacher').classList.toggle('active', which === 'teacher');
     document.getElementById('viewAdmin').classList.toggle('active', which === 'admin');
-    // The room picker only makes sense for the teacher grid.
-    document.getElementById('tfRoomWrap').style.display = which === 'teacher' ? '' : 'none';
     if (which === 'teacher' && !teacherLoaded) loadTeacher();
     if (which === 'admin' && !adminLoaded) loadAdmin();
 }
@@ -398,7 +461,12 @@ function setYear(y) {
     teacherLoaded = false; adminLoaded = false;
     if (activeTab === 'teacher') loadTeacher(); else loadAdmin();
 }
-function setRoom(r) { activeRoom = r; renderTeacher(); }
+function setRoom(r) {
+    activeRoom = r;
+    buildRoomSidebar();                     // re-highlight the active room
+    if (activeTab === 'admin') renderAdmin();
+    else renderTeacher();
+}
 
 // ══════════════ TEACHER SUBSET ══════════════
 function initForms() {
@@ -568,8 +636,11 @@ function childDocFile(studentId, docKey) {
 }
 function renderAdmin() {
     var body = document.getElementById('afBody');
-    var roster = activeRoster().sort(sortByRoomThenName);
-    if (!roster.length) { body.innerHTML = '<div class="cf-empty">No enrolled children.</div>'; return; }
+    var roster = (activeRoom === 'all' ? activeRoster() : roomRoster(activeRoom)).slice().sort(sortByRoomThenName);
+    if (!roster.length) {
+        body.innerHTML = '<div class="cf-empty">No enrolled children' + (activeRoom === 'all' ? '.' : ' in this room.') + '</div>';
+        return;
+    }
     var head = '<tr><th class="cfg-name">Child</th><th class="cfg-room">Room</th>'
         + CHILD_DOCS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
         + DOC_FORM_COLS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
@@ -639,6 +710,9 @@ async function loadAdmin() {
     ]);
     adminLoaded = true;
     renderAdmin();
+    // The sidebar's "need docs" count is derived from the admin doc data just loaded,
+    // so refresh it now that docChecklist / file index are populated.
+    buildRoomSidebar();
 }
 async function toggleChildDoc(studentId, docKey, checked) {
     try {
@@ -757,11 +831,9 @@ async function init() {
         document.getElementById('tfBody').innerHTML = '<div class="cf-empty">Could not load the roster: ' + escapeHtml(e.message) + '</div>';
         return;
     }
-    buildRoomPicker();
-    // Administrative is the default open subset (the leftmost tab). The room picker
-    // only applies to the Teacher grid, so it starts hidden.
-    var roomWrap = document.getElementById('tfRoomWrap');
-    if (roomWrap) roomWrap.style.display = 'none';
+    // Build the room sidebar up front (with enrolled counts); loadAdmin refreshes it
+    // once the "need docs" data is in. Administrative is the default open subset.
+    buildRoomSidebar();
     await loadAdmin();
 }
 
