@@ -553,6 +553,16 @@
         font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--sp-muted);
     }
     .sp-theme:hover { color: var(--sp-accent); }
+    /* Back link to the staff dashboard. A little more prominent than the plain bar
+       links (bordered pill) since it is navigation, but still quiet. */
+    .sp-back {
+        display: inline-flex; align-items: center; gap: 4px;
+        font-size: 0.82rem; font-weight: 600; text-decoration: none;
+        color: var(--sp-text-2); background: var(--sp-surface-2);
+        border: 1px solid var(--sp-border-in); border-radius: 7px;
+        padding: 5px 11px;
+    }
+    .sp-back:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
 
     /* ── My Classroom (teacher checklist) ──
        Ported from the ISBE classroom view, but recoloured onto this page's theme
@@ -634,6 +644,8 @@
 
 <div class="sp-wrap">
     <div class="sp-bar">
+        <!-- Back to the /staff/ dashboard of cards this page was reached from. -->
+        <a href="/staff/" class="sp-back" title="Back to the staff portal">&#8592; Back</a>
         <strong style="font-size:0.9rem;">Staff Portal</strong>
         <!-- The chooser is the director's control. A staff member sees their own name
              instead, because there is nothing for them to choose: the server sends
@@ -2159,6 +2171,20 @@ function classroomChecklistHtml(rooms) {
            tracked on the ISBE admin roster's Weighted Eligibility column, not a teacher
            duty on the classroom card. (Its click handler and data load remain harmless.) */
 
+        /* PFA Exit Interview (PFA Item 4): a per-child end-of-year signed form, appended
+           after the column chips for PFA children only. Green once signed & filed (by the
+           teacher here or the parent from the portal). */
+        var exitChip = '';
+        if (String(s.PFA_PI_na || '').trim().toUpperCase() === 'PFA') {
+            var eiSt = ChildForms.state(s.Id, 'ExitInterview', !!t.ExitInterview, false);
+            var eiDone = eiSt === 'form' || eiSt === 'tick' || eiSt === 'unknown';
+            exitChip = '<a href="#" class="cls-chip' + (eiDone ? ' cls-chip-done' : '')
+                + '" data-act="' + esc('exitInterview|' + s.Id) + '"'
+                + ' title="PFA Exit Interview \u2014 confirm screening results and the final report card were shared, then sign. '
+                + (eiDone ? 'Signed & on file.' : 'Not signed yet.') + '">'
+                + (eiDone ? '\u2713 ' : '') + 'Exit Interview</a>';
+        }
+
         const outstanding = cols.filter(col =>
             !ChildForms.isDone(s.Id, col.field, !!t[col.field], childIsPI)).length;
         const status = outstanding
@@ -2181,7 +2207,7 @@ function classroomChecklistHtml(rooms) {
             + '<div><div class="cls-name">' + esc(s.Last_Name + ', ' + s.First_Name) + progTag + '</div>'
             + (meta ? '<div class="cls-meta">' + meta + '</div>' : '') + '</div>'
             + status + '</div>'
-            + '<div class="cls-chips">' + chips + '</div></div>';
+            + '<div class="cls-chips">' + chips + exitChip + '</div></div>';
     }).join('');
 
     return pick + rosterEditHtml(activeClsRoom) + batchBlock + '<div class="cls-cards">' + cards + '</div>';
@@ -2230,6 +2256,7 @@ function wireClassroom() {
             e.preventDefault();
             const parts = a.getAttribute('data-act').split('|');
             if (parts[0] === 'permission') CofpForms.openPermissionSlip(parseInt(parts[1], 10));
+            else if (parts[0] === 'exitInterview') CofpForms.openExitInterview(parseInt(parts[1], 10));
             else if (parts[0] === 'screening') CofpForms.openScreening(parseInt(parts[1], 10), parts[2], parts[3]);
             else if (parts[0] === 'upload') CofpForms.openReportUpload(parseInt(parts[1], 10), parts[2]);
             // The relPath can (in theory) contain a pipe, so rejoin the tail rather than
