@@ -1506,8 +1506,8 @@
         '<div class="pi-section"><h4>Signatures</h4>',
         '<div class="doc-note">Sign here when the results are shared. Signing files a PDF of this record into the child\u2019s folder; re-signing files a fresh copy and keeps the old one.</div>',
         '<div class="pi-grid">',
-        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="rsParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="rsParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="rsParentSigDate" style="flex:1;" title="Date signed"></div></div>',
-        '<div class="pi-field pi-full"><label>Staff Signature</label><div id="rsStaffSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="rsStaffSig" placeholder="Printed name" style="flex:2;"><input type="date" id="rsStaffSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
+        '<div class="pi-field"><label>Parent/Guardian Signature</label><div id="rsParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="rsParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="rsParentSigDate" style="flex:1;" title="Date signed"></div></div>',
+        '<div class="pi-field"><label>Staff Signature</label><div id="rsStaffSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="rsStaffSig" placeholder="Printed name" style="flex:2;"><input type="date" id="rsStaffSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
         '</div>',
         '<div class="pi-modal-footer"><span class="pi-saved-badge" id="rsSavedBadge" style="display:none;">&#10003; Saved</span>',
         '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printResultsShared()">&#x1F5A8;&#xFE0F; Print</button>',
@@ -1526,8 +1526,8 @@
         '<div class="pi-section"><h4>Signatures</h4>',
         '<div class="doc-note">Hand the screen to the parent to sign, then sign as the teacher. Signing files the exit interview into the child\u2019s folder and marks it complete for the year. It can also be signed by the parent from the Parent Portal.</div>',
         '<div class="pi-grid">',
-        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="eiParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="eiParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="eiParentSigDate" style="flex:1;" title="Date signed"></div></div>',
-        '<div class="pi-field pi-full"><label>Teacher Signature</label><div id="eiStaffSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="eiStaffSig" placeholder="Printed name" style="flex:2;"><input type="date" id="eiStaffSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
+        '<div class="pi-field"><label>Parent/Guardian Signature</label><div id="eiParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="eiParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="eiParentSigDate" style="flex:1;" title="Date signed"></div></div>',
+        '<div class="pi-field"><label>Teacher Signature</label><div id="eiStaffSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="eiStaffSig" placeholder="Printed name" style="flex:2;"><input type="date" id="eiStaffSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
         '</div>',
         '<div class="pi-modal-footer"><span class="pi-saved-badge" id="eiSavedBadge" style="display:none;">&#10003; Saved</span>',
         '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printExitInterview()">&#x1F5A8;&#xFE0F; Print</button>',
@@ -1580,8 +1580,8 @@
         '<div class="pi-section"><h4>Signatures</h4>',
         '<div class="doc-note">Sign the scored summary here. Signing files a PDF of the scores into the child\u2019s folder; re-signing files a fresh copy and keeps the old one.</div>',
         '<div class="pi-grid">',
-        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="scrParentSigPad"></div><input type="text" id="scrParentSig" placeholder="Printed name" style="margin-top:7px;"></div>',
-        '<div class="pi-field pi-full"><label>Staff Signature</label><div id="scrStaffSigPad"></div><input type="text" id="scrStaffSig" placeholder="Printed name" style="margin-top:7px;"></div></div></div>',
+        '<div class="pi-field"><label>Parent/Guardian Signature</label><div id="scrParentSigPad"></div><input type="text" id="scrParentSig" placeholder="Printed name" style="margin-top:7px;"></div>',
+        '<div class="pi-field"><label>Staff Signature</label><div id="scrStaffSigPad"></div><input type="text" id="scrStaffSig" placeholder="Printed name" style="margin-top:7px;"></div></div></div>',
         '</div>',
         '<div class="pi-modal-footer"><span class="pi-saved-badge" id="scrSavedBadge" style="display:none;">&#10003; Saved</span>',
         '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printScreening()">&#x1F5A8;&#xFE0F; Print</button>',
@@ -1630,11 +1630,18 @@
         '.pi-field { display:flex;flex-direction:column;gap:3px; }',
         '.pi-field label { font-size:0.7rem;font-weight:600;color:#6b7280; }',
         '.pi-field .pi-value { font-size:0.82rem;font-weight:500;color:#111;padding:6px 10px;background:#f8fafc;border-radius:6px;min-height:28px;display:flex;align-items:center; }',
-        '.pi-field textarea, .pi-field input[type=text], .pi-field input[type=date], .pi-field input[type=number] { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;resize:vertical; }',
+        /* Explicit background AND text colour on every control. The modal is a white
+           form, but it is injected into pages with different themes (the dark staff
+           portal among them). Without an explicit colour the text inherits the host
+           page's — light text on this white modal, which rendered the score-status
+           dropdowns unreadable (white-on-white) on My Page. Pin both so the modal
+           reads the same everywhere. */
+        '.pi-field textarea, .pi-field input[type=text], .pi-field input[type=date], .pi-field input[type=number] { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;resize:vertical;background:#fff;color:#111; }',
         '.pi-field textarea { min-height:60px; }',
         '.pi-field textarea:focus, .pi-field input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
-        '.pi-field select { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:white; }',
+        '.pi-field select { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:#fff;color:#111; }',
         '.pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
+        '.pi-field select option { color:#111;background:#fff; }',
         /* The consent statement sits in its own soft panel so it reads as the formal
            declaration it is, with comfortable padding rather than hugging the edge. */
         '.pi-consent { background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;'

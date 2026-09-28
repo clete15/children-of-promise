@@ -2044,7 +2044,7 @@ async function saveClsRosterRow(sid, btn) {
    the centre-admin Enrolled Students form. */
 function rosterEditHtml(roomNumber) {
     const kids = allRoomStudents(roomNumber);
-    const roomOpts = (window.ROOMS || []).map(r =>
+    const roomOpts = (Array.isArray(ROOMS) ? ROOMS : []).map(r =>
         '<option value="' + esc(r.RoomNumber) + '">' + esc(r.Room) + '</option>').join('');
     const dayKeys = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
     const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
