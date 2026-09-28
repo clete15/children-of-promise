@@ -2590,13 +2590,25 @@ function renderRoster() {
                 return '<td class="' + ('cf-doc' + divide).trim() + '">' + cell + '</td>';
             }
 
-            // Parent Interview is an ADMIN duty done from this page: a checkbox that
-            // reflects/toggles the tracking bit, plus a [form] link that opens the
-            // pre-filling interview modal (open → review → Print the pre-filled blank
-            // for the family, or fill and save). Moved here from the classroom card.
+            // Parent Interview is an ADMIN duty done from this page. It opens/saves the
+            // SAME interview record the parent portal uses, so a director can complete it
+            // at the center when a family has no internet, or a parent can do it online —
+            // either way the same file fills and this pill lights.
+            //   • ON FILE  -> a green "✓ on file" pill (click to view/update). No checkbox.
+            //   • NOT YET  -> a checkbox + [form] link to open and complete it (Zayden).
             if (f === 'ParentInterview') {
-                const cc = [cellClass(s, f), divide.trim()].filter(Boolean).join(' ');
-                return '<td' + (cc ? ' class="' + cc + '"' : '') + '>'
+                const st = ChildForms.state(s.Id, f, !!(trackingData[s.Id] || {})[f],
+                    String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI');
+                const tdc = ('cf-doc' + divide).trim();
+                if (st === 'form') {
+                    const d = ChildForms.formDate(s.Id, f);
+                    return '<td class="' + tdc + '">'
+                        + '<a class="cf-pill" href="#" title="Parent Interview on file'
+                        + (d ? ', dated ' + d : '') + ' \u2014 click to view or update."'
+                        + ' onclick="event.preventDefault();openInterview(' + s.Id + ')">\u2713 on file</a>'
+                        + '</td>';
+                }
+                return '<td class="' + tdc + '">'
                     + checkBox(s, f)
                     + formLink('openInterview(' + s.Id + ')',
                         'Open the Parent Interview \u2014 pre-fills from pre-enrollment; print it blank for the family, or fill and save')
