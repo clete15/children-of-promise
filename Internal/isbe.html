@@ -133,6 +133,11 @@
         .cf-pill-missing { color:var(--sp-bad-fg);background:var(--sp-bad-bg);border-color:var(--sp-bad-br); }
         td { padding:8px 12px;border-bottom:1px solid var(--sp-border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:16px; }
+        /* Uniform row height: a cell with a screening pill + its date/flag line is two
+           lines tall, while an empty cell is one, so those rows (e.g. Smith, Stickels)
+           used to stand taller than the rest. Reserving a consistent height on every
+           body row keeps the grid even whether or not a cell carries a date line. */
+        tbody td { height:44px;vertical-align:middle;box-sizing:border-box; }
         /* Subtle zebra striping so the eye tracks a child's row across a wide grid.
            Even rows get a faint surface-2 wash; the frozen name/room columns and the
            teacher band override with their own opaque backgrounds (below), so striping
