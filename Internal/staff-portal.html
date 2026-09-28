@@ -1980,12 +1980,17 @@ function classroomSection(s) {
         + inner + '</div>';
 }
 
-/* Every child in a room, active OR inactive, sorted by name. The editable roster shows
-   all of them (unlike classroomRoster, which is active-only) so a teacher can toggle a
-   child's Active flag without them vanishing from the list the moment it flips. */
+/* Active children in a room, sorted by name. The staff portal only surfaces active
+   children — withdrawn/inactive records stay out of the teacher's view (they linger on
+   the centre-admin Enrolled Students form, where re-activation belongs). This matches
+   classroomRoster's active filter so the editable roster and the per-child cards below
+   show the same set. A child toggled inactive here stays on screen until the next
+   re-render (the row's Save does not re-render), so the edit is never yanked mid-action;
+   it simply drops off on the following paint. */
 function allRoomStudents(roomNumber) {
     return CLS_STUDENTS
-        .filter(s => String(s.RoomNumber) === String(roomNumber))
+        .filter(s => (s.Active === 'Yes' || s.Active === 'YES')
+            && String(s.RoomNumber) === String(roomNumber))
         .sort(CofpForms.sortByName);
 }
 
@@ -2008,7 +2013,6 @@ async function saveClsRosterRow(sid, btn) {
         thursday:  !!(dayCbs.find(c => c.getAttribute('data-day') === '3') || {}).checked,
         friday:    !!(dayCbs.find(c => c.getAttribute('data-day') === '4') || {}).checked,
         pfaPiNa:   tr.querySelector('.clsr-prog').value,
-        active:    tr.querySelector('.clsr-active').value,
     };
     btn.disabled = true; const orig = btn.textContent; btn.textContent = '…';
     try {
@@ -2023,7 +2027,7 @@ async function saveClsRosterRow(sid, btn) {
                 Monday: body.monday ? 1 : 0, Tuesday: body.tuesday ? 1 : 0,
                 Wednesday: body.wednesday ? 1 : 0, Thursday: body.thursday ? 1 : 0,
                 Friday: body.friday ? 1 : 0,
-                PFA_PI_na: body.pfaPiNa, Active: body.active,
+                PFA_PI_na: body.pfaPiNa,
             });
             showNotification(s.First_Name + ' ' + s.Last_Name + ' updated', 'success');
             btn.textContent = orig; btn.style.opacity = '0.4';
@@ -2056,15 +2060,14 @@ function rosterEditHtml(roomNumber) {
         const prog = String(s.PFA_PI_na || '');
         const progOpts = ['', 'PFA', 'PI', 'INCCRA'].map(p =>
             '<option value="' + p + '"' + (p === prog ? ' selected' : '') + '>' + (p || '--') + '</option>').join('');
-        const act = isTruthy(s.Active) ? 'Yes' : 'No';
+        // No Active column here: this table is active-only, so a teacher only edits
+        // room / days / program. Activating or withdrawing a child is a centre-admin
+        // action on the Enrolled Students form.
         return '<tr data-sid="' + esc(s.Id) + '">'
             + '<td class="clsr-name">' + esc(s.Last_Name + ', ' + s.First_Name) + '</td>'
             + '<td><select class="clsr-room">' + roomOpts + '</select></td>'
             + days
             + '<td><select class="clsr-prog">' + progOpts + '</select></td>'
-            + '<td><select class="clsr-active">'
-                + '<option value="Yes"' + (act === 'Yes' ? ' selected' : '') + '>Yes</option>'
-                + '<option value="No"' + (act === 'No' ? ' selected' : '') + '>No</option></select></td>'
             + '<td class="clsr-savecell"><button type="button" class="clsr-save" data-sid="' + esc(s.Id) + '" disabled>Save</button></td>'
             + '</tr>';
     }).join('');
@@ -2073,7 +2076,7 @@ function rosterEditHtml(roomNumber) {
         ? '<table class="clsr-table"><thead><tr>'
             + '<th class="clsr-name">Student</th><th>Room</th>'
             + dayLabels.map(d => '<th class="clsr-day">' + d + '</th>').join('')
-            + '<th>Program</th><th>Active</th><th></th></tr></thead>'
+            + '<th>Program</th><th></th></tr></thead>'
             + '<tbody>' + rows + '</tbody></table>'
         : '<div class="cls-empty">No children in this room.</div>';
 
@@ -2340,7 +2343,7 @@ function wireClassroom() {
     document.querySelectorAll('#sppanel_classroom .clsr-table tr[data-sid]').forEach(tr => {
         const save = tr.querySelector('.clsr-save');
         if (!save) return;
-        tr.querySelectorAll('.clsr-room, .clsr-prog, .clsr-active, .clsr-day-cb').forEach(ctrl => {
+        tr.querySelectorAll('.clsr-room, .clsr-prog, .clsr-day-cb').forEach(ctrl => {
             ctrl.addEventListener('change', () => { save.disabled = false; save.style.opacity = '1'; });
         });
         save.addEventListener('click', () => saveClsRosterRow(save.getAttribute('data-sid'), save));
