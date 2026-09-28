@@ -495,14 +495,18 @@ function roster(roomNumber) {
 
 // Whether a checklist item is done for a child — falls back to the raw tick if the
 // evidence module is missing.
+// Only PI children need a real backing form; PFA and non-PI rooms complete on a tick
+// (see compliance steering), so the child's program is passed through.
 function itemDone(s, field) {
     const ticked = !!(CK_TRACKING[s.Id] || {})[field];
-    if (window.ChildForms && ChildForms.isDone) return ChildForms.isDone(s.Id, field, ticked);
+    const isPI = String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI';
+    if (window.ChildForms && ChildForms.isDone) return ChildForms.isDone(s.Id, field, ticked, isPI);
     return ticked;
 }
 function itemState(s, field) {
     const ticked = !!(CK_TRACKING[s.Id] || {})[field];
-    if (window.ChildForms && ChildForms.state) return ChildForms.state(s.Id, field, ticked);
+    const isPI = String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI';
+    if (window.ChildForms && ChildForms.state) return ChildForms.state(s.Id, field, ticked, isPI);
     return ticked ? 'tick' : 'none';
 }
 

@@ -420,17 +420,15 @@ function initForms() {
 var COLS = null;
 function chipFor(s, col) {
     var t = TRACKING[s.Id] || {};
-    var st = ChildForms.state(s.Id, col.field, !!t[col.field]);
+    // Only PI children need a real backing form; PFA and non-PI rooms count a checked
+    // box as done (see compliance steering). A screening completes on the teacher-scored
+    // summary alone, so there is no "needs questionnaire" state any more.
+    var isPI = String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI';
+    var st = ChildForms.state(s.Id, col.field, !!t[col.field], isPI);
     var done = st === 'form' || st === 'tick' || st === 'unknown';
     var label = col.label.replace(/<br>/g, ' ');
     var flag = '';
     if (st === 'tick-only') flag = '<span class="tf-flag" title="Ticked, but nothing saved here. If done on paper that is fine; otherwise open the form.">on paper?</span>';
-    if (st === 'partial' && ChildForms.isScreening && ChildForms.isScreening(col.field)) {
-        var haveQ = ChildForms.hasFile(s.Id, col.field, 'questionnaire');
-        var haveScored = ChildForms.hasForm(s.Id, col.field);
-        var need = !haveQ ? 'needs questionnaire' : !haveScored ? 'needs scoring' : 'in progress';
-        flag = '<span class="tf-flag">' + need + '</span>';
-    }
     var inner = (done ? '\u2713 ' : '') + escapeHtml(label) + flag;
     var act = '';
     if (col.field === 'PermissionSlip') act = 'permission|' + s.Id;
@@ -456,8 +454,9 @@ function weightedChip(s) {
 }
 function childCard(s) {
     var chips = COLS.map(function (col) { return chipFor(s, col); }).join('') + weightedChip(s);
+    var isPIrow = String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI';
     var outstanding = COLS.filter(function (col) {
-        return !ChildForms.isDone(s.Id, col.field, !!(TRACKING[s.Id] || {})[col.field]);
+        return !ChildForms.isDone(s.Id, col.field, !!(TRACKING[s.Id] || {})[col.field], isPIrow);
     }).length;
     var status = outstanding
         ? '<span class="tf-out">' + outstanding + ' outstanding</span>'

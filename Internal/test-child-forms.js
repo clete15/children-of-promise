@@ -83,16 +83,23 @@ check('MidYearReport is a backed field now', CF.isBacked('MidYearReport'), true)
 check('report card with an upload is form', CF.state(20, 'MidYearReport', true), 'form');
 check('report card upload counts as done', CF.isDone(20, 'MidYearReport', true), true);
 check('report card ticked with no upload is tick-only', CF.state(99, 'EndYearReport', true), 'tick-only');
-check('report card partial rolls up as missing', (function () {
-    var rr = CF.rollup(['BegASQ'], [{ Id: 10 }, { Id: 12 }], { 10: { BegASQ: true }, 12: { BegASQ: true } });
+check('PI screening ticked with no form rolls up as missing', (function () {
+    // PI children need a real scored form; a bare tick is not done. (10 has neither.)
+    var rr = CF.rollup(['BegASQ'], [{ Id: 10, PFA_PI_na: 'PI' }, { Id: 12, PFA_PI_na: 'PI' }],
+        { 10: { BegASQ: true }, 12: { BegASQ: true } });
     return rr.missing.map(function (s) { return s.Id; });
 })(), [10]);
+check('PFA screening ticked with no form counts as DONE (tick = done for non-PI)', (function () {
+    var rr = CF.rollup(['BegASQ'], [{ Id: 30, PFA_PI_na: 'PFA' }], { 30: { BegASQ: true } });
+    return rr.complete;
+})(), 1);
 
 // Reset the file index so later tests see the same world they always did.
 CF._setFiles({});
 
 // ── rollup(), what the compliance panel reports ──────────────────────────
-const roster = [{ Id: 1 }, { Id: 2 }, { Id: 3 }];
+// PI children: the strict case, where a bare tick is NOT done and a real form is needed.
+const roster = [{ Id: 1, PFA_PI_na: 'PI' }, { Id: 2, PFA_PI_na: 'PI' }, { Id: 3, PFA_PI_na: 'PI' }];
 CF._set({
     '1': { ParentInterview: { on: true, date: '' }, PermissionSlip: { on: true, date: '' } },
     '2': { ParentInterview: { on: true, date: '' } },

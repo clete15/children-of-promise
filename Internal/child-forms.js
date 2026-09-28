@@ -213,7 +213,9 @@
        and separates the two ways a file can fail: nothing there at all, or a
        tick with nothing behind it. The second used to be counted as complete.
 
-       roster    the children in scope (already filtered to the program)
+       roster    the children in scope (already filtered to the program). Each child's
+                 own PFA_PI_na decides whether a bare tick counts: PI children need a
+                 real form, everyone else (PFA, non-PI rooms) may complete on a tick.
        fields    the item's childFields
        tracking  { studentId: { Field: bool } }, the caller's ISBETracking map  */
     function rollup(fields, roster, tracking) {
@@ -226,9 +228,10 @@
         };
         roster.forEach(function (s) {
             var t = (tracking && tracking[s.Id]) || {};
+            var isPI = String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI';
             var anyMissing = false, anyUnbacked = false;
             fields.forEach(function (f) {
-                var st = state(s.Id, f, !!t[f]);
+                var st = state(s.Id, f, !!t[f], isPI);
                 if (st === 'tick-only') { anyUnbacked = true; anyMissing = true; }
                 else if (st === 'none') anyMissing = true;
                 // 'partial' is retained for any future half-done backed field; screenings
