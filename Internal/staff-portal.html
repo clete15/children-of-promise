@@ -581,6 +581,29 @@
     }
     .sp-back:hover { color: var(--sp-accent); border-color: var(--sp-accent); }
 
+    /* Account menu: a single quiet trigger in the bar that opens a small dropdown with
+       the personal actions (change password, sign out), instead of spelling them out as
+       loose links that crowded the bar. */
+    .sp-acct { position: relative; }
+    .sp-acct-trigger {
+        display: inline-flex; align-items: center; gap: 5px;
+        background: none; border: none; padding: 4px 6px; cursor: pointer;
+        font: inherit; font-size: 0.82rem; font-weight: 600; color: var(--sp-muted);
+    }
+    .sp-acct-trigger:hover { color: var(--sp-accent); }
+    .sp-acct-menu {
+        display: none; position: absolute; right: 0; top: calc(100% + 6px); z-index: 20;
+        min-width: 170px; background: var(--sp-surface); border: 1.5px solid var(--sp-border);
+        border-radius: 9px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); padding: 5px;
+    }
+    .sp-acct.open .sp-acct-menu { display: block; }
+    .sp-acct-menu a {
+        display: block; padding: 8px 11px; border-radius: 6px; text-decoration: none;
+        font-size: 0.82rem; font-weight: 600; color: var(--sp-text-2); white-space: nowrap;
+    }
+    .sp-acct-menu a:hover { background: var(--sp-surface-2); color: var(--sp-accent); }
+    .sp-acct-menu a.sp-signout { color: var(--sp-muted); }
+
     /* ── My Classroom (teacher checklist) ──
        Ported from the ISBE classroom view, but recoloured onto this page's theme
        variables so it works in dark mode and — deliberately — carries no amber:
@@ -673,10 +696,16 @@
         <!-- Outside the staff-only block, so the director gets the theme choice too. -->
         <button type="button" id="spTheme" class="sp-theme" style="margin-left:auto;"
                 aria-pressed="false" title="Switch between light and dark"></button>
-        <span id="spStaffActions" style="display:none;font-size:0.82rem;">
-            <a href="#" id="spChangePw" style="font-weight:600;">Change my password</a>
-            &nbsp;·&nbsp;
-            <a href="#" id="spSignOut" class="sp-quiet" style="font-weight:600;">Sign out</a>
+        <!-- Personal actions collapsed into one quiet menu, shown only when a staff
+             member is signed in as themselves. Same ids as before, so the existing
+             click handlers still wire up unchanged. -->
+        <span id="spStaffActions" class="sp-acct" style="display:none;">
+            <button type="button" class="sp-acct-trigger" id="spAcctTrigger"
+                    aria-haspopup="true" aria-expanded="false" title="Account">&#9881; Account &#9662;</button>
+            <div class="sp-acct-menu" id="spAcctMenu" role="menu">
+                <a href="#" id="spChangePw" role="menuitem">Change my password</a>
+                <a href="#" id="spSignOut" class="sp-signout" role="menuitem">Sign out</a>
+            </div>
         </span>
         <span id="spBarNote" class="sp-quiet" style="flex-basis:100%;font-size:0.8rem;">
             Everything here comes from your staff record. If something is wrong, it is wrong
@@ -3335,7 +3364,7 @@ function applyIdentityToBar() {
         $('spBarNote').textContent = 'Signed in as ' + ((WHO && WHO.name) || 'an administrator')
             + '. Choose any member of staff above \u2014 including yourself.';
     }
-    if (isPersonal) $('spStaffActions').style.display = 'inline';
+    if (isPersonal) $('spStaffActions').style.display = 'inline-block';
     return { mayChoose: mayChoose, isPersonal: isPersonal };
 }
 
@@ -3370,6 +3399,24 @@ $('spChangePw').addEventListener('click', e => {
         .then(() => alert('Changed. Use the new one next time you sign in.'))
         .catch(err => alert(err.message || 'Could not change it.'));
 });
+
+/* Account dropdown: the ⚙ Account trigger opens/closes the small menu holding Change
+   password + Sign out. Closes on outside click or Escape, and after either item is
+   chosen. Kept simple — a positioned menu, not a component. */
+(function () {
+    const acct = $('spStaffActions');
+    const trigger = $('spAcctTrigger');
+    const menu = $('spAcctMenu');
+    if (!acct || !trigger || !menu) return;
+    function setOpen(open) {
+        acct.classList.toggle('open', open);
+        trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    trigger.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); setOpen(!acct.classList.contains('open')); });
+    menu.addEventListener('click', () => setOpen(false));   // any item chosen → close
+    document.addEventListener('click', e => { if (!acct.contains(e.target)) setOpen(false); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setOpen(false); });
+})();
 
 load();
 
