@@ -294,16 +294,24 @@ var CHILD_DOCS = [
     { key: 'vision', label: 'Vision' },
     { key: 'hearing', label: 'Hearing' },
     { key: 'emergency', label: 'Emergency / Release' },
-    { key: 'incomeproof', label: 'Proof of Income' }
-    // Behavior Plan, Transition Plan and Referral columns were removed — they are only
-    // needed where applicable and are handled elsewhere, not on this grid.
+    { key: 'incomeproof', label: 'Proof of Income' },
+    // The Transition Plan is the fillable form in DOC_FORM_COLS below (with Referral),
+    // so the old upload-only 'transitionplan' column was a confusing duplicate and is
+    // removed. Behavior Plan stays here as an upload/checkbox item.
+    { key: 'behaviorplan', label: 'Behavior Plan*' }
 ];
 
-/* Fillable PICC document-form columns (Transition Plan, Referral) used to live here as
-   green "on file" pills, but they are only required where applicable, so they have been
-   removed from this grid. Kept as an empty list so the rendering code that maps over it
-   stays valid without special-casing. */
-var DOC_FORM_COLS = [];
+/* PICC document forms shown on the Administrative tab as green "on file" pills,
+   moved here off the PI/PFA roster. `docForm` is the DOC_FORM_SPECS key in
+   pi-forms.js; `field` is the ISBETracking column ChildForms.state() checks to
+   decide whether a real form exists for the child this year. Clicking the pill
+   opens the shared form engine (openDocForm) — green loads the saved copy, faded
+   starts a blank one. The old upload-only "Transition Plan*" column in CHILD_DOCS
+   stays for a scanned copy; this new column is the fillable form. */
+var DOC_FORM_COLS = [
+    { docForm: 'transitionPlan', field: 'TransitionPlan', label: 'Transition Plan' },
+    { docForm: 'referral', field: 'Referral', label: 'Referral' }
+];
 
 // ── Helpers ──
 function apiFetch(url, opts) {
@@ -680,7 +688,8 @@ function renderAdmin() {
         return '<tr><td class="cfg-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + prog + '</td>'
             + cells + formCells + '</tr>';
     }).join('');
-    body.innerHTML = '<table class="cfg"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>';
+    body.innerHTML = '<table class="cfg"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>'
+        + '<div style="font-size:0.7rem;color:#94a3b8;margin:10px 20px;">* Behavior and transition plans are only required where applicable.</div>';
 }
 async function loadAdmin() {
     document.getElementById('afBody').innerHTML = '<div class="cf-loading">Loading…</div>';
