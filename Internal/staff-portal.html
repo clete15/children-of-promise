@@ -623,6 +623,11 @@
     .cls-partial { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--sp-warn-bg);color:var(--sp-warn-fg);cursor:help; }
     .cls-dl-overdue { background:var(--sp-bad-bg);color:var(--sp-bad-fg); }
     .cls-dl-due { background:var(--sp-warn-bg);color:var(--sp-warn-fg); }
+    /* Before/Afterschool cards: enrolled days instead of a checklist (placeholder). */
+    .cls-days { display:flex;align-items:center;flex-wrap:wrap;gap:5px; }
+    .cls-days-label { font-size:0.66rem;font-weight:700;color:var(--sp-quiet);margin-right:4px;text-transform:uppercase;letter-spacing:0.03em; }
+    .cls-day { display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 6px;border-radius:6px;border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-quiet);font-size:0.72rem;font-weight:700; }
+    .cls-day-on { background:var(--sp-accent-soft);border-color:var(--sp-accent);color:var(--sp-accent); }
 </style>
 </head>
 <body>
@@ -2054,10 +2059,13 @@ function classroomChecklistHtml(rooms) {
             + '<div class="cls-empty">No active PFA or PI children in this classroom.</div>';
     }
 
-    // Batch actions first: a teacher works a whole task at a time.
+    // Batch actions first: a teacher works a whole task at a time. Before/after
+    // children (room Type 'n/a') have no checklist, so they are not counted here.
     const batch = cols.map(col => {
         const missing = roster.filter(s =>
-            !ChildForms.isDone(s.Id, col.field, !!(CLS_TRACKING[s.Id] || {})[col.field]));
+            String(s.Type || '').trim().toLowerCase() !== 'n/a'
+            && !ChildForms.isDone(s.Id, col.field, !!(CLS_TRACKING[s.Id] || {})[col.field],
+                String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI'));
         if (!missing.length) return '';
         const label = col.label.replace(/<br>/g, ' ');
         // No "print all" — everything is signed on screen (stylus) now, so a stack of
@@ -2085,8 +2093,33 @@ function classroomChecklistHtml(rooms) {
         return d !== 0 ? d : CofpForms.sortByName(a, b);
     }).map(s => {
         const t = CLS_TRACKING[s.Id] || {};
+        // Only PI children need a real backing form for the checklist to count; for PFA
+        // and the non-PI rooms (2s/3s, before-after) a checked box is done (see the
+        // compliance steering — monitors review the PFA folder, not the app).
+        const childIsPI = String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI';
+
+        /* Before/Afterschool (room Type 'n/a', e.g. "Before and Afterschool") children
+           have none of these forms. Their card holds space with the days of the week
+           they are enrolled instead of a checklist. */
+        const isBeforeAfter = String(s.Type || '').trim().toLowerCase() === 'n/a';
+        if (isBeforeAfter) {
+            const DAYS = [['Monday', 'M'], ['Tuesday', 'T'], ['Wednesday', 'W'], ['Thursday', 'Th'], ['Friday', 'F']];
+            const dayChips = DAYS.map(function (d) {
+                const on = s[d[0]] === 1 || s[d[0]] === '1' || s[d[0]] === true;
+                return '<span class="cls-day' + (on ? ' cls-day-on' : '') + '">' + d[1] + '</span>';
+            }).join('');
+            const meta0 = [
+                s.Birth_date ? 'born ' + esc(s.Birth_date) : '',
+                s.Start_Date ? 'enrolled ' + esc(s.Start_Date) : ''
+            ].filter(Boolean).join(' \u00b7 ');
+            return '<div class="cls-card"><div class="cls-card-head">'
+                + '<div><div class="cls-name">' + esc(s.Last_Name + ', ' + s.First_Name) + '</div>'
+                + (meta0 ? '<div class="cls-meta">' + meta0 + '</div>' : '') + '</div></div>'
+                + '<div class="cls-days"><span class="cls-days-label">Enrolled</span>' + dayChips + '</div></div>';
+        }
+
         const chips = cols.map(col => {
-            const st = ChildForms.state(s.Id, col.field, !!t[col.field]);
+            const st = ChildForms.state(s.Id, col.field, !!t[col.field], childIsPI);
             const done = st === 'form' || st === 'tick' || st === 'unknown';
             const label = col.label.replace(/<br>/g, ' ');
             let extra = st === 'tick-only'
@@ -2127,7 +2160,7 @@ function classroomChecklistHtml(rooms) {
            duty on the classroom card. (Its click handler and data load remain harmless.) */
 
         const outstanding = cols.filter(col =>
-            !ChildForms.isDone(s.Id, col.field, !!t[col.field])).length;
+            !ChildForms.isDone(s.Id, col.field, !!t[col.field], childIsPI)).length;
         const status = outstanding
             ? '<span class="cls-out">' + outstanding + ' outstanding</span>'
             : '<span class="cls-ok">complete</span>';

@@ -2367,7 +2367,10 @@ function screeningDeadline(student, screeningDate, year) {
    away the ability to record it would push people to lie to the form instead.
    What changes is that the cell now says which kind of tick it is. */
 function cellClass(student, field) {
-    const st = ChildForms.state(student.Id, field, !!(trackingData[student.Id] || {})[field]);
+    // Only PI children need a real backing form; PFA counts a tick as done (monitors
+    // review the PFA folder, not the app). See compliance steering.
+    const st = ChildForms.state(student.Id, field, !!(trackingData[student.Id] || {})[field],
+        String(student.PFA_PI_na || '').trim().toUpperCase() === 'PI');
     return st === 'form' ? 'cf-form' : st === 'tick-only' ? 'cf-tick-only' : '';
 }
 
@@ -2377,12 +2380,22 @@ function cellClass(student, field) {
    [form] link, no deadline hint — those all live in the classroom card now. `extra` is
    optional trailing markup (a screening's date/flag line) shown only alongside a pill. */
 function teacherPill(student, field, extra) {
-    const st = ChildForms.state(student.Id, field, !!(trackingData[student.Id] || {})[field]);
-    if (st !== 'form') return '';   // nothing on file yet — empty cell
-    const d = ChildForms.formDate(student.Id, field);
-    const tip = 'On file' + (d ? ', dated ' + d : '') + '. Entered by the teacher in the classroom card.';
-    return '<span class="cf-pill" title="' + tip.replace(/"/g, '&quot;') + '">\u2713 on file</span>'
-        + (extra || '');
+    const isPI = String(student.PFA_PI_na || '').trim().toUpperCase() === 'PI';
+    const st = ChildForms.state(student.Id, field, !!(trackingData[student.Id] || {})[field], isPI);
+    // PI: only a real filed form ('form') shows the pill — a bare tick is not evidence.
+    // PFA: a checked box counts as done, so a 'tick' shows a green pill too (the folder,
+    // not the app, is the monitored evidence for PFA).
+    if (st === 'form') {
+        const d = ChildForms.formDate(student.Id, field);
+        const tip = 'On file' + (d ? ', dated ' + d : '') + '. Entered by the teacher in the classroom card.';
+        return '<span class="cf-pill" title="' + tip.replace(/"/g, '&quot;') + '">\u2713 on file</span>'
+            + (extra || '');
+    }
+    if (st === 'tick') {
+        return '<span class="cf-pill" title="Checked off by the teacher. For PFA the evidence lives in the child\u2019s physical folder.">\u2713 done</span>'
+            + (extra || '');
+    }
+    return '';   // nothing on file yet — empty cell
 }
 
 /* Weighted Eligibility on the roster is a read-only VIEW of the Child Files form, not a
@@ -2461,7 +2474,8 @@ function uploadIncome(studentId) {
 
 function checkBox(student, field) {
     const ticked = !!(trackingData[student.Id] || {})[field];
-    const st = ChildForms.state(student.Id, field, ticked);
+    const st = ChildForms.state(student.Id, field, ticked,
+        String(student.PFA_PI_na || '').trim().toUpperCase() === 'PI');
     let title = 'Toggle checkbox';
     let mark = '';
     if (st === 'form') {
@@ -2652,7 +2666,8 @@ function renderRoster() {
            box is ticked with nothing saved: they have no form in the system, so a
            blank one to work from is exactly what they need. */
         const uncheckedCount = roster.filter(s =>
-            !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field])).length;
+            !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field],
+                String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI')).length;
         if (uncheckedCount > 0) {
             return '<td' + dv + '><a href="#" onclick="event.preventDefault();printAllForColumn(\'' + c.field + '\')" style="font-size:0.6rem;color:#2563eb;text-decoration:none;font-weight:700;white-space:nowrap;" title="Print all unchecked forms for this column">🖨️ All (' + uncheckedCount + ')</a></td>';
         }
@@ -2707,7 +2722,8 @@ async function printAllForColumn(field) {
     // (ChildForms.isDone): a hand-ticked box with no saved form still needs a blank
     // to work from, so it belongs in the print run.
     const unchecked = roster.filter(s =>
-        !ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field]));
+        !ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field],
+            String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI'));
     if (!unchecked.length) { alert('All forms in this column are already completed!'); return; }
 
     const count = unchecked.length;
@@ -4418,7 +4434,8 @@ function outstandingByTask(program) {
     return visibleColumnsFor(program)
         .map(col => {
             const missing = roster.filter(s =>
-                !ChildForms.isDone(s.Id, col.field, !!(trackingData[s.Id] || {})[col.field]));
+                !ChildForms.isDone(s.Id, col.field, !!(trackingData[s.Id] || {})[col.field],
+                    String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI'));
             return { col: col, missing: missing, total: roster.length };
         })
         .filter(t => t.missing.length);
@@ -4449,7 +4466,8 @@ function beginningScreeningStatus(program) {
             // A screening is done once the teacher's scored summary is on file
             // (staff-administered; the parent questionnaire is optional). ChildForms.isDone
             // enforces that, so a bare tick still does not count the batch as complete.
-            const done = ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field]);
+            const done = ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field],
+                String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI');
             if (lateOne) {
                 if (done) return;
                 const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
@@ -4597,7 +4615,8 @@ function renderStartYearWorklist(program) {
     // Per child: the teacher columns still outstanding, in checklist order.
     const perChild = roster.map(s => {
         const missing = teacherCols.filter(c =>
-            !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field]));
+            !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field],
+                String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI'));
         return { student: s, missing: missing };
     }).filter(x => x.missing.length);
 

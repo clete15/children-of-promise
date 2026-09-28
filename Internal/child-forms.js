@@ -170,8 +170,18 @@
            completed questionnaire). A parent questionnaire upload is optional best
            practice: if present it also counts as complete, but its absence never holds
            a screening back. Nothing there but a tick is 'tick-only'.
-         - A report card is 'form' when its scan is uploaded, else tick-only/none. */
-    function state(studentId, field, ticked) {
+         - A report card is 'form' when its scan is uploaded, else tick-only/none.
+
+       isPI — whether this child is in the Prevention Initiative. Only PI children need
+       a real backing form for a "backed" field: PI files are the ones a monitor opens
+       (electronic files uploaded through the portal), so a bare tick on a PI child is
+       'tick-only' (not done). For everyone else — PFA (monitors review the physical
+       folder, not the app) and the 2s/3s and other non-PI rooms — the app checklist is
+       just a working tick, so a checked box counts as done. A real filed form still
+       reads as 'form' for any child when one exists. isPI defaults to true so any
+       caller that does not pass it keeps the strict (safe) behavior. */
+    function state(studentId, field, ticked, isPI) {
+        if (isPI === undefined) isPI = true;
         if (!isBacked(field)) return ticked ? 'tick' : 'none';
         if (loadState !== 'ready') return ticked ? 'unknown' : 'none';
 
@@ -181,20 +191,20 @@
             var scored = hasForm(studentId, field);
             var quest = hasFile(studentId, field, 'questionnaire');
             if (scored || quest) return 'form';
-            return ticked ? 'tick-only' : 'none';
+            return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
         }
         if (isReport(field)) {
             if (hasFile(studentId, field, 'report')) return 'form';
-            return ticked ? 'tick-only' : 'none';
+            return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
         }
         if (hasForm(studentId, field)) return 'form';
-        return ticked ? 'tick-only' : 'none';
+        return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
     }
 
     // Done for checklist purposes: a form on file, or a tick where there is no
-    // form to have. A tick-only on a backed field is deliberately NOT done.
-    function isDone(studentId, field, ticked) {
-        var s = state(studentId, field, ticked);
+    // form to have. A tick-only on a backed field (PI children only) is NOT done.
+    function isDone(studentId, field, ticked, isPI) {
+        var s = state(studentId, field, ticked, isPI);
         return s === 'form' || s === 'tick' || s === 'unknown';
     }
 
