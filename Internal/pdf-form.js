@@ -309,9 +309,10 @@ function buildFormPdf(spec) {
                 need(15);
                 const applies = !!it.applies;
                 const baseline = y - 10;
-                // Tick gutter: a green check for a Yes, an empty box otherwise.
+                // Tick gutter: a green check for a Yes; blank otherwise. (A non-applicable
+                // row is already clear from its grey label, and the middle-dot glyph used
+                // here before rendered as "?" in the PDF's base font.)
                 if (applies) coloredText('\u2713', MARGIN, baseline, 11, true, 0.09, 0.55, 0.28);
-                else coloredText('\u00b7', MARGIN + 2, baseline, 11, false, 0.6, 0.64, 0.72);
 
                 // Points, right-aligned in their own column.
                 const ptsTxt = String(it.points == null ? '' : it.points);
