@@ -157,7 +157,10 @@
             <p>Child Files &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="/staff/">← Staff Portal</a>
+    <div style="display:flex;align-items:center;gap:10px;">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/">← Staff Portal</a>
+    </div>
 </header>
 
 <div class="cf-layout">
@@ -206,21 +209,6 @@
                     style="font-size:0.75rem;padding:6px 12px;"
                     title="Copy last year's checked documents into this year as a starting point to confirm">
                     &#8617; Copy last year's checkmarks forward
-                </button>
-                <button class="btn-secondary" id="cfBackfillBtn" onclick="backfillFolders()"
-                    style="font-size:0.75rem;padding:6px 12px;"
-                    title="Create a folder and a pre-filled weighted eligibility form for every currently enrolled child. Safe to run more than once.">
-                    &#128193; Create child folders + weighted eligibility forms
-                </button>
-                <button class="btn-secondary" id="cfRefreshBtn" onclick="backfillFolders(true)"
-                    style="font-size:0.75rem;padding:6px 12px;"
-                    title="Regenerate every child's weighted eligibility form with the current scoring, replacing the existing one. Use after the scoring rules change.">
-                    &#128260; Refresh weighted eligibility forms
-                </button>
-                <button class="btn-secondary" id="cfRescoreBtn" onclick="rescoreWaitlist()"
-                    style="font-size:0.75rem;padding:6px 12px;"
-                    title="Recalculate the weighted score for every waiting-list child using the current rules, so the list re-ranks.">
-                    &#128290; Recalculate waiting-list scores
                 </button>
                 <span id="cfActionStatus" style="font-size:0.72rem;color:#6b7280;"></span>
             </div>
@@ -419,8 +407,11 @@ function buildRoomSidebar() {
     activeRoster().forEach(function (s) { withKids[s.RoomNumber] = true; });
     var rooms = (classrooms || []).filter(function (r) { return withKids[r.RoomNumber]; });
 
-    var totalEnrolled = activeRoster().length;
-    var totalNeed = activeRoster().filter(roomNeedsDocs).length;
+    // One room is always selected — there is no "All rooms" option. If the current
+    // activeRoom isn't a room with kids (e.g. the initial 'all' default), fall back to
+    // the first room so the grid always shows a single classroom.
+    var haveActive = rooms.some(function (r) { return String(r.RoomNumber) === String(activeRoom); });
+    if (!haveActive && rooms.length) activeRoom = rooms[0].RoomNumber;
 
     function countLine(enrolled, need) {
         var right = need
@@ -435,7 +426,7 @@ function buildRoomSidebar() {
             + countLine(enrolled, need) + '</button>';
     }
 
-    var html = btn('all', 'All rooms', totalEnrolled, totalNeed);
+    var html = '';
     rooms.forEach(function (r) {
         var kids = roomRoster(r.RoomNumber);
         var need = kids.filter(roomNeedsDocs).length;
@@ -613,6 +604,7 @@ async function loadTeacher() {
         }
     } catch (e) { /* renders on tick-only data */ }
     teacherLoaded = true;
+    buildRoomSidebar();
     renderTeacher();
 }
 
@@ -641,7 +633,7 @@ function renderAdmin() {
         body.innerHTML = '<div class="cf-empty">No enrolled children' + (activeRoom === 'all' ? '.' : ' in this room.') + '</div>';
         return;
     }
-    var head = '<tr><th class="cfg-name">Child</th><th class="cfg-room">Room</th>'
+    var head = '<tr><th class="cfg-name">Child</th>'
         + CHILD_DOCS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
         + DOC_FORM_COLS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
         + '</tr>';
@@ -694,7 +686,7 @@ function renderAdmin() {
         }).join('');
         var prog = (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') ? '<span class="cfg-prog">' + s.PFA_PI_na + '</span>' : '';
         return '<tr><td class="cfg-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + prog + '</td>'
-            + '<td class="cfg-room">' + escapeHtml(getRoomName(s.RoomNumber)) + '</td>' + cells + formCells + '</tr>';
+            + cells + formCells + '</tr>';
     }).join('');
     body.innerHTML = '<table class="cfg"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>'
         + '<div style="font-size:0.7rem;color:#94a3b8;margin:10px 20px;">* Behavior and transition plans are only required where applicable.</div>';
@@ -709,10 +701,11 @@ async function loadAdmin() {
         (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve()
     ]);
     adminLoaded = true;
-    renderAdmin();
-    // The sidebar's "need docs" count is derived from the admin doc data just loaded,
-    // so refresh it now that docChecklist / file index are populated.
+    // Build the sidebar first: with no "All rooms" option it resolves activeRoom to a
+    // real room, and its "need docs" counts use the admin doc data just loaded. Then
+    // render the grid for whichever room is now selected.
     buildRoomSidebar();
+    renderAdmin();
 }
 async function toggleChildDoc(studentId, docKey, checked) {
     try {
@@ -836,6 +829,35 @@ async function init() {
     buildRoomSidebar();
     await loadAdmin();
 }
+
+/* ── Light / dark theme ──
+   Shares the same `copStaffTheme` preference and `sp-dark` body class as the rest of
+   the portal, so a person's choice carries across every staff page. The --sp-* tokens
+   and the body.sp-dark overrides live in styles.css. */
+(function () {
+    var KEY = 'copStaffTheme';
+    function prefersDark() {
+        try { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+        catch (e) { return false; }
+    }
+    function apply(dark) {
+        document.body.classList.toggle('sp-dark', !!dark);
+        var btn = document.getElementById('spTheme');
+        if (btn) {
+            btn.textContent = dark ? '\u2600 Light mode' : '\u263e Dark mode';
+            btn.setAttribute('aria-pressed', dark ? 'true' : 'false');
+        }
+    }
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
+    apply(saved === null ? prefersDark() : saved === 'dark');
+    var btn = document.getElementById('spTheme');
+    if (btn) btn.addEventListener('click', function () {
+        var dark = !document.body.classList.contains('sp-dark');
+        apply(dark);
+        try { localStorage.setItem(KEY, dark ? 'dark' : 'light'); } catch (e) {}
+    });
+})();
 
 init();
 </script>
