@@ -4,21 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Children Of Promise - Staff Portal</title>
+    <!-- Share the staff app's theme tokens so this dashboard gets light/dark like every
+         other page. styles.css maps the legacy names this page uses (--bg, --card-bg,
+         --border, --text, --text-muted, --primary, --accent, --danger, --success) onto
+         the themed --sp-* tokens, so the page's existing rules become theme-aware. -->
+    <link rel="stylesheet" href="/staff/styles.css">
+    <!-- Pre-paint theme: set the dark class on <html> before first paint (no flash). -->
+    <script>
+        (function () {
+            try {
+                var s = localStorage.getItem('copStaffTheme');
+                var dark = s === null
+                    ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                    : s === 'dark';
+                if (dark) document.documentElement.classList.add('sp-dark');
+            } catch (e) {}
+        })();
+    </script>
     <style>
-        :root {
-            --primary: #2563eb;
-            --primary-dark: #1d4ed8;
-            --accent: #f59e0b;
-            --success: #16a34a;
-            --danger: #dc2626;
-            --bg: #f1f5f9;
-            --card-bg: #ffffff;
-            --border: #e2e8f0;
-            --text: #1e293b;
-            --text-muted: #64748b;
-            --radius: 12px;
-            --shadow: 0 4px 16px rgba(0,0,0,0.10);
-        }
+        /* This page keeps slightly rounder cards than the shared default. Everything else
+           (colours) comes from styles.css so it themes with the rest of the portal. */
+        :root { --radius: 12px; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -190,8 +196,8 @@
         /* OFFLINE WARNING */
         .offline-warning {
             display: none;
-            background: #fef2f2;
-            border: 1.5px solid #fecaca;
+            background: var(--sp-bad-bg, #fef2f2);
+            border: 1.5px solid var(--sp-bad-br, #fecaca);
             border-radius: var(--radius);
             padding: 14px 20px;
             max-width: 680px;
@@ -199,8 +205,8 @@
             margin-bottom: 20px;
             text-align: center;
         }
-        .offline-warning h4 { color: var(--danger); font-size: 0.9rem; margin-bottom: 4px; }
-        .offline-warning p  { color: #7f1d1d; font-size: 0.8rem; line-height: 1.5; }
+        .offline-warning h4 { color: var(--sp-bad-fg, #b91c1c); font-size: 0.9rem; margin-bottom: 4px; }
+        .offline-warning p  { color: var(--sp-bad-fg, #7f1d1d); font-size: 0.8rem; line-height: 1.5; }
 
         /* DASHBOARD */
         .dashboard { width: 100%; max-width: 680px; }
@@ -232,12 +238,12 @@
             transition: background 0.12s;
         }
         .dash-item:last-child { border-bottom: none; }
-        .dash-item:hover { background: #f8fafc; }
+        .dash-item:hover { background: var(--sp-surface-2, #f8fafc); }
         .dash-item .di-icon { font-size: 1.4rem; flex-shrink: 0; width: 28px; text-align: center; }
         .dash-item .di-content { flex: 1; min-width: 0; }
         .dash-item .di-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
         .dash-item .di-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 1px; }
-        .dash-item .di-arrow { color: #cbd5e0; font-size: 1rem; flex-shrink: 0; transition: color 0.12s, transform 0.12s; }
+        .dash-item .di-arrow { color: var(--sp-quiet, #cbd5e0); font-size: 1rem; flex-shrink: 0; transition: color 0.12s, transform 0.12s; }
         .dash-item:hover .di-arrow { color: var(--primary); transform: translateX(2px); }
         @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:0.7} }
 
@@ -294,6 +300,7 @@
         <div class="status-dot"></div>
         <span id="statusText">Checking server…</span>
     </div>
+    <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false" title="Switch between light and dark" style="margin-left:8px;"></button>
     <button onclick="runDeploy()" id="deployBtn" data-role="admin" style="display:none;padding:8px 16px;background:#16a34a;color:white;border:none;border-radius:20px;font-size:0.8rem;font-weight:700;cursor:pointer;transition:background 0.15s;margin-left:8px;" onmouseover="this.style.background='#15803d'" onmouseout="this.style.background='#16a34a'" title="Pull latest code from GitHub and restart server">🚀 Deploy</button>
 </header>
 
@@ -303,7 +310,7 @@
         <p>The server may be restarting. Please wait a moment and refresh the page.</p>
     </div>
 
-    <p id="dashLead" style="max-width:680px;margin:0 auto 18px;color:#64748b;font-size:0.9rem;"></p>
+    <p id="dashLead" style="max-width:680px;margin:0 auto 18px;color:var(--sp-muted);font-size:0.9rem;"></p>
 
     <div class="dashboard">
         <div class="dash-section" data-role="admin">
@@ -493,6 +500,9 @@
 
      my-portal.html carries the same note for the same reason at /me. The server now also
      redirects /staff to /staff/, so this is belt and braces rather than the only guard. -->
+<!-- Shared helpers + the light/dark theme toggle (owns #spTheme wiring, keyed on
+     localStorage 'copStaffTheme' — same choice as every other staff page). -->
+<script src="/staff/app.js"></script>
 <script src="/staff/auth.js"></script>
 <script>
 // The password is not held here any more; the server is the only authority.
