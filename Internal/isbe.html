@@ -5,6 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ISBE PFA/PI Management – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Pre-paint theme: set the dark class on <html> synchronously, before first paint,
+         so a dark-mode user never sees a flash of the light background. The full toggle
+         (and the body class it also sets) runs later on the page. -->
+    <script>
+        (function () {
+            try {
+                var s = localStorage.getItem('copStaffTheme');
+                var dark = s === null
+                    ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                    : s === 'dark';
+                if (dark) document.documentElement.classList.add('sp-dark');
+            } catch (e) {}
+        })();
+    </script>
     <style>
         /* Themed to match the Enrollment Management pages (was a fixed blue gradient with
            translucent-white sidebar). Surfaces, borders and text follow the --sp-* tokens
@@ -1200,6 +1214,7 @@ if (!window.ChildForms) {
     var KEY = 'copStaffTheme';
     function apply(dark) {
         document.body.classList.toggle('sp-dark', !!dark);
+        document.documentElement.classList.toggle('sp-dark', !!dark);
         var btn = document.getElementById('spTheme');
         if (btn) {
             btn.textContent = dark ? '\u2600 Light mode' : '\u263e Dark mode';

@@ -217,6 +217,8 @@
                     void persist;
                     sessionStorage.setItem(TOKEN_KEY, body.token);
                     sessionStorage.setItem(TOKEN_NAME_KEY, body.name || '');
+                    // A fresh sign-in invalidates any cached identity from a prior token.
+                    try { sessionStorage.removeItem('copStaffWho'); } catch (e) {}
                     // Clear any token a previous build left in localStorage, so an old
                     // persisted session cannot keep silently signing someone in.
                     try { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(TOKEN_NAME_KEY); } catch (e) {}
@@ -229,6 +231,7 @@
     function staffLogout() {
         try { localStorage.removeItem(TOKEN_KEY); sessionStorage.removeItem(TOKEN_KEY); } catch (e) {}
         try { localStorage.removeItem(TOKEN_NAME_KEY); sessionStorage.removeItem(TOKEN_NAME_KEY); } catch (e) {}
+        try { sessionStorage.removeItem('copStaffWho'); } catch (e) {}
     }
 
     /* Changes the signed-in staff member's own password. The server requires the
@@ -261,7 +264,32 @@
        Asks with the personal credentials, so on a browser holding both this answers
        "you are Paige" rather than "you are the director". Getting that wrong is what
        put the staff chooser on a staff member's own page. */
-    function whoAmI() {
+    /* Per-session cache of the resolved identity, keyed by the token it was resolved
+       for. whoAmI() used to hit /api/staff-whoami on EVERY page load, so each
+       navigation between staff pages paid one blocking round-trip before it could
+       render or redirect — the "slight delay" on links. The token already lives in
+       sessionStorage for the whole browser session (12h TTL, server-enforced), so the
+       identity it maps to is stable for that session; caching it in sessionStorage
+       lets a second/third page resolve instantly from memory instead of the network.
+
+       Keyed by token so a sign-out + different sign-in can't return a stale identity:
+       the cache only hits when the stored token matches the one it was cached against.
+       On a cache miss it still fetches and the answer is authoritative. */
+    var WHO_KEY = 'copStaffWho';
+    function cachedWho(t) {
+        try {
+            var raw = sessionStorage.getItem(WHO_KEY);
+            if (!raw) return undefined;
+            var o = JSON.parse(raw);
+            if (o && o.t === t) return o.who;   // who may be null (known "not this token")
+        } catch (e) {}
+        return undefined;
+    }
+    function storeWho(t, who) {
+        try { sessionStorage.setItem(WHO_KEY, JSON.stringify({ t: t, who: who })); } catch (e) {}
+    }
+
+    function whoAmI(opts) {
         /* Identity is asked with the TOKEN ONLY — never the shared password. Who you
            are is a person; the shared centre password is not a person. Sending it here
            is what let a browser holding the password report as "director" and walk
@@ -269,9 +297,15 @@
            NOT use personalHeaders() (which falls back to the password): no token means
            not signed in, which is the honest answer and sends the visitor to /me. */
         var t = token();
-        if (!t) return Promise.resolve(null);
+        if (!t) { storeWho('', null); return Promise.resolve(null); }
+        // Serve from the per-session cache unless the caller explicitly forces a refresh.
+        if (!(opts && opts.fresh)) {
+            var c = cachedWho(t);
+            if (c !== undefined) return Promise.resolve(c);
+        }
         return fetch('/api/staff-whoami', { headers: { 'X-Staff-Token': t } })
             .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (who) { storeWho(t, who); return who; })
             .catch(function () { return null; });
     }
 

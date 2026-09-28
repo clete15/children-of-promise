@@ -5,11 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Child Files – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Pre-paint theme: set the dark class on <html> synchronously, before first paint,
+         so a dark-mode user never sees a flash of the light background. The full toggle
+         (and the body class it also sets) runs later at the end of the page. -->
+    <script>
+        (function () {
+            try {
+                var s = localStorage.getItem('copStaffTheme');
+                var dark = s === null
+                    ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                    : s === 'dark';
+                if (dark) document.documentElement.classList.add('sp-dark');
+            } catch (e) {}
+        })();
+    </script>
     <style>
         /* Themed to match the staff / EMS pages: surfaces, borders and text follow the
            shared --sp-* tokens so it reads the same in light AND dark mode, instead of
            the old white card on a blue gradient. */
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
+        /* Auth gate: keep the page contents invisible (but the correct-theme background
+           painted) until the sign-in check passes, so a signed-out visitor never sees
+           the page flash before being sent to /me. whoAmI() is cached per session, so
+           on second and later navigations this reveals immediately. */
+        body:not(.auth-ready) .site-header,
+        body:not(.auth-ready) .cf-layout { visibility: hidden; }
         .cf-layout { padding:20px;max-width:1300px;margin:0 auto; }
         .cf-shell { background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.12);overflow:hidden; }
 
@@ -811,6 +831,7 @@ async function init() {
     var who = null;
     try { who = await CofpAuth.whoAmI(); } catch (e) { who = null; }
     if (!who) { location.replace('/me'); return; }
+    document.body.classList.add('auth-ready');   // signed in — reveal the page
 
     activeYear = currentSchoolYear();
     buildYearPicker();
@@ -842,6 +863,7 @@ async function init() {
     }
     function apply(dark) {
         document.body.classList.toggle('sp-dark', !!dark);
+        document.documentElement.classList.toggle('sp-dark', !!dark);
         var btn = document.getElementById('spTheme');
         if (btn) {
             btn.textContent = dark ? '\u2600 Light mode' : '\u263e Dark mode';

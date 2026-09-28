@@ -43,7 +43,10 @@
     --text: var(--sp-text);
     --text-muted: var(--sp-muted);
 }
-body.sp-dark {
+/* `html.sp-dark` is set by a tiny pre-paint script in each page's <head> so the dark
+   background is correct on the very first paint (no light→dark flash). `body.sp-dark`
+   is set later by the theme toggle. Both select the same dark token block. */
+body.sp-dark, html.sp-dark {
     --sp-bg: #0f172a;
     --sp-surface: #1a2235;
     --sp-surface-2: #212b41;
