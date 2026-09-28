@@ -913,6 +913,101 @@
         document.getElementById('rsOverlay').removeAttribute('data-printing');
     }
 
+    // ── PFA Exit Interview (PFA Item 4) ──────────────────────────────────────
+    /* End-of-year confirmation that the ASQ/ASE screening results and the final
+       Teaching Strategies Gold report card were shared with the parent. A per-child
+       signed form: the parent signs (in person on the classroom tablet, or from the
+       parent portal) and the teacher signs; filing the signed PDF turns the child's
+       Exit Interview pill green. Same shape as Results Shared, minus the structured
+       fields — the confirmation text plus the two signatures is the whole form. */
+    var currentEIStudentId = null;
+
+    function exitInterviewText(sy) {
+        return 'The parent/guardian confirms that Children of Promise has shared the '
+            + 'ASQ-3 and ASQ:SE-2 developmental screening results for the ' + (sy || 'school')
+            + ' school year, and that they have received a final Teaching Strategies Gold '
+            + 'report card for that school year.';
+    }
+
+    function openExitInterview(studentId) {
+        currentEIStudentId = studentId;
+        var student = students().find(function (s) { return String(s.Id) === String(studentId); });
+        if (!student) return;
+        var today = new Date().toISOString().split('T')[0];
+        var sy = year();
+
+        document.getElementById('eiModalTitle').textContent = 'Exit Interview \u2013 ' + student.First_Name + ' ' + student.Last_Name;
+        document.getElementById('eiChildName').textContent = student.First_Name + ' ' + student.Last_Name;
+        document.getElementById('eiSchoolYear').textContent = sy || '\u2014';
+        document.getElementById('eiConfirmText').textContent = exitInterviewText(sy);
+
+        ['eiParentSig', 'eiStaffSig'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+        document.getElementById('eiParentSigDate').value = today;
+        document.getElementById('eiStaffSigDate').value = today;
+        document.getElementById('eiSavedBadge').style.display = 'none';
+
+        sigPads = {};
+        mountSigPad('eiParentSigPad', studentId, 'ExitInterview', 'parent',
+            { label: 'Parent/Guardian signature', printedName: 'eiParentSig', dateField: 'eiParentSigDate' });
+        mountSigPad('eiStaffSigPad', studentId, 'ExitInterview', 'staff',
+            { label: 'Teacher signature', printedName: 'eiStaffSig', dateField: 'eiStaffSigDate' });
+
+        document.getElementById('eiOverlay').classList.add('open');
+        refreshSigPads();
+    }
+
+    function closeExitInterview() {
+        document.getElementById('eiOverlay').classList.remove('open');
+        currentEIStudentId = null;
+    }
+
+    async function saveExitInterview() {
+        if (!currentEIStudentId) return;
+        var btn = document.getElementById('eiSaveBtn');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        var sy = year();
+        try {
+            var st = students().find(function (s) { return String(s.Id) === String(currentEIStudentId); });
+            // Filing the signed PDF ticks ExitInterview server-side (child-signed-form),
+            // which lights the pill; mark locally so it turns green without a reload.
+            var t = tracking();
+            if (!t[currentEIStudentId]) t[currentEIStudentId] = {};
+            t[currentEIStudentId].ExitInterview = 1;
+            ChildForms().mark(currentEIStudentId, 'ExitInterview', new Date().toISOString().split('T')[0]);
+            var sigProblems = await fileSignedForm(currentEIStudentId, 'ExitInterview', {
+                formTitle: 'PFA Exit Interview Form',
+                rows: [
+                    { label: 'Child', value: st ? st.Last_Name + ', ' + st.First_Name : '' },
+                    { label: 'Date of birth', value: st ? (st.Birth_date || '') : '' },
+                    { label: 'School year', value: sy }
+                ],
+                blocks: [{ heading: 'Exit Interview Confirmation', text: exitInterviewText(sy) }]
+            });
+            refreshActiveView();
+            if (sigProblems.length) {
+                // Nothing was signed, or filing failed. Without a signature there is no
+                // evidence, so undo the optimistic local tick.
+                t[currentEIStudentId].ExitInterview = 0;
+                alert(sigProblems.join('\n') || 'Please sign before saving.');
+                return;
+            }
+            document.getElementById('eiSavedBadge').style.display = 'inline-flex';
+            setTimeout(function () { document.getElementById('eiSavedBadge').style.display = 'none'; }, 3000);
+        } catch (e) {
+            alert('Save failed: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Sign & File Exit Interview';
+        }
+    }
+
+    function printExitInterview() {
+        document.getElementById('eiOverlay').setAttribute('data-printing', '1');
+        window.print();
+        document.getElementById('eiOverlay').removeAttribute('data-printing');
+    }
+
     // ── Screening (ASQ-3 / ASQ:SE-2) ─────────────────────────────────────────
     var currentScrStudentId = null;
     var currentScrType = '';
@@ -1419,6 +1514,26 @@
         '<button class="pi-btn pi-btn-primary" id="rsSaveBtn" onclick="CofpForms.saveResultsShared()">Save Record</button></div>',
         '</div></div>',
 
+        // ── PFA Exit Interview (PFA Item 4) — end-of-year, per child ──
+        '<div class="pi-overlay" id="eiOverlay"><div class="pi-modal">',
+        '<div class="pi-modal-header"><h3 id="eiModalTitle">Exit Interview</h3>',
+        '<button class="pi-close" onclick="CofpForms.closeExitInterview()" aria-label="Close">&times;</button></div>',
+        '<div class="pi-modal-body">',
+        '<div class="pi-section"><h4>Children of Promise PFA \u2014 Exit Interview</h4>',
+        '<div class="pi-grid"><div class="pi-field"><label>Child</label><div class="pi-value" id="eiChildName"></div></div>',
+        '<div class="pi-field"><label>School Year</label><div class="pi-value" id="eiSchoolYear"></div></div></div>',
+        '<p class="pi-value" id="eiConfirmText" style="margin-top:12px;line-height:1.6;white-space:normal;background:none;padding:0;"></p></div>',
+        '<div class="pi-section"><h4>Signatures</h4>',
+        '<div class="doc-note">Hand the screen to the parent to sign, then sign as the teacher. Signing files the exit interview into the child\u2019s folder and marks it complete for the year. It can also be signed by the parent from the Parent Portal.</div>',
+        '<div class="pi-grid">',
+        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="eiParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="eiParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="eiParentSigDate" style="flex:1;" title="Date signed"></div></div>',
+        '<div class="pi-field pi-full"><label>Teacher Signature</label><div id="eiStaffSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="eiStaffSig" placeholder="Printed name" style="flex:2;"><input type="date" id="eiStaffSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
+        '</div>',
+        '<div class="pi-modal-footer"><span class="pi-saved-badge" id="eiSavedBadge" style="display:none;">&#10003; Saved</span>',
+        '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printExitInterview()">&#x1F5A8;&#xFE0F; Print</button>',
+        '<button class="pi-btn pi-btn-primary" id="eiSaveBtn" onclick="CofpForms.saveExitInterview()">Sign &amp; File Exit Interview</button></div>',
+        '</div></div>',
+
         '<div class="pi-overlay" id="scrOverlay"><div class="pi-modal">',
         '<div class="pi-modal-header"><h3 id="scrModalTitle">Screening Score Entry</h3>',
         '<button class="pi-close" onclick="CofpForms.closeScreening()" aria-label="Close">&times;</button></div>',
@@ -1547,6 +1662,23 @@
         '.pi-flags { display:flex;flex-wrap:wrap;gap:6px;padding:4px 0; }',
         '.pi-flag { padding:3px 9px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:0.7rem;font-weight:700;white-space:nowrap; }',
         '.doc-note { font-size:0.72rem;color:#6b7280;margin:-4px 0 10px 0;line-height:1.5; }',
+        /* Weighted eligibility criteria table — grouped sections with subtotals and
+           highlighted qualifying rows. Shipped here so the modal is styled on any page
+           that injects the shared modals (isbe.html defines its own inline copy). */
+        '.doc-criteria { width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px; }',
+        '.doc-criteria thead th { text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748b;padding:6px 8px;border-bottom:2px solid #e5e7eb;background:#f8fafc; }',
+        '.doc-criteria td { padding:5px 8px;border-bottom:1px solid #f3f4f6;vertical-align:middle; }',
+        '.doc-criteria tbody tr:hover { background:#f8fafc; }',
+        '.doc-criteria select { font-size:0.76rem;padding:4px 6px;border:1px solid #d1d5db;border-radius:5px;font-family:inherit;background:white;width:100%; }',
+        '.doc-criteria-picc { font-size:0.66rem;font-weight:700;color:#1d4ed8;white-space:nowrap; }',
+        '.doc-criteria-pts { text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap; }',
+        '.doc-criteria tfoot td { border-top:2px solid #2563eb;border-bottom:none;font-weight:700;font-size:0.8rem;color:#1d4ed8;padding-top:8px; }',
+        '.doc-criteria th:nth-child(4), .doc-criteria td:nth-child(4) { width:90px; }',
+        '.doc-crit-grouphdr th { text-align:left;font-size:0.66rem;font-weight:800;letter-spacing:0.03em;color:#334155;background:#eef2f7;padding:6px 8px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb; }',
+        '.doc-crit-grouphdr th.doc-criteria-pts { text-align:right;color:#166534; }',
+        '.doc-criteria tr.applies { background:#f0fdf4; }',
+        '.doc-criteria tr.applies:hover { background:#e7f9ec; }',
+        '.doc-criteria tr.applies td:first-child { font-weight:700;color:#14532d; }',
         '.cls-upload-row { display:flex;align-items:center;gap:10px;flex-wrap:wrap; }',
         '.cls-upload-row input[type=file] { font-size:0.8rem; }',
         '.cls-upload-status { font-size:0.75rem;font-weight:600; }',
@@ -1603,6 +1735,10 @@
         openPermissionSlip: openPermissionSlip,
         savePermissionSlip: savePermissionSlip,
         closePermissionSlip: closePermissionSlip,
+        openExitInterview: openExitInterview,
+        saveExitInterview: saveExitInterview,
+        closeExitInterview: closeExitInterview,
+        printExitInterview: printExitInterview,
         openResultsShared: openResultsShared,
         saveResultsShared: saveResultsShared,
         closeResultsShared: closeResultsShared,

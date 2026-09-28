@@ -230,39 +230,123 @@ function buildFormPdf(spec) {
         y -= size * 1.35;
     }
 
+    /* A filled rectangle at (x,y,w,h) in the given RGB (0..1). Used for the shaded
+       group-header bars and the score banner behind the weighted-eligibility table. */
+    function fillRect(x, ry, w, h, r, g, bl) {
+        ops.push(r + ' ' + g + ' ' + bl + ' rg '
+            + x.toFixed(2) + ' ' + ry.toFixed(2) + ' ' + w.toFixed(2) + ' ' + h.toFixed(2) + ' re f');
+    }
+
+    /* Text in a specific RGB, left-aligned at an x/baseline. Lets a criterion that does
+       NOT apply print in soft grey so the applicable factors stand out, and the tick
+       column print in green. Colour is reset to black after each string. */
+    function coloredText(text, x, baseline, size, bold, r, g, bl) {
+        ops.push('BT ' + r + ' ' + g + ' ' + bl + ' rg /' + (bold ? 'F2' : 'F1') + ' ' + size
+            + ' Tf ' + x.toFixed(2) + ' ' + baseline.toFixed(2) + ' Td (' + pdfString(text) + ') Tj ET 0 0 0 rg');
+    }
+
     // ── Blocks ──
-    // Two shapes:
-    //   { heading, text }              wrapped paragraph(s)  (original)
-    //   { heading, items:[{label, answer, applies}] }  a checklist: one line per
-    //     item, the answer right-aligned in its own column, applicable items bold so
-    //     what actually counts stands out from the sea of "No".
-    (spec.blocks || []).forEach(b => {
-        if (!b) return;
-        if (Array.isArray(b.items)) {
-            need(30);
-            y -= 8;
-            if (b.heading) line(b.heading, 11, true);
-            y -= 2;
-            b.items.forEach(it => {
-                need(15);
-                const mark = it.applies ? '[X] ' : '';           // a leading tick for a Yes
-                const left = mark + (it.label || '');
-                // A label too wide for the answer column is truncated with an ellipsis
-                // rather than colliding with the answer — one clean line per item.
-                const answer = it.answer || '';
-                const maxLeft = BODY - textWidth(answer, 10, false) - 16;
-                let shown = left;
-                if (textWidth(shown, 10, !!it.applies) > maxLeft) {
-                    while (shown.length > 1 && textWidth(shown + '\u2026', 10, !!it.applies) > maxLeft) {
-                        shown = shown.slice(0, -1);
-                    }
-                    shown += '\u2026';
-                }
-                rowLR(shown, answer, 10, !!it.applies);
+    // Shapes:
+    //   { heading, text }                              wrapped paragraph(s)
+    //   { summary: { total, determination, qualifying:[{label,points}] } }
+    //                                                  a highlighted score banner
+    //   { heading, subtotal, items:[{label, points, answer, applies, recorded}] }
+    //                                                  a scored criteria group: a
+    //     shaded header bar, then one row per item — a tick gutter, the label (bold +
+    //     black when it applies, soft grey when it does not), and the points
+    //     right-aligned in their own column. A per-group subtotal closes it.
+    function drawScoreBanner(sm) {
+        // A shaded panel: big total on the left, determination on the right, then the
+        // qualifying factors listed in bold beneath — the answer to "why this score".
+        const qual = Array.isArray(sm.qualifying) ? sm.qualifying : [];
+        const qualLines = [];
+        qual.forEach(q => {
+            const t = '\u2022 ' + q.label + ' (' + q.points + ')';
+            wrapText(t, BODY - 24, 10, true).forEach(l => qualLines.push(l));
+        });
+        const bannerH = 34 + (qualLines.length ? (qualLines.length * 13 + 10) : 0);
+        need(bannerH + 10);
+        y -= 6;
+        const top = y;
+        // Panel background (very light indigo) + a left accent bar.
+        fillRect(MARGIN, top - bannerH, BODY, bannerH, 0.93, 0.95, 1);
+        fillRect(MARGIN, top - bannerH, 4, bannerH, 0.15, 0.39, 0.92);
+        // Total (large) and determination (right side), on the top row of the panel.
+        coloredText('Total weighted points: ' + (sm.total || 0), MARGIN + 14, top - 22, 15, true, 0.11, 0.25, 0.6);
+        const det = 'Determination: ' + (sm.determination || 'Eligible');
+        coloredText(det, PAGE.width - MARGIN - textWidth(det, 11, true) - 12, top - 21, 11, true, 0.09, 0.4, 0.2);
+        y = top - 34;
+        if (qualLines.length) {
+            coloredText('Qualifying factors:', MARGIN + 14, y - 11, 9, true, 0.3, 0.34, 0.45);
+            y -= 15;
+            qualLines.forEach(l => {
+                ops.push('BT /F2 10 Tf ' + (MARGIN + 20) + ' ' + (y - 10) + ' Td (' + pdfString(l) + ') Tj ET');
+                y -= 13;
             });
             y -= 4;
+        }
+        y = top - bannerH - 6;
+    }
+
+    const PTS_COL_W = 46;   // right-hand points column width, shared by rows + subtotal
+
+    (spec.blocks || []).forEach(b => {
+        if (!b) return;
+
+        if (b.summary) { drawScoreBanner(b.summary); return; }
+
+        if (Array.isArray(b.items)) {
+            need(34);
+            y -= 10;
+            // Shaded group-header bar with the heading and a right-aligned "Pts" label.
+            const barTop = y;
+            fillRect(MARGIN, barTop - 16, BODY, 16, 0.90, 0.92, 0.96);
+            coloredText(b.heading || '', MARGIN + 6, barTop - 12, 9.5, true, 0.2, 0.24, 0.34);
+            coloredText('Pts', PAGE.width - MARGIN - textWidth('Pts', 8, true) - 6, barTop - 12, 8, true, 0.4, 0.44, 0.53);
+            y = barTop - 16 - 4;
+
+            b.items.forEach(it => {
+                need(15);
+                const applies = !!it.applies;
+                const baseline = y - 10;
+                // Tick gutter: a green check for a Yes, an empty box otherwise.
+                if (applies) coloredText('\u2713', MARGIN, baseline, 11, true, 0.09, 0.55, 0.28);
+                else coloredText('\u00b7', MARGIN + 2, baseline, 11, false, 0.6, 0.64, 0.72);
+
+                // Points, right-aligned in their own column.
+                const ptsTxt = String(it.points == null ? '' : it.points);
+                if (ptsTxt) {
+                    coloredText(ptsTxt, PAGE.width - MARGIN - textWidth(ptsTxt, 10, applies), baseline,
+                        10, applies, applies ? 0.11 : 0.55, applies ? 0.25 : 0.58, applies ? 0.6 : 0.66);
+                }
+
+                // Label — bold black when it applies, soft grey when it does not, so the
+                // qualifying factors carry the eye. A trailing "(not recorded)" note when
+                // the intake never answered it, kept subtle.
+                const labelX = MARGIN + 16;
+                const note = it.recorded === false ? '  (not recorded)' : '';
+                const maxLabel = BODY - 16 - PTS_COL_W;
+                let shown = (it.label || '') + note;
+                if (textWidth(shown, 10, applies) > maxLabel) {
+                    while (shown.length > 1 && textWidth(shown + '\u2026', 10, applies) > maxLabel) shown = shown.slice(0, -1);
+                    shown += '\u2026';
+                }
+                if (applies) coloredText(shown, labelX, baseline, 10, true, 0, 0, 0);
+                else coloredText(shown, labelX, baseline, 10, false, 0.42, 0.46, 0.55);
+                y -= 14;
+            });
+
+            // Per-group subtotal, right-aligned under the points column.
+            if (b.subtotal != null) {
+                need(14);
+                const sub = 'Subtotal: ' + b.subtotal;
+                coloredText(sub, PAGE.width - MARGIN - textWidth(sub, 8.5, true), y - 10, 8.5, true, 0.3, 0.34, 0.45);
+                y -= 14;
+            }
+            y -= 2;
             return;
         }
+
         need(40);
         y -= 8;
         if (b.heading) line(b.heading, 11, true);

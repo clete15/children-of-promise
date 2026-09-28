@@ -160,54 +160,68 @@
         return '';
     }
 
+    /* `group` clusters the criteria into labelled sections in the on-screen editor, the
+       same groups the filed PDF uses (server SEEDED_WEIGHTED_CRITERIA), so the two read
+       the same. WEIGHTED_CRITERIA_GROUPS below gives the section order + headings. */
     const WEIGHTED_CRITERIA = [
-        { key: 'homeless', label: 'Experiencing homelessness', points: 50, picc: 'PI5.D', intakeKey: 'Homeless' },
+        { key: 'homeless', group: 'auto', label: 'Experiencing homelessness', points: 50, picc: 'PI5.D', intakeKey: 'Homeless' },
         {
-            key: 'youthInCare', label: 'Youth in Care (foster) or adopted', points: 50, picc: 'PI5.E',
+            key: 'youthInCare', group: 'auto', label: 'Youth in Care (foster) or adopted', points: 50, picc: 'PI5.E',
             intakeKey: 'FosterAdopted',
             // Foster is not its own column on the enrollment row; it is the pay category.
             fromStudent: s => (String(s.Category || '') === 'Foster' ? 'Yes' : '')
         },
-        { key: 'earlyIntervention', label: 'Enrolled in Early Intervention with an identified delay', points: 5, picc: 'PI5.B', intakeKey: 'EarlyIntervention' },
+        { key: 'earlyIntervention', group: 'dev', label: 'Enrolled in Early Intervention with an identified delay', points: 5, picc: 'PI5.B', intakeKey: 'EarlyIntervention' },
         {
-            key: 'hasIep', label: 'Has an IEP', points: 5, picc: 'PI5.B', intakeKey: 'IEP',
+            key: 'hasIep', group: 'dev', label: 'Has an IEP', points: 5, picc: 'PI5.B', intakeKey: 'IEP',
             fromStudent: s => yesNoOrBlank(s.IEP)
         },
-        { key: 'screeningDelayNoEi', label: 'Screening indicated a delay but no current Early Intervention referral', points: 5, picc: 'PI5.C', intakeKey: 'ScreeningDelayNoEi' },
+        { key: 'screeningDelayNoEi', group: 'dev', label: 'Screening indicated a delay but no current Early Intervention referral', points: 5, picc: 'PI5.C', intakeKey: 'ScreeningDelayNoEi' },
+        { key: 'lowBirthWeight', group: 'dev', label: 'Low birth weight or failure to thrive', points: 5, intakeKey: 'LowBirthWeight' },
         // The intake form offers "Not sure" on this one. Leave it unanswered rather
         // than defaulting to No, so staff settle it from the income verification.
         {
-            key: 'incomeBelow50Fpl', label: 'Family income at or below 50% of the federal poverty level', points: 5, picc: 'PI5.F',
+            key: 'incomeBelow50Fpl', group: 'income', label: 'Family income at or below 50% of the federal poverty level', points: 5, picc: 'PI5.F',
             derive: d => {
                 const v = String(d.IncomeBelow50Fpl || '').trim().toLowerCase();
                 return v === 'yes' ? 'Yes' : v === 'no' ? 'No' : '';
             }
         },
-        { key: 'parentEll', label: 'Parent or caregiver is an English language learner', points: 5, picc: 'PI5.G', intakeKey: 'ParentEll' },
-        { key: 'nonEnglishHome', label: 'Primary language in the home is not English', points: 5, intakeKey: 'NonEnglishHome' },
         {
-            key: 'publicBenefits', label: 'Receiving public benefits (WIC, Medicaid, SNAP, TANF)', points: 5,
+            key: 'publicBenefits', group: 'income', label: 'Receiving public benefits (WIC, Medicaid, SNAP, TANF)', points: 5,
             derive: d => (d.PublicBenefits ? 'Yes' : 'No'),
             // The enrollment row carries the same benefits string, so this is
             // answerable even without an intake record.
             fromStudent: s => (String(s.PublicBenefits || '').trim() ? 'Yes' : '')
         },
-        { key: 'abuseHistory', label: 'Abuse or domestic violence history', points: 5, intakeKey: 'AbuseHistory' },
-        { key: 'mentalIllness', label: 'Mental illness in the home', points: 5, intakeKey: 'MentalIllness' },
-        { key: 'dcfsInvolvement', label: 'DCFS involvement', points: 5, intakeKey: 'DcfsInvolvement' },
-        { key: 'substanceAbuse', label: 'Substance abuse in the home', points: 5, intakeKey: 'SubstanceAbuse' },
-        { key: 'caregiverOther', label: 'Child cared for by someone other than a parent', points: 5, intakeKey: 'CaregiverOther' },
-        { key: 'familyDeath', label: 'Death in the immediate family', points: 5, intakeKey: 'FamilyDeath' },
-        { key: 'lowBirthWeight', label: 'Low birth weight or failure to thrive', points: 5, intakeKey: 'LowBirthWeight' },
-        { key: 'parentIncarcerated', label: 'Parent incarcerated', points: 5, intakeKey: 'ParentIncarcerated' },
-        { key: 'teenParent', label: 'Teen parent', points: 5, intakeKey: 'TeenParent' },
-        { key: 'noHsDiploma', label: 'Parent without a high school diploma', points: 5, intakeKey: 'NoHSDiploma' },
-        { key: 'bornOutsideUs', label: 'Child or parent born outside the United States', points: 5, intakeKey: 'BornOutsideUS' },
+        { key: 'parentEll', group: 'lang', label: 'Parent or caregiver is an English language learner', points: 5, picc: 'PI5.G', intakeKey: 'ParentEll' },
+        { key: 'nonEnglishHome', group: 'lang', label: 'Primary language in the home is not English', points: 5, intakeKey: 'NonEnglishHome' },
+        { key: 'bornOutsideUs', group: 'lang', label: 'Child or parent born outside the United States', points: 5, intakeKey: 'BornOutsideUS' },
+        { key: 'singleParent', group: 'family', label: 'Single-parent household', points: 3, derive: d => (d.LivingSituation === 'Single Parent' ? 'Yes' : 'No') },
+        { key: 'teenParent', group: 'family', label: 'Teen parent', points: 5, intakeKey: 'TeenParent' },
+        { key: 'noHsDiploma', group: 'family', label: 'Parent without a high school diploma', points: 5, intakeKey: 'NoHSDiploma' },
+        { key: 'parentIncarcerated', group: 'family', label: 'Parent incarcerated', points: 5, intakeKey: 'ParentIncarcerated' },
         {
-            key: 'activeMilitary', label: 'Active military family', points: 5, intakeKey: 'ActiveMilitary',
+            key: 'activeMilitary', group: 'family', label: 'Active military family', points: 5, intakeKey: 'ActiveMilitary',
             fromStudent: s => yesNoOrBlank(s.Military)
         },
-        { key: 'singleParent', label: 'Single-parent household', points: 3, derive: d => (d.LivingSituation === 'Single Parent' ? 'Yes' : 'No') }
+        { key: 'caregiverOther', group: 'family', label: 'Child cared for by someone other than a parent', points: 5, intakeKey: 'CaregiverOther' },
+        { key: 'abuseHistory', group: 'trauma', label: 'Abuse or domestic violence history', points: 5, intakeKey: 'AbuseHistory' },
+        { key: 'mentalIllness', group: 'trauma', label: 'Mental illness in the home', points: 5, intakeKey: 'MentalIllness' },
+        { key: 'dcfsInvolvement', group: 'trauma', label: 'DCFS involvement', points: 5, intakeKey: 'DcfsInvolvement' },
+        { key: 'substanceAbuse', group: 'trauma', label: 'Substance abuse in the home', points: 5, intakeKey: 'SubstanceAbuse' },
+        { key: 'familyDeath', group: 'trauma', label: 'Death in the immediate family', points: 5, intakeKey: 'FamilyDeath' }
+    ];
+
+    // Section order + headings for the grouped editor, matching the filed PDF's groups.
+    const WEIGHTED_CRITERIA_GROUPS = [
+        ['auto', 'Automatic eligibility (50 points each)'],
+        ['dev', 'Developmental & health'],
+        ['income', 'Income & public benefits'],
+        ['lang', 'Language & country of origin'],
+        ['family', 'Family & household'],
+        ['trauma', 'Adverse experiences in the home'],
+        ['other', 'Other factors']
     ];
 
     // PI5.H: the three determinations the checklist recognises.
@@ -632,22 +646,38 @@
         return f.items.map(it => ({ key: it.key, type: 'select', options: YES_NO, criterion: it }));
     }
 
+    /* The criteria editor, grouped into the same sections as the filed PDF so the two
+       read alike. Each group is a <tbody> with a shaded header row (its live subtotal on
+       the right) and one row per criterion: label, PICC tag, points, and a Yes/No/blank
+       select. A row whose select is "Yes" is highlighted (.applies) by recalcWeightedTotal
+       so the factors that count stand out from the rest. */
     function criteriaHtml(f) {
-        const rows = f.items.map(it =>
-            '<tr>'
-            + '<td>' + escHtml(it.label) + '</td>'
-            + '<td class="doc-criteria-picc">' + (it.picc ? escHtml(it.picc) : '') + '</td>'
-            + '<td class="doc-criteria-pts">' + it.points + '</td>'
-            + '<td><select id="doc_' + it.key + '" onchange="recalcWeightedTotal()">'
-            + YES_NO.map(o => '<option value="' + escHtml(o) + '">'
-                + escHtml(o || '\u2014') + '</option>').join('')
-            + '</select></td>'
-            + '</tr>').join('');
+        const groups = (typeof WEIGHTED_CRITERIA_GROUPS !== 'undefined')
+            ? WEIGHTED_CRITERIA_GROUPS : [['other', 'Weighted criteria']];
+        const byGroup = {};
+        f.items.forEach(it => { (byGroup[it.group || 'other'] = byGroup[it.group || 'other'] || []).push(it); });
+
+        const bodies = groups.filter(([key]) => (byGroup[key] || []).length).map(([key, heading]) => {
+            const rows = byGroup[key].map(it =>
+                '<tr id="docrow_' + it.key + '">'
+                + '<td>' + escHtml(it.label) + '</td>'
+                + '<td class="doc-criteria-picc">' + (it.picc ? escHtml(it.picc) : '') + '</td>'
+                + '<td class="doc-criteria-pts">' + it.points + '</td>'
+                + '<td><select id="doc_' + it.key + '" onchange="recalcWeightedTotal()">'
+                + YES_NO.map(o => '<option value="' + escHtml(o) + '">'
+                    + escHtml(o || '\u2014') + '</option>').join('')
+                + '</select></td>'
+                + '</tr>').join('');
+            return '<tbody class="doc-crit-group">'
+                + '<tr class="doc-crit-grouphdr"><th colspan="3">' + escHtml(heading) + '</th>'
+                + '<th class="doc-criteria-pts">+<span id="docsub_' + key + '">0</span></th></tr>'
+                + rows + '</tbody>';
+        }).join('');
 
         return '<div class="pi-field pi-full"><label>' + escHtml(f.label) + '</label>'
             + '<table class="doc-criteria">'
             + '<thead><tr><th>Criterion</th><th>PICC</th><th>Pts</th><th>Applies</th></tr></thead>'
-            + '<tbody>' + rows + '</tbody>'
+            + bodies
             + '<tfoot><tr><td colspan="2">Total weighted points</td>'
             + '<td class="doc-criteria-pts" id="docCriteriaTotal">0</td><td></td></tr></tfoot>'
             + '</table>'
@@ -729,9 +759,20 @@
         if (!block) return;
 
         let total = 0;
+        const subByGroup = {};
         block.items.forEach(it => {
             const el = document.getElementById('doc_' + it.key);
-            if (el && el.value === 'Yes') total += it.points;
+            const yes = el && el.value === 'Yes';
+            if (yes) { total += it.points; subByGroup[it.group || 'other'] = (subByGroup[it.group || 'other'] || 0) + it.points; }
+            // Highlight the row so a qualifying factor stands out from the rest.
+            const row = document.getElementById('docrow_' + it.key);
+            if (row) row.classList.toggle('applies', !!yes);
+        });
+
+        // Live per-group subtotals next to each section heading.
+        (typeof WEIGHTED_CRITERIA_GROUPS !== 'undefined' ? WEIGHTED_CRITERIA_GROUPS : []).forEach(([key]) => {
+            const sub = document.getElementById('docsub_' + key);
+            if (sub) sub.textContent = subByGroup[key] || 0;
         });
 
         const totalEl = document.getElementById('docCriteriaTotal');

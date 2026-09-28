@@ -333,9 +333,11 @@
         .doc-checkgroup { display:flex;flex-direction:column;gap:5px;padding:4px 0; }
         .doc-check { display:flex;align-items:center;gap:7px;font-size:0.78rem;font-weight:500;color:#111;cursor:pointer; }
         .doc-check input { margin:0; }
-        /* Weighted eligibility criteria table (PI5.A) */
+        /* Weighted eligibility criteria table (PI5.A). Grouped into sections that match
+           the filed PDF, with a shaded header row per group carrying its live subtotal,
+           and qualifying (Yes) rows highlighted so the factors that count stand out. */
         .doc-criteria { width:100%;border-collapse:collapse;font-size:0.76rem;margin-top:4px; }
-        .doc-criteria th { text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748b;padding:6px 8px;border-bottom:2px solid #e5e7eb;background:#f8fafc; }
+        .doc-criteria thead th { text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748b;padding:6px 8px;border-bottom:2px solid #e5e7eb;background:#f8fafc; }
         .doc-criteria td { padding:5px 8px;border-bottom:1px solid #f3f4f6;vertical-align:middle; }
         .doc-criteria tbody tr:hover { background:#f8fafc; }
         .doc-criteria select { font-size:0.76rem;padding:4px 6px;border:1px solid #d1d5db;border-radius:5px;font-family:inherit;background:white;width:100%; }
@@ -343,6 +345,14 @@
         .doc-criteria-pts { text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap; }
         .doc-criteria tfoot td { border-top:2px solid #2563eb;border-bottom:none;font-weight:700;font-size:0.8rem;color:#1d4ed8;padding-top:8px; }
         .doc-criteria th:nth-child(4), .doc-criteria td:nth-child(4) { width:90px; }
+        /* Group header row within the criteria table. */
+        .doc-crit-grouphdr th { text-align:left;font-size:0.66rem;font-weight:800;letter-spacing:0.03em;color:#334155;
+            background:#eef2f7;padding:6px 8px;border-top:1px solid #e5e7eb;border-bottom:1px solid #e5e7eb; }
+        .doc-crit-grouphdr th.doc-criteria-pts { text-align:right;color:#166534; }
+        /* A qualifying (Yes) row: soft green wash + bold label so it stands out. */
+        .doc-criteria tr.applies { background:#f0fdf4; }
+        .doc-criteria tr.applies:hover { background:#e7f9ec; }
+        .doc-criteria tr.applies td:first-child { font-weight:700;color:#14532d; }
 
         /* PICC compliance panel */
         .picc-head { display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:14px; }

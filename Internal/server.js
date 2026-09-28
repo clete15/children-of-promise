@@ -706,6 +706,11 @@ const ISBE_TRACKING_COLUMNS = [
     // Weighted Eligibility applies to BOTH programs (PFA priority/weighted enrollment
     // and PI), so it has no program restriction on the roster.
     'WeightedEligibility',
+    // PFA end-of-year Exit Interview (PFA Item 4). A per-child signed form confirming
+    // the ASQ/ASE screening results and the final Teaching Strategies Gold report card
+    // were shared with the parent. Signable from the staff classroom card OR the parent
+    // portal; a filed signed PDF turns the child's pill green.
+    'ExitInterview',
     // PICC per-child document forms (Prevention Initiative only).
     'ScreeningResultsShared',
     'FamilyCenteredAssessment', 'FamilyGoalPlan', 'TransitionPlan', 'Referral',
@@ -2131,36 +2136,50 @@ function seedWeightedEligibilityDoc(studentId, opts) {
        weight on the left, the Yes/No answer right-aligned, applicable ones bold so the
        factors that actually drive eligibility stand out. A Yes adds its points to the
        running total — the same total the waiting list ranks by. */
+    /* Score every criterion, tracking the qualifying factors (the Yeses that drive the
+       score) so the redesigned document can lead with them, and grouping the full list
+       for the audited table below. `points`, `applies` and `recorded` are passed to the
+       PDF engine, which renders a tick gutter, a soft-grey label for non-applicable
+       rows, and a right-aligned points column — instead of the old flat one-line-per
+       "(label) (5 pts) - [ ] Yes [X] No" that was hard to scan. */
     let total = 0;
     const itemsByGroup = {};
+    const subtotalByGroup = {};
+    const qualifying = [];
     SEEDED_WEIGHTED_CRITERIA.forEach(c => {
         let ans = '';
         try { ans = seededYesNoOrBlank(c.from(intake, enroll)); } catch (e) { ans = ''; }
+        const recorded = ans !== '';
         if (!ans && fillBlanksAsNo) ans = 'No';
         const applies = ans === 'Yes';
-        if (applies) total += (c.points || 0);
-        const pts = '(' + (c.points || 0) + ' pt' + ((c.points || 0) === 1 ? '' : 's') + ')';
-        const label = (c.picc ? '(' + c.picc + ') ' : '') + c.label + '  ' + pts;
-        const answer = ans === 'Yes' ? '[X] Yes' : ans === 'No' ? 'No' : '(not recorded)';
+        const pts = c.points || 0;
+        if (applies) { total += pts; qualifying.push({ label: c.label, points: pts }); }
         const g = c.group || 'other';
-        (itemsByGroup[g] = itemsByGroup[g] || []).push({ label: label, answer: answer, applies: applies });
+        (itemsByGroup[g] = itemsByGroup[g] || []).push({
+            label: (c.picc ? c.label + ' \u2014 ' + c.picc : c.label),
+            points: pts, applies: applies, recorded: recorded
+        });
+        subtotalByGroup[g] = (subtotalByGroup[g] || 0) + (applies ? pts : 0);
     });
 
-    // One checklist block per group, in the defined order; empty groups are skipped.
+    // The qualifying factors lead the document (highest-value first), so the reader sees
+    // why the child scored what they did without hunting through the full list.
+    qualifying.sort((a, b) => b.points - a.points);
+
+    // One scored block per group, in the defined order; empty groups are skipped.
     const criteriaBlocks = WEIGHTED_CRITERIA_GROUPS
         .filter(([key]) => (itemsByGroup[key] || []).length)
-        .map(([key, heading]) => ({ heading: heading, items: itemsByGroup[key] }));
+        .map(([key, heading]) => ({ heading: heading, items: itemsByGroup[key], subtotal: subtotalByGroup[key] || 0 }));
 
     const blocks = [
-        { heading: 'Weighted eligibility criteria (PICC PI5.A / PI5.B\u2013G)',
-          text: 'Applicable factors are ticked and shown in bold. Pre-filled from the '
-              + 'family\u2019s pre-enrollment submission; any criterion not recorded at intake '
-              + 'is shown as \u201cNo\u201d. Review and update before relying on it.' },
+        // Lead with the score banner + qualifying factors (PI5.H determination up top).
+        { summary: { total: total, determination: 'Eligible', qualifying: qualifying } },
+        { heading: 'All weighted eligibility criteria (PICC PI5.A / PI5.B\u2013G)',
+          text: 'Applicable factors are ticked and shown in bold; the rest are listed in '
+              + 'grey for the record. Pre-filled from the family\u2019s pre-enrollment '
+              + 'submission, falling back to the enrollment record. Review and update before '
+              + 'relying on it.' },
         ...criteriaBlocks,
-        { heading: 'Determination (PICC PI5.H)',
-          // Every child served is determined eligible, so the determination line is filled.
-          text: 'Total weighted points: ' + total + '\n'
-              + 'Eligibility determination: Eligible' },
         { heading: 'Income verification (PICC PI5.J)',
           // Auto-fed from the Proof of Income upload; blank lines remain if none on file.
           text: 'Income verified by: ' + (incVerifiedBy || '____________________________')
@@ -2226,6 +2245,108 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ChildS
     ALTER TABLE ChildSignatures ADD SigImagePath NVARCHAR(500);
 GO
 `;
+}
+
+/* Files a per-child signed form: builds the signed PDF, writes it (and each role's
+   signature image) into the child's Teacher folder, and records the ChildSignatures
+   rows. Shared by the staff route (/api/child-signed-form) and the parent portal
+   (/api/parent-portal/sign for ExitInterview), so a form signed by a teacher and one
+   signed by a parent are filed identically. Returns { status, body } for sendJSON.
+
+   d = { studentId, field, program, year, formTitle, rows, blocks, childName,
+         capturedOn, signatures:[{ role:'parent'|'staff', label, name, date, dataUrl }] } */
+function fileChildSignedForm(d) {
+    const studentId = parseInt(d.studentId);
+    if (!studentId) return { status: 400, body: { error: 'Invalid student id' } };
+    if (!ISBE_TRACKING_COLUMNS.includes(d.field)) {
+        return { status: 400, body: { error: 'Unknown form: ' + d.field } };
+    }
+    const year = resolveSchoolYear(d.year);
+    const program = d.program === 'PFA' ? 'PFA' : 'PI';
+
+    const incoming = Array.isArray(d.signatures) ? d.signatures : [];
+    const signatures = [];
+    for (const s of incoming) {
+        const role = s.role === 'staff' ? 'staff' : s.role === 'parent' ? 'parent' : null;
+        if (!role) return { status: 400, body: { error: 'Role must be parent or staff' } };
+        const m = String(s.dataUrl || '').match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
+        if (!m) return { status: 400, body: { error: 'Expected a JPEG signature' } };
+        const bytes = Buffer.from(m[1], 'base64');
+        if (!bytes.length) return { status: 400, body: { error: 'A signature was empty' } };
+        if (bytes.length > 2 * 1024 * 1024) return { status: 413, body: { error: 'A signature image is unreasonably large' } };
+        signatures.push({ role: role, label: String(s.label || ''), name: String(s.name || ''),
+                          date: String(s.date || ''), jpeg: bytes });
+    }
+    if (!signatures.length) return { status: 400, body: { error: 'Nothing was signed, so there is nothing to file' } };
+
+    const folder = childSubFolder(studentId, 'Teacher');
+    if (folder.error) return { status: 400, body: { error: folder.error } };
+
+    let pdf;
+    try {
+        pdf = buildFormPdf({
+            title: String(d.formTitle || d.field),
+            subtitle: 'Children of Promise LLC \u2014 '
+                + (program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative') + ' \u2014 ' + year,
+            rows: Array.isArray(d.rows) ? d.rows : [],
+            blocks: Array.isArray(d.blocks) ? d.blocks : [],
+            signatures: signatures,
+            footer: 'Signed electronically in the Children of Promise portal on '
+                + new Date().toLocaleString('en-US')
+        });
+    } catch (e) {
+        return { status: 400, body: { error: 'Could not build the document: ' + e.message } };
+    }
+
+    const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
+    const stamp = new Date().toISOString().slice(0, 10);
+    const base = [safe(d.childName) || ('Student ' + studentId),
+                  safe(d.formTitle || d.field), year, 'signed ' + stamp].join(' - ');
+    let target = path.join(folder.path, base + '.pdf');
+    let n = 2;
+    while (fs.existsSync(target) && n < 50) { target = path.join(folder.path, base + ' (' + n + ').pdf'); n++; }
+    try {
+        fs.writeFileSync(target, pdf);
+    } catch (e) {
+        console.error('[SIGNED FORM]', e.message);
+        return { status: 500, body: { error: 'Could not write the signed document' } };
+    }
+    const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
+    console.log('[SIGNED FORM] ' + pdf.length + ' bytes -> ' + rel);
+
+    const baseName = path.basename(target, '.pdf');
+    const sigImgRel = {};
+    signatures.forEach(s => {
+        try {
+            const imgTarget = path.join(folder.path, baseName + ' - ' + s.role + ' signature.jpg');
+            fs.writeFileSync(imgTarget, s.jpeg);
+            sigImgRel[s.role] = path.relative(findDocRoot(), imgTarget).replace(/\\/g, '/');
+        } catch (e) {
+            console.warn('[SIGNED FORM] could not write ' + s.role + ' signature image: ' + e.message);
+        }
+    });
+
+    let sql = childSignatureEnsureSQL();
+    signatures.forEach(s => {
+        const img = sigImgRel[s.role] || '';
+        const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} `
+            + `AND FormField=${esc(d.field)} AND Role=${esc(s.role)}`;
+        sql += `IF EXISTS (SELECT 1 FROM ChildSignatures WHERE ${where})
+    UPDATE ChildSignatures SET SignedName=${esc(s.name)},RelPath=${esc(rel)},SigImagePath=${esc(img)},
+        SignedAt=GETDATE(),CapturedOn=${esc(d.capturedOn)} WHERE ${where}
+ELSE
+    INSERT INTO ChildSignatures (StudentId,SchoolYear,FormField,Role,SignedName,RelPath,SigImagePath,SignedAt,CapturedOn)
+    VALUES (${studentId},${esc(year)},${esc(d.field)},${esc(s.role)},${esc(s.name)},${esc(rel)},${esc(img)},GETDATE(),${esc(d.capturedOn)});
+`;
+    });
+    const r = runSQL(sql);
+    if (!r.ok) {
+        return { status: 500, body: {
+            error: 'The signed document was filed as "' + path.basename(target)
+                 + '" but could not be recorded against the form: ' + r.error } };
+    }
+    return { status: 200, body: {
+        success: true, relPath: rel, name: path.basename(target), bytes: pdf.length, sigImages: sigImgRel } };
 }
 
 /* Uploaded child evidence that is a scan or photo rather than something signed in
@@ -4881,7 +5002,13 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             ['BegASQ', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ-3'' AND Period=''Beginning''"],
             ['EndASQ', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ-3'' AND Period=''End''"],
             ['BegASE', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ:SE-2'' AND Period=''Beginning''"],
-            ['EndASE', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ:SE-2'' AND Period=''End''"]
+            ['EndASE', 'ScreeningScores', 'ScreeningDate', " AND ScreeningType=''ASQ:SE-2'' AND Period=''End''"],
+            // The PFA Exit Interview has no table of its own: its evidence IS the signed
+            // PDF, so a filed ChildSignatures row (FormField='ExitInterview') is the
+            // "on file" record. This makes hasForm('ExitInterview') true for a signed
+            // child regardless of program, so the pill reads as real evidence, not just
+            // a tick.
+            ['ExitInterview', 'ChildSignatures', 'SignedAt', " AND FormField=''ExitInterview''"]
         ];
 
         /* The PICC document forms come from their own declaration rather than being
