@@ -230,6 +230,11 @@
                     title="Copy last year's checked documents into this year as a starting point to confirm">
                     &#8617; Copy last year's checkmarks forward
                 </button>
+                <button class="btn-secondary" id="cfRefreshBtn" onclick="backfillFolders(true)"
+                    style="font-size:0.75rem;padding:6px 12px;"
+                    title="Regenerate every enrolled child's weighted eligibility form with the current design and scoring, replacing the existing one. Use after the form design or scoring rules change.">
+                    &#128260; Refresh weighted eligibility forms
+                </button>
                 <span id="cfActionStatus" style="font-size:0.72rem;color:#6b7280;"></span>
             </div>
             <div class="cf-body" id="afBody"><div class="cf-loading">Loading…</div></div>
@@ -534,7 +539,9 @@ function weightedChip(s) {
         : '<span class="tf-chip" title="No weighted eligibility form on file yet">Weighted Eligibility</span>';
 }
 function childCard(s) {
-    var chips = COLS.map(function (col) { return chipFor(s, col); }).join('') + weightedChip(s);
+    // Weighted Eligibility moved to the Administrative tab (it is an administrative
+    // document, not a classroom form), so it is no longer appended here.
+    var chips = COLS.map(function (col) { return chipFor(s, col); }).join('');
     var isPIrow = String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI';
     var outstanding = COLS.filter(function (col) {
         return !ChildForms.isDone(s.Id, col.field, !!(TRACKING[s.Id] || {})[col.field], isPIrow);
@@ -646,6 +653,19 @@ function childDocFile(studentId, docKey) {
     if (window.ChildForms && ChildForms.fileFor) return ChildForms.fileFor(studentId, 'ChildDoc', docKey);
     return null;
 }
+/* Weighted Eligibility cell for the Administrative grid (moved here from the Teacher
+   tab — it is an administrative document). A green "on file" pill opens the generated
+   PDF; faded "not on file" when none is on disk yet. Fed from the WEIGHTED map, the same
+   /api/weighted-eligibility-files source the ISBE roster uses. */
+function weightedAdminCell(s) {
+    var rel = WEIGHTED[s.Id] || WEIGHTED[String(s.Id)];
+    var pill = rel
+        ? '<a href="#" class="cfg-pill on" title="Weighted eligibility form is on file \u2014 click to open"'
+            + ' onclick="event.preventDefault();openDoc(\'' + String(rel).replace(/'/g, "\\'")
+            + '\',\'Weighted Eligibility\')">\u2713 on file</a>'
+        : '<span class="cfg-pill off" title="No weighted eligibility form on file yet. Use \u201cRefresh weighted eligibility forms\u201d to generate them.">not on file</span>';
+    return '<td class="cfg-cell' + (rel ? ' filed' : '') + '">' + pill + '</td>';
+}
 function renderAdmin() {
     var body = document.getElementById('afBody');
     var roster = (activeRoom === 'all' ? activeRoster() : roomRoster(activeRoom)).slice().sort(sortByRoomThenName);
@@ -654,6 +674,7 @@ function renderAdmin() {
         return;
     }
     var head = '<tr><th class="cfg-name">Child</th>'
+        + '<th>Weighted<br>Eligibility</th>'
         + CHILD_DOCS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
         + DOC_FORM_COLS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
         + '</tr>';
@@ -706,20 +727,28 @@ function renderAdmin() {
         }).join('');
         var prog = (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') ? '<span class="cfg-prog">' + s.PFA_PI_na + '</span>' : '';
         return '<tr><td class="cfg-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + prog + '</td>'
-            + cells + formCells + '</tr>';
+            + weightedAdminCell(s) + cells + formCells + '</tr>';
     }).join('');
     body.innerHTML = '<table class="cfg"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>'
         + '<div style="font-size:0.7rem;color:#94a3b8;margin:10px 20px;">* Behavior and transition plans are only required where applicable.</div>';
 }
 async function loadAdmin() {
     document.getElementById('afBody').innerHTML = '<div class="cf-loading">Loading…</div>';
-    await Promise.all([
+    var results = await Promise.all([
         loadChildDocChecklist(),
         // The document-form pills (Transition Plan, Referral) read ChildForms.state(),
         // which needs the forms index, not just the file index. Load both.
         (window.ChildForms && ChildForms.load) ? ChildForms.load(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
-        (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve()
+        (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(activeYear, apiFetch).catch(function () { return null; }) : Promise.resolve(),
+        // Which children have a weighted-eligibility form on disk, so the Administrative
+        // grid's Weighted Eligibility pill lights and opens it (moved here off Teacher).
+        apiFetch('/api/weighted-eligibility-files').catch(function () { return null; })
     ]);
+    WEIGHTED = {};
+    var weRes = results[3];
+    if (weRes && weRes.ok) {
+        try { var we = await weRes.json(); WEIGHTED = (we && we.files) ? we.files : {}; } catch (e) { /* additive */ }
+    }
     adminLoaded = true;
     // Build the sidebar first: with no "All rooms" option it resolves activeRoom to a
     // real room, and its "need docs" counts use the admin doc data just loaded. Then
