@@ -583,10 +583,6 @@
              (Clete); the server also enforces checkITAdmin on /api/deploy. Pulls the latest
              code from GitHub; server.js changes still need a Restart afterward. -->
         <button type="button" class="header-theme-btn" id="hdrDeploy" style="display:none;" title="Pull the latest code from GitHub. Page/script changes take effect on reload; server.js changes need a Restart.">🚀 Deploy</button>
-        <!-- Bulk import of scanned paper Parent Interview Forms. Matches each file to a
-             PI child by name and files it in the child's folder, ticking the column.
-             A once-a-year batch job, so it lives in the header rather than the roster. -->
-        <button type="button" class="header-theme-btn" id="hdrImportPI" onclick="openBulkInterviewImport()" title="Upload many scanned Parent Interview Forms at once. Each is matched to a PI child by the file name.">📥 Import Interviews</button>
     </div>
 </header>
 
@@ -622,12 +618,6 @@
             <button id="btnChildFiles" onclick="setView('childFiles')">
                 <div>🗂️ <span id="childFilesProgLabel">PFA</span><br>Child Files</div>
                 <span class="isbe-sub"></span>
-            </button>
-            <!-- Last. Follow-up is an exception report that is usually empty, not a place
-                 to start. It spans both programs, so it is not affected by the toggle. -->
-            <button id="btnFollowUp" onclick="setView('followUp')">
-                <div>🔎 Screening<br>Follow-Up</div>
-                <span id="followUpCount"></span>
             </button>
         </div>
 
@@ -691,14 +681,6 @@
                     Only required where applicable (Behavior / Transition plan)
                 </p>
                 <div id="childFilesBody"></div>
-            </div>
-            <!-- Screening Follow-Up: children whose screening flagged a concern -->
-            <div id="followUpPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
-                <p style="font-size:0.78rem;color:#6b7280;margin-bottom:16px;">
-                    Children whose ASQ-3 or ASQ:SE-2 screening fell below cutoff or in the monitoring zone.
-                    A screening that flags a concern should have a documented referral or follow-up action.
-                </p>
-                <div id="followUpBody"></div>
             </div>
 
             <!-- Program Compliance Panel -->
@@ -1580,7 +1562,8 @@ async function init() {
             'PFA': ['PFA', 'roster'], 'PI': ['PI', 'roster'],
             'pfaCompliance': ['PFA', 'compliance'], 'piCompliance': ['PI', 'compliance'],
             'pfaChildFiles': ['PFA', 'childFiles'], 'piChildFiles': ['PI', 'childFiles'],
-            'startYear': [null, 'startYear'], 'followUp': [null, 'followUp'],
+            // 'followUp' view was removed; an old ?view=followUp link lands on the roster.
+            'startYear': [null, 'startYear'], 'followUp': [null, 'roster'],
             'roster': [null, 'roster'], 'compliance': [null, 'compliance'], 'childFiles': [null, 'childFiles'],
         };
         if (legacy && LEGACY_MAP[legacy]) {
@@ -1607,7 +1590,6 @@ function getRoom(roomNum) {
 // do nothing.
 function refreshActiveView() {
     if (activeView === 'startYear') renderStartYear();
-    else if (activeView === 'followUp') renderFollowUp();
     else if (activeView === 'roster') renderRoster();
     else if (activeView === 'childFiles') renderChildFilesGrid(activeProgram);
     else if (activeView === 'compliance') loadCompliance(activeProgram === 'PFA' ? 'pfaCompliance' : 'piCompliance');
@@ -1638,9 +1620,9 @@ function setProgramProgram(p) {
     renderActiveView();
 }
 
-// The sidebar view buttons. Screening Follow-Up spans both programs; the others follow
-// the PFA⇄PI toggle.
+// The sidebar view buttons. The others follow the PFA⇄PI toggle.
 function setView(v) {
+    if (v === 'followUp') v = 'roster';   // Screening Follow-Up view was removed.
     activeView = v;
     renderActiveView();
 }
@@ -1654,7 +1636,8 @@ function setProgram(legacy) {
         'PFA': ['PFA', 'roster'], 'PI': ['PI', 'roster'],
         'pfaCompliance': ['PFA', 'compliance'], 'piCompliance': ['PI', 'compliance'],
         'pfaChildFiles': ['PFA', 'childFiles'], 'piChildFiles': ['PI', 'childFiles'],
-        'startYear': [null, 'startYear'], 'followUp': [null, 'followUp'],
+        // 'followUp' removed; fall through to the roster if an old link asks for it.
+        'startYear': [null, 'startYear'], 'followUp': [null, 'roster'],
     };
     const m = MAP[legacy];
     if (!m) return;
@@ -1671,14 +1654,11 @@ function renderActiveView() {
     document.getElementById('btnRoster').classList.toggle('active', v === 'roster');
     document.getElementById('btnCompliance').classList.toggle('active', v === 'compliance');
     document.getElementById('btnChildFiles').classList.toggle('active', v === 'childFiles');
-    document.getElementById('btnFollowUp').classList.toggle('active', v === 'followUp');
-
     const grid = document.getElementById('isbeRosterGrid');
     const compliance = document.getElementById('compliancePanel');
-    const followUp = document.getElementById('followUpPanel');
     const startYear = document.getElementById('startYearPanel');
     const childFiles = document.getElementById('childFilesPanel');
-    [grid, compliance, followUp, startYear, childFiles].forEach(el => { el.style.display = 'none'; });
+    [grid, compliance, startYear, childFiles].forEach(el => { if (el) el.style.display = 'none'; });
     // The classroom/admin column toggle belongs only to the roster view.
     var rgt = document.getElementById('rgToggle');
     if (rgt) rgt.style.display = (v === 'roster') ? '' : 'none';
@@ -1695,11 +1675,6 @@ function renderActiveView() {
         count.textContent = '';
         compliance.style.display = 'block';
         loadCompliance(prog === 'PFA' ? 'pfaCompliance' : 'piCompliance');
-    } else if (v === 'followUp') {
-        title.textContent = 'Screening Follow-Up';
-        count.textContent = '';
-        followUp.style.display = 'block';
-        renderFollowUp();
     } else if (v === 'startYear') {
         title.textContent = 'What Needs Doing';
         count.textContent = '';
@@ -1753,8 +1728,9 @@ function updateRosterCount() {
 }
 
 function renderFollowUp() {
-    const items = collectFollowUps();
     const body = document.getElementById('followUpBody');
+    if (!body) return;   // The Screening Follow-Up panel was removed.
+    const items = collectFollowUps();
     if (!items.length) {
         body.innerHTML = '<p style="color:#16a34a;font-weight:600;font-size:0.9rem;">No screening concerns recorded. '
             + 'Note this only reflects screenings that have been entered with scores.</p>';
@@ -5622,9 +5598,7 @@ function renderPiccItem(item, data) {
     if (item.waitlistLink) {
         jumps += '<a class="picc-btn picc-btn-jump" href="waitinglist.html">Waiting list</a>';
     }
-    if (item.followUpLink) {
-        jumps += '<a class="picc-btn picc-btn-jump" href="#" onclick="event.preventDefault();setProgram(\'followUp\')">Screening follow-up</a>';
-    }
+    // (The old "Screening follow-up" jump was removed with that view.)
 
     var missingNote = childStatsNote(stats);
 
