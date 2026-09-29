@@ -1747,8 +1747,10 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
             guidance = '<div class="sp-need-sub">No coursework or training on file yet. Upload this '
                 + 'person\u2019s PDR (below) to fill in coverage by area.</div>';
         } else if (model.focus.length) {
-            guidance = '<div class="sp-need-focus">\u2192 Neither coursework nor training covers <b>'
-                + model.focus.map(esc).join(', ') + '</b> yet. Aim the next course or training there.</div>';
+            /* No "aim here" sentence: the area card itself already carries the AIM HERE
+               tag and its "no college course / training" line, so a banner repeating it
+               was redundant. */
+            guidance = '';
         } else {
             guidance = '<div class="sp-need-focus ok">\u2713 Every area this level draws on is covered by '
                 + 'coursework or training. Gateways confirms the competencies against your record.</div>';
@@ -1821,16 +1823,13 @@ function credentialsSection(s) {
             + '<div class="sp-attn-row">'
             + '<input type="file" id="pdrFile" accept=".pdf">'
             + '<button type="button" id="pdrUpload" class="sp-save">Read &amp; preview</button>'
-            /* Opens the newest PDR already on file for this person, view-only, so you
-               can check the current one without re-uploading. Hidden by wirePdr when
-               there is none on file yet. */
-            + '<button type="button" id="pdrOpenLatest" class="sp-pdr-link" style="display:none;">'
-            + '\u2197 Open most recent PDR</button>'
-            /* Straight to the Registry to fetch the PDR, sitting right beside the upload
-               so the two steps — get it, upload it — are together. Styled as an outline
-               button so it reads as "go get the file" rather than the primary action. */
-            + '<a class="sp-pdr-link" href="https://registry.ilgateways.com/login" target="_blank" rel="noopener">'
-            + '\u2197 Open my Gateways page</a>'
+            /* Registry link sits right beside "Read & preview" so the two steps — go get
+               the PDR, upload it — are together. Outline style so it reads as the
+               secondary action. The old "Open most recent PDR" and "Open my Gateways
+               page" buttons were removed as duplicates (of the tab-strip "\u2197 PDR"
+               button and this link, respectively). */
+            + '<a class="sp-pdr-link" href="https://registry.ilgateways.com" target="_blank" rel="noopener">'
+            + '\u2197 Open the Gateways Registry</a>'
             + '<span id="pdrMsg" class="sp-savemsg"></span>'
             + '</div>'
             + '<div id="pdrResult"></div>'
@@ -1851,8 +1850,8 @@ function credentialsSection(s) {
             + '<li>Click <b>Get Report</b> to generate the official training record.</li>'
             + '<li><b>Save it as a PDF</b>, then upload it above.</li>'
             + '</ol>'
-            + '<a class="sp-pdr-btn" href="https://registry.ilgateways.com" target="_blank" rel="noopener">'
-            + 'Open the Gateways Registry \u2192</a>'
+            /* The "Open the Gateways Registry" button moved up beside "Read & preview";
+               it is no longer repeated here at the foot of the how-to. */
             + '</div></details>'
             + '</div>';
     }
@@ -2661,58 +2660,8 @@ function wirePdr() {
     });
     const close = $('pdrClose');
     if (close) close.addEventListener('click', () => { pdrOpen = false; PDR_PREVIEW = null; render(); });
-
-    // "Open most recent PDR" — shown only once we confirm one is on file for this
-    // person. The check is async, so the button starts hidden and reveals itself.
-    const openLatest = $('pdrOpenLatest');
-    if (openLatest && current && current.Id) {
-        openLatest.addEventListener('click', () => openLatestPdr(current.Id, current.Name, openLatest));
-        refreshLatestPdrButton(current.Id, openLatest);
-    }
-}
-
-/* Show the "Open most recent PDR" button only if this person has a PDR on file,
-   and remember the newest one's path on the button so the click can open it without
-   asking the server twice. */
-async function refreshLatestPdrButton(staffId, btn) {
-    try {
-        const res = await myFetch('/api/staff-files?staffId=' + encodeURIComponent(staffId));
-        if (!res.ok) return;
-        const data = await res.json();
-        const mine = Array.isArray(data.mine) ? data.mine : [];
-        const pdrs = mine
-            .filter(f => /professional development record/i.test(f.category || ''))
-            .sort((a, b) => String(b.uploadedDate || '').localeCompare(String(a.uploadedDate || '')));
-        if (pdrs.length) {
-            btn.dataset.rel = pdrs[0].rel;
-            btn.style.display = '';
-        }
-    } catch (e) { /* leave the button hidden on any error */ }
-}
-
-/* Open the newest PDR on file for a person, view-only, through the same authenticated
-   blob route the admin card and "my files" links use. */
-async function openLatestPdr(staffId, name, btn) {
-    let rel = btn && btn.dataset ? btn.dataset.rel : '';
-    // If the click beat the availability check, look it up now.
-    if (!rel) {
-        try {
-            const res = await myFetch('/api/staff-files?staffId=' + encodeURIComponent(staffId));
-            if (res.ok) {
-                const data = await res.json();
-                const pdrs = (Array.isArray(data.mine) ? data.mine : [])
-                    .filter(f => /professional development record/i.test(f.category || ''))
-                    .sort((a, b) => String(b.uploadedDate || '').localeCompare(String(a.uploadedDate || '')));
-                if (pdrs.length) rel = pdrs[0].rel;
-            }
-        } catch (e) { /* fall through to the message below */ }
-    }
-    if (!rel) {
-        alert('No PDR is on file for ' + (name || 'this person') + ' yet. Upload one with '
-            + '\u201cRead & preview\u201d and it will be filed automatically.');
-        return;
-    }
-    await fetchStaffFile(rel, btn);
+    // The in-panel "Open most recent PDR" button was removed (the tab-strip "\u2197 PDR"
+    // button already opens it), so there is nothing more to wire here.
 }
 
 /* The ECE / ITC picker on the credentials tab. Clicking one switches which
@@ -2752,13 +2701,11 @@ async function runPdrPreview() {
         PDR_PREVIEW = data;
         if (msg) { msg.className = 'sp-savemsg good'; msg.textContent = 'Read the PDR. Review below.'; }
         // The server filed this PDR (unless it was someone else's), so the newest one
-        // is now this upload — reveal the in-panel and tab-strip open buttons and point
-        // them at the filed copy.
+        // is now this upload — point the tab-strip "\u2197 PDR" button at the filed copy
+        // and reveal it. (The in-panel open button was removed as a duplicate.)
         if (data.filedPdr && data.filedPdr.rel) {
-            ['pdrOpenLatest', 'openPdr'].forEach(id => {
-                const b = $(id);
-                if (b) { b.dataset.rel = data.filedPdr.rel; b.style.display = ''; }
-            });
+            const b = $('openPdr');
+            if (b) { b.dataset.rel = data.filedPdr.rel; b.style.display = ''; }
         }
         renderPdrResult();
     } catch (e) {
