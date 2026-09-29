@@ -7005,7 +7005,14 @@ ELSE
             res.writeHead(404); return res.end('Not found');
         }
 
-        if (!actor.director) {
+        /* A centre admin (Clete/Megan/Sara, or the shared password) may open anyone's
+           file — same rule as the /api/staff-files listing above, which scopes by
+           (actor.director || actor.admin). This guard previously checked only
+           actor.director, so an admin signed in AS THEMSELVES (director:false,
+           admin:true) fell into the ownership check and got a 404 opening a COLLEAGUE's
+           PDR — the file was fine, the caller was simply wrongly treated as non-admin.
+           Everyone else may only open a file confirmed as theirs. */
+        if (!actor.director && !actor.admin) {
             const links = staffFileLinkMap();
             if (!links.ok) return sendJSON(res, 500, { error: links.error });
             const link = staffFileLinkFor(links, rel);
