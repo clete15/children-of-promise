@@ -6286,10 +6286,23 @@ ELSE
            theirs to see while it waits, and marked so they know it has not been
            checked yet — hiding it would look like the upload had failed. Empty when
            no id was asked for, which is the filing screen rather than a person. */
+        /* A file only counts as "mine" if it is linked to this person AND actually
+           resolves to a real file through the SAME resolver the download endpoint uses
+           (resolveDocPath). Checking existence with resolveDocPath — not a bare
+           fs.existsSync on listed.files — guarantees the listing and the download agree:
+           if the button shows, the file can be served. This closes the "button appears
+           then 404s" case, which happened when a link/rel drifted from the file the
+           download resolver lands on. A linked file that no longer resolves is simply
+           dropped from the list (no dead button) rather than shown. */
         const mine = staffId
             ? listed.files
                 .map(f => ({ file: f, link: staffFileLinkFor(links, f.rel) }))
                 .filter(x => x.link && x.link.staffId === String(staffId))
+                .filter(x => {
+                    const full = resolveDocPath(x.file.rel);
+                    try { return !!full && fs.existsSync(full) && fs.statSync(full).isFile(); }
+                    catch (e) { return false; }
+                })
             : [];
         const body = {
             staffId: staffId ? String(staffId) : '',
@@ -6970,8 +6983,24 @@ ELSE
     if (req.method === 'GET' && url.startsWith('/api/staff-file-download')) {
         const actor = requireActor(req, res);
         if (!actor) return;
-        const rel = String(new URLSearchParams(req.url.split('?')[1] || '').get('path') || '')
-            .replace(/\\/g, '/').trim();
+        /* Parse the path param by hand rather than through URLSearchParams. The client
+           sends encodeURIComponent(rel); URLSearchParams.get() additionally turns any
+           literal '+' into a space, so a filename containing '+' (or other characters it
+           treats specially) would resolve to the wrong name and 404 even though the
+           file is on disk. Pulling the raw value and decodeURIComponent-ing it round-
+           trips exactly what the listing produced. */
+        const rawQ = req.url.split('?')[1] || '';
+        let rel = '';
+        for (const pair of rawQ.split('&')) {
+            const eq = pair.indexOf('=');
+            if (eq === -1) continue;
+            if (pair.slice(0, eq) === 'path') {
+                try { rel = decodeURIComponent(pair.slice(eq + 1)); }
+                catch (e) { rel = pair.slice(eq + 1); }
+                break;
+            }
+        }
+        rel = String(rel).replace(/\\/g, '/').trim();
         if (!rel.startsWith(STAFF_DOC_ROOT_FOLDER + '/')) {
             res.writeHead(404); return res.end('Not found');
         }
