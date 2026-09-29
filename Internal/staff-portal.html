@@ -122,6 +122,25 @@
     .sp-tile.good { background: var(--sp-good-bg); border-color: var(--sp-good-br); }
     .sp-tile.warn { background: var(--sp-warn-bg); border-color: var(--sp-warn-br); }
     .sp-tile.bad  { background: var(--sp-bad-bg);  border-color: var(--sp-bad-br); }
+
+    /* ── Quiet stat readout (PD hours / college credit) ──────────────────────
+       Flat, borderless figures separated by a thin divider — a readout, not a card,
+       so it never reads as a clickable button. A small status dot carries good/warn
+       without colouring a whole box. */
+    .sp-stats { display: flex; flex-wrap: wrap; gap: 8px 28px; align-items: flex-start; }
+    .sp-stat { position: relative; padding-left: 16px; }
+    .sp-stat-lbl {
+        font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: 0.04em; color: var(--sp-muted);
+    }
+    .sp-stat-val { font-size: 1.05rem; font-weight: 800; color: var(--sp-text); line-height: 1.25; margin-top: 2px; }
+    /* Status dot, left of each stat. Neutral by default; coloured for good/warn. */
+    .sp-stat::before {
+        content: ''; position: absolute; left: 0; top: 5px;
+        width: 8px; height: 8px; border-radius: 50%; background: var(--sp-border);
+    }
+    .sp-stat.good::before { background: var(--sp-good-fg); }
+    .sp-stat.warn::before { background: var(--sp-warn-fg); }
     /* The editable fields on the "keep my record right" card. Kept wider than the
        compact summary tiles so the inputs have room. */
     .sp-tile.sp-field { background: var(--sp-surface); flex-basis: 210px; min-width: 190px; padding: 12px 14px; }
@@ -839,6 +858,16 @@ function tile(cls, label, value, note) {
         + '</div>';
 }
 
+/* A quiet inline stat: label above value, a small colour dot for good/warn status,
+   no border or hover — deliberately NOT a tile, so it does not read as a button. Used
+   for the PD-hours / college-credit readout under the name. */
+function stat(cls, label, value) {
+    return '<div class="sp-stat ' + (cls || '') + '">'
+        + '<div class="sp-stat-lbl">' + esc(label) + '</div>'
+        + '<div class="sp-stat-val">' + value + '</div>'
+        + '</div>';
+}
+
 // ── credential next steps ─────────────────────────────────────────────────
 /* The level tables live in credential-framework.js, transcribed from the two
    Gateways framework documents in Internal/documents. The rendering is now driven by
@@ -1526,17 +1555,16 @@ function standingTiles(s) {
     const shEce = parseFloat(s.SemesterHoursEce);
     const transcriptMissing = String(s.TranscriptOnFile || '') === 'Not submitted';
 
-    // Compact tiles: just the label and the value, no explanatory note under each —
-    // the notes made the cards tall and mostly repeated what the value already says.
-    let html = '<div class="sp-grid">'
-        + tile(credLevel(s, 'ece') ? 'good' : 'warn', 'ECE Credential',
-            credLevel(s, 'ece') ? 'Level ' + credLevel(s, 'ece') : 'Not yet held')
-        + tile(credLevel(s, 'it') ? 'good' : '', 'Infant Toddler Credential',
-            credLevel(s, 'it') ? 'Level ' + credLevel(s, 'it') : 'Not yet held')
-        + tile(hours === null ? 'warn' : (hours >= PD_REQUIRED ? 'good' : 'warn'),
+    /* Two stats only: PD hours and college credit. The ECE and Infant Toddler credential
+       LEVELS used to sit here too, but they are shown again — and interactively — by the
+       ECE/ITC picker on the Credentials tab just below, so having them here as well was
+       the same two facts twice. Rendered as a quiet inline stat row (see .sp-stats), not
+       bordered tiles, so they no longer read as clickable buttons next to the real ones. */
+    let html = '<div class="sp-stats">'
+        + stat(hours === null ? 'warn' : (hours >= PD_REQUIRED ? 'good' : ''),
             'PD hours in ' + new Date().getFullYear(),
             hours === null ? 'Not recorded' : hours + ' of ' + PD_REQUIRED)
-        + tile(isFinite(shEce) ? '' : 'warn', 'College credit on file',
+        + stat(isFinite(shEce) ? '' : 'warn', 'College credit on file',
             isFinite(shTotal) ? shTotal + ' hrs' : 'Not recorded')
         + '</div>';
 
