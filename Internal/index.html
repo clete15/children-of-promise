@@ -214,6 +214,12 @@
            edge to edge. */
         .dashboard { width: 100%; max-width: 980px; }
         .dash-section { margin-bottom: 20px; }
+        /* Two single-card sections placed side by side — each keeps its own header and
+           its one card, they just share a row so the page is not a tall stack of
+           one-card sections. The header sits over its own card. Collapses to a stack on
+           a narrow screen (handled by the .dash-group media query width). */
+        .dash-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .dash-row > .dash-section { margin-bottom: 20px; }
         .dash-section-title {
             font-size: 0.68rem;
             font-weight: 700;
@@ -223,20 +229,26 @@
             margin-bottom: 8px;
             padding-left: 4px;
         }
-        /* Two cards per row on a normal screen, one when it gets narrow (tablet /
-           phone). auto-fit + minmax means the count follows the width on its own — no
-           media query needed and nothing to keep in sync as cards are added. The old
-           single-card border-and-divider look is replaced by a gap between tiles, which
-           is what actually works in a grid (a per-row bottom border cannot line up
-           across columns). */
+        /* Exactly two columns — a firm, even grid rather than auto-fit, which stretched
+           lone cards to full width and squeezed three across on a wide screen. A single
+           card in a section spans both columns (see .dash-item:only-child) so it reads
+           as a deliberate full-width row instead of a stretched half. Drops to one
+           column on a narrow screen (tablet / phone) via the media query below. */
         .dash-group {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
+        /* A section with one card: let it fill the row rather than sit awkwardly in the
+           left half with an empty right. */
+        .dash-item:only-child { grid-column: 1 / -1; }
         .dash-item {
             display: flex;
-            align-items: center;
+            /* Top-aligned, not centred: descriptions wrap to different line counts, and
+               centring left short cards with big vertical gaps beside tall ones. The
+               grid stretches every card in a row to the tallest, and top alignment keeps
+               their icon/title lined up across the row. */
+            align-items: flex-start;
             gap: 14px;
             padding: 14px 18px;
             text-decoration: none;
@@ -248,6 +260,12 @@
             transition: background 0.12s, border-color 0.12s;
         }
         .dash-item:hover { background: var(--sp-surface-2, #f8fafc); border-color: var(--primary); }
+        /* One column when the viewport is too narrow for two comfortable cards — both
+           the card grid and the paired-section row stack. */
+        @media (max-width: 720px) {
+            .dash-group { grid-template-columns: 1fr; }
+            .dash-row { grid-template-columns: 1fr; }
+        }
         .dash-item .di-icon { font-size: 1.4rem; flex-shrink: 0; width: 28px; text-align: center; }
         .dash-item .di-content { flex: 1; min-width: 0; }
         .dash-item .di-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
@@ -355,6 +373,11 @@
             </div>
         </div>
 
+        <!-- Parents and Staff Portal sit side by side: two single-card sections sharing
+             a row (.dash-row) so each header stands over its own card without stacking
+             two short sections vertically. They are NOT combined — each keeps its own
+             heading and data-role. -->
+        <div class="dash-row">
         <!-- Parents. The entry point for the parent/child portal: per-child access codes,
              the forms a parent can fill out about their child, and video conferences with
              a teacher. data-role="all" because teachers run conferences and hand out codes,
@@ -396,6 +419,7 @@
                 </a>
             </div>
         </div>
+        </div><!-- /.dash-row -->
 
         <div class="dash-section" data-role="all">
             <div class="dash-section-title">Compliance &amp; Programs</div>
