@@ -209,7 +209,10 @@
         .offline-warning p  { color: var(--sp-bad-fg, #7f1d1d); font-size: 0.8rem; line-height: 1.5; }
 
         /* DASHBOARD */
-        .dashboard { width: 100%; max-width: 680px; }
+        /* Wider than the old 680px single column so the cards can sit two-up. Still
+           centred and capped, so it reads as a focused dashboard rather than sprawling
+           edge to edge. */
+        .dashboard { width: 100%; max-width: 980px; }
         .dash-section { margin-bottom: 20px; }
         .dash-section-title {
             font-size: 0.68rem;
@@ -220,12 +223,16 @@
             margin-bottom: 8px;
             padding-left: 4px;
         }
+        /* Two cards per row on a normal screen, one when it gets narrow (tablet /
+           phone). auto-fit + minmax means the count follows the width on its own — no
+           media query needed and nothing to keep in sync as cards are added. The old
+           single-card border-and-divider look is replaced by a gap between tiles, which
+           is what actually works in a grid (a per-row bottom border cannot line up
+           across columns). */
         .dash-group {
-            background: var(--card-bg);
-            border: 1.5px solid var(--border);
-            border-radius: var(--radius);
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 10px;
         }
         .dash-item {
             display: flex;
@@ -234,11 +241,13 @@
             padding: 14px 18px;
             text-decoration: none;
             color: var(--text);
-            border-bottom: 1px solid var(--border);
-            transition: background 0.12s;
+            background: var(--card-bg);
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            transition: background 0.12s, border-color 0.12s;
         }
-        .dash-item:last-child { border-bottom: none; }
-        .dash-item:hover { background: var(--sp-surface-2, #f8fafc); }
+        .dash-item:hover { background: var(--sp-surface-2, #f8fafc); border-color: var(--primary); }
         .dash-item .di-icon { font-size: 1.4rem; flex-shrink: 0; width: 28px; text-align: center; }
         .dash-item .di-content { flex: 1; min-width: 0; }
         .dash-item .di-title { font-size: 0.88rem; font-weight: 700; color: var(--text); }
