@@ -1783,11 +1783,11 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
 }
 
 function ladderShell(title, heldLevel, heldWord, body) {
+    // No heading strip here: the ECE/ITC picker directly above already names the
+    // credential and shows the held level ("ECE — none held"), so a second title +
+    // level pill was the same information twice. The title/level args are kept in the
+    // signature for callers but only the ladder card is rendered now.
     return '<div class="sp-cred-col">'
-        + '<div class="sp-cred-head">'
-        + '<span class="n">' + title + '</span>'
-        + '<span class="lvl">' + (heldLevel ? heldWord : 'none held') + '</span>'
-        + '</div>'
         + '<div class="sp-card sp-need-card">' + body + '</div></div>';
 }
 
