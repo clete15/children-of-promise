@@ -248,11 +248,12 @@
     .sp-who { margin-bottom: 14px; }
     .sp-who h2 { font-size: 1.25rem; }
     .sp-who .sp-sub { margin-bottom: 0; font-size: 0.9rem; }
-    /* The summary tiles now live inside the name card; a little space sets them off
-       from the name/role line above without a second border. */
-    .sp-standing { margin-top: 14px; }
-    /* Name on the left, the actions (classroom link + Edit) on the right. */
-    .sp-who-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    /* The stats sit to the RIGHT of the name/subtitle on the same row now, so no top
+       margin and right-align them. They wrap under the name only if the card is narrow. */
+    .sp-standing { flex: 0 0 auto; }
+    .sp-standing .sp-stats { justify-content: flex-end; }
+    /* Name+subtitle on the left, the stat readout on the right; both top-aligned. */
+    .sp-who-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 28px; flex-wrap: wrap; }
     .sp-who-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex: 0 0 auto; }
     .sp-edit-btn {
         flex: 0 0 auto; appearance: none; -webkit-appearance: none; cursor: pointer;
@@ -1488,19 +1489,19 @@ function identityHeader(s) {
         + '<div class="sp-who-row">'
         + '<div>'
         + '<h2>' + esc(s.Name) + '</h2>'
+        // Registry number shown bare (no "Registry" word) — the N-prefix already reads
+        // as a registry id, and it keeps the grey subtitle line short.
         + '<div class="sp-sub">' + esc(s.Role || 'Role not recorded')
         + (rooms ? ' \u00b7 ' + esc(rooms) : ' \u00b7 no classroom assigned')
-        + (s.RegistryId ? ' \u00b7 Registry ' + esc(s.RegistryId) : '')
+        + (s.RegistryId ? ' \u00b7 ' + esc(s.RegistryId) : '')
         + '</div>'
         + '</div>'
-        // The "Edit my details" button was retired: records are now maintained from
-        // the PDR upload (admin) rather than hand-edited here. The self-edit form and
-        // its toggle wiring remain in the code, just no longer surfaced.
+        // PD-hours / college-credit stats to the RIGHT of the name+subtitle, same row.
+        + '<div class="sp-standing">' + standingStats(s) + '</div>'
         + '</div>'
-        // The "where you stand" figures live inside this same card, right under the
-        // name and role, so the person and their summary read as one thing rather
-        // than as two stacked boxes.
-        + '<div id="spStanding" class="sp-standing">' + standingTiles(s) + '</div>'
+        // Attention blocks (transcript missing / Gateways waiting) full-width below the
+        // name row. Kept in #spStanding so any code that refreshes that node still works.
+        + '<div id="spStanding">' + standingFlags(s) + '</div>'
         + '</div>';
 }
 
@@ -1550,24 +1551,35 @@ function closeDetailsToOverview() {
    inside the name card (the summary is part of the person, not a separate box).
    The transcript flag rides along when it applies. */
 function standingTiles(s) {
+    // Back-compat wrapper: the stat row and the flag blocks are now built separately
+    // (standingStats sits on the header row; standingFlags renders full-width below).
+    return standingStats(s) + standingFlags(s);
+}
+
+/* The compact PD-hours / college-credit readout that sits to the RIGHT of the name.
+   Two stats only: the ECE and Infant Toddler LEVELS used to sit here too, but the
+   ECE/ITC picker on the Credentials tab already shows them interactively, so having
+   them here as well was the same facts twice. A quiet inline readout (.sp-stats), not
+   bordered tiles, so they do not read as buttons next to the real ones. */
+function standingStats(s) {
     const hours = pdHours(s);
     const shTotal = parseFloat(s.SemesterHoursTotal);
     const shEce = parseFloat(s.SemesterHoursEce);
-    const transcriptMissing = String(s.TranscriptOnFile || '') === 'Not submitted';
-
-    /* Two stats only: PD hours and college credit. The ECE and Infant Toddler credential
-       LEVELS used to sit here too, but they are shown again — and interactively — by the
-       ECE/ITC picker on the Credentials tab just below, so having them here as well was
-       the same two facts twice. Rendered as a quiet inline stat row (see .sp-stats), not
-       bordered tiles, so they no longer read as clickable buttons next to the real ones. */
-    let html = '<div class="sp-stats">'
+    return '<div class="sp-stats">'
         + stat(hours === null ? 'warn' : (hours >= PD_REQUIRED ? 'good' : ''),
             'PD hours in ' + new Date().getFullYear(),
             hours === null ? 'Not recorded' : hours + ' of ' + PD_REQUIRED)
         + stat(isFinite(shEce) ? '' : 'warn', 'College credit on file',
             isFinite(shTotal) ? shTotal + ' hrs' : 'Not recorded')
         + '</div>';
+}
 
+/* The attention blocks (transcript missing, Gateways waiting). These are full-width
+   and render BELOW the name row, so they are never squeezed into the narrow right
+   column where the stats live. Visible on every tab, since they hang off the name card. */
+function standingFlags(s) {
+    const transcriptMissing = String(s.TranscriptOnFile || '') === 'Not submitted';
+    let html = '';
     if (transcriptMissing) {
         html += '<div class="sp-step alert">'
             + '<div class="t">Your transcript has not reached Gateways</div>'
@@ -1575,12 +1587,6 @@ function standingTiles(s) {
             + 'credential level, however many hours you have earned. Sending the transcript is '
             + 'usually the single biggest step available.</div></div>';
     }
-
-    /* Gateways is waiting on something — pending credential, awaiting work experience,
-       awaiting additional coursework, etc. This used to show only on the Credentials
-       tab, so it was easy to miss; surfaced here under the name card it is visible on
-       every tab, the same way the transcript flag is. pendingText scans the record for
-       "pending"/"awaiting", so it covers anyone in that state, not one named person. */
     const waiting = pendingText(s);
     if (waiting) {
         html += '<div class="sp-step caution">'
