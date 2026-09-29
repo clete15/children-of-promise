@@ -373,6 +373,55 @@
             </div>
         </div>
 
+        <!-- Parents and Staff Portal sit side by side: two single-card sections sharing
+             a row (.dash-row) so each header stands over its own card without stacking
+             two short sections vertically. They are NOT combined — each keeps its own
+             heading and data-role. Placed just below Daily Operations, above
+             Administration, per the requested section order. -->
+        <div class="dash-row">
+        <!-- Parents. The entry point for the parent/child portal: per-child access codes,
+             the forms a parent can fill out about their child, and video conferences with
+             a teacher. data-role="all" because teachers run conferences and hand out codes,
+             not just admins. Links to its own page rather than living inside the enrolled
+             students form, where the per-student Parent Code / Conference buttons started. -->
+        <div class="dash-section" data-role="all">
+            <div class="dash-section-title">Parents</div>
+            <div class="dash-group">
+                <a class="dash-item" href="/staff/parents.html">
+                    <div class="di-icon">👪</div>
+                    <div class="di-content">
+                        <div class="di-title">Parent Portal</div>
+                        <div class="di-desc">Set up a child portal for parents — access codes, forms, and video conferences with a teacher.</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+            </div>
+        </div>
+
+        <!-- Its own section rather than an entry under Administration. What a person
+             holds, is owed and must do is a different question from administering
+             everyone else, and it was previously reachable only by scrolling past two
+             sections of centre-wide tools to find it filed beside Staff Cards. -->
+        <div class="dash-section" data-role="all">
+            <div class="dash-section-title">Staff Portal</div>
+            <div class="dash-group">
+                <!-- Opens the personal record page directly. The person is ALREADY
+                     signed in (that happened at /me before this dashboard), so this
+                     card is not a login — it is the destination. It carries the token
+                     the session already holds. Clete/Megan/Sara get the staff chooser
+                     on that page; everyone else lands on their own record. -->
+                <a class="dash-item" href="/staff/staff-portal.html">
+                    <div class="di-icon">🎓</div>
+                    <div class="di-content">
+                        <div class="di-title">Staff Portal</div>
+                        <div class="di-desc">Your credentials, files and forms. Megan and Clete can view any staff member.</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+            </div>
+        </div>
+        </div><!-- /.dash-row -->
+
         <div class="dash-section" data-role="admin">
             <div class="dash-section-title">Administration</div>
             <div class="dash-group">
@@ -466,55 +515,6 @@
                 </a>
             </div>
         </div>
-
-        <!-- Parents and Staff Portal sit side by side: two single-card sections sharing
-             a row (.dash-row) so each header stands over its own card without stacking
-             two short sections vertically. They are NOT combined — each keeps its own
-             heading and data-role. Placed at the foot of the dashboard, below
-             Administration, per the requested section order. -->
-        <div class="dash-row">
-        <!-- Parents. The entry point for the parent/child portal: per-child access codes,
-             the forms a parent can fill out about their child, and video conferences with
-             a teacher. data-role="all" because teachers run conferences and hand out codes,
-             not just admins. Links to its own page rather than living inside the enrolled
-             students form, where the per-student Parent Code / Conference buttons started. -->
-        <div class="dash-section" data-role="all">
-            <div class="dash-section-title">Parents</div>
-            <div class="dash-group">
-                <a class="dash-item" href="/staff/parents.html">
-                    <div class="di-icon">👪</div>
-                    <div class="di-content">
-                        <div class="di-title">Parent Portal</div>
-                        <div class="di-desc">Set up a child portal for parents — access codes, forms, and video conferences with a teacher.</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
-            </div>
-        </div>
-
-        <!-- Its own section rather than an entry under Administration. What a person
-             holds, is owed and must do is a different question from administering
-             everyone else, and it was previously reachable only by scrolling past two
-             sections of centre-wide tools to find it filed beside Staff Cards. -->
-        <div class="dash-section" data-role="all">
-            <div class="dash-section-title">Staff Portal</div>
-            <div class="dash-group">
-                <!-- Opens the personal record page directly. The person is ALREADY
-                     signed in (that happened at /me before this dashboard), so this
-                     card is not a login — it is the destination. It carries the token
-                     the session already holds. Clete/Megan/Sara get the staff chooser
-                     on that page; everyone else lands on their own record. -->
-                <a class="dash-item" href="/staff/staff-portal.html">
-                    <div class="di-icon">🎓</div>
-                    <div class="di-content">
-                        <div class="di-title">Staff Portal</div>
-                        <div class="di-desc">Your credentials, files and forms. Megan and Clete can view any staff member.</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
-            </div>
-        </div>
-        </div><!-- /.dash-row -->
 
     </div>
 </main>

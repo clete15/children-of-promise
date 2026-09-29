@@ -1589,7 +1589,11 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
         return ladderShell(title, heldLevel, heldWord, body);
     }
 
-    body += '<div class="sp-need-head">Working toward <b>' + esc(model.levelWord) + '</b></div>';
+    // Name the credential in the heading ("Working toward ECE Level 2" rather than a
+    // bare "Level 2"), so it is clear which ladder this is when a person holds one and
+    // is climbing the other.
+    const credWord = kind === 'itc' ? 'Infant Toddler' : 'ECE';
+    body += '<div class="sp-need-head">Working toward <b>' + credWord + ' ' + esc(model.levelWord) + '</b></div>';
 
     /* Apply-now check (ITC only). When the held ECE has already unlocked a higher ITC
        level than the person holds, they can apply for the level they qualify for rather
@@ -1648,9 +1652,16 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
         }
     }
 
-    // ── College / education gate ──
-    const collegeVal = model.education
-        ? esc(model.education.replace(/\.\s*$/, '')) + '.'
+    // ── Education gate ──
+    // Prefixed "Requested:" and with a trailing "is required" dropped: college is not
+    // actually required until ECE Level 3, so stating a diploma/GED as "requested"
+    // rather than "required" is the honest wording for the lower levels. The framework
+    // text is the source; we just trim a trailing "... is required." for display.
+    const eduText = model.education
+        ? esc(model.education.replace(/\s*is required\.?\s*$/i, '').replace(/\.\s*$/, ''))
+        : '';
+    const collegeVal = eduText
+        ? 'Requested: ' + eduText + '.'
         : 'Set by the credential.';
     let collegeExtra = '';
     if (kind === 'ece') {
@@ -1679,15 +1690,14 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
         }
     }
     body += '<div class="sp-need">'
-        + '<div class="sp-need-k">College</div>'
+        + '<div class="sp-need-k">Education</div>'
         + '<div class="sp-need-v">' + collegeVal + collegeExtra + '</div></div>';
 
     // ── Competencies + training-by-area ──
-    let comp = '<div class="sp-need-v">'
-        + 'The skill areas below are covered by your college coursework and approved training, '
-        + 'with training filling any gaps. Gateways confirms this against your transcript and '
-        + 'record. Check the coverage by content area below to see where you may still be short.'
-        + '</div>';
+    // No intro paragraph: the coverage-by-area cards below are self-explanatory
+    // (each shows COVERED / AIM HERE with its college + training), so the sentence
+    // explaining them was just extra text.
+    let comp = '';
 
     /* College coursework on file, with the content areas each course covers. This is
        the LEFT panel of the split below; the per-area coverage is the RIGHT panel, so
@@ -1769,17 +1779,20 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
     } else {
         comp += areaCol + guidance;
     }
-    // Competencies spans the FULL card width (label on top) so the per-area blocks
-    // are not squeezed into a narrow value column.
-    body += '<div class="sp-need sp-need-full"><div class="sp-need-k">Competencies</div>'
-        + '<div class="sp-need-body">' + comp + '</div></div>';
-
     // ── Classroom / experience ──
+    // Sits right after College (above Competencies): it is a short, single-line
+    // requirement like College, so the two brief rows read together at the top and the
+    // wide coverage-by-area grid comes last.
     if (model.classroom) {
         body += '<div class="sp-need">'
             + '<div class="sp-need-k">Classroom</div>'
             + '<div class="sp-need-v">' + esc(model.classroom) + '</div></div>';
     }
+
+    // Competencies spans the FULL card width (label on top) so the per-area blocks
+    // are not squeezed into a narrow value column.
+    body += '<div class="sp-need sp-need-full"><div class="sp-need-k">Competencies</div>'
+        + '<div class="sp-need-body">' + comp + '</div></div>';
 
     return ladderShell(title, heldLevel, heldWord, body);
 }
