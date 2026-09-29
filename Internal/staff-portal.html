@@ -441,13 +441,15 @@
     }
     @media (max-width: 700px) { .sp-comp-split { grid-template-columns: 1fr; gap: 6px; } }
     .sp-comp-left, .sp-comp-right { min-width: 0; display: flex; flex-direction: column; }
-    /* The per-area list has its own top margin from the head; drop the list's extra. */
-    .sp-comp-left .sp-area-list { margin-top: 8px; }
-    /* Cards are a consistent size (min-height above) with an even gap; the two columns
-       often have different row counts (areas vs courses), so we do NOT stretch rows to
-       force equal total height — that distorted the cards. A shorter column simply ends
-       sooner, which reads cleaner than uneven blocks. */
-    .sp-comp-left .sp-area-list, .sp-comp-right .sp-course-list { gap: 8px; }
+    /* Both column headings are the SAME fixed height with the SAME margins, so the
+       first card under each starts on exactly the same line — the two stacks line up at
+       the top even if one heading is longer/wraps. The lists carry no extra top margin
+       (the heading owns the gap), which was the source of the earlier misalignment: the
+       left list had margin-top:8px and the right did not. */
+    .sp-comp-split .sp-course-head {
+        min-height: 20px; line-height: 20px; margin: 0 0 8px; padding: 0;
+    }
+    .sp-comp-left .sp-area-list, .sp-comp-right .sp-course-list { margin-top: 0; gap: 8px; }
 
     /* College coursework list: each course with the content-area codes it covers. */
     /* Column headings centred over their card stacks. */
