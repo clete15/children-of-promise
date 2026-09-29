@@ -384,6 +384,10 @@
         padding: 10px 12px; border-radius: 9px; margin: 0;
         border: 1px solid var(--sp-border); border-left: 3px solid var(--sp-border);
         background: var(--sp-surface-2);
+        /* Consistent card height and centred content so a card with one coverage line
+           (e.g. AIM HERE) sits the same size as a two-line one — the column reads as an
+           even stack rather than ragged blocks. */
+        min-height: 64px; display: flex; flex-direction: column; justify-content: center;
     }
     /* Covered = green edge; needs-attention = indigo edge (never the red alarm). */
     .sp-area.ok { border-left-color: var(--sp-good-br); }
@@ -419,19 +423,17 @@
     .sp-comp-left, .sp-comp-right { min-width: 0; display: flex; flex-direction: column; }
     /* The per-area list has its own top margin from the head; drop the list's extra. */
     .sp-comp-left .sp-area-list { margin-top: 8px; }
-    /* Let the course list (now on the right) fill its column's height so the two
-       columns balance — the rows spread to fill rather than leaving a bottom gap. */
-    .sp-comp-right .sp-course-list { flex: 1 1 auto; }
-    .sp-comp-right .sp-course { flex: 1 1 auto; }
-    /* On a phone the columns stack, so don't stretch rows there. */
-    @media (max-width: 700px) {
-        .sp-comp-right .sp-course-list, .sp-comp-right .sp-course { flex: 0 0 auto; }
-    }
+    /* Cards are a consistent size (min-height above) with an even gap; the two columns
+       often have different row counts (areas vs courses), so we do NOT stretch rows to
+       force equal total height — that distorted the cards. A shorter column simply ends
+       sooner, which reads cleaner than uneven blocks. */
+    .sp-comp-left .sp-area-list, .sp-comp-right .sp-course-list { gap: 8px; }
 
     /* College coursework list: each course with the content-area codes it covers. */
+    /* Column headings centred over their card stacks. */
     .sp-course-head {
         font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
-        color: var(--sp-muted); margin: 12px 0 6px;
+        color: var(--sp-muted); margin: 12px 0 8px; text-align: center;
     }
     .sp-comp-split .sp-course-head { margin-top: 0; }
     .sp-course-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 4px; }
@@ -439,6 +441,9 @@
         display: flex; align-items: center; flex-wrap: wrap; gap: 5px 10px;
         padding: 9px 12px; border-radius: 8px; background: var(--sp-surface-2);
         border: 1px solid var(--sp-border); font-size: 0.9rem;
+        /* Same min-height as the area cards so the two columns read as matched,
+           evenly-sized stacks side by side. */
+        min-height: 64px;
     }
     .sp-course-nbr { font-weight: 800; color: var(--sp-text); white-space: nowrap; font-size: 0.92rem; }
     .sp-course-name { color: var(--sp-text-2); flex: 1 1 auto; min-width: 0; }
@@ -1789,9 +1794,10 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
             + '<div class="sp-need-v">' + esc(model.classroom) + '</div></div>';
     }
 
-    // Competencies spans the FULL card width (label on top) so the per-area blocks
-    // are not squeezed into a narrow value column.
-    body += '<div class="sp-need sp-need-full"><div class="sp-need-k">Competencies</div>'
+    // The coverage grid spans the FULL card width. No "Competencies" label: the two
+    // centred column headings (Coverage by content area / College coursework on file)
+    // already say what each side is, so the extra label was noise.
+    body += '<div class="sp-need sp-need-full">'
         + '<div class="sp-need-body">' + comp + '</div></div>';
 
     return ladderShell(title, heldLevel, heldWord, body);
