@@ -3886,6 +3886,75 @@ const PI_COMPLIANCE_ITEMS = [
    scored       false only for PI1, which the CQIP marks "Not Scored for IDEC
                 Monitoring"                                                     */
 const PICC_ITEMS = [
+    /* CB (Center-Based) items lead the list, ahead of the PI items, to match the
+       document-library folder order (the monitoring PICC folder lists CB1-CB8 first).
+       They are the same items; only the display order changed. */
+    {
+        num: 'CB1', title: 'Hours of PI center-based services',
+        requires: 'PI children are enrolled in a program providing a minimum of 2 hours 30 minutes, with set program hours and a PI-funded teacher present throughout.',
+        subs: [
+            'A. Minimum of 2 hours 30 minutes of service',
+            'B. Number of hours and minutes',
+            'C. Program has set PI program hours',
+            'D. Start and end time',
+            'E. A PI-funded teacher is in the classroom throughout PI operating hours'
+        ],
+        na: 'F. Second caregiver requirement applies to DCFS Family Child Care Homes only.',
+        guidance: 'Some children attend PI hours only while others receive extended hours through CCAP or Early Head Start. Maintain sign-in sheets, classroom schedules and attendance records for the PI program, and lesson plans specific to the PI period.',
+        evidence: 'Class schedules, policies and procedures manual, sign-in sheets, attendance records, PI-specific lesson plans.'
+    },
+    {
+        num: 'CB2', title: 'DCFS licensure, ExceleRate and Early Head Start',
+        requires: 'Current DCFS license, and evidence of work toward the next ExceleRate Circle of Quality.',
+        subs: [
+            'A. Current DCFS licensure, with license number and expiration date',
+            'B. Alignment with Early Head Start / Head Start, if applicable',
+            'C. Working toward the next advanced ExceleRate level',
+            'D. Description of the evidence of that work'
+        ],
+        evidence: 'DCFS license, ExceleRate award letter and report dates, Early Head Start federal monitoring report if applicable.',
+        // Renders the site-level DCFS license panel (number + effective/expiry +
+        // countdown) inside this item. The license is not a per-year value.
+        licensePanel: true
+    },
+    {
+        num: 'CB3', title: 'Research-based curriculum aligned to the IELG',
+        requires: 'A research-based child-centered curriculum and assessment, with Illinois Early Learning Guidelines references visible in classroom lesson plans.',
+        subs: [
+            'A. Identification of the research-based, IELG-aligned curriculum',
+            'B. References to the IELG are evident in classroom lesson plans'
+        ],
+        guidance: 'To be in compliance the child activities in the lesson plans must carry IELG references.',
+        evidence: 'Classroom lesson plans, curriculum documentation.'
+    },
+    {
+        num: 'CB4', title: 'Staff to classroom ratios',
+        requires: 'Ratios meet the standard for DCFS Licensed Child Care Centers in every PI classroom.',
+        evidence: 'Classroom rosters, staffing schedules, DCFS ratio documentation.'
+    },
+    {
+        num: 'CB5', title: 'Classroom food service',
+        requires: 'The program provides food service meeting the applicable standards.',
+        evidence: 'Menus, meal counts, CACFP records.'
+    },
+    {
+        num: 'CB6', title: 'Classroom staff qualifications',
+        requires: 'Center-based staff meet the qualification requirements.',
+        subs: ['A. Staff qualifications for center-based classrooms'],
+        guidance: 'Judged against TITLE 89: Social Services, and Gateways credential levels.',
+        evidence: 'Transcripts, Gateways training certificates, credential letters.'
+    },
+    {
+        num: 'CB7', title: 'Center-based parent and family education services',
+        requires: 'Parent and family education services are identified and delivered.',
+        evidence: 'Parent education calendars, sign-in sheets, newsletters, family engagement plans.'
+    },
+    {
+        num: 'CB8', title: 'Center-based policies and procedures',
+        requires: 'Written policies and procedures covering the center-based program, including preventing suspensions and expulsions.',
+        subs: ['A. Evidence the program has developed the required policies and procedures'],
+        evidence: 'Policies and procedures manual, suspension and expulsion policy.'
+    },
     {
         num: 'PI1', title: 'Identification of the Prevention Initiative program',
         scored: false,
@@ -3990,72 +4059,6 @@ const PICC_ITEMS = [
         childFields: ['PermissionSlip', 'BegASQ', 'BegASE', 'ScreeningResultsShared'],
         guidance: 'More than one tool may be needed for a comprehensive screening; ASQ-3 plus ASQ:SE-2 together satisfy it. Permission forms are valid July 1 to June 30 and must exist for every child screened. The results-shared documentation needs seven components: child name, tool used, evidence shared, shared with whom, date screened, date shared, and screener name.',
         followUpLink: true
-    },
-    {
-        num: 'CB1', title: 'Hours of PI center-based services',
-        requires: 'PI children are enrolled in a program providing a minimum of 2 hours 30 minutes, with set program hours and a PI-funded teacher present throughout.',
-        subs: [
-            'A. Minimum of 2 hours 30 minutes of service',
-            'B. Number of hours and minutes',
-            'C. Program has set PI program hours',
-            'D. Start and end time',
-            'E. A PI-funded teacher is in the classroom throughout PI operating hours'
-        ],
-        na: 'F. Second caregiver requirement applies to DCFS Family Child Care Homes only.',
-        guidance: 'Some children attend PI hours only while others receive extended hours through CCAP or Early Head Start. Maintain sign-in sheets, classroom schedules and attendance records for the PI program, and lesson plans specific to the PI period.',
-        evidence: 'Class schedules, policies and procedures manual, sign-in sheets, attendance records, PI-specific lesson plans.'
-    },
-    {
-        num: 'CB2', title: 'DCFS licensure, ExceleRate and Early Head Start',
-        requires: 'Current DCFS license, and evidence of work toward the next ExceleRate Circle of Quality.',
-        subs: [
-            'A. Current DCFS licensure, with license number and expiration date',
-            'B. Alignment with Early Head Start / Head Start, if applicable',
-            'C. Working toward the next advanced ExceleRate level',
-            'D. Description of the evidence of that work'
-        ],
-        evidence: 'DCFS license, ExceleRate award letter and report dates, Early Head Start federal monitoring report if applicable.',
-        // Renders the site-level DCFS license panel (number + effective/expiry +
-        // countdown) inside this item. The license is not a per-year value.
-        licensePanel: true
-    },
-    {
-        num: 'CB3', title: 'Research-based curriculum aligned to the IELG',
-        requires: 'A research-based child-centered curriculum and assessment, with Illinois Early Learning Guidelines references visible in classroom lesson plans.',
-        subs: [
-            'A. Identification of the research-based, IELG-aligned curriculum',
-            'B. References to the IELG are evident in classroom lesson plans'
-        ],
-        guidance: 'To be in compliance the child activities in the lesson plans must carry IELG references.',
-        evidence: 'Classroom lesson plans, curriculum documentation.'
-    },
-    {
-        num: 'CB4', title: 'Staff to classroom ratios',
-        requires: 'Ratios meet the standard for DCFS Licensed Child Care Centers in every PI classroom.',
-        evidence: 'Classroom rosters, staffing schedules, DCFS ratio documentation.'
-    },
-    {
-        num: 'CB5', title: 'Classroom food service',
-        requires: 'The program provides food service meeting the applicable standards.',
-        evidence: 'Menus, meal counts, CACFP records.'
-    },
-    {
-        num: 'CB6', title: 'Classroom staff qualifications',
-        requires: 'Center-based staff meet the qualification requirements.',
-        subs: ['A. Staff qualifications for center-based classrooms'],
-        guidance: 'Judged against TITLE 89: Social Services, and Gateways credential levels.',
-        evidence: 'Transcripts, Gateways training certificates, credential letters.'
-    },
-    {
-        num: 'CB7', title: 'Center-based parent and family education services',
-        requires: 'Parent and family education services are identified and delivered.',
-        evidence: 'Parent education calendars, sign-in sheets, newsletters, family engagement plans.'
-    },
-    {
-        num: 'CB8', title: 'Center-based policies and procedures',
-        requires: 'Written policies and procedures covering the center-based program, including preventing suspensions and expulsions.',
-        subs: ['A. Evidence the program has developed the required policies and procedures'],
-        evidence: 'Policies and procedures manual, suspension and expulsion policy.'
     }
 ];
 
