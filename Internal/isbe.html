@@ -5499,10 +5499,10 @@ function renderPfaChecklistSection(data) {
             + (item.na ? '' : piccDocsHtml(item.num))
             + (actions ? '<div class="picc-actions">' + actions + '</div>' : '')
             + (item.na ? '' : '<div class="picc-controls">'
-                // No manual tick where the children's files decide it: two sources for
-                // one answer is how the roster got into this state to begin with.
-                + (stats ? '' : '<label class="picc-check"><input type="checkbox" ' + checked
-                    + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>')
+                // "Evidence assembled" checkbox removed on request across the PICC cards;
+                // saveCompliance and its stored value remain so nothing that reads the
+                // manual tick breaks. Child-file items already computed status from the
+                // roster; the rest now show just the date, evidence and notes.
                 + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
                 // The link to the current form/evidence file for this item. Paste the
                 // library link (or any URL) and it becomes the "Open current form"
@@ -5651,13 +5651,12 @@ function renderPiccItem(item, data) {
         + piccDocsHtml(item.num)
         + '<div class="picc-actions">' + evidence + jumps + '</div>'
         + '<div class="picc-controls">'
-        + (stats ? '' : '<label class="picc-check"><input type="checkbox" ' + checked
-            + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>')
+        /* The "Evidence assembled" checkbox and the external-link URL box were both
+           removed on request: a card now shows just the date, the evidence upload, and
+           the monitor notes. saveCompliance / saveComplianceLink and their stored values
+           remain in the code, so any previously ticked/linked items keep their data and
+           nothing that reads them breaks — the controls are simply no longer rendered. */
         + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
-        /* The "link to something outside the library" URL box was removed on request:
-           evidence lives in the server library, so an external link was clutter on every
-           card. saveComplianceLink and the stored value remain, so any previously saved
-           links are preserved and nothing else that reads them breaks. */
         + '<span id="up_' + item.num + '" style="flex-basis:100%;font-size:0.72rem;margin-top:6px;"></span>'
         + '</div>'
         + '<textarea class="picc-notes" placeholder="Notes for the monitor, or what is still outstanding" '
