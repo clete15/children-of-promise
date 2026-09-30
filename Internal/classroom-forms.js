@@ -1060,13 +1060,34 @@
         mountSigPad('scrStaffSigPad', studentId, scrField, 'staff',
             { label: 'Staff signature', printedName: 'scrStaffSig', dateField: 'scrDate' });
 
-        // Reset and reflect the parent-questionnaire upload slot.
+        // Reset and reflect the parent-questionnaire upload slot. For a PI child on the
+        // beginning screenings the questionnaire is REQUIRED, so the slot is relabelled
+        // and its empty-state reads "Required", not "Optional".
+        var childIsPI = String(student.PFA_PI_na || '').trim().toUpperCase() === 'PI';
+        var questRequired = childIsPI && (scrField === 'BegASQ' || scrField === 'BegASE');
+        var qSection = document.getElementById('scrQuestSection');
+        var qHeading = document.getElementById('scrQuestHeading');
+        var qNote = document.getElementById('scrQuestNote');
+        if (qHeading) qHeading.textContent = questRequired
+            ? 'Parent\u2019s Completed Questionnaire (required)'
+            : 'Parent\u2019s Completed Questionnaire (optional)';
+        if (qNote) qNote.textContent = questRequired
+            ? 'Required for PI children: upload the parent\u2019s completed Ages & Stages '
+                + 'questionnaire (PDF or a clear photo). The scored summary alone does not '
+                + 'complete this screening until the questionnaire is on file.'
+            : 'Optional. The scored summary above completes the screening on its own. If a '
+                + 'parent completed an Ages & Stages questionnaire, you can attach the scan or a '
+                + 'clear photo (PDF or image) to keep it in the child\u2019s folder \u2014 but it '
+                + 'is not required.';
+        if (qSection) qSection.classList.toggle('scr-quest-required', questRequired);
         var qFile = document.getElementById('scrQuestFile');
         if (qFile) qFile.value = '';
         var existingQ = ChildForms().fileFor(studentId, scrField, 'questionnaire');
         setUploadStatus('scrQuestStatus', existingQ
             ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
-            : null, 'Optional \u2014 no questionnaire on file.');
+            : null, questRequired
+                ? '\u26a0 Required \u2014 no questionnaire on file yet.'
+                : 'Optional \u2014 no questionnaire on file.');
 
         try {
             var res = await apiFetch(yearQS('/api/screening/' + studentId + '?type=' + encodeURIComponent(type) + '&period=' + encodeURIComponent(period)));
@@ -1572,8 +1593,8 @@
         // own (staff-administered). If a parent filled in a paper questionnaire, it can
         // be scanned/photographed and attached here for the child\u2019s folder, but it
         // is not required.
-        '<div class="pi-section"><h4>Parent\u2019s Completed Questionnaire (optional)</h4>',
-        '<div class="doc-note">Optional. The scored summary above completes the screening on its own. If a parent completed an Ages &amp; Stages questionnaire, you can attach the scan or a clear photo (PDF or image) to keep it in the child\u2019s folder &mdash; but it is not required.</div>',
+        '<div class="pi-section" id="scrQuestSection"><h4 id="scrQuestHeading">Parent\u2019s Completed Questionnaire (optional)</h4>',
+        '<div class="doc-note" id="scrQuestNote">Optional. The scored summary above completes the screening on its own. If a parent completed an Ages &amp; Stages questionnaire, you can attach the scan or a clear photo (PDF or image) to keep it in the child\u2019s folder &mdash; but it is not required.</div>',
         '<div class="cls-upload-row"><input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">',
         '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload questionnaire</button>',
         '<span id="scrQuestStatus" class="cls-upload-status"></span></div></div>',

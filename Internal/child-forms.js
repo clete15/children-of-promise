@@ -49,6 +49,7 @@
         'BegASQ', 'BegASE', 'EndASQ', 'EndASE',
         'MidYearReport', 'EndYearReport',
         'WeightedEligibility', 'ScreeningResultsShared',
+        'ExitInterview',
         'FamilyCenteredAssessment', 'FamilyGoalPlan', 'TransitionPlan', 'Referral'
     ];
 
@@ -70,6 +71,16 @@
     }
     function isScreening(field) { return SCREENING_FIELDS.indexOf(field) !== -1; }
     function isReport(field) { return REPORT_FIELDS.indexOf(field) !== -1; }
+
+    /* The beginning-of-year screenings, where a PI child must have the parent's
+       uploaded questionnaire on file (not just a teacher-scored summary) for the column
+       to count. Program policy above the compliance floor; PFA/non-PI keep the scored
+       summary as sufficient. Kept as its own list so it is one line to change if the
+       end-of-year screenings are ever brought under the same rule. */
+    var QUESTIONNAIRE_REQUIRED_FIELDS = ['BegASQ', 'BegASE'];
+    function requiresQuestionnaire(field, isPI) {
+        return !!isPI && QUESTIONNAIRE_REQUIRED_FIELDS.indexOf(field) !== -1;
+    }
 
     /* Reads the year's form records. The caller supplies its own fetch wrapper so
        this file carries no opinion about authentication. Failure is recorded, not
@@ -186,10 +197,20 @@
         if (loadState !== 'ready') return ticked ? 'unknown' : 'none';
 
         if (isScreening(field)) {
-            // Teacher-scored summary OR a parent questionnaire on file completes it.
-            // (Scored alone is the normal, streamlined path.)
             var scored = hasForm(studentId, field);
             var quest = hasFile(studentId, field, 'questionnaire');
+            /* PI children now REQUIRE the parent's completed questionnaire on file for
+               the BEGINNING screenings (Beg ASQ / Beg ASE) — a program decision to hold
+               PI families to the questionnaire, above the compliance floor. For those
+               the uploaded questionnaire is what completes the column; a teacher-scored
+               summary without it is real progress but not done ('partial'). Everything
+               else (PFA, non-PI rooms, and the END screenings) keeps the streamlined
+               rule: scored summary OR questionnaire completes it. */
+            if (requiresQuestionnaire(field, isPI)) {
+                if (quest) return 'form';
+                if (scored) return 'partial';   // scored but questionnaire still needed
+                return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
+            }
             if (scored || quest) return 'form';
             return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
         }
