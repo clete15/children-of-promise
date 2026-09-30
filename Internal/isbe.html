@@ -5654,11 +5654,10 @@ function renderPiccItem(item, data) {
         + (stats ? '' : '<label class="picc-check"><input type="checkbox" ' + checked
             + ' onchange="saveCompliance(\'' + key + '\',this.checked)"> Evidence assembled</label>')
         + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
-        /* The SharePoint link box has gone: evidence is indexed from the server's
-           own library, so there is no external URL to paste. Kept as an optional
-           external reference only where something genuinely lives elsewhere. */
-        + '<input type="url" class="picc-link-input" placeholder="Optional: link to something held outside the library" value="'
-        + savedLink.replace(/"/g, '&quot;') + '" onchange="saveComplianceLink(\'' + key + '\',this.value)">'
+        /* The "link to something outside the library" URL box was removed on request:
+           evidence lives in the server library, so an external link was clutter on every
+           card. saveComplianceLink and the stored value remain, so any previously saved
+           links are preserved and nothing else that reads them breaks. */
         + '<span id="up_' + item.num + '" style="flex-basis:100%;font-size:0.72rem;margin-top:6px;"></span>'
         + '</div>'
         + '<textarea class="picc-notes" placeholder="Notes for the monitor, or what is still outstanding" '
