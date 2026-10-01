@@ -481,6 +481,18 @@ async function load() {
             ? 'program=' + p + '&folder=' + encodeURIComponent(forcedFolder)
             : 'program=' + p;
         const res = await apiFetch('/api/doc-index?' + qs);
+        /* 401 means this browser session has no valid sign-in (opened directly, or the
+           12-hour token expired). The endpoint answers plain "Unauthorized", so calling
+           res.json() on it threw the confusing 'Unexpected token U ... is not valid JSON'
+           the page used to show. Instead, send them to /me to sign in and bounce straight
+           back here — the same recovery the PAS pages use — so a missing session is a
+           sign-in prompt, not a dead end. */
+        if (res.status === 401) {
+            const back = encodeURIComponent(location.pathname + location.search);
+            location.replace('/me?next=' + back);
+            return;
+        }
+        if (!res.ok) throw new Error('HTTP ' + res.status);
         INDEX = await res.json();
         render();
         msg(INDEX.missing ? '' : INDEX.folder);
