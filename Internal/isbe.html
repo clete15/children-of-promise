@@ -2714,8 +2714,13 @@ function renderRoster() {
             if (f === 'GrantPerfReport') {
                 const item = GRANT_REPORT_ITEMS[activeProgram];
                 if (!item) return td + box + '</td>';
+                /* No rel="noopener": documents.html reads identity from sessionStorage
+                   (copStaffToken), and noopener gives the new tab an EMPTY sessionStorage,
+                   so /api/doc-index 401s and the library shows nothing — the "dead link".
+                   Dropping it lets the new tab inherit the sign-in. Same-origin, so there
+                   is no reverse-tabnabbing concern. */
                 return td + box + '<a href="' + libraryHref(item)
-                    + '" target="_blank" rel="noopener" style="' + LINK_STYLE
+                    + '" target="_blank" style="' + LINK_STYLE
                     + '" title="Open the Grant Periodic Performance Report in the document library">'
                     + '[doc]</a></td>';
             }
@@ -5378,7 +5383,7 @@ function openChildFiles(studentId) {
         + 'folder. '
         + (docIndex && docIndex.childFolder
             ? 'The whole folder (' + docIndex.childFolder.count + ' files) is in the '
-              + '<a href="' + libraryHref('') + '" target="_blank" rel="noopener">document library</a>.'
+              + '<a href="' + libraryHref('') + '" target="_blank">document library</a>.'
             : '')
         + '</p>'
         + '<p id="cfilesStatus" style="font-size:0.76rem;margin-top:8px;"></p>';
@@ -5625,7 +5630,7 @@ function renderPfaChecklistSection(data) {
         + (ready === applicable.length ? 'all evidence recorded' : (applicable.length - ready) + ' still open')
         + '</div>'
         + '</div>'
-        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('', 'PFA') + '" target="_blank" rel="noopener">Open document library</a>'
+        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('', 'PFA') + '" target="_blank">Open document library</a>'
         + '</div>'
         + '<div class="picc-list">' + rows + '</div>';
 }
@@ -5654,7 +5659,7 @@ function renderPiccSection(data) {
         + '<div class="picc-readiness-num">' + ready + ' / ' + PICC_ITEMS.length + '</div>'
         + '<div class="picc-readiness-lbl">' + (blocked ? blocked + ' still open' : 'all evidence recorded') + '</div>'
         + '</div>'
-        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('', 'PI') + '" target="_blank" rel="noopener">Open document library</a>'
+        + '<a class="picc-btn picc-btn-primary" href="' + libraryHref('', 'PI') + '" target="_blank">Open document library</a>'
         + '</div>'
         + '<div class="picc-list">' + rows + '</div>';
 }
@@ -5702,13 +5707,17 @@ function renderPiccItem(item, data) {
             + 'onclick="event.preventDefault();setProgram(\'' + (item.childDocGrid === 'PI' ? 'piChildFiles' : 'pfaChildFiles') + '\')" '
             + 'title="Open the per-child document checklist">Child file checklist</a>';
     }
+    // These forms and docs are in-app, same-origin pages that read the sign-in from
+    // sessionStorage; no rel="noopener" so a new tab inherits the token (noopener blanks
+    // it and the page 401s to a dead/empty view). The savedLink below is user-supplied
+    // and may be cross-origin, so it keeps noopener.
     (item.forms || []).forEach(function (f) {
         evidence += '<a class="picc-btn picc-btn-primary" href="' + String(f.href).replace(/"/g, '&quot;') + '" '
-            + 'target="_blank" rel="noopener" title="Open, edit and sign this evidence form in the app">'
+            + 'target="_blank" title="Open, edit and sign this evidence form in the app">'
             + escapeHtml(f.label) + '</a>';
     });
     (item.docs || []).forEach(function (d) {
-        evidence += '<a class="picc-btn" href="' + d.url + '" target="_blank" rel="noopener">' + d.label + '</a>';
+        evidence += '<a class="picc-btn" href="' + d.url + '" target="_blank">' + d.label + '</a>';
     });
     if (savedLink) {
         evidence += '<a class="picc-btn picc-btn-primary" href="' + savedLink.replace(/"/g, '&quot;') + '" '
@@ -5771,7 +5780,10 @@ function renderInstrumentSection(items, prefix, data) {
            and a PFA button then appeared to show the wrong evidence. */
         var libProg = item.libraryProgram || (activeProgram === 'PFA' ? 'PFA' : 'PI');
         var libHref = libraryHref(item.libraryItem, libProg);
-        var linkBtn = '<a class="picc-btn" href="' + libHref + '" target="_blank" rel="noopener"'
+        // Same-origin library link: no rel="noopener" (it would blank the new tab's
+        // sessionStorage and 401 the doc-index). The savedLink below is user-supplied
+        // and may be cross-origin, so that one keeps noopener.
+        var linkBtn = '<a class="picc-btn" href="' + libHref + '" target="_blank"'
             + ' title="' + (item.libraryItem
                 ? 'Open ' + item.libraryItem + ' in the document library'
                 : 'Open the document library') + '">Library</a>';
