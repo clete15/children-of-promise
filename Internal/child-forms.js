@@ -82,6 +82,18 @@
         return !!isPI && QUESTIONNAIRE_REQUIRED_FIELDS.indexOf(field) !== -1;
     }
 
+    /* Original scored test sheets (the raw ASQ-3 / ASQ:SE-2 scoring sheets the summary
+       was built from). PI families must have these on file for ALL four screening
+       columns — beginning AND end — not just the scored summary. A summary with no test
+       sheets behind it is real progress but not done ('partial', shown yellow): the
+       monitor wants to see the original scores, not only our typed-up summary. PFA and
+       non-PI rooms keep the streamlined rule (summary alone completes it). One list so
+       the policy is one line to change. */
+    var TESTSHEET_REQUIRED_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
+    function requiresTestSheets(field, isPI) {
+        return !!isPI && TESTSHEET_REQUIRED_FIELDS.indexOf(field) !== -1;
+    }
+
     /* Reads the year's form records. The caller supplies its own fetch wrapper so
        this file carries no opinion about authentication. Failure is recorded, not
        thrown: a roster that cannot reach this endpoint should still render its
@@ -199,13 +211,25 @@
         if (isScreening(field)) {
             var scored = hasForm(studentId, field);
             var quest = hasFile(studentId, field, 'questionnaire');
-            /* PI children now REQUIRE the parent's completed questionnaire on file for
-               the BEGINNING screenings (Beg ASQ / Beg ASE) — a program decision to hold
-               PI families to the questionnaire, above the compliance floor. For those
-               the uploaded questionnaire is what completes the column; a teacher-scored
-               summary without it is real progress but not done ('partial'). Everything
-               else (PFA, non-PI rooms, and the END screenings) keeps the streamlined
-               rule: scored summary OR questionnaire completes it. */
+            var sheets = hasFile(studentId, field, 'testsheet');
+            // Whatever the program's "summary" artefact is for this child: the typed-up
+            // scored summary, or (where a questionnaire is required) the questionnaire.
+            var summaryOnFile = requiresQuestionnaire(field, isPI) ? quest : (scored || quest);
+
+            /* PI children must ALSO have the original scored test sheets on file for the
+               screening columns — the raw ASQ-3 / ASQ:SE-2 sheets with the original
+               scores the summary was built from. A summary with no test sheets behind it
+               is 'partial' (yellow): progress, but a monitor still has nothing original
+               to check. Both present completes the column. */
+            if (requiresTestSheets(field, isPI)) {
+                if (summaryOnFile && sheets) return 'form';
+                if (summaryOnFile || scored) return 'partial';   // summary up, test sheets still needed
+                return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
+            }
+
+            /* PI beginning screenings (where no test sheets rule applies, e.g. legacy)
+               still require the parent's completed questionnaire. Kept for completeness;
+               with test sheets required above this branch is reached only for non-PI. */
             if (requiresQuestionnaire(field, isPI)) {
                 if (quest) return 'form';
                 if (scored) return 'partial';   // scored but questionnaire still needed

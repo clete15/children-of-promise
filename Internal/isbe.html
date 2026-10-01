@@ -145,6 +145,11 @@
         /* The "missing" state — red, for a read-only status pill that is not yet on file
            (e.g. Proof of Income, which is collected in Child Files, not here). */
         .cf-pill-missing { color:var(--sp-bad-fg);background:var(--sp-bad-bg);border-color:var(--sp-bad-br); }
+        /* The "partial" state — amber/yellow. A PI screening whose summary is on file
+           but whose original scored test sheets are still missing. Done enough to see,
+           not done enough to pass a monitor. */
+        .cf-pill-partial { color:#92400e;background:#fef3c7;border-color:#f59e0b; }
+        a.cf-pill-partial:hover { filter:brightness(1.03); }
         td { padding:8px 12px;border-bottom:1px solid var(--sp-border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:16px; }
         /* Uniform row height: a cell with a screening pill + its date/flag line is two
@@ -1049,6 +1054,15 @@
                         <label>Notes / Follow-up</label>
                         <textarea id="scrNotes" placeholder="Any concerns, referral details, follow-up actions..."></textarea>
                     </div>
+                </div>
+            </div>
+            <div class="pi-section" id="scrSheetsSection">
+                <h4>Original Scored Test Sheets</h4>
+                <div class="doc-note">Attach the original ASQ-3 / ASQ:SE-2 scoring sheets &mdash; the ones with the original item scores the summary above was built from. For PI children a monitor wants to see these originals, so the column stays <strong>yellow</strong> until they are on file. If there are several pages, combine them into one PDF; re-uploading replaces the file on record.</div>
+                <div class="cls-upload-row">
+                    <input type="file" id="scrSheetsFile" accept=".pdf,.jpg,.jpeg,.png">
+                    <button type="button" class="pi-btn pi-btn-primary" id="scrSheetsBtn" onclick="uploadScreeningTestSheets()">Upload test sheets</button>
+                    <span id="scrSheetsStatus" class="cls-upload-status"></span>
                 </div>
             </div>
             <div class="pi-section">
@@ -2414,7 +2428,27 @@ function teacherPill(student, field, extra) {
         return '<span class="cf-pill" title="Checked off by the teacher. For PFA the evidence lives in the child\u2019s physical folder.">\u2713 done</span>'
             + (extra || '');
     }
+    if (st === 'partial') {
+        // Summary on file but the original scored test sheets are still missing. Yellow,
+        // and clickable so it opens the screening form where the test sheets are uploaded.
+        const tip = 'Summary on file, but the original scored test sheets are still needed. '
+            + 'Open the screening to upload them.';
+        return '<a class="cf-pill cf-pill-partial" href="#" title="' + tip.replace(/"/g, '&quot;') + '"'
+            + ' onclick="event.preventDefault();' + screeningOpenCall(student, field) + '">\u25B2 test sheets</a>'
+            + (extra || '');
+    }
     return '';   // nothing on file yet — empty cell
+}
+
+/* The openScreening(...) call for a screening field, so the yellow "partial" pill can
+   open the right modal. Mirrors cellClickHandler's mapping. */
+function screeningOpenCall(student, field) {
+    const id = student.Id;
+    if (field === 'BegASQ') return "openScreening(" + id + ",'ASQ-3','Beginning')";
+    if (field === 'EndASQ') return "openScreening(" + id + ",'ASQ-3','End')";
+    if (field === 'BegASE') return "openScreening(" + id + ",'ASQ:SE-2','Beginning')";
+    if (field === 'EndASE') return "openScreening(" + id + ",'ASQ:SE-2','End')";
+    return "void 0";
 }
 
 /* Weighted Eligibility on the roster is a read-only VIEW of the Child Files form, not a
@@ -3492,6 +3526,38 @@ async function uploadScreeningQuestionnaire() {
     }
 }
 
+/* Attach the original scored test sheets for the open screening. Kind 'testsheet'.
+   For a PI child this is what flips the roster cell from yellow (summary only) to a
+   green "on file" pill. Mirrors uploadScreeningQuestionnaire. */
+async function uploadScreeningTestSheets() {
+    if (!currentScrStudentId) return;
+    var field = screeningField(currentScrType, currentScrPeriod);
+    var input = document.getElementById('scrSheetsFile');
+    var statusEl = document.getElementById('scrSheetsStatus');
+    if (!input || !input.files || !input.files.length) {
+        if (statusEl) { statusEl.textContent = 'Choose a file first.'; statusEl.style.color = '#b91c1c'; }
+        return;
+    }
+    var file = input.files[0];
+    if (file.size > 15 * 1024 * 1024) {
+        if (statusEl) { statusEl.textContent = 'That is over 15 MB. A PDF scan is usually much smaller.'; statusEl.style.color = '#b91c1c'; }
+        return;
+    }
+    var btn = document.getElementById('scrSheetsBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Uploading\u2026'; }
+    if (statusEl) { statusEl.textContent = 'Uploading\u2026'; statusEl.style.color = '#64748b'; }
+    try {
+        var d = await uploadChildFile(currentScrStudentId, field, 'testsheet', file);
+        ChildForms.markFile(currentScrStudentId, field, 'testsheet', d.relPath, d.name);
+        setUploadStatus('scrSheetsStatus', { on: true, name: d.name, relPath: d.relPath }, '');
+        refreshActiveView();
+    } catch (e) {
+        if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Upload test sheets'; }
+    }
+}
+
 // ── Report card uploads (Mid-Year / End-Year) ──
 var currentRCStudentId = null, currentRCField = null;
 var RC_LABELS = { MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card' };
@@ -3639,6 +3705,18 @@ async function openScreening(studentId, type, period) {
     setUploadStatus('scrQuestStatus', existingQ
         ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
         : null, 'Optional \u2014 no questionnaire on file.');
+
+    // Original scored test sheets. Required for PI children on every screening column;
+    // the section hides for non-PI children, who complete on the summary alone.
+    var sFile = document.getElementById('scrSheetsFile');
+    if (sFile) sFile.value = '';
+    var isPIChild = String(student.PFA_PI_na || '').trim().toUpperCase() === 'PI';
+    var sheetsSection = document.getElementById('scrSheetsSection');
+    if (sheetsSection) sheetsSection.style.display = isPIChild ? 'block' : 'none';
+    var existingS = ChildForms.fileFor(studentId, scrField, 'testsheet');
+    setUploadStatus('scrSheetsStatus', existingS
+        ? { on: true, name: existingS.name, relPath: existingS.relPath }
+        : null, 'Required for PI \u2014 no test sheets on file yet.');
 
     // Load existing data
     try {
@@ -5499,20 +5577,14 @@ function renderPfaChecklistSection(data) {
             + (item.na ? '' : piccDocsHtml(item.num))
             + (actions ? '<div class="picc-actions">' + actions + '</div>' : '')
             + (item.na ? '' : '<div class="picc-controls">'
-                // "Evidence assembled" checkbox removed on request across the PICC cards;
-                // saveCompliance and its stored value remain so nothing that reads the
-                // manual tick breaks. Child-file items already computed status from the
-                // roster; the rest now show just the date, evidence and notes.
-                + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
-                // The link to the current form/evidence file for this item. Paste the
-                // library link (or any URL) and it becomes the "Open current form"
-                // button above; editable here so it can be pointed at a newer version.
+                // Manual controls (Evidence-assembled checkbox, date, monitor notes) all
+                // removed on request. The save* handlers and stored values remain so no
+                // data is lost. The current-form link is kept — it drives the "Open
+                // current form" button — as is the upload status span.
                 + '<input type="url" class="picc-link-input" placeholder="Link to the current form for this item" value="'
                 + savedLink.replace(/"/g, '&quot;') + '" onchange="saveComplianceLink(\'' + key + '\',this.value)">'
                 + '<span id="up_' + item.num + '" style="flex-basis:100%;font-size:0.72rem;margin-top:6px;"></span>'
-                + '</div>'
-                + '<textarea class="picc-notes" placeholder="Notes for the monitor, or what is still outstanding" '
-                + 'onchange="saveComplianceNotes(\'' + key + '\',this.value)">' + notes + '</textarea>')
+                + '</div>')
             + '</div>';
     }).join('');
 
@@ -5650,17 +5722,15 @@ function renderPiccItem(item, data) {
         + (item.licensePanel ? licensePanelHtml() : '')
         + piccDocsHtml(item.num)
         + '<div class="picc-actions">' + evidence + jumps + '</div>'
+        /* The manual controls (Evidence-assembled checkbox, external link, date, and the
+           monitor notes) were all removed on request — a card is now just its heading,
+           requirements, and evidence. The save* handlers and their stored values remain
+           in the code so no saved data is lost and nothing that reads them breaks; the
+           inputs are simply no longer rendered. Only the evidence-upload target span is
+           kept so uploads still have somewhere to report status. */
         + '<div class="picc-controls">'
-        /* The "Evidence assembled" checkbox and the external-link URL box were both
-           removed on request: a card now shows just the date, the evidence upload, and
-           the monitor notes. saveCompliance / saveComplianceLink and their stored values
-           remain in the code, so any previously ticked/linked items keep their data and
-           nothing that reads them breaks — the controls are simply no longer rendered. */
-        + '<input type="date" value="' + dateVal + '" onchange="saveComplianceDate(\'' + key + '\',this.value)" title="Date evidence was assembled or reviewed">'
         + '<span id="up_' + item.num + '" style="flex-basis:100%;font-size:0.72rem;margin-top:6px;"></span>'
         + '</div>'
-        + '<textarea class="picc-notes" placeholder="Notes for the monitor, or what is still outstanding" '
-        + 'onchange="saveComplianceNotes(\'' + key + '\',this.value)">' + notes + '</textarea>'
         + '</div>';
 }
 
