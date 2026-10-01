@@ -2431,13 +2431,33 @@ function teacherPill(student, field, extra) {
     if (st === 'partial') {
         // Summary on file but the original scored test sheets are still missing. Yellow,
         // and clickable so it opens the screening form where the test sheets are uploaded.
-        const tip = 'Summary on file, but the original scored test sheets are still needed. '
-            + 'Open the screening to upload them.';
+        // The tooltip spells out exactly what IS on file and what is still needed, so a
+        // hover answers "why is this still yellow?" without opening the modal.
+        const tip = partialScreeningReason(student, field);
         return '<a class="cf-pill cf-pill-partial" href="#" title="' + tip.replace(/"/g, '&quot;') + '"'
             + ' onclick="event.preventDefault();' + screeningOpenCall(student, field) + '">\u25B2 test sheets</a>'
             + (extra || '');
     }
     return '';   // nothing on file yet — empty cell
+}
+
+/* Why a screening cell is yellow, in words, for the pill's hover tooltip. Lists what
+   is already on file (scored summary and/or parent questionnaire) and then the one
+   thing that keeps it from going green — the original scored test sheets. */
+function partialScreeningReason(student, field) {
+    const id = student.Id;
+    const have = [];
+    if (window.ChildForms) {
+        if (ChildForms.hasForm && ChildForms.hasForm(id, field)) have.push('the scored summary');
+        if (ChildForms.hasFile && ChildForms.hasFile(id, field, 'questionnaire')) have.push('the parent questionnaire');
+    }
+    const haveTxt = have.length
+        ? 'You have ' + (have.length === 2 ? have[0] + ' and ' + have[1] : have[0]) + ' on file. '
+        : '';
+    return 'Still yellow because the original scored test sheets are not on file yet. '
+        + haveTxt
+        + 'A monitor needs to see the original ASQ / ASQ:SE score sheets, not just the summary. '
+        + 'Click to open the screening and upload them \u2014 then this turns green.';
 }
 
 /* The openScreening(...) call for a screening field, so the yellow "partial" pill can
