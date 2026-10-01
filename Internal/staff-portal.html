@@ -1320,8 +1320,15 @@ function tabBar(s, tabs) {
               + '<button type="button" id="openPdr" class="sp-docbtn" style="display:none;" '
               + 'title="Open ' + esc(s.Name || 'this person') + '\u2019s most recent Gateways PDR (view only)">'
               + '\u2197 PDR</button>'
+              /* Same-origin PAS page: it reads identity from sessionStorage (copStaffToken).
+                 rel="noopener" gives the new tab a FRESH, EMPTY sessionStorage, so the token
+                 does not carry over and the PAS page's /api/staff 401s straight to /me — the
+                 "it kicks me back to the password screen" bug. Dropping noopener lets the new
+                 tab inherit the opener's sessionStorage snapshot, which carries the sign-in.
+                 Safe here because the target is our own origin (reverse-tabnabbing is only a
+                 cross-origin concern). */
               + '<a class="sp-histbtn" href="/pas/staff-work-history.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" '
-              + 'rel="noopener" title="Everywhere ' + esc(s.Name || 'this person') + ' has worked with children (Gateways form '
+              + 'title="Everywhere ' + esc(s.Name || 'this person') + ' has worked with children (Gateways form '
               + 'PD75a) \u2014 used to verify experience toward a credential level">Work History</a>'
               + '<button type="button" id="pdrToggle" class="sp-pdrtoggle' + (pdrOpen ? ' on' : '')
               + '" aria-pressed="' + (pdrOpen ? 'true' : 'false') + '" '
@@ -1656,7 +1663,7 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
             const row = F.ITC_LEVELS.find(r => r.level === model.level);
             if (row && row.experience && row.experience.documented) need = row.experience.documented;
         }
-        const whLink = '<a href="/pas/staff-work-history.html" target="_blank" rel="noopener">Work History form</a>';
+        const whLink = '<a href="/pas/staff-work-history.html" target="_blank">Work History form</a>';
 
         if (wfe.blank) {
             // Nothing to verify against — the form has no hours yet.
@@ -2417,8 +2424,11 @@ function formsSection(s) {
     // One card from a MY_FORMS entry.
     const formCard = f => {
         const done = formState(f, s.Id);
+        // Same-origin PAS form in a new tab: no rel="noopener", so the tab inherits the
+        // opener's sessionStorage (the copStaffToken sign-in). With noopener the new tab
+        // gets empty storage and the PAS page bounces to /me. See the Work History note.
         return '<a class="sp-link" href="' + f.href + '?staffId=' + encodeURIComponent(s.Id)
-            + '" target="_blank" rel="noopener">'
+            + '" target="_blank">'
             + '<div class="n">' + esc(f.name) + ' '
             + '<span class="sp-pill' + (done ? ' done' : '') + '">'
             + (done ? '\u2713 done' : 'not started') + '</span></div>'
@@ -2429,11 +2439,11 @@ function formsSection(s) {
        the rest. The Goal Plan has its own URL and copy; the survey is anonymous, so
        it deliberately cannot show a done/not-done tick against a name. */
     const specialCards = {
-        isbe: '<a class="sp-link" href="/pas/individual-pd-plan.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" rel="noopener">'
+        isbe: '<a class="sp-link" href="/pas/individual-pd-plan.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank">'
             + '<div class="n">My Goal Plan</div>'
             + '<div class="s">Your goals for the year, the development that supports each one, and '
             + 'the mid-year and year-end reviews. This is the individual PD plan PICC PI9 asks for.</div></a>',
-        pas: '<a class="sp-link" href="/pas/staff-program-evaluation.html" target="_blank" rel="noopener">'
+        pas: '<a class="sp-link" href="/pas/staff-program-evaluation.html" target="_blank">'
             + '<div class="n">Staff Program Evaluation <span class="sp-pill">anonymous</span></div>'
             + '<div class="s">Your view of how the programme is run. Responses are saved under a '
             + 'number, not your name, so this cannot show whether you have done it.</div></a>'
