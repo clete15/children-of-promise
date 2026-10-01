@@ -624,8 +624,8 @@
                  program. It flips the active program; the Roster / Compliance / Child
                  Files views below all follow it. -->
             <div class="isbe-progtoggle">
-                <button type="button" id="progPFA" class="isbe-prog on" onclick="setProgramProgram('PFA')">PFA</button>
-                <button type="button" id="progPI" class="isbe-prog" onclick="setProgramProgram('PI')">PI</button>
+                <button type="button" id="progPI" class="isbe-prog on" onclick="setProgramProgram('PI')">PI</button>
+                <button type="button" id="progPFA" class="isbe-prog" onclick="setProgramProgram('PFA')">PFA</button>
             </div>
             <!-- Opens on the work outstanding for the year in view, so the first
                  thing the director sees is what to do rather than a grid to audit. -->
@@ -634,18 +634,18 @@
                 <span id="startYearCount"></span>
             </button>
             <button class="active" id="btnRoster" onclick="setView('roster')">
-                <div>📋 <span id="rosterProgLabel">PFA</span> Roster</div>
+                <div>📋 <span id="rosterProgLabel">PI</span> Roster</div>
                 <span id="rosterCount"></span>
             </button>
             <button id="btnCompliance" onclick="setView('compliance')">
-                <div>✅ <span id="complianceProgLabel">PFA</span><br>Compliance</div>
+                <div>✅ <span id="complianceProgLabel">PI</span><br>Compliance</div>
                 <span class="isbe-sub">Site-level</span>
             </button>
             <!-- Per-child file document checklists (compliance Item 2 / PI5). A grid of
                  the required documents per child; each is checked off or has a scan
                  attached into the child's folder. -->
             <button id="btnChildFiles" onclick="setView('childFiles')">
-                <div>🗂️ <span id="childFilesProgLabel">PFA</span><br>Child Files</div>
+                <div>🗂️ <span id="childFilesProgLabel">PI</span><br>Child Files</div>
                 <span class="isbe-sub"></span>
             </button>
         </div>
@@ -653,7 +653,7 @@
         <!-- RIGHT CARD -->
         <div class="isbe-card">
             <div class="isbe-header">
-                <h2 id="isbeTitle">PFA Roster</h2>
+                <h2 id="isbeTitle">PI Roster</h2>
                 <span id="isbeCount"></span>
                 <!-- Everything per-child is stored against a school year. Checklist
                      items reset each year because permission, screenings and the
@@ -1308,7 +1308,9 @@ let trackingData = {};
 let screeningData = {};
 // ISBE/IDEC expects developmental screening within 45 days of enrollment.
 const SCREENING_DEADLINE_DAYS = 45;
-let activeProgram = 'PFA';
+// The page opens on PI (the Prevention Initiative is what we are graded on). The
+// PI⇄PFA toggle flips it; a ?program= deep link can still override on load.
+let activeProgram = 'PI';
 
 /* Active school year for every per-child record on this page.
    The checklist, the forms and the screening scores are all stored per year, so
