@@ -2215,6 +2215,7 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         console.error('[SEED] could not write weighted eligibility PDF: ' + e.message);
         return { ok: false, error: e.message };
     }
+    invalidateDocCache();   // new weighted-eligibility PDF filed — refresh the scan cache
     return { ok: true, path: target, rel: path.relative(findDocRoot() || '', target).replace(/\\/g, '/') };
 }
 
@@ -2311,6 +2312,7 @@ function fileChildSignedForm(d) {
         console.error('[SIGNED FORM]', e.message);
         return { status: 500, body: { error: 'Could not write the signed document' } };
     }
+    invalidateDocCache();   // new signed PDF filed — refresh the scan cache
     const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
     console.log('[SIGNED FORM] ' + pdf.length + ' bytes -> ' + rel);
 
@@ -3339,8 +3341,47 @@ function newestVisitFolder(docRoot, programFolder) {
     return dirs.slice().sort((a, b) => yearOf(b) - yearOf(a))[0];
 }
 
-// Walks a year's evidence folder and groups the files by item number.
+/* ── Document-library scan cache ─────────────────────────────────────────────
+   indexYearFolder() and the weighted-eligibility scan each walk the document
+   library on disk with synchronous fs.readdirSync, recursively. On the ISBE roster
+   that walk is on the critical path (every roster render asks for the doc index,
+   and the weighted-eligibility scan is in the init fetch), and it blocks the single
+   Node thread. The library changes rarely — only when someone uploads or files a
+   document — so re-walking it on every request, for every staff member and every
+   render, is wasted work and the main reason the roster feels slow.
+
+   A small in-memory cache with a short TTL fixes that: the first request after a
+   change pays the walk, everyone else for the next few seconds gets the cached
+   result instantly, and any write into the library clears it so a freshly filed
+   document shows up at once. Keyed per (program, folder) / per scan so one program's
+   result never serves another's. Cleared wholesale by invalidateDocCache() from the
+   upload/save/sign handlers. */
+const DOC_SCAN_TTL_MS = 20 * 1000;
+const docScanCache = new Map();   // key -> { at: ms, value }
+function docCacheGet(key) {
+    const hit = docScanCache.get(key);
+    if (hit && (Date.now() - hit.at) < DOC_SCAN_TTL_MS) return hit.value;
+    return undefined;
+}
+function docCacheSet(key, value) {
+    docScanCache.set(key, { at: Date.now(), value: value });
+    return value;
+}
+// Called by anything that writes a file into the library (uploads, signed PDFs,
+// filing). Blunt on purpose: a cleared cache just means the next read re-walks.
+function invalidateDocCache() { docScanCache.clear(); }
+
+// Walks a year's evidence folder and groups the files by item number. Cached for a
+// few seconds (DOC_SCAN_TTL_MS) because the walk is synchronous and on the roster's
+// critical path; invalidateDocCache() clears it the moment a document is filed.
 function indexYearFolder(programFolder, yearFolder) {
+    const cacheKey = 'idx\u0000' + programFolder + '\u0000' + yearFolder;
+    const cached = docCacheGet(cacheKey);
+    if (cached !== undefined) return cached;
+    return docCacheSet(cacheKey, indexYearFolderUncached(programFolder, yearFolder));
+}
+
+function indexYearFolderUncached(programFolder, yearFolder) {
     const DOC_ROOT = findDocRoot();
     if (!DOC_ROOT) return { items: {}, childFiles: [], missing: true, noRoot: true };
     const base = path.join(DOC_ROOT, programFolder, yearFolder);
@@ -5160,6 +5201,7 @@ DROP TABLE #cf;`;
                 console.error('[SIGNED FORM]', e.message);
                 return sendJSON(res, 500, { error: 'Could not write the signed document' });
             }
+            invalidateDocCache();   // new signed PDF filed — refresh the scan cache
             const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
             console.log('[SIGNED FORM] ' + pdf.length + ' bytes -> ' + rel);
 
@@ -5304,6 +5346,7 @@ ELSE
                 console.error('[MONITORING FORM]', e.message);
                 return sendJSON(res, 500, { error: 'Could not write the signed document' });
             }
+            invalidateDocCache();   // new monitoring-form PDF filed — refresh the scan cache
             const rel = path.relative(DR, target).replace(/\\/g, '/');
             console.log('[MONITORING FORM] ' + pdf.length + ' bytes -> ' + rel);
             return sendJSON(res, 200, {
@@ -5463,6 +5506,9 @@ ELSE
                     console.error('[CHILD FILE]', e.message);
                     return sendJSON(res, 500, { error: 'Could not save it: ' + e.message });
                 }
+                // A new file in the library — drop the scan cache so the roster's next
+                // doc-index / weighted-eligibility read reflects it immediately.
+                invalidateDocCache();
                 const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
 
                 // The classroom checklist runs under the shared internal password, so
@@ -7672,6 +7718,7 @@ ELSE
                             fs.copyFileSync(full, stem + ' (before ' + stamp + ')' + ext);
                         }
                         fs.writeFileSync(full, data);
+                        invalidateDocCache();   // document edited in place — refresh the scan cache
                         console.log('[OFFICE] saved ' + data.length + ' bytes -> ' + rel);
                         return sendJSON(res, 200, { error: 0 });
                     } catch (e) {
@@ -7769,6 +7816,7 @@ ELSE
                     console.error('[DOC UPLOAD]', e.message);
                     return sendJSON(res, 500, { error: 'Could not save the file' });
                 }
+                invalidateDocCache();   // new library upload — refresh the scan cache
                 const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
                 console.log('[DOC UPLOAD] ' + data.length + ' bytes -> ' + rel);
                 return sendJSON(res, 200, {
@@ -7885,6 +7933,7 @@ ELSE
                     }
                     fs.unlinkSync(full);
                 }
+                invalidateDocCache();   // a file left the active tree — refresh the scan cache
                 const newRel = path.relative(path.resolve(root), target).replace(/\\/g, '/');
                 console.log('[ARCHIVE] ' + rel + '  ->  ' + newRel);
                 return sendJSON(res, 200, { success: true, archivedTo: newRel });
@@ -8480,6 +8529,11 @@ ELSE
         if (!checkClassroomAuth(req, res)) return;
         const DOC_ROOT = findDocRoot();
         if (!DOC_ROOT) return sendJSON(res, 200, { files: {} });
+        // Cached: this walks every child folder (two readdirSync each) and sits in the
+        // roster's init fetch, so it gates first paint. invalidateDocCache() on any
+        // filing clears it, so a newly saved weighted-eligibility form still shows up.
+        const cached = docCacheGet('weighted');
+        if (cached !== undefined) return sendJSON(res, 200, { files: cached });
         const base = path.join(DOC_ROOT, CHILD_FILES_ROOT_FOLDER);
         let dirs = [];
         try { dirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory()); } catch (e) { return sendJSON(res, 200, { files: {} }); }
@@ -8499,6 +8553,7 @@ ELSE
             const full = findForm(path.join(base, d.name));
             if (full) files[m[1]] = path.relative(DOC_ROOT, full).replace(/\\/g, '/');
         });
+        docCacheSet('weighted', files);
         return sendJSON(res, 200, { files: files });
     }
 
