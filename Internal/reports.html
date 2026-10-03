@@ -345,11 +345,23 @@ function printFoodCountSheets() {
     }
 
     const roomGroups = {};
+    // Remember each room's RoomNumber so the sheets can print youngest-first (by room
+    // number, the same age ordering the roster uses) rather than alphabetically by room
+    // name — the monitor expects the meal sheets in age-group order.
+    const roomNum = {};
     activeStudents.forEach(s => {
         const room = s.Room || 'Room ' + s.RoomNumber;
         if (!roomGroups[room]) roomGroups[room] = [];
         roomGroups[room].push(s);
+        if (roomNum[room] === undefined) {
+            const n = parseInt(s.RoomNumber, 10);
+            roomNum[room] = isNaN(n) ? Infinity : n;
+        }
     });
+    // Age order = room-number order. Ties (or missing numbers) fall back to the name so
+    // the result is still stable.
+    const roomsInAgeOrder = Object.keys(roomGroups).sort((a, b) =>
+        (roomNum[a] - roomNum[b]) || a.localeCompare(b));
 
     let html = '<!DOCTYPE html><html><head><title>Meal Participation Records - ' + monthYear + '</title><style>';
     html += '@page { size: landscape; margin: 0.2in; }';
@@ -392,7 +404,7 @@ function printFoodCountSheets() {
         return out;
     };
 
-    Object.keys(roomGroups).sort().forEach(room => {
+    roomsInAgeOrder.forEach(room => {
         // ISBE meal sheets group by F/R/P (Free, Reduced, Paid), then by last name.
         const order = { 'free': 0, 'reduced': 1, 'paid': 2 };
         const rank = s => {

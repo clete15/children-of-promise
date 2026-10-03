@@ -321,7 +321,16 @@ function printFoodCountSheets(monthKey) {
     for (let d = 1; d <= daysInMonth; d++) { if ([0,6].includes(new Date(year, month, d).getDay())) weekendDays.push(d); }
 
     const roomGroups = {};
-    active.forEach(s => { const room = s.Room || 'Room ' + s.RoomNumber; if (!roomGroups[room]) roomGroups[room] = []; roomGroups[room].push(s); });
+    // Track each room's RoomNumber so the sheets print youngest-first (room-number order,
+    // the roster's age ordering) rather than alphabetically by room name.
+    const roomNum = {};
+    active.forEach(s => {
+        const room = s.Room || 'Room ' + s.RoomNumber;
+        if (!roomGroups[room]) roomGroups[room] = [];
+        roomGroups[room].push(s);
+        if (roomNum[room] === undefined) { const n = parseInt(s.RoomNumber, 10); roomNum[room] = isNaN(n) ? Infinity : n; }
+    });
+    const roomsInAgeOrder = Object.keys(roomGroups).sort((a, b) => (roomNum[a] - roomNum[b]) || a.localeCompare(b));
 
     let html = '<!DOCTYPE html><html><head><style>';
     html += '@page{size:landscape;margin:0.2in}body{font-family:Arial,sans-serif;margin:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}';
@@ -335,7 +344,7 @@ function printFoodCountSheets(monthKey) {
     html += '</style></head><body>';
 
     const order = {'free':0,'reduced':1,'paid':2};
-    Object.keys(roomGroups).sort().forEach(room => {
+    roomsInAgeOrder.forEach(room => {
         const roomStudents = [...roomGroups[room]].sort((a,b) => {
             const av = order[(a.F_R_P_Food||'').trim().toLowerCase()] !== undefined ? order[(a.F_R_P_Food||'').trim().toLowerCase()] : 2;
             const bv = order[(b.F_R_P_Food||'').trim().toLowerCase()] !== undefined ? order[(b.F_R_P_Food||'').trim().toLowerCase()] : 2;
