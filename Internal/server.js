@@ -7733,6 +7733,132 @@ ELSE
         });
     }
 
+    /* Upload evidence for ONE evidence-type of ONE compliance item, from the card.
+
+       POST /api/picc-evidence-upload?item=CB1&type=sign-in-sheets&program=PI
+       (multipart file body).
+
+       The compliance card lists each required evidence TYPE and lets the office
+       upload a file for it, turning that type blue once it is on file. Unlike
+       /api/doc-upload, the caller does NOT pass a destination folder: this resolves
+       it from the item itself, so a card can file evidence even for an item that has
+       no dedicated subfolder yet (CB1, PI3, …). Destination order:
+         1. the item's existing evidence subfolder, if the index shows one;
+         2. otherwise loose in the living visit folder (the same place
+            /api/monitoring-signed-form files, where the indexer attributes loose
+            files to an item by filename prefix).
+       The saved filename carries BOTH the item prefix (so the indexer files it under
+       the right item) AND a "[type-code]" tag (so the card can tell WHICH evidence
+       type it satisfies and turn just that line blue):
+            "CB1 [sign-in-sheets] - <original name>.pdf"
+       Never overwrites — a name clash gets a dated suffix, same as doc-upload. */
+    if (req.method === 'POST' && url.startsWith('/api/picc-evidence-upload')) {
+        if (!checkAuth(req, res)) return;
+        const qs = new URLSearchParams(req.url.split('?')[1] || '');
+        const itemRaw = String(qs.get('item') || '').trim();
+        const typeCode = String(qs.get('type') || '').trim().toLowerCase()
+            .replace(/[^a-z0-9-]/g, '');
+        const program = qs.get('program') === 'PFA' ? 'PFA' : 'PI';
+        if (!itemRaw) return sendJSON(res, 400, { error: 'Which compliance item?' });
+        if (!typeCode) return sendJSON(res, 400, { error: 'Which evidence type?' });
+
+        const DR = findDocRoot();
+        if (!DR) return sendJSON(res, 400, { error: 'The document library is not reachable from the server.' });
+        const programFolder = program === 'PFA' ? 'Preschool for All' : 'Birth to Three';
+        const visitFolderName = newestVisitFolder(DR, programFolder);
+        if (!visitFolderName) {
+            return sendJSON(res, 400, { error: 'No monitoring visit folder found for ' + program + '.' });
+        }
+        const visitPath = path.join(DR, programFolder, visitFolderName);
+
+        /* Prefer the item's own subfolder when one already exists (so evidence stays
+           grouped the way the monitor's SharePoint groups it); else file loose in the
+           visit folder. The index already knows the item's folder paths. */
+        let destFolder = visitPath;
+        try {
+            const idx = indexYearFolder(programFolder, visitFolderName);
+            const entry = idx && idx.items && idx.items[itemRaw];
+            if (entry && Array.isArray(entry.folderPaths) && entry.folderPaths.length) {
+                const abs = path.join(DR, entry.folderPaths[0]);
+                if (fs.existsSync(abs) && fs.statSync(abs).isDirectory()) destFolder = abs;
+            }
+        } catch (e) { /* fall back to the visit folder */ }
+
+        // The filename prefix the indexer attributes by: "Item N" for PFA, "PI N"/"CB N"
+        // for PI/CB. The item key the client sends already carries that shape
+        // (Item1 / CB1 / PI5), so docItemNumberFromFile will read it straight back.
+        const prefix = itemRaw.replace(/[\\/:*?"<>|]/g, '_');
+
+        const MAX = 40 * 1024 * 1024;
+        let body = [], size = 0, aborted = false;
+        req.on('data', chunk => {
+            if (aborted) return;
+            size += chunk.length;
+            if (size > MAX) {
+                aborted = true;
+                sendJSON(res, 413, { error: 'File is larger than 40 MB' });
+                req.destroy();
+                return;
+            }
+            body.push(chunk);
+        });
+        req.on('end', () => {
+            if (aborted) return;
+            const ct = req.headers['content-type'] || '';
+            const boundary = ct.split('boundary=')[1];
+            if (!boundary) return sendJSON(res, 400, { error: 'Not a file upload' });
+            const parts = Buffer.concat(body).toString('binary').split('--' + boundary);
+            for (const part of parts) {
+                if (!part.includes('filename=')) continue;
+                const m = part.match(/filename="([^"]*)"/);
+                if (!m || !m[1]) continue;
+                let safe = path.basename(m[1].replace(/\0/g, ''))
+                    .replace(/[\\/:*?"<>|]/g, '_')
+                    .replace(/^\.+/, '')
+                    .trim();
+                if (!safe) safe = 'upload';
+                const ext = path.extname(safe).toLowerCase();
+                const ALLOWED = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.xlsx', '.doc', '.xls', '.txt'];
+                if (!ALLOWED.includes(ext)) {
+                    return sendJSON(res, 400, { error: 'That file type is not accepted (' + (ext || 'no extension') + ')' });
+                }
+                const headerEnd = part.indexOf('\r\n\r\n');
+                if (headerEnd < 0) continue;
+                const data = Buffer.from(part.slice(headerEnd + 4, part.lastIndexOf('\r\n')), 'binary');
+                if (!data.length) return sendJSON(res, 400, { error: 'That file was empty' });
+
+                // Tag the filename with the item prefix and the evidence-type code.
+                const stem = path.basename(safe, ext);
+                const tagged = prefix + ' [' + typeCode + '] - ' + stem + ext;
+                let target = path.join(destFolder, tagged);
+                if (fs.existsSync(target)) {
+                    const stamp = new Date().toISOString().slice(0, 10);
+                    let n = 1;
+                    do {
+                        target = path.join(destFolder,
+                            prefix + ' [' + typeCode + '] - ' + stem + ' (' + stamp + (n > 1 ? ' ' + n : '') + ')' + ext);
+                        n++;
+                    } while (fs.existsSync(target) && n < 50);
+                }
+                try {
+                    fs.writeFileSync(target, data);
+                } catch (e) {
+                    console.error('[PICC EVIDENCE UPLOAD]', e.message);
+                    return sendJSON(res, 500, { error: 'Could not save the file' });
+                }
+                invalidateDocCache();
+                const rel = path.relative(DR, target).replace(/\\/g, '/');
+                console.log('[PICC EVIDENCE] ' + itemRaw + ' [' + typeCode + '] ' + data.length + ' bytes -> ' + rel);
+                return sendJSON(res, 200, {
+                    success: true, name: path.basename(target), relPath: rel, bytes: data.length,
+                    item: itemRaw, type: typeCode
+                });
+            }
+            sendJSON(res, 400, { error: 'No file found in the upload' });
+        });
+        return;
+    }
+
     /* Checks a document IN — the other half of check-out.
 
        Takes a file from the browser and writes it into an item's evidence folder

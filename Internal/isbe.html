@@ -384,6 +384,18 @@
         .picc-guidance { font-size:0.72rem;color:#475569;background:#f8fafc;border-left:3px solid #cbd5e1;padding:8px 11px;border-radius:0 6px 6px 0;margin-top:9px;line-height:1.55; }
         .picc-evidence-hint, .picc-na { font-size:0.71rem;color:#64748b;margin-top:8px;line-height:1.55; }
         .picc-na { color:#92400e; }
+        /* Per-evidence-type upload list. Each required evidence type is its own row with
+           an upload control; the label turns blue once a file for that type is on file. */
+        .picc-ev-list { list-style:none;margin:5px 0 0;padding:0;display:flex;flex-direction:column;gap:3px; }
+        .picc-ev-row { display:flex;align-items:center;gap:8px;font-size:0.71rem;line-height:1.4; }
+        .picc-ev-label { color:#64748b;flex:1;min-width:0; }
+        /* On file: the whole point — the evidence type goes blue when its file exists. */
+        .picc-ev-row.on .picc-ev-label { color:#2563eb;font-weight:700; }
+        .picc-ev-tick { width:14px;flex-shrink:0;text-align:center;color:#2563eb;font-weight:700; }
+        .picc-ev-up { flex-shrink:0;cursor:pointer;font-size:0.64rem;font-weight:700;color:#2563eb;
+                      background:#eff6ff;border:1px solid #bfdbfe;border-radius:5px;padding:1px 8px;white-space:nowrap; }
+        .picc-ev-up:hover { background:#dbeafe; }
+        .picc-ev-up input { display:none; }
         /* Real documents from the library, resolved by item number so folder
            renames between years do not break the link. */
         .picc-docs { margin-top:10px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden; }
@@ -4549,6 +4561,118 @@ function loadDocIndex(program) {
         });
 }
 
+/* ── Per-evidence-type upload + on-file state ─────────────────────────────────
+   Each checklist item lists several evidence TYPES (sign-in sheets, lesson plans,
+   …). The office uploads a file for a type; the server files it into the item's
+   folder (or loose in the visit folder) with the type's code tagged into the
+   filename as "[code]". The card then shows each type on its own line and turns it
+   BLUE once a file carrying its tag is on file. This gives per-type progress a
+   monitor can read at a glance, instead of one comma-joined sentence.
+
+   evidenceTypes come from the item's optional `evidenceTypes` array when present;
+   otherwise they are derived by splitting the free-text `evidence` string on commas
+   so every item works without rewriting its prose. */
+function evidenceTypeCode(label) {
+    // A short, stable, filename-safe code for an evidence type. Lowercase words,
+    // hyphen-joined, capped so filenames stay sane. Deterministic for a given label.
+    return String(label || '').toLowerCase()
+        .replace(/\(.*?\)/g, ' ')              // drop parenthetical asides
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .split('-').slice(0, 4).join('-') || 'evidence';
+}
+function evidenceTypesFor(item) {
+    if (Array.isArray(item.evidenceTypes) && item.evidenceTypes.length) {
+        return item.evidenceTypes.map(function (t) {
+            var label = typeof t === 'string' ? t : t.label;
+            return { label: label, code: (t && t.code) || evidenceTypeCode(label) };
+        });
+    }
+    if (!item.evidence) return [];
+    return String(item.evidence).replace(/\.\s*$/, '')      // trailing period
+        .split(/,\s*/).map(function (s) { return s.trim(); }).filter(Boolean)
+        .map(function (label) { return { label: label, code: evidenceTypeCode(label) }; });
+}
+/* The "[code]" tag an uploaded file carries, so a type's own file is recognisable
+   among the item's files. Kept bracketed and lowercase to be unmistakable and to
+   survive the server's filename sanitiser (brackets are allowed). */
+function evidenceTypeTag(code) { return '[' + code + ']'; }
+
+/* True when the item already has a file on file for this evidence-type code. Reads
+   the doc index only — on-file state is always derived from the folder, never stored
+   separately, so it cannot drift from what a monitor would actually find. */
+function evidenceTypeOnFile(num, code) {
+    var found = piccItemDocs(num);
+    if (!found || !found.files) return false;
+    var tag = evidenceTypeTag(code).toLowerCase();
+    return found.files.some(function (f) {
+        return String(f.name || '').toLowerCase().indexOf(tag) !== -1;
+    });
+}
+
+/* The interactive evidence list for a card: one row per evidence type, each with an
+   upload control, each turning blue when its file is on file. Replaces the old
+   comma-joined "Evidence:" sentence. `program` is 'PI' or 'PFA' so the upload files
+   into the right programme's visit folder. */
+function evidenceListHtml(item, program) {
+    var types = evidenceTypesFor(item);
+    if (!types.length) return '';
+    var ready = docIndexState === 'ready';
+    var rows = types.map(function (t) {
+        var on = ready && evidenceTypeOnFile(item.num, t.code);
+        var tickChar = on ? '\u2713' : '';
+        var up = '<label class="picc-ev-up" title="Upload a file for: ' + escapeHtml(t.label) + '">'
+            + 'Upload'
+            + '<input type="file" accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt" '
+            + 'onchange="uploadEvidenceType(\'' + item.num + '\',\'' + t.code + '\',\'' + program + '\',this)"></label>';
+        return '<li class="picc-ev-row' + (on ? ' on' : '') + '">'
+            + '<span class="picc-ev-tick">' + tickChar + '</span>'
+            + '<span class="picc-ev-label">' + escapeHtml(t.label) + '</span>'
+            + up + '</li>';
+    }).join('');
+    return '<div class="picc-evidence-hint"><strong>Evidence</strong>'
+        + ' <span style="color:#94a3b8;">— upload each type; it turns blue once on file</span>'
+        + '<ul class="picc-ev-list">' + rows + '</ul></div>';
+}
+
+/* Upload a file as evidence for a specific type of a specific item. The server
+   files it into the item's folder when one exists, else loose in the living visit
+   folder, tagging the filename with the item prefix AND the "[code]" so both the
+   item and the evidence type are recoverable by the indexer and by evidenceTypeOnFile. */
+function uploadEvidenceType(num, code, program, input) {
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var status = document.getElementById('up_' + num);
+    var say = function (text, colour) {
+        if (!status) return;
+        status.textContent = text;
+        status.style.color = colour || '#6b7280';
+    };
+    say('Uploading ' + file.name + '\u2026');
+    var fd = new FormData();
+    fd.append('file', file);
+    var qs = 'item=' + encodeURIComponent(num)
+        + '&type=' + encodeURIComponent(code)
+        + '&program=' + encodeURIComponent(program || 'PI');
+    fetch('/api/picc-evidence-upload?' + qs, {
+        method: 'POST',
+        headers: (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
+        body: fd
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        if (!res.ok || !res.j.success) {
+            say(res.j && res.j.error ? res.j.error : 'Upload failed', '#b91c1c');
+            return;
+        }
+        say('Filed as ' + res.j.name, '#166534');
+        input.value = '';
+        // Re-read the library so the type flips to blue straight away.
+        docIndexState = 'idle';
+        docIndex = null;
+        loadDocIndex(program === 'PFA' ? 'PFA' : 'PI');
+      }).catch(function () { say('Upload failed \u2014 no connection', '#b91c1c'); });
+}
+
 /* Every indexed file whose folder maps to this checklist item. An item number
    may span several folders (PI8 has PI8.A and PI8.B), so matches are collected
    rather than taking the first. The '.' in the prefix test keeps PI1 from
@@ -4930,7 +5054,7 @@ function renderPfaChecklistSection(data) {
                 + item.subs.map(function (s) { return '<li>' + s + '</li>'; }).join('')
                 + '</ul></details>' : '')
             + (item.guidance ? '<div class="picc-guidance">' + item.guidance + '</div>' : '')
-            + (item.evidence ? '<div class="picc-evidence-hint"><strong>Evidence:</strong> ' + item.evidence + '</div>' : '')
+            + (item.na ? '' : evidenceListHtml(item, 'PFA'))
             + (item.excelerate ? '<div class="picc-evidence-hint"><strong>ExceleRate:</strong> '
                 + escapeHtml(item.excelerate) + '</div>' : '')
             + (item.na ? '<div class="picc-na"><strong>Not applicable:</strong> ' + item.na + '</div>' : '')
@@ -5082,7 +5206,7 @@ function renderPiccItem(item, data) {
             + item.subs.map(function (s) { return '<li>' + s + '</li>'; }).join('')
             + '</ul></details>' : '')
         + (item.guidance ? '<div class="picc-guidance">' + item.guidance + '</div>' : '')
-        + (item.evidence ? '<div class="picc-evidence-hint"><strong>Evidence:</strong> ' + item.evidence + '</div>' : '')
+        + evidenceListHtml(item, activeComplianceProgram === 'pfaCompliance' ? 'PFA' : 'PI')
         + (item.na ? '<div class="picc-na"><strong>Not applicable:</strong> ' + item.na + '</div>' : '')
         + (item.licensePanel ? licensePanelHtml() : '')
         + piccDocsHtml(item.num)
