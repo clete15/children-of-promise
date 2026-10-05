@@ -159,13 +159,16 @@ const ART = (() => {
             `<g opacity="${o}"><ellipse cx="30" cy="38" rx="13" ry="15" fill="${c}"/>`
             + `<path d="M16 28 Q30 18 44 28 Q44 34 16 34 Z" fill="#78350f"/>`
             + `<rect x="28" y="12" width="4" height="8" rx="2" fill="#78350f"/></g>`),
+        // The sun keeps its own warm gold regardless of the theme colour — a
+        // blue/purple sun looks wrong, so it ignores `c` like the firework does.
         sun: (s, c = 'currentColor', o = 1) => wrap(s,
-            `<g opacity="${o}"><circle cx="30" cy="30" r="12" fill="${c}"/>`
-            + `<g stroke="${c}" stroke-width="2.5" stroke-linecap="round">`
-            + `<line x1="30" y1="3" x2="30" y2="13"/><line x1="30" y1="47" x2="30" y2="57"/>`
-            + `<line x1="3" y1="30" x2="13" y2="30"/><line x1="47" y1="30" x2="57" y2="30"/>`
-            + `<line x1="11" y1="11" x2="18" y2="18"/><line x1="42" y1="42" x2="49" y2="49"/>`
-            + `<line x1="49" y1="11" x2="42" y2="18"/><line x1="18" y1="42" x2="11" y2="49"/></g></g>`),
+            `<g opacity="${o}"><circle cx="30" cy="30" r="12" fill="#fbbf24"/>`
+            + `<circle cx="30" cy="30" r="12" fill="none" stroke="#f59e0b" stroke-width="1.5"/>`
+            + `<g stroke="#f59e0b" stroke-width="3" stroke-linecap="round">`
+            + `<line x1="30" y1="2" x2="30" y2="12"/><line x1="30" y1="48" x2="30" y2="58"/>`
+            + `<line x1="2" y1="30" x2="12" y2="30"/><line x1="48" y1="30" x2="58" y2="30"/>`
+            + `<line x1="10" y1="10" x2="17" y2="17"/><line x1="43" y1="43" x2="50" y2="50"/>`
+            + `<line x1="50" y1="10" x2="43" y2="17"/><line x1="17" y1="43" x2="10" y2="50"/></g></g>`),
         wave: (s, c = 'currentColor', o = 1) => wrap(s,
             `<g opacity="${o}" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round">`
             + `<path d="M4 24 Q14 14 24 24 T44 24 T64 24"/>`
@@ -250,25 +253,50 @@ const ART = (() => {
             + `<path d="M30 42 l-2 2 h4 Z" fill="#f9a8d4"/></g>`),
         shamrock: (s, c = 'currentColor', o = 1) => wrap(s,
             `<g opacity="${o}" fill="${c}">`
-            // Three heart-shaped leaves meeting at the centre (28,30), + a stem.
-            // Each leaf is a heart drawn small and rotated into place.
-            + `<path d="M28 30 C20 20 12 24 16 15 C19 9 27 11 28 22 C29 11 37 9 40 15 C44 24 36 20 28 30Z" transform="translate(2 -8)"/>`
-            + `<path d="M28 30 C18 30 14 38 20 44 C25 49 30 44 28 34 C26 44 20 48 14 43 C9 38 13 30 24 30Z" transform="translate(-6 2)"/>`
-            + `<path d="M28 30 C38 30 42 38 36 44 C31 49 26 44 28 34 C30 44 36 48 42 43 C47 38 43 30 32 30Z" transform="translate(6 2)"/>`
-            + `<path d="M28 32 Q30 46 34 54" stroke="${c}" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>`),
+            // Three identical heart leaves rotated 120° apart around the centre
+            // (30,28). A heart's point sits at the centre so all three meet there;
+            // a stem drops straight down. This reads as a shamrock at any size.
+            + `<g>`
+            + `<path d="M30 28 C24 18 12 20 15 11 C17 5 27 6 30 16 C33 6 43 5 45 11 C48 20 36 18 30 28Z"/>`
+            + `<path d="M30 28 C24 18 12 20 15 11 C17 5 27 6 30 16 C33 6 43 5 45 11 C48 20 36 18 30 28Z" transform="rotate(120 30 28)"/>`
+            + `<path d="M30 28 C24 18 12 20 15 11 C17 5 27 6 30 16 C33 6 43 5 45 11 C48 20 36 18 30 28Z" transform="rotate(240 30 28)"/>`
+            + `</g>`
+            + `<path d="M30 28 Q30 44 33 55" stroke="${c}" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>`),
         rainbow: (s, c = 'currentColor', o = 1) => wrap(s,
             `<g opacity="${o}" fill="none" stroke-width="4">`
             + `<path d="M8 46 a22 22 0 0 1 44 0" stroke="#dc2626"/>`
             + `<path d="M14 46 a16 16 0 0 1 32 0" stroke="#f59e0b"/>`
             + `<path d="M20 46 a10 10 0 0 1 20 0" stroke="#16a34a"/>`
             + `<path d="M26 46 a4 4 0 0 1 8 0" stroke="#2563eb"/></g>`),
-        firework: (s, c = 'currentColor', o = 1) => wrap(s,
-            `<g opacity="${o}" stroke="${c}" stroke-width="2.5" stroke-linecap="round">`
-            + `<line x1="30" y1="8" x2="30" y2="20"/><line x1="30" y1="40" x2="30" y2="52"/>`
-            + `<line x1="8" y1="30" x2="20" y2="30"/><line x1="40" y1="30" x2="52" y2="30"/>`
-            + `<line x1="14" y1="14" x2="22" y2="22"/><line x1="38" y1="38" x2="46" y2="46"/>`
-            + `<line x1="46" y1="14" x2="38" y2="22"/><line x1="22" y1="38" x2="14" y2="46"/></g>`
-            + `<circle cx="30" cy="30" r="4" fill="${c}" opacity="${o}"/>`),
+        // A festive burst: 12 trails radiating from the centre, each ending in a
+        // bright dot, alternating red/gold/blue. Keeps its own colours (ignores
+        // `c`) so it stays celebratory on the navy 4th-of-July sheet.
+        // A festive burst: 12 trails radiating from the centre, each ending in a
+        // bright dot, cycling pink/purple/blue/red (4 colours over 12 rays = 3
+        // each) so it glows like a real firework and the blue ties back to the
+        // navy 4th-of-July sheet. Keeps its own colours (ignores `c`).
+        firework: (s, c = 'currentColor', o = 1) => {
+            const cols = ['#ec4899', '#a855f7', '#2563eb', '#dc2626']; // pink, purple, blue, red
+            let rays = '';
+            for (let i = 0; i < 12; i++) {
+                const a = (i * 30) * Math.PI / 180;
+                const col = cols[i % 4];
+                const r1 = 7;                       // trail starts away from centre
+                const r2 = i % 2 === 0 ? 26 : 20;   // alternate long/short trails
+                const x1 = 30 + Math.cos(a) * r1, y1 = 30 + Math.sin(a) * r1;
+                const x2 = 30 + Math.cos(a) * r2, y2 = 30 + Math.sin(a) * r2;
+                rays += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-width="2"/>`;
+                rays += `<circle cx="${x2.toFixed(1)}" cy="${y2.toFixed(1)}" r="2.3" fill="${col}"/>`;
+                // A faint mid-trail spark on the long rays for a sense of scatter.
+                if (i % 2 === 0) {
+                    const xm = 30 + Math.cos(a) * 15, ym = 30 + Math.sin(a) * 15;
+                    rays += `<circle cx="${xm.toFixed(1)}" cy="${ym.toFixed(1)}" r="1.1" fill="${col}" opacity="0.7"/>`;
+                }
+            }
+            return wrap(s,
+                `<g opacity="${o}" stroke-linecap="round">${rays}`
+                + `<circle cx="30" cy="30" r="3.5" fill="#f9a8d4"/></g>`);
+        },
         flag: (s, c = 'currentColor', o = 1) => wrap(s,
             `<g opacity="${o}"><rect x="12" y="10" width="36" height="24" fill="#dc2626"/>`
             + `<rect x="12" y="10" width="36" height="4" fill="#fff"/>`
