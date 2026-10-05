@@ -113,6 +113,159 @@ function apiFetch(url, opts = {}) {
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const MEALS = ['Breakfast','AM Snack','Lunch','PM Snack'];
+
+/* ------------------------------------------------------------------ *
+ * Shared seasonal art library (inline SVG — no package, no build).
+ *
+ * Why SVG and not emoji: emoji render differently per OS and FONT, and
+ * routinely print as empty boxes (□) on the Windows print path this page
+ * uses. Inline SVG is identical on screen and on paper, scales crisply,
+ * and inherits colour via `currentColor` so one icon serves every theme.
+ *
+ * Each icon is a function(size, color) -> svg string so the same shape
+ * works tiny (banner, 22px) and large (print corner art, 110px).
+ * ------------------------------------------------------------------ */
+const ART = (() => {
+    const wrap = (size, body, extra) =>
+        `<svg viewBox="0 0 60 60" width="${size}" height="${size}" `
+        + `style="vertical-align:middle;${extra || ''}" aria-hidden="true">${body}</svg>`;
+
+    return {
+        snowflake: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g stroke="${c}" stroke-width="2" fill="${c}" opacity="${o}">`
+            + `<path d="M30 5v50M5 30h50M12 12l36 36M48 12L12 48" fill="none"/>`
+            + `<circle cx="30" cy="30" r="4"/><circle cx="30" cy="10" r="2"/>`
+            + `<circle cx="30" cy="50" r="2"/><circle cx="10" cy="30" r="2"/>`
+            + `<circle cx="50" cy="30" r="2"/><circle cx="16" cy="16" r="2"/>`
+            + `<circle cx="44" cy="44" r="2"/><circle cx="44" cy="16" r="2"/>`
+            + `<circle cx="16" cy="44" r="2"/></g>`),
+        snowman: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><circle cx="30" cy="40" r="14" fill="#fff" stroke="${c}" stroke-width="2"/>`
+            + `<circle cx="30" cy="20" r="9" fill="#fff" stroke="${c}" stroke-width="2"/>`
+            + `<circle cx="27" cy="18" r="1.4" fill="${c}"/><circle cx="33" cy="18" r="1.4" fill="${c}"/>`
+            + `<polygon points="30,21 38,23 30,25" fill="#ea580c"/>`
+            + `<circle cx="30" cy="36" r="1.5" fill="${c}"/><circle cx="30" cy="42" r="1.5" fill="${c}"/>`
+            + `<path d="M18 32 L8 28 M42 32 L52 28" stroke="${c}" stroke-width="2" fill="none"/></g>`),
+        leaf: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><path d="M10 50C10 50 20 10 50 10C50 10 40 30 30 40C20 50 10 50 10 50Z" fill="${c}"/>`
+            + `<path d="M15 45L45 15" stroke="#fff" stroke-width="1.5" opacity="0.5" fill="none"/>`
+            + `<path d="M25 35C25 35 30 25 40 20" stroke="#fff" stroke-width="1" opacity="0.4" fill="none"/></g>`),
+        acorn: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><ellipse cx="30" cy="38" rx="13" ry="15" fill="${c}"/>`
+            + `<path d="M16 28 Q30 18 44 28 Q44 34 16 34 Z" fill="#78350f"/>`
+            + `<rect x="28" y="12" width="4" height="8" rx="2" fill="#78350f"/></g>`),
+        sun: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><circle cx="30" cy="30" r="12" fill="${c}"/>`
+            + `<g stroke="${c}" stroke-width="2.5" stroke-linecap="round">`
+            + `<line x1="30" y1="3" x2="30" y2="13"/><line x1="30" y1="47" x2="30" y2="57"/>`
+            + `<line x1="3" y1="30" x2="13" y2="30"/><line x1="47" y1="30" x2="57" y2="30"/>`
+            + `<line x1="11" y1="11" x2="18" y2="18"/><line x1="42" y1="42" x2="49" y2="49"/>`
+            + `<line x1="49" y1="11" x2="42" y2="18"/><line x1="18" y1="42" x2="11" y2="49"/></g></g>`),
+        wave: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round">`
+            + `<path d="M4 24 Q14 14 24 24 T44 24 T64 24"/>`
+            + `<path d="M4 36 Q14 26 24 36 T44 36 T64 36"/>`
+            + `<path d="M4 48 Q14 38 24 48 T44 48 T64 48"/></g>`),
+        flower: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><circle cx="30" cy="18" r="9" fill="${c}" opacity="0.6"/>`
+            + `<circle cx="18" cy="30" r="9" fill="${c}" opacity="0.6"/>`
+            + `<circle cx="42" cy="30" r="9" fill="${c}" opacity="0.6"/>`
+            + `<circle cx="22" cy="42" r="9" fill="${c}" opacity="0.6"/>`
+            + `<circle cx="38" cy="42" r="9" fill="${c}" opacity="0.6"/>`
+            + `<circle cx="30" cy="30" r="6" fill="#f59e0b"/></g>`),
+        butterfly: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><path d="M30 30 Q12 10 10 26 Q8 40 30 32 Z" fill="${c}"/>`
+            + `<path d="M30 30 Q48 10 50 26 Q52 40 30 32 Z" fill="${c}"/>`
+            + `<path d="M30 32 Q14 44 16 52 Q26 52 30 36 Z" fill="${c}" opacity="0.7"/>`
+            + `<path d="M30 32 Q46 44 44 52 Q34 52 30 36 Z" fill="${c}" opacity="0.7"/>`
+            + `<line x1="30" y1="26" x2="30" y2="50" stroke="#374151" stroke-width="2"/></g>`),
+        heart: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<path opacity="${o}" d="M30 52C30 52 3 36 3 19C3 10 10 3 19 3C24 3 28 6 30 11C32 6 36 3 41 3C50 3 57 10 57 19C57 36 30 52 30 52Z" fill="${c}"/>`),
+        star: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<polygon opacity="${o}" points="30,3 37,22 57,22 41,35 47,55 30,43 13,55 19,35 3,22 23,22" fill="${c}"/>`),
+        tree: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><polygon points="30,3 8,48 52,48" fill="${c}"/>`
+            + `<rect x="25" y="48" width="10" height="10" fill="#78350f"/>`
+            + `<circle cx="25" cy="22" r="3" fill="#dc2626"/><circle cx="35" cy="30" r="3" fill="#f59e0b"/>`
+            + `<circle cx="28" cy="38" r="3" fill="#2563eb"/><polygon points="30,1 32,8 28,8" fill="#f59e0b"/></g>`),
+        holly: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><path d="M30 20 Q18 24 20 36 Q32 34 30 20Z" fill="#16a34a"/>`
+            + `<path d="M30 20 Q42 24 40 36 Q28 34 30 20Z" fill="#15803d"/>`
+            + `<path d="M30 22 Q22 34 30 46 Q38 34 30 22Z" fill="#16a34a"/>`
+            + `<circle cx="27" cy="42" r="4" fill="#dc2626"/><circle cx="34" cy="44" r="4" fill="#dc2626"/>`
+            + `<circle cx="30" cy="48" r="4" fill="#b91c1c"/></g>`),
+        pumpkin: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><ellipse cx="30" cy="36" rx="22" ry="20" fill="${c}"/>`
+            + `<ellipse cx="20" cy="36" rx="10" ry="18" fill="${c}" opacity="0.75"/>`
+            + `<ellipse cx="40" cy="36" rx="10" ry="18" fill="${c}" opacity="0.75"/>`
+            + `<rect x="27" y="8" width="6" height="14" rx="3" fill="#16a34a"/>`
+            + `<path d="M30 8C30 8 37 3 43 6" stroke="#16a34a" stroke-width="2.5" fill="none"/></g>`),
+        ghost: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><path d="M14 50 V26 a16 16 0 0 1 32 0 V50 l-5-5 -5 5 -6-5 -6 5 -4-5Z" fill="#fff" stroke="${c}" stroke-width="2"/>`
+            + `<circle cx="24" cy="26" r="3" fill="${c}"/><circle cx="36" cy="26" r="3" fill="${c}"/>`
+            + `<ellipse cx="30" cy="34" rx="3" ry="4" fill="${c}"/></g>`),
+        turkey: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><g>`
+            + `<ellipse cx="30" cy="18" rx="6" ry="12" fill="#b45309"/>`
+            + `<ellipse cx="16" cy="22" rx="5" ry="11" fill="#d97706" transform="rotate(-30 16 22)"/>`
+            + `<ellipse cx="44" cy="22" rx="5" ry="11" fill="#d97706" transform="rotate(30 44 22)"/>`
+            + `<ellipse cx="22" cy="18" rx="5" ry="11" fill="#f59e0b" transform="rotate(-15 22 18)"/>`
+            + `<ellipse cx="38" cy="18" rx="5" ry="11" fill="#f59e0b" transform="rotate(15 38 18)"/></g>`
+            + `<ellipse cx="30" cy="42" rx="13" ry="14" fill="${c}"/>`
+            + `<circle cx="30" cy="34" r="7" fill="#92400e"/>`
+            + `<circle cx="27" cy="33" r="1.3" fill="#fff"/><circle cx="33" cy="33" r="1.3" fill="#fff"/>`
+            + `<polygon points="30,35 35,37 30,39" fill="#f59e0b"/>`
+            + `<path d="M30 38 q3 3 1 6" stroke="#dc2626" stroke-width="2" fill="none"/></g>`),
+        egg: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><ellipse cx="30" cy="32" rx="18" ry="24" fill="${c}"/>`
+            + `<path d="M12 26h36" stroke="#fff" stroke-width="2.5"/>`
+            + `<path d="M12 38h36" stroke="#fff" stroke-width="2.5"/>`
+            + `<circle cx="20" cy="32" r="3" fill="#fff" opacity="0.8"/>`
+            + `<circle cx="30" cy="32" r="3" fill="#fff" opacity="0.8"/>`
+            + `<circle cx="40" cy="32" r="3" fill="#fff" opacity="0.8"/></g>`),
+        bunny: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><ellipse cx="22" cy="18" rx="4" ry="13" fill="${c}"/>`
+            + `<ellipse cx="38" cy="18" rx="4" ry="13" fill="${c}"/>`
+            + `<ellipse cx="22" cy="20" rx="2" ry="8" fill="#f9a8d4"/>`
+            + `<ellipse cx="38" cy="20" rx="2" ry="8" fill="#f9a8d4"/>`
+            + `<circle cx="30" cy="40" r="14" fill="${c}"/>`
+            + `<circle cx="25" cy="38" r="1.6" fill="#374151"/><circle cx="35" cy="38" r="1.6" fill="#374151"/>`
+            + `<path d="M30 42 l-2 2 h4 Z" fill="#f9a8d4"/></g>`),
+        shamrock: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}" fill="${c}"><path d="M30 28 Q20 18 26 12 Q34 14 30 28Z"/>`
+            + `<path d="M30 28 Q40 18 34 12 Q26 14 30 28Z"/>`
+            + `<path d="M30 28 Q18 30 20 40 Q30 38 30 28Z"/>`
+            + `<path d="M30 28 Q42 30 40 40 Q30 38 30 28Z"/>`
+            + `<path d="M30 28 Q29 42 32 52" stroke="${c}" stroke-width="2.5" fill="none"/></g>`),
+        rainbow: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}" fill="none" stroke-width="4">`
+            + `<path d="M8 46 a22 22 0 0 1 44 0" stroke="#dc2626"/>`
+            + `<path d="M14 46 a16 16 0 0 1 32 0" stroke="#f59e0b"/>`
+            + `<path d="M20 46 a10 10 0 0 1 20 0" stroke="#16a34a"/>`
+            + `<path d="M26 46 a4 4 0 0 1 8 0" stroke="#2563eb"/></g>`),
+        firework: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}" stroke="${c}" stroke-width="2.5" stroke-linecap="round">`
+            + `<line x1="30" y1="8" x2="30" y2="20"/><line x1="30" y1="40" x2="30" y2="52"/>`
+            + `<line x1="8" y1="30" x2="20" y2="30"/><line x1="40" y1="30" x2="52" y2="30"/>`
+            + `<line x1="14" y1="14" x2="22" y2="22"/><line x1="38" y1="38" x2="46" y2="46"/>`
+            + `<line x1="46" y1="14" x2="38" y2="22"/><line x1="22" y1="38" x2="14" y2="46"/></g>`
+            + `<circle cx="30" cy="30" r="4" fill="${c}" opacity="${o}"/>`),
+        flag: (s, c = 'currentColor', o = 1) => wrap(s,
+            `<g opacity="${o}"><rect x="12" y="10" width="36" height="24" fill="#dc2626"/>`
+            + `<rect x="12" y="10" width="36" height="4" fill="#fff"/>`
+            + `<rect x="12" y="18" width="36" height="4" fill="#fff"/>`
+            + `<rect x="12" y="26" width="36" height="4" fill="#fff"/>`
+            + `<rect x="12" y="10" width="16" height="14" fill="#1e3a8a"/>`
+            + `<rect x="10" y="10" width="3" height="44" fill="#78350f"/></g>`)
+    };
+})();
+
+/* A short run of one icon, used in the on-screen banner so screen matches print. */
+function artRun(name, size, color, count) {
+    const f = ART[name];
+    if (!f) return '';
+    return Array.from({ length: count || 1 }, () => f(size, color)).join('');
+}
 let currentWeekStart = getMonday(new Date());
 // Default to next week
 currentWeekStart.setDate(currentWeekStart.getDate() + 7);
@@ -189,24 +342,20 @@ const TEMPLATES = {
     ]
 };
 
-// Seasonal themes
+/* On-screen seasonal banner. Derived from the SAME theme as the print sheet
+   (getSeasonalTheme) so what staff see on screen matches what prints — the two
+   used to drift because they were two separate month/day ladders. The little
+   icons are the shared SVG set, not emoji, so nothing shows as a box. */
 function getSeasonalBanner(weekStart) {
-    const m = weekStart.getMonth();
-    const d = weekStart.getDate();
-    // Check for holidays near this week
-    if (m === 6 && d <= 7) return { text:'🎆 Happy 4th of July! 🎇', bg:'#fef2f2', color:'#dc2626' };
-    if (m === 9 && d >= 25) return { text:'🎃 Happy Halloween! 👻', bg:'#fff7ed', color:'#ea580c' };
-    if (m === 10 && d >= 18 && d <= 28) return { text:'🦃 Happy Thanksgiving! 🍂', bg:'#fefce8', color:'#a16207' };
-    if (m === 11 && d >= 15) return { text:'🎄 Merry Christmas! ⛄', bg:'#f0fdf4', color:'#16a34a' };
-    if (m === 1 && d >= 7 && d <= 16) return { text:'💕 Happy Valentine\'s Day! 💝', bg:'#fdf2f8', color:'#db2777' };
-    if (m === 2 && d >= 10 && d <= 20) return { text:'☘️ Happy St. Patrick\'s Day! 🌈', bg:'#f0fdf4', color:'#16a34a' };
-    if (m === 3 && d >= 14 && d <= 21) return { text:'🐣 Happy Easter! 🌷', bg:'#faf5ff', color:'#7c3aed' };
-    // Seasons
-    if (m >= 5 && m <= 7) return { text:'☀️ Summer Vibes! 🌊', bg:'#eff6ff', color:'#2563eb' };
-    if (m >= 8 && m <= 10) return { text:'🍁 Fall Harvest Season 🌽', bg:'#fffbeb', color:'#d97706' };
-    if (m >= 11 || m <= 1) return { text:'❄️ Winter Wonderland ⛄', bg:'#f0f9ff', color:'#0284c7' };
-    if (m >= 2 && m <= 4) return { text:'🌸 Spring is Here! 🐝', bg:'#fdf4ff', color:'#a855f7' };
-    return null;
+    const t = getSeasonalTheme(weekStart);
+    if (!t) return null;
+    const icon = artRun(t.icon, 22, t.cornerColor, 1);
+    return {
+        text: t.label,
+        icon,
+        bg: t.bannerBg,
+        color: t.bannerColor
+    };
 }
 
 function getMonday(d) {
@@ -244,7 +393,11 @@ function render() {
     const banner = getSeasonalBanner(currentWeekStart);
     const bannerEl = document.getElementById('seasonalBanner');
     if (banner) {
-        bannerEl.innerHTML = `<div class="seasonal-banner" style="background:${banner.bg};color:${banner.color};">${banner.text}</div>`;
+        bannerEl.innerHTML = `<div class="seasonal-banner" style="background:${banner.bg};color:${banner.color};display:flex;align-items:center;justify-content:center;gap:10px;">`
+            + `<span style="display:inline-flex;">${banner.icon}</span>`
+            + `<span>${banner.text}</span>`
+            + `<span style="display:inline-flex;transform:scaleX(-1);">${banner.icon}</span>`
+            + `</div>`;
     } else { bannerEl.innerHTML = ''; }
 
     ['pfa','other'].forEach(section => {
@@ -418,49 +571,104 @@ async function loadMenus() {
     }
 }
 
+/* One theme definition drives BOTH the on-screen banner and the printed sheet.
+
+   Each theme names icons from the ART library (strings, not emoji) plus the
+   colours. `icon` is the primary motif (banner + sheet corners); `scatter` is a
+   second motif tiled very faintly behind the menu cells as a watermark. Keeping
+   everything on one object is what keeps screen and print in sync. */
+const SEASON_THEMES = {
+    july4:       { name:'4th of July', label:'Happy 4th of July!', icon:'firework', scatter:'star',
+                   headerBg:'#1e3a8a', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#dc2626',
+                   accentBg:'linear-gradient(135deg,#1e3a8a,#dc2626,#1e3a8a)', cornerColor:'#1e3a8a',
+                   bannerBg:'#eff6ff', bannerColor:'#1e3a8a' },
+    halloween:   { name:'Halloween', label:'Happy Halloween!', icon:'ghost', scatter:'pumpkin',
+                   headerBg:'#1c1917', headerColor:'#fb923c', cellBg:'#fff7ed', borderColor:'#ea580c',
+                   accentBg:'linear-gradient(135deg,#1c1917,#ea580c)', cornerColor:'#ea580c',
+                   bannerBg:'#fff7ed', bannerColor:'#c2410c' },
+    christmas:   { name:'Christmas', label:'Merry Christmas!', icon:'holly', scatter:'tree',
+                   headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#dc2626',
+                   accentBg:'linear-gradient(135deg,#14532d,#dc2626,#14532d)', cornerColor:'#14532d',
+                   bannerBg:'#f0fdf4', bannerColor:'#15803d' },
+    valentines:  { name:'Valentines', label:"Happy Valentine's Day!", icon:'heart', scatter:'heart',
+                   headerBg:'#831843', headerColor:'#fdf2f8', cellBg:'#fdf2f8', borderColor:'#ec4899',
+                   accentBg:'linear-gradient(135deg,#831843,#ec4899)', cornerColor:'#ec4899',
+                   bannerBg:'#fdf2f8', bannerColor:'#be185d' },
+    stpatricks:  { name:'St Patricks', label:"Happy St. Patrick's Day!", icon:'shamrock', scatter:'rainbow',
+                   headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#16a34a',
+                   accentBg:'linear-gradient(135deg,#14532d,#16a34a)', cornerColor:'#16a34a',
+                   bannerBg:'#f0fdf4', bannerColor:'#15803d' },
+    thanksgiving:{ name:'Thanksgiving', label:'Happy Thanksgiving!', icon:'turkey', scatter:'leaf',
+                   headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706',
+                   accentBg:'linear-gradient(135deg,#78350f,#d97706)', cornerColor:'#d97706',
+                   bannerBg:'#fffbeb', bannerColor:'#b45309' },
+    easter:      { name:'Easter', label:'Happy Easter!', icon:'egg', scatter:'bunny',
+                   headerBg:'#581c87', headerColor:'#faf5ff', cellBg:'#faf5ff', borderColor:'#a855f7',
+                   accentBg:'linear-gradient(135deg,#581c87,#a855f7,#ec4899)', cornerColor:'#a855f7',
+                   bannerBg:'#faf5ff', bannerColor:'#7c3aed' },
+    summer:      { name:'Summer', label:'Summer Fun!', icon:'sun', scatter:'wave',
+                   headerBg:'#1e40af', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#2563eb',
+                   accentBg:'linear-gradient(135deg,#0ea5e9,#2563eb)', cornerColor:'#2563eb',
+                   bannerBg:'#eff6ff', bannerColor:'#1d4ed8' },
+    fall:        { name:'Fall', label:'Fall Harvest', icon:'leaf', scatter:'acorn',
+                   headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706',
+                   accentBg:'linear-gradient(135deg,#92400e,#d97706)', cornerColor:'#d97706',
+                   bannerBg:'#fffbeb', bannerColor:'#b45309' },
+    winter:      { name:'Winter', label:'Winter Wonderland', icon:'snowflake', scatter:'snowman',
+                   headerBg:'#1e3a5f', headerColor:'#e0f2fe', cellBg:'#f0f9ff', borderColor:'#0284c7',
+                   accentBg:'linear-gradient(135deg,#1e3a5f,#0284c7)', cornerColor:'#0284c7',
+                   bannerBg:'#f0f9ff', bannerColor:'#0369a1' },
+    spring:      { name:'Spring', label:'Spring is Here!', icon:'flower', scatter:'butterfly',
+                   headerBg:'#4c1d95', headerColor:'#faf5ff', cellBg:'#fdf4ff', borderColor:'#a855f7',
+                   accentBg:'linear-gradient(135deg,#7c3aed,#ec4899)', cornerColor:'#a855f7',
+                   bannerBg:'#fdf4ff', bannerColor:'#9333ea' }
+};
+
 function getSeasonalTheme(weekStart) {
     const m = weekStart.getMonth();
     const d = weekStart.getDate();
-    // Check if a specific date falls within this Mon-Fri week
-    function weekContains(month, day) {
-        const target = new Date(weekStart.getFullYear(), month, day);
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekEnd.getDate() + 4);
-        return target >= weekStart && target <= weekEnd;
-    }
-    // Also check if holiday is on the weekend right after this week (Sat/Sun)
+    // Is a holiday within this Mon-Fri week, or on the weekend right after it?
     function weekNear(month, day) {
         const target = new Date(weekStart.getFullYear(), month, day);
         const weekEnd = new Date(weekStart);
         weekEnd.setDate(weekEnd.getDate() + 6); // include Sat+Sun
         return target >= weekStart && target <= weekEnd;
     }
-    // SVG corner art for each theme
-    const svgSnowflakes = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><path d="M30 5v50M5 30h50M12 12l36 36M48 12L12 48" stroke="currentColor" stroke-width="2" fill="none"/><circle cx="30" cy="30" r="4" fill="currentColor"/><circle cx="30" cy="10" r="2" fill="currentColor"/><circle cx="30" cy="50" r="2" fill="currentColor"/><circle cx="10" cy="30" r="2" fill="currentColor"/><circle cx="50" cy="30" r="2" fill="currentColor"/><circle cx="16" cy="16" r="2" fill="currentColor"/><circle cx="44" cy="44" r="2" fill="currentColor"/><circle cx="44" cy="16" r="2" fill="currentColor"/><circle cx="16" cy="44" r="2" fill="currentColor"/></svg>';
-    const svgLeaves = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><path d="M10 50C10 50 20 10 50 10C50 10 40 30 30 40C20 50 10 50 10 50Z" fill="currentColor"/><path d="M15 45L45 15" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M25 35C25 35 30 25 40 20" stroke="currentColor" stroke-width="1" fill="none"/><path d="M20 40C20 40 28 32 35 28" stroke="currentColor" stroke-width="1" fill="none"/></svg>';
-    const svgSun = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><circle cx="30" cy="30" r="12" fill="currentColor"/><g stroke="currentColor" stroke-width="2.5"><line x1="30" y1="3" x2="30" y2="13"/><line x1="30" y1="47" x2="30" y2="57"/><line x1="3" y1="30" x2="13" y2="30"/><line x1="47" y1="30" x2="57" y2="30"/><line x1="11" y1="11" x2="18" y2="18"/><line x1="42" y1="42" x2="49" y2="49"/><line x1="49" y1="11" x2="42" y2="18"/><line x1="18" y1="42" x2="11" y2="49"/></g></svg>';
-    const svgFlower = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><circle cx="30" cy="18" r="9" fill="currentColor" opacity="0.6"/><circle cx="18" cy="30" r="9" fill="currentColor" opacity="0.6"/><circle cx="42" cy="30" r="9" fill="currentColor" opacity="0.6"/><circle cx="22" cy="42" r="9" fill="currentColor" opacity="0.6"/><circle cx="38" cy="42" r="9" fill="currentColor" opacity="0.6"/><circle cx="30" cy="30" r="6" fill="currentColor"/></svg>';
-    const svgHeart = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><path d="M30 52C30 52 3 36 3 19C3 10 10 3 19 3C24 3 28 6 30 11C32 6 36 3 41 3C50 3 57 10 57 19C57 36 30 52 30 52Z" fill="currentColor"/></svg>';
-    const svgStar = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><polygon points="30,3 37,22 57,22 41,35 47,55 30,43 13,55 19,35 3,22 23,22" fill="#f59e0b"/></svg>';
-    const svgTree = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><polygon points="30,3 8,48 52,48" fill="currentColor"/><rect x="25" y="48" width="10" height="10" fill="currentColor" opacity="0.7"/><circle cx="25" cy="22" r="3" fill="#dc2626" opacity="0.8"/><circle cx="35" cy="30" r="3" fill="#dc2626" opacity="0.8"/><circle cx="28" cy="38" r="3" fill="#dc2626" opacity="0.8"/><polygon points="30,1 32,8 28,8" fill="#f59e0b"/></svg>';
-    const svgPumpkin = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><ellipse cx="30" cy="36" rx="22" ry="20" fill="currentColor"/><ellipse cx="20" cy="36" rx="10" ry="18" fill="currentColor" opacity="0.8"/><ellipse cx="40" cy="36" rx="10" ry="18" fill="currentColor" opacity="0.8"/><rect x="27" y="8" width="6" height="14" rx="3" fill="#16a34a"/><path d="M30 8C30 8 37 3 43 6" stroke="#16a34a" stroke-width="2.5" fill="none"/></svg>';
-    const svgEgg = '<svg viewBox="0 0 60 60" width="110" height="110" style="opacity:0.4;"><ellipse cx="30" cy="32" rx="18" ry="24" fill="currentColor"/><path d="M12 26h36" stroke="white" stroke-width="2.5"/><path d="M12 38h36" stroke="white" stroke-width="2.5"/><circle cx="20" cy="32" r="3" fill="white" opacity="0.7"/><circle cx="30" cy="32" r="3" fill="white" opacity="0.7"/><circle cx="40" cy="32" r="3" fill="white" opacity="0.7"/></svg>';
 
-    // Holidays first (triggers if holiday falls within or adjacent to this week)
-    if (weekNear(6, 4)) return { name:'4th of July', banner:'🎆 Happy 4th of July!', headerBg:'#1e3a8a', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#1e3a8a,#dc2626,#1e3a8a)', leftEmoji:'🎆', rightEmoji:'🎇', cornerSvg:svgStar, cornerColor:'#1e3a8a' };
-    if (weekNear(9, 31)) return { name:'Halloween', banner:'🎃 Happy Halloween! 👻', headerBg:'#1c1917', headerColor:'#fb923c', cellBg:'#fff7ed', borderColor:'#ea580c', accentBg:'linear-gradient(135deg,#1c1917,#ea580c)', leftEmoji:'🎃', rightEmoji:'👻', cornerSvg:svgPumpkin, cornerColor:'#ea580c' };
-    if (weekNear(11, 25)) return { name:'Christmas', banner:'🎄 Merry Christmas! ⛄', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#dc2626', accentBg:'linear-gradient(135deg,#14532d,#dc2626,#14532d)', leftEmoji:'🎄', rightEmoji:'🎅', cornerSvg:svgTree, cornerColor:'#14532d' };
-    if (weekNear(1, 14)) return { name:'Valentines', banner:'💕 Happy Valentine\'s Day! 💝', headerBg:'#831843', headerColor:'#fdf2f8', cellBg:'#fdf2f8', borderColor:'#ec4899', accentBg:'linear-gradient(135deg,#831843,#ec4899)', leftEmoji:'💕', rightEmoji:'💝', cornerSvg:svgHeart, cornerColor:'#ec4899' };
-    if (weekNear(2, 17)) return { name:'St Patricks', banner:'☘️ Happy St. Patrick\'s Day! 🌈', headerBg:'#14532d', headerColor:'#fff', cellBg:'#f0fdf4', borderColor:'#16a34a', accentBg:'linear-gradient(135deg,#14532d,#16a34a)', leftEmoji:'☘️', rightEmoji:'🌈', cornerSvg:svgLeaves, cornerColor:'#16a34a' };
-    // Thanksgiving (4th Thursday of November)
-    if (m === 10 && d >= 18 && d <= 28) return { name:'Thanksgiving', banner:'🦃 Happy Thanksgiving! 🍂', headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706', accentBg:'linear-gradient(135deg,#78350f,#d97706)', leftEmoji:'🦃', rightEmoji:'🍂', cornerSvg:svgLeaves, cornerColor:'#d97706' };
-    // Easter (approximate - mid April)
-    if (m === 3 && d >= 7 && d <= 21) return { name:'Easter', banner:'🐣 Happy Easter! 🌷', headerBg:'#581c87', headerColor:'#faf5ff', cellBg:'#faf5ff', borderColor:'#a855f7', accentBg:'linear-gradient(135deg,#581c87,#a855f7,#ec4899)', leftEmoji:'🐣', rightEmoji:'🐰', cornerSvg:svgEgg, cornerColor:'#a855f7' };
+    // Holidays first (a specific holiday wins over its surrounding season)
+    if (weekNear(6, 4)) return SEASON_THEMES.july4;
+    if (weekNear(9, 31)) return SEASON_THEMES.halloween;
+    if (weekNear(11, 25)) return SEASON_THEMES.christmas;
+    if (weekNear(1, 14)) return SEASON_THEMES.valentines;
+    if (weekNear(2, 17)) return SEASON_THEMES.stpatricks;
+    if (m === 10 && d >= 18 && d <= 28) return SEASON_THEMES.thanksgiving; // 4th Thu of Nov
+    if (m === 3 && d >= 7 && d <= 21) return SEASON_THEMES.easter;         // approx mid-April
     // Seasons
-    if (m >= 5 && m <= 7) return { name:'Summer', banner:'☀️ Summer Fun! 🌊', headerBg:'#1e40af', headerColor:'#fff', cellBg:'#eff6ff', borderColor:'#2563eb', accentBg:'linear-gradient(135deg,#0ea5e9,#2563eb)', leftEmoji:'☀️', rightEmoji:'🌊', cornerSvg:svgSun, cornerColor:'#2563eb' };
-    if (m >= 8 && m <= 10) return { name:'Fall', banner:'🍁 Fall Harvest 🌽', headerBg:'#78350f', headerColor:'#fef3c7', cellBg:'#fffbeb', borderColor:'#d97706', accentBg:'linear-gradient(135deg,#92400e,#d97706)', leftEmoji:'🍁', rightEmoji:'🍎', cornerSvg:svgLeaves, cornerColor:'#d97706' };
-    if (m >= 11 || m <= 1) return { name:'Winter', banner:'❄️ Winter Wonderland ⛄', headerBg:'#1e3a5f', headerColor:'#e0f2fe', cellBg:'#f0f9ff', borderColor:'#0284c7', accentBg:'linear-gradient(135deg,#1e3a5f,#0284c7)', leftEmoji:'❄️', rightEmoji:'⛄', cornerSvg:svgSnowflakes, cornerColor:'#0284c7' };
-    return { name:'Spring', banner:'🌸 Spring is Here! 🐝', headerBg:'#4c1d95', headerColor:'#faf5ff', cellBg:'#fdf4ff', borderColor:'#a855f7', accentBg:'linear-gradient(135deg,#7c3aed,#ec4899)', leftEmoji:'🌸', rightEmoji:'🦋', cornerSvg:svgFlower, cornerColor:'#a855f7' };
+    if (m >= 5 && m <= 7) return SEASON_THEMES.summer;
+    if (m >= 8 && m <= 10) return SEASON_THEMES.fall;
+    if (m >= 11 || m <= 1) return SEASON_THEMES.winter;
+    return SEASON_THEMES.spring;
+}
+
+/* A faint tiled watermark of the theme's scatter motif, drawn as a data-URI
+   background so it sits behind the table text without affecting layout. Kept
+   very low-opacity so it never fights the menu text or the print legibility. */
+function themeCellPattern(theme) {
+    const f = ART[theme.scatter] || ART[theme.icon];
+    if (!f) return '';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">`
+        + `<g transform="translate(30 30)">${f(60, theme.cornerColor, 0.06)}</g></svg>`;
+    const uri = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    return `background-image:url("${uri}");background-repeat:repeat;background-size:120px 120px;`;
+}
+
+/* Decorative inner frame: a row of small motifs along the top edge of the sheet,
+   echoing the theme. Returns absolutely-positioned HTML to drop inside .print-sheet. */
+function themeFrameStrip(theme) {
+    const row = Array.from({ length: 9 }, (_, i) =>
+        `<span style="opacity:0.5;">${ART[theme.icon](26, theme.cornerColor, 1)}</span>`).join('');
+    return `<div style="position:absolute;left:0;right:0;bottom:6px;display:flex;`
+        + `justify-content:space-around;padding:0 40px;pointer-events:none;">${row}</div>`;
 }
 
 function printMenus() {
@@ -478,23 +686,41 @@ function printMenus() {
         { title: 'PI', id: 'other' }
     ];
 
+    // One corner-art motif reused four ways, mirrored into each corner.
+    const corner = ART[theme.icon](104, theme.cornerColor, 0.4);
+    const cornerAt = (pos, flip) =>
+        `<div style="position:absolute;${pos};${flip || ''}pointer-events:none;">${corner}</div>`;
+    const cellWatermark = themeCellPattern(theme);
+    // The holiday "closed" marker, as SVG (a star) instead of the 🎉 emoji box.
+    const closedMark = ART.star(22, theme.cornerColor, 1);
+
     let html = '';
     sections.forEach(sec => {
         html += `<div class="print-sheet" style="border:4px solid ${theme.borderColor};border-radius:12px;padding:10px 16px;position:relative;overflow:hidden;">`;
-        // Top corner art - staggered (left higher, right lower)
-        html += `<div style="position:absolute;top:12px;left:12px;color:${theme.cornerColor};">${theme.cornerSvg}</div>`;
-        html += `<div style="position:absolute;top:35px;right:12px;color:${theme.cornerColor};transform:scaleX(-1);">${theme.cornerSvg}</div>`;
-        // Themed banner
-        html += `<div style="background:${theme.accentBg};color:white;text-align:center;padding:8px 16px;border-radius:8px;margin-bottom:6px;font-size:16px;font-weight:700;letter-spacing:1px;font-family:'Fredoka',sans-serif;">${theme.banner}</div>`;
-        // Header: logo left, centered date+emojis
-        html += `<div style="display:flex;align-items:center;margin-bottom:8px;">
+        // Corner art in all four corners, each mirrored to face inward.
+        html += cornerAt('top:10px;left:10px');
+        html += cornerAt('top:10px;right:10px', 'transform:scaleX(-1);');
+        html += cornerAt('bottom:10px;left:10px', 'transform:scaleY(-1);');
+        html += cornerAt('bottom:10px;right:10px', 'transform:scale(-1,-1);');
+        // Themed banner with a matching icon on each side.
+        html += `<div style="position:relative;z-index:1;background:${theme.accentBg};color:white;text-align:center;padding:8px 16px;border-radius:8px;margin-bottom:6px;font-size:16px;font-weight:700;letter-spacing:1px;font-family:'Fredoka',sans-serif;display:flex;align-items:center;justify-content:center;gap:12px;">`
+            + `<span style="display:inline-flex;">${ART[theme.icon](24, '#fff', 1)}</span>`
+            + `<span>${theme.label}</span>`
+            + `<span style="display:inline-flex;transform:scaleX(-1);">${ART[theme.icon](24, '#fff', 1)}</span>`
+            + `</div>`;
+        // Header: logo left, centered date flanked by the theme motif.
+        html += `<div style="position:relative;z-index:1;display:flex;align-items:center;margin-bottom:8px;">
             <img src="logo-sm.png" alt="Children of Promise" style="width:120px;height:120px;">
             <div style="flex:1;text-align:center;padding-right:120px;">
-                <h1 style="color:${theme.headerBg};font-family:'Dancing Script',cursive;font-size:32px;margin:0;"><span style="font-family:sans-serif;font-size:72px;vertical-align:middle;">${theme.leftEmoji || ''}</span> ${dateRange} <span style="font-family:sans-serif;font-size:72px;vertical-align:middle;">${theme.rightEmoji || ''}</span></h1>
+                <h1 style="color:${theme.headerBg};font-family:'Dancing Script',cursive;font-size:32px;margin:0;display:flex;align-items:center;justify-content:center;gap:18px;">
+                    <span style="display:inline-flex;">${ART[theme.icon](60, theme.cornerColor, 1)}</span>
+                    <span>${dateRange}</span>
+                    <span style="display:inline-flex;transform:scaleX(-1);">${ART[theme.icon](60, theme.cornerColor, 1)}</span>
+                </h1>
             </div>
         </div>`;
-        // Table with themed colors
-        html += `<table style="border:2px solid ${theme.borderColor};">`;
+        // Table with themed colors and a faint seasonal watermark behind the cells.
+        html += `<table style="position:relative;z-index:1;border:2px solid ${theme.borderColor};">`;
         html += `<thead><tr><th style="width:90px;background:${theme.headerBg};color:${theme.headerColor};"></th>`;
         DAYS.forEach(day => html += `<th style="background:${theme.headerBg};color:${theme.headerColor};">${day}</th>`);
         html += '</tr></thead><tbody>';
@@ -505,16 +731,17 @@ function printMenus() {
                 const el = document.getElementById(sec.id + '_' + di + '_' + meal.replace(/\s/g,''));
                 const val = el ? el.value.replace(/\n+$/,'').trim() : '';
                 if (val === 'CLOSED - Holiday') {
-                    html += `<td class="holiday-cell" style="background:${theme.cellBg};border-color:${theme.borderColor};font-size:18px;">🎉</td>`;
+                    html += `<td class="holiday-cell" style="background:${theme.cellBg};border-color:${theme.borderColor};">`
+                        + `<div style="display:flex;align-items:center;justify-content:center;gap:6px;">${closedMark}<span>Closed</span>${closedMark}</div></td>`;
                 } else {
-                    html += `<td style="background:${rowBg};border-color:${theme.borderColor};">${val.replace(/\n/g,'<br>')}</td>`;
+                    html += `<td style="background:${rowBg};${cellWatermark}border-color:${theme.borderColor};">${val.replace(/\n/g,'<br>')}</td>`;
                 }
             }
             html += '</tr>';
         });
         html += '</tbody></table>';
         // PFA/PI label bottom right (inside the page)
-        html += `<div style="text-align:right;font-size:11px;font-weight:600;color:#6b7280;margin-top:4px;padding-right:8px;">${sec.title}</div>`;
+        html += `<div style="position:relative;z-index:1;text-align:right;font-size:11px;font-weight:600;color:#6b7280;margin-top:4px;padding-right:8px;">${sec.title}</div>`;
         html += '</div>';
     });
 
