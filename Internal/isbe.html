@@ -2583,6 +2583,22 @@ function renderRoster() {
                 const tdc = ('cf-doc' + divide).trim();
                 if (st === 'form') {
                     const d = ChildForms.formDate(s.Id, f);
+                    /* Two ways this is "on file", and they open DIFFERENTLY:
+                       - an ONLINE record (ChildForms.hasForm) -> open the editable modal
+                         to view/update the typed answers;
+                       - a SCANNED paper form with no online record -> open the scanned PDF,
+                         because opening the editable modal would show a blank form (there
+                         are no typed answers to load) and read as a bug. */
+                    const online = window.ChildForms && ChildForms.hasForm && ChildForms.hasForm(s.Id, f);
+                    const scan = online ? null : childFormFileRel(s, f);
+                    if (!online && scan) {
+                        return '<td class="' + tdc + '">'
+                            + '<a class="cf-pill" href="#" title="Parent Interview on file as a scanned form'
+                            + (d ? ', dated ' + d : '') + ' \u2014 click to open the scan."'
+                            + ' onclick="event.preventDefault();openDoc(\'' + escapeHtml(scan.rel).replace(/'/g, "\\'")
+                            + '\',\'' + escapeHtml(scan.name).replace(/'/g, "\\'") + '\',true)">\u2713 on file</a>'
+                            + '</td>';
+                    }
                     return '<td class="' + tdc + '">'
                         + '<a class="cf-pill" href="#" title="Parent Interview on file'
                         + (d ? ', dated ' + d : '') + ' \u2014 click to view or update."'

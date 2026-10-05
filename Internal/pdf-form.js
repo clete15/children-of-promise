@@ -245,6 +245,18 @@ function buildFormPdf(spec) {
             + ' Tf ' + x.toFixed(2) + ' ' + baseline.toFixed(2) + ' Td (' + pdfString(text) + ') Tj ET 0 0 0 rg');
     }
 
+    /* A ZapfDingbats glyph in a specific RGB. Helvetica/WinAnsi has no checkmark or
+       bullet, so a literal ✓/• went through pdfString() and rendered as "?". ZapfDingbats
+       is one of the 14 standard PDF fonts (no embedding), reached as /F3. The glyph is
+       chosen by its ONE-BYTE code in that font's own encoding, passed here as `ch`:
+         '4' (0x34) = a check mark ✓
+         'l' (0x6C) = a solid round bullet •
+       The byte is emitted directly — NOT through pdfString, which would mangle it. */
+    function dingbat(ch, x, baseline, size, r, g, bl) {
+        ops.push('BT ' + r + ' ' + g + ' ' + bl + ' rg /F3 ' + size
+            + ' Tf ' + x.toFixed(2) + ' ' + baseline.toFixed(2) + ' Td (' + ch + ') Tj ET 0 0 0 rg');
+    }
+
     // ── Blocks ──
     // Shapes:
     //   { heading, text }                              wrapped paragraph(s)
@@ -259,10 +271,13 @@ function buildFormPdf(spec) {
         // A shaded panel: big total on the left, determination on the right, then the
         // qualifying factors listed in bold beneath — the answer to "why this score".
         const qual = Array.isArray(sm.qualifying) ? sm.qualifying : [];
+        // Each qualifying factor renders as a bulleted line. The bullet is a ZapfDingbats
+        // glyph drawn separately (see below); the text itself is indented past it and
+        // carries NO bullet character, because a literal • in Helvetica printed as "?".
         const qualLines = [];
         qual.forEach(q => {
-            const t = '\u2022 ' + q.label + ' (' + q.points + ')';
-            wrapText(t, BODY - 24, 10, true).forEach(l => qualLines.push(l));
+            const t = q.label + ' (' + q.points + ')';
+            wrapText(t, BODY - 30, 10, true).forEach((l, i) => qualLines.push({ text: l, bullet: i === 0 }));
         });
         const bannerH = 34 + (qualLines.length ? (qualLines.length * 13 + 10) : 0);
         need(bannerH + 10);
@@ -280,7 +295,11 @@ function buildFormPdf(spec) {
             coloredText('Qualifying factors:', MARGIN + 14, y - 11, 9, true, 0.3, 0.34, 0.45);
             y -= 15;
             qualLines.forEach(l => {
-                ops.push('BT /F2 10 Tf ' + (MARGIN + 20) + ' ' + (y - 10) + ' Td (' + pdfString(l) + ') Tj ET');
+                // Bullet (ZapfDingbats) only on a factor's first wrapped line; continuation
+                // lines align under the text. Text is bold indigo-black, drawn at F2.
+                if (l.bullet) dingbat('l', MARGIN + 20, y - 10, 6, 0.11, 0.25, 0.6);
+                ops.push('BT 0.11 0.25 0.6 rg /F2 10 Tf ' + (MARGIN + 30) + ' ' + (y - 10)
+                    + ' Td (' + pdfString(l.text) + ') Tj ET 0 0 0 rg');
                 y -= 13;
             });
             y -= 4;
@@ -309,10 +328,10 @@ function buildFormPdf(spec) {
                 need(15);
                 const applies = !!it.applies;
                 const baseline = y - 10;
-                // Tick gutter: a green check for a Yes; blank otherwise. (A non-applicable
-                // row is already clear from its grey label, and the middle-dot glyph used
-                // here before rendered as "?" in the PDF's base font.)
-                if (applies) coloredText('\u2713', MARGIN, baseline, 11, true, 0.09, 0.55, 0.28);
+                // Tick gutter: a green ZapfDingbats check for a Yes; blank otherwise. (A
+                // non-applicable row is already clear from its grey label. A WinAnsi
+                // checkmark rendered as "?", so the check is drawn from ZapfDingbats.)
+                if (applies) dingbat('4', MARGIN, baseline, 11, 0.09, 0.55, 0.28);
 
                 // Points, right-aligned in their own column.
                 const ptsTxt = String(it.points == null ? '' : it.points);
@@ -395,6 +414,10 @@ function buildFormPdf(spec) {
 
     const fontRegular = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>');
     const fontBold = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>');
+    // ZapfDingbats (standard 14, no embedding) for the check and bullet glyphs that
+    // WinAnsi/Helvetica cannot render. Its OWN built-in encoding, so no /Encoding entry:
+    // byte '4' is the check mark, 'l' the round bullet (see dingbat()).
+    const fontDingbats = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /ZapfDingbats >>');
 
     const imageIds = {};
     images.forEach(img => {
@@ -423,7 +446,8 @@ function buildFormPdf(spec) {
             : '';
         pageIds.push(addObject('<< /Type /Page /Parent ' + pagesId + ' 0 R /MediaBox [0 0 '
             + PAGE.width + ' ' + PAGE.height + '] /Resources << /Font << /F1 ' + fontRegular
-            + ' 0 R /F2 ' + fontBold + ' 0 R >>' + xobjects + ' >> /Contents ' + contentId + ' 0 R >>'));
+            + ' 0 R /F2 ' + fontBold + ' 0 R /F3 ' + fontDingbats + ' 0 R >>' + xobjects
+            + ' >> /Contents ' + contentId + ' 0 R >>'));
     });
 
     const realPagesId = addObject('<< /Type /Pages /Count ' + pageIds.length + ' /Kids ['
