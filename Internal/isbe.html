@@ -213,7 +213,6 @@
            show through. Even rows match the zebra; hover matches the row hover. */
         tbody tr:nth-child(even) td.pin-1 { background:var(--sp-surface-2); }
         tbody tr:hover td.pin-1 { background:var(--sp-accent-soft); }
-        tr.print-all-row td.pin-1 { background:var(--sp-accent-soft); }
         input[type=checkbox] { width:auto;accent-color:var(--primary);cursor:pointer; }
 
         /* ── Is there a form behind this tick? ──
@@ -263,10 +262,6 @@
         .scr-flag.dl-due     { background:var(--sp-warn-bg);color:var(--sp-warn-fg); }
         .scr-flag.dl-late,
         .scr-flag.dl-overdue { background:var(--sp-bad-bg);color:var(--sp-bad-fg); }
-
-        /* Print All row */
-        tr.print-all-row { background:var(--sp-accent-soft);border-top:2px solid var(--sp-accent); }
-        tr.print-all-row td { padding:8px 6px; }
 
         /* Parent Interview Modal */
         .pi-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center; }
@@ -425,41 +420,6 @@
            this page still uses its own inline copies of those modals below, for the
            roster and compliance [form] links. */
 
-        /* "What Needs Doing" panel */
-        .sy-header { padding:14px 18px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:16px; }
-        .sy-year { font-size:1rem;font-weight:800;color:#1e293b; }
-        .sy-year-sub { font-size:0.74rem;color:#64748b;margin-top:3px;line-height:1.5; }
-        .sy-block { margin-bottom:18px;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden; }
-        .sy-block-head { padding:11px 15px;background:#f8fafc;border-bottom:1px solid #e5e7eb; }
-        .sy-block-title { font-size:0.84rem;font-weight:800;color:#1e293b; }
-        .sy-block-sub { font-size:0.72rem;color:#64748b;margin-top:2px;line-height:1.5; }
-        .sy-table { width:100%;border-collapse:collapse;font-size:0.76rem; }
-        .sy-table th { text-align:left;font-size:0.62rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#94a3b8;padding:7px 15px;border-bottom:1px solid #f1f5f9; }
-        .sy-table td { padding:8px 15px;border-bottom:1px solid #f8fafc;vertical-align:middle;color:#334155; }
-        .sy-table tbody tr:last-child td { border-bottom:none; }
-        .sy-table tbody tr:hover { background:#f8fafc; }
-        .sy-table a { color:#2563eb;text-decoration:none;font-weight:700;font-size:0.72rem;white-space:nowrap; }
-        .sy-table a:hover { text-decoration:underline; }
-        .sy-count { font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap; }
-        .sy-names { color:#64748b;font-size:0.72rem;line-height:1.5; }
-        .sy-pill { font-size:0.66rem;font-weight:700;padding:3px 9px;border-radius:11px;white-space:nowrap; }
-        .sy-overdue { background:#fef2f2;color:#b91c1c; }
-        .sy-due { background:#fffbeb;color:#92400e; }
-        .sy-done { padding:14px 15px;font-size:0.76rem;color:#166534;background:#f0fdf4; }
-        .sy-license { padding:12px 15px;font-size:0.8rem;font-weight:600; }
-        .sy-license.sy-overdue { background:#fef2f2;color:#b91c1c; }
-        .sy-license.sy-due { background:#fffbeb;color:#92400e; }
-        .sy-license a { margin-left:8px;font-weight:700; }
-
-        /* Child-first worklist: room groups and per-item chips. */
-        .sy-room-group { border-top:1px solid #f1f5f9; }
-        .sy-room-group:first-child { border-top:none; }
-        .sy-room-name { padding:8px 15px 2px;font-size:0.66rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;color:#475569; }
-        .sy-chips { line-height:2; }
-        .sy-chip { display:inline-block;font-size:0.68rem;font-weight:700;padding:2px 9px;border-radius:11px;background:#eff6ff;color:#2563eb;border:1px solid #dbeafe;white-space:nowrap;text-decoration:none;margin:0 3px 3px 0; }
-        a.sy-chip:hover { background:#dbeafe;text-decoration:none; }
-        .sy-chip-noform { background:#f8fafc;color:#64748b;border-color:#e5e7eb;font-weight:600; }
-
         /* DCFS license panel inside CB2 */
         .lic-panel { border:1px solid #e5e7eb;border-radius:8px;padding:11px 13px;margin-top:10px;background:#f8fafc; }
         .lic-head { font-size:0.78rem;font-weight:800;color:#1e293b;display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:9px; }
@@ -482,10 +442,6 @@
         .year-picker select:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
         .year-prior { font-size:0.64rem;font-weight:700;color:var(--sp-warn-fg);background:var(--sp-warn-bg);padding:3px 8px;border-radius:10px;white-space:nowrap; }
 
-        /* Print All container is hidden on screen; only used to build the print job */
-        #printAllContainer { display:none; }
-        .print-value { display:inline-block;min-height:1em; }
-
         /* Print styles for the form */
         @media print {
             /* Remove the blue page gradient so it doesn't print as a colored block */
@@ -507,15 +463,6 @@
             .pi-overlay[data-printing] textarea::placeholder { color:transparent !important; opacity:0 !important; }
             .pi-overlay[data-printing] input::-webkit-input-placeholder,
             .pi-overlay[data-printing] textarea::-webkit-input-placeholder { color:transparent !important; opacity:0 !important; }
-
-            /* Print All: single job, one form per page */
-            #printAllContainer[data-printing] { display:block !important;position:static;visibility:visible; }
-            #printAllContainer[data-printing] * { visibility:visible; }
-            #printAllContainer[data-printing] .print-page { page-break-after:always;break-after:page; }
-            #printAllContainer[data-printing] .print-page:last-child { page-break-after:auto;break-after:auto; }
-            #printAllContainer[data-printing] .pi-modal { position:static;width:100%;max-width:100%;box-shadow:none;border-radius:0;margin:0; }
-            /* Render captured values with the same underline styling as signature/date fields */
-            #printAllContainer[data-printing] .print-value { border-bottom:1px solid #9ca3af;min-width:120px;padding:2px 4px;font-weight:600; }
 
             /* ── Parent Interview as a fillable PAPER form ──
                When the interview overlay is printed, an admin is producing a blank-with-
@@ -627,12 +574,6 @@
                 <button type="button" id="progPI" class="isbe-prog on" onclick="setProgramProgram('PI')">PI</button>
                 <button type="button" id="progPFA" class="isbe-prog" onclick="setProgramProgram('PFA')">PFA</button>
             </div>
-            <!-- Opens on the work outstanding for the year in view, so the first
-                 thing the director sees is what to do rather than a grid to audit. -->
-            <button id="btnStartYear" onclick="setView('startYear')">
-                <div>🚦 What Needs<br>Doing</div>
-                <span id="startYearCount"></span>
-            </button>
             <button class="active" id="btnRoster" onclick="setView('roster')">
                 <div>📋 <span id="rosterProgLabel">PI</span> Roster</div>
                 <span id="rosterCount"></span>
@@ -683,10 +624,6 @@
                         <tr><td colspan="16" style="text-align:center;padding:40px;color:var(--text-muted);">Loading...</td></tr>
                     </tbody>
                 </table>
-            </div>
-            <!-- Start of year / outstanding work -->
-            <div id="startYearPanel" style="display:none;overflow-y:auto;flex:1;padding:24px;">
-                <div id="startYearBody"></div>
             </div>
             <!-- The My Classroom panel moved to My Page (staff-portal.html). -->
             <!-- Per-child document checklist grid (Item 2 / PI5) -->
@@ -1165,9 +1102,6 @@
     </div>
 </div>
 
-<!-- Hidden container used to build a single multi-form print job (Print All) -->
-<div id="printAllContainer"></div>
-
 <!-- The Parent Interview schema + render/serialize/prefill engine, shared with the
      parent portal so both render the identical ~100-field form. Defines globals
      (PI_INTERVIEW_SCHEMA, renderInterviewForm, serializeInterviewForm, ...) used by
@@ -1377,7 +1311,6 @@ async function setSchoolYear(year) {
         console.error('Failed to load data for ' + year, e);
     }
     updateFollowUpCount();
-    updateStartYearCount();
     refreshActiveView();
 }
 /* ── Signatures ────────────────────────────────────────────────────────────
@@ -1591,9 +1524,8 @@ async function init() {
         // Update counts
         updateRosterCount();
         updateFollowUpCount();
-        updateStartYearCount();
         /* Deep link. Accepts the new ?program=PFA|PI and ?view=roster|compliance|
-           childFiles|followUp|startYear, and still understands the OLD merged strings
+           childFiles, and still understands the OLD merged strings
            (?view=PFA, pfaCompliance, piChildFiles, …) so existing bookmarks keep working. */
         const params = new URLSearchParams(location.search);
         const wantedProgram = (params.get('program') || '').toUpperCase();
@@ -1603,8 +1535,8 @@ async function init() {
             'PFA': ['PFA', 'roster'], 'PI': ['PI', 'roster'],
             'pfaCompliance': ['PFA', 'compliance'], 'piCompliance': ['PI', 'compliance'],
             'pfaChildFiles': ['PFA', 'childFiles'], 'piChildFiles': ['PI', 'childFiles'],
-            // 'followUp' view was removed; an old ?view=followUp link lands on the roster.
-            'startYear': [null, 'startYear'], 'followUp': [null, 'roster'],
+            // 'followUp' and 'startYear' views were removed; old links land on the roster.
+            'startYear': [null, 'roster'], 'followUp': [null, 'roster'],
             'roster': [null, 'roster'], 'compliance': [null, 'compliance'], 'childFiles': [null, 'childFiles'],
         };
         if (legacy && LEGACY_MAP[legacy]) {
@@ -1630,12 +1562,10 @@ function getRoom(roomNum) {
 // looking at My Classroom or What Needs Doing, so a just-saved form appeared to
 // do nothing.
 function refreshActiveView() {
-    if (activeView === 'startYear') renderStartYear();
-    else if (activeView === 'roster') renderRoster();
+    if (activeView === 'roster') renderRoster();
     else if (activeView === 'childFiles') renderChildFilesGrid(activeProgram);
     else if (activeView === 'compliance') loadCompliance(activeProgram === 'PFA' ? 'pfaCompliance' : 'piCompliance');
     updateFollowUpCount();
-    updateStartYearCount();
 }
 
 /* Program (PFA/PI) and view (roster/compliance/childFiles/followUp/startYear) are now
@@ -1657,13 +1587,13 @@ function setProgramProgram(p) {
         const el = document.getElementById(id); if (el) el.textContent = p;
     });
     updateRosterCount();
-    updateStartYearCount();   // the What Needs Doing count follows the selected program
     renderActiveView();
 }
 
 // The sidebar view buttons. The others follow the PFA⇄PI toggle.
 function setView(v) {
     if (v === 'followUp') v = 'roster';   // Screening Follow-Up view was removed.
+    if (v === 'startYear') v = 'roster';  // What Needs Doing view was removed.
     activeView = v;
     renderActiveView();
 }
@@ -1677,8 +1607,8 @@ function setProgram(legacy) {
         'PFA': ['PFA', 'roster'], 'PI': ['PI', 'roster'],
         'pfaCompliance': ['PFA', 'compliance'], 'piCompliance': ['PI', 'compliance'],
         'pfaChildFiles': ['PFA', 'childFiles'], 'piChildFiles': ['PI', 'childFiles'],
-        // 'followUp' removed; fall through to the roster if an old link asks for it.
-        'startYear': [null, 'startYear'], 'followUp': [null, 'roster'],
+        // 'followUp' and 'startYear' views were removed; old links fall through to the roster.
+        'startYear': [null, 'roster'], 'followUp': [null, 'roster'],
     };
     const m = MAP[legacy];
     if (!m) return;
@@ -1691,15 +1621,13 @@ function setProgram(legacy) {
 function renderActiveView() {
     const v = activeView, prog = activeProgram;
     // Sidebar active state.
-    document.getElementById('btnStartYear').classList.toggle('active', v === 'startYear');
     document.getElementById('btnRoster').classList.toggle('active', v === 'roster');
     document.getElementById('btnCompliance').classList.toggle('active', v === 'compliance');
     document.getElementById('btnChildFiles').classList.toggle('active', v === 'childFiles');
     const grid = document.getElementById('isbeRosterGrid');
     const compliance = document.getElementById('compliancePanel');
-    const startYear = document.getElementById('startYearPanel');
     const childFiles = document.getElementById('childFilesPanel');
-    [grid, compliance, startYear, childFiles].forEach(el => { if (el) el.style.display = 'none'; });
+    [grid, compliance, childFiles].forEach(el => { if (el) el.style.display = 'none'; });
     // The classroom/admin column toggle belongs only to the roster view.
     var rgt = document.getElementById('rgToggle');
     if (rgt) rgt.style.display = (v === 'roster') ? '' : 'none';
@@ -1716,11 +1644,6 @@ function renderActiveView() {
         count.textContent = '';
         compliance.style.display = 'block';
         loadCompliance(prog === 'PFA' ? 'pfaCompliance' : 'piCompliance');
-    } else if (v === 'startYear') {
-        title.textContent = 'What Needs Doing';
-        count.textContent = '';
-        startYear.style.display = 'block';
-        renderStartYear();
     } else {
         title.textContent = prog + ' Roster';
         grid.style.display = 'block';
@@ -1885,19 +1808,6 @@ function partitionedColumns() {
     if (activeRosterGroup === 'teacher') admin = [];
     else if (activeRosterGroup === 'admin') teacher = [];
     return { teacher: teacher, admin: admin, ordered: teacher.concat(admin) };
-}
-
-// Columns wired to a form, so Print All knows which cells to offer.
-const SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
-/* Transition Plan and Referral keep their `docForm` key (it still resolves the
-   spec/title and the read-only pill), but they are now filled out in Child Files,
-   not on the roster. So the roster offers no form action or Print All for them —
-   exclude them here the same way the teacher and Results Shared columns are. */
-const ROSTER_READONLY_DOCFORMS = ['TransitionPlan', 'Referral'];
-function columnHasForm(c) {
-    if (ROSTER_READONLY_DOCFORMS.indexOf(c.field) !== -1) return false;
-    return !!c.docForm || c.field === 'PermissionSlip' || c.field === 'ParentInterview'
-        || SCREENING_FIELDS.indexOf(c.field) !== -1;
 }
 
 const LINK_STYLE = 'font-size:0.65rem;color:#2563eb;margin-left:3px;text-decoration:none;font-weight:700;';
@@ -2749,121 +2659,6 @@ function renderRoster() {
             + childNameCell(s) + roomTag + transferMarker(s)
             + '</td>' + cells + '</tr>';
     }).join('');
-
-    // "Print All" footer row, one cell per column that can produce a form. Same
-    // partitioned order and same divider on the first admin cell as the rows above.
-    // Teacher columns are handled in the classroom card now, so Print All here is
-    // offered only for admin document columns.
-    const printAllCells = cols.map(c => {
-        const dv = c.field === firstAdminField ? ' class="col-divide"' : '';
-        if (c.teacher || !columnHasForm(c)) return '<td' + dv + '></td>';
-        /* Counts children who still need this form, which now includes a child whose
-           box is ticked with nothing saved: they have no form in the system, so a
-           blank one to work from is exactly what they need. */
-        const uncheckedCount = roster.filter(s =>
-            !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field],
-                String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI')).length;
-        if (uncheckedCount > 0) {
-            return '<td' + dv + '><a href="#" onclick="event.preventDefault();printAllForColumn(\'' + c.field + '\')" style="font-size:0.6rem;color:#2563eb;text-decoration:none;font-weight:700;white-space:nowrap;" title="Print all unchecked forms for this column">🖨️ All (' + uncheckedCount + ')</a></td>';
-        }
-        return '<td' + dv + ' style="font-size:0.58rem;color:#9ca3af;">✓ Done</td>';
-    }).join('');
-    // Uses the existing .print-all-row class rather than an inline background, so the
-    // frozen cells in this row can be repainted to match it.
-    tbody.innerHTML += '<tr class="print-all-row"><td class="left pin-1" style="font-weight:700;font-size:0.7rem;color:var(--sp-accent);">Print All</td>'
-        + printAllCells + '</tr>';
-}
-
-// ── Print All for Column ──
-// Serialize a populated .pi-modal into static HTML with input/textarea/select
-// values baked in (so typed and saved values print correctly, empties print blank).
-function serializeModalForPrint(modalEl) {
-    const clone = modalEl.cloneNode(true);
-    // Drop the footer (buttons) and the close button from the print copy.
-    clone.querySelectorAll('.pi-modal-footer, .pi-close').forEach(el => el.remove());
-    // Replace live form controls with their current values as static text.
-    const liveControls = modalEl.querySelectorAll('input, textarea, select');
-    const cloneControls = clone.querySelectorAll('input, textarea, select');
-    cloneControls.forEach((cEl, i) => {
-        const live = liveControls[i];
-        let val = '';
-        if (live) {
-            if (live.tagName === 'SELECT') {
-                val = live.options[live.selectedIndex] ? live.options[live.selectedIndex].text : '';
-                // Placeholder option prints blank rather than the "select" prompt.
-                if (!live.value) val = '';
-            } else if (live.type === 'checkbox' || live.type === 'radio') {
-                // .value on a checkbox is its payload ("on"), not its state, so
-                // render the tick state instead or every box prints as "on".
-                val = live.checked ? '\u2611' : '\u2610';
-            } else {
-                val = live.value || '';
-            }
-        }
-        const span = document.createElement('span');
-        span.className = 'print-value';
-        span.textContent = val;
-        cEl.replaceWith(span);
-    });
-    return clone.outerHTML;
-}
-
-async function printAllForColumn(field) {
-    // Scoped to the program roster in view. (The classroom scope moved to My Page,
-    // which prints through its own copy of this in classroom-forms.js.)
-    const roster = students.filter(s => s.PFA_PI_na === activeProgram && (s.Active === 'Yes' || s.Active === 'YES'))
-        .sort(sortByRoomThenName);
-    // "Unchecked" here means not truly done, matching the footer's own count
-    // (ChildForms.isDone): a hand-ticked box with no saved form still needs a blank
-    // to work from, so it belongs in the print run.
-    const unchecked = roster.filter(s =>
-        !ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field],
-            String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI'));
-    if (!unchecked.length) { alert('All forms in this column are already completed!'); return; }
-
-    const count = unchecked.length;
-    if (!confirm('This will build a single print preview with ' + count + ' form(s) — one per page — for all unchecked students in this column.\n\nContinue?')) return;
-
-    // Map the column to the open function + overlay used to populate a form.
-    let openFn, overlayId, closeFn;
-    const docCol = COLUMNS.find(c => c.field === field && c.docForm);
-    if (docCol) {
-        // All four PICC document forms share one overlay and one renderer.
-        openFn = id => openDocForm(docCol.docForm, id); overlayId = 'docOverlay'; closeFn = closeDocForm;
-    } else if (field === 'PermissionSlip') {
-        openFn = id => openPermissionSlip(id); overlayId = 'psOverlay'; closeFn = closePermissionSlip;
-    } else if (field === 'ParentInterview') {
-        openFn = id => openInterview(id); overlayId = 'piOverlay'; closeFn = closeInterview;
-    } else if (field === 'BegASQ' || field === 'EndASQ') {
-        const period = field === 'BegASQ' ? 'Beginning' : 'End';
-        openFn = id => openScreening(id, 'ASQ-3', period); overlayId = 'scrOverlay'; closeFn = closeScreening;
-    } else if (field === 'BegASE' || field === 'EndASE') {
-        const period = field === 'BegASE' ? 'Beginning' : 'End';
-        openFn = id => openScreening(id, 'ASQ:SE-2', period); overlayId = 'scrOverlay'; closeFn = closeScreening;
-    } else {
-        alert('This column does not support Print All.');
-        return;
-    }
-
-    const overlay = document.getElementById(overlayId);
-    const modalEl = overlay.querySelector('.pi-modal');
-
-    // Build all forms into the print container (one page each).
-    const pages = [];
-    for (const s of unchecked) {
-        await openFn(s.Id);          // populates the live modal + loads saved data
-        pages.push(serializeModalForPrint(modalEl));
-    }
-    closeFn();
-
-    const container = document.getElementById('printAllContainer');
-    container.innerHTML = pages
-        .map(html => '<div class="print-page">' + html + '</div>')
-        .join('');
-    container.setAttribute('data-printing', '1');
-    window.print();
-    container.removeAttribute('data-printing');
-    container.innerHTML = '';
 }
 
 async function saveField(studentId, field, value) {
@@ -3424,12 +3219,6 @@ async function savePermissionSlip() {
         btn.disabled = false;
         btn.textContent = 'Save Permission Slip';
     }
-}
-
-function printPermissionSlip() {
-    document.getElementById('psOverlay').setAttribute('data-printing', '1');
-    window.print();
-    document.getElementById('psOverlay').removeAttribute('data-printing');
 }
 
 // ── Screening Score Entry Modal (ASQ-3 / ASQ:SE-2) ──
@@ -4553,436 +4342,6 @@ async function loadCompliance(prog) {
    classroom-forms.js module; this page keeps its own inline copies (below) for the
    roster and compliance [form] links, saving to the same endpoints either way. */
 
-/* ── What Needs Doing ──
-   Answers "what is outstanding right now" for the year in view.
-
-   Grouped by task rather than by child on purpose: the work is done in batches
-   ("print all the permission slips"), not child by child. Anything with a
-   regulatory clock is pulled to the top and sorted by how late it is, because a
-   count of outstanding items does not tell you which ones put you out of
-   compliance. */
-
-// Children in a program who are active, for the year in view.
-function activeRoster(program) {
-    return students.filter(s => s.PFA_PI_na === program && (s.Active === 'Yes' || s.Active === 'YES'));
-}
-
-// Per-task outstanding counts for one program.
-// A task is outstanding for a child when it is not truly done: ChildForms.isDone
-// treats a hand-ticked box with no form/scan behind it as NOT done, so this agrees
-// with the roster grid and the compliance rollup rather than the raw tracking bit.
-function outstandingByTask(program) {
-    const roster = activeRoster(program);
-    return visibleColumnsFor(program)
-        .map(col => {
-            const missing = roster.filter(s =>
-                !ChildForms.isDone(s.Id, col.field, !!(trackingData[s.Id] || {})[col.field],
-                    String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI'));
-            return { col: col, missing: missing, total: roster.length };
-        })
-        .filter(t => t.missing.length);
-}
-
-// visibleColumns() reads activeProgram; this view needs both programs at once.
-function visibleColumnsFor(program) {
-    return COLUMNS.filter(c => !c.programs || c.programs.indexOf(program) !== -1);
-}
-
-// Beginning ASQ / ASE for the whole program, split into the start-of-year batch
-// (children on the roster at year start, one shared deadline) and late enrollees
-// (each on their own 45-day clock). Returns per-program summaries plus the flat
-// list of late-enrollee items so the views can show the batch as one line.
-function beginningScreeningStatus(program) {
-    const roster = activeRoster(program);
-    const batchDue = schoolYearStartDate(activeSchoolYear);
-    const batchDeadline = batchDue ? addDays(batchDue, SCREENING_DEADLINE_DAYS) : null;
-    const today = new Date().toISOString().split('T')[0];
-
-    const batch = { total: 0, done: 0, deadline: batchDeadline };
-    const late = [];
-
-    roster.forEach(s => {
-        const lateOne = isLateEnrollee(s, activeSchoolYear);
-        ['BegASQ', 'BegASE'].forEach(field => {
-            const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
-            // A screening is done once the teacher's scored summary is on file
-            // (staff-administered; the parent questionnaire is optional). ChildForms.isDone
-            // enforces that, so a bare tick still does not count the batch as complete.
-            const done = ChildForms.isDone(s.Id, field, !!(trackingData[s.Id] || {})[field],
-                String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI');
-            if (lateOne) {
-                if (done) return;
-                const rec = (screeningData[s.Id] || {})[type + '|Beginning'];
-                const dl = screeningDeadline(s, rec && rec.ScreeningDate, activeSchoolYear);
-                if (dl && (dl.state === 'overdue' || dl.state === 'due')) {
-                    late.push({ student: s, field: field, type: type, state: dl.state, text: dl.text });
-                }
-            } else {
-                batch.total++;
-                if (done) batch.done++;
-            }
-        });
-    });
-
-    // Batch urgency measured against the shared deadline.
-    let batchState = 'ok';
-    if (batchDeadline && batch.done < batch.total) {
-        const left = daysBetween(today, batchDeadline);
-        if (left === null) batchState = 'ok';
-        else if (left < 0) batchState = 'overdue';
-        else if (left <= 14) batchState = 'due';
-    }
-    batch.state = batchState;
-    batch.left = batchDeadline ? daysBetween(today, batchDeadline) : null;
-
-    return { program: program, batch: batch, late: late };
-}
-
-// Small date helper: add days to a YYYY-MM-DD string, returning the same format.
-function addDays(iso, n) {
-    const d = new Date(iso);
-    if (isNaN(d)) return null;
-    d.setDate(d.getDate() + n);
-    return d.toISOString().split('T')[0];
-}
-
-/* Nothing is chased in the opening weeks of a school year.
-
-   Rosters move for the first month or so, and documents raised against a child
-   who has only just started, or who is still being placed, are noise the director
-   learns to scroll past. Notices therefore stay quiet until 45 days after the
-   school year begins, the same 45-day mark the screening batch uses.
-
-   This suppresses the REMINDER, not the requirement: a document that is genuinely
-   late is still late, and shows the moment the window opens. */
-const NOTICE_GRACE_DAYS = 45;
-
-function noticesOpenDate(year) {
-    const start = schoolYearStartDate(year);
-    return start ? addDays(start, NOTICE_GRACE_DAYS) : null;
-}
-
-function noticesSuppressed(year) {
-    const open = noticesOpenDate(year);
-    if (!open) return false;
-    return new Date().toISOString().split('T')[0] < open;
-}
-
-// Shown in place of a list while the grace period is running, so it is obvious
-// the list is quiet by design rather than empty because nothing is outstanding.
-function noticeGraceNote(year) {
-    const open = noticesOpenDate(year);
-    return '<p style="font-size:0.8rem;color:#64748b;margin:0;">Reminders open on <strong>'
-        + open + '</strong>, 45 days after the school year starts. Rosters are still settling '
-        + 'before then, so nothing is chased yet. Anything genuinely overdue will appear that day.</p>';
-}
-
-// PI6 documents are due within 6 months of enrollment.
-function sixMonthWatch() {
-    // Held during the opening 45 days of the school year.
-    if (noticesSuppressed(activeSchoolYear)) return [];
-    const WINDOW = 182;
-    const today = new Date().toISOString().split('T')[0];
-    const items = [
-        { field: 'FamilyCenteredAssessment', label: 'Family Centered Assessment', form: 'familyAssessment' },
-        { field: 'FamilyGoalPlan', label: 'Individual Family Goal Plan', form: 'familyGoalPlan' }
-    ];
-    const out = [];
-    activeRoster('PI').forEach(s => {
-        if (!s.Start_Date) return;
-        const elapsed = daysBetween(s.Start_Date, today);
-        if (elapsed === null) return;
-        items.forEach(it => {
-            if ((trackingData[s.Id] || {})[it.field]) return;
-            const left = WINDOW - elapsed;
-            if (left > 45) return;   // not yet worth chasing
-            out.push({
-                student: s, label: it.label, form: it.form,
-                state: left < 0 ? 'overdue' : 'due',
-                text: left < 0 ? Math.abs(left) + ' days overdue' : left + ' days left'
-            });
-        });
-    });
-    return out.sort((a, b) => (a.state === 'overdue' ? -1 : 1) - (b.state === 'overdue' ? -1 : 1));
-}
-
-// Records that break the deadline maths or the roll-ups, so they are worth
-// fixing before relying on either.
-function dataGaps() {
-    const gaps = [];
-    ['PFA', 'PI'].forEach(p => {
-        activeRoster(p).forEach(s => {
-            if (!s.Start_Date) gaps.push({ student: s, program: p, issue: 'No enrollment date, so the 45-day and 6-month clocks cannot be checked' });
-            else if (!s.RoomNumber) gaps.push({ student: s, program: p, issue: 'No classroom assigned' });
-        });
-    });
-    return gaps;
-}
-
-function syBlock(title, sub, body) {
-    return '<div class="sy-block"><div class="sy-block-head"><div class="sy-block-title">' + title + '</div>'
-        + (sub ? '<div class="sy-block-sub">' + sub + '</div>' : '') + '</div>' + body + '</div>';
-}
-
-function nameOf(s) { return s.Last_Name + ', ' + s.First_Name; }
-
-/* The onclick that opens the form behind a teacher checklist column, so the
-   child-first worklist can link each outstanding item straight to its form.
-   Mirrors the routing in openColumnForm(): permission slip, interview, the four
-   screenings, or a shared docForm overlay. Report-card columns have no form to
-   open (they are printed/sent), so they get no link. */
-function worklistOpenFor(col, studentId) {
-    if (col.field === 'PermissionSlip') return 'openPermissionSlip(' + studentId + ')';
-    if (col.field === 'ParentInterview') return 'openInterview(' + studentId + ')';
-    if (col.field === 'BegASQ') return "openScreening(" + studentId + ",'ASQ','Beginning')";
-    if (col.field === 'BegASE') return "openScreening(" + studentId + ",'ASE','Beginning')";
-    if (col.field === 'EndASQ') return "openScreening(" + studentId + ",'ASQ','End')";
-    if (col.field === 'EndASE') return "openScreening(" + studentId + ",'ASE','End')";
-    if (col.docForm) return "openDocForm('" + col.docForm + "'," + studentId + ')';
-    return null; // report cards: nothing to open, they are printed and sent
-}
-
-/* Child-first roll-up for the start-of-year view. The task-first block above is
-   for a director batching one job across the roster ("print all permission
-   slips"); this is for a teacher working one child's file at a time ("what does
-   Ava still need?"). Uses ChildForms.isDone, the same done-test as the roster grid,
-   outstandingByTask and the compliance rollup, so a hand-ticked box with nothing
-   filed still shows as outstanding here and none of the views can disagree.
-   Grouped by room (teachers own a room), youngest room first to match the grid. */
-function renderStartYearWorklist(program) {
-    const roster = activeRoster(program);
-    if (!roster.length) return '';
-    const teacherCols = visibleColumnsFor(program).filter(c => c.teacher);
-
-    // Per child: the teacher columns still outstanding, in checklist order.
-    const perChild = roster.map(s => {
-        const missing = teacherCols.filter(c =>
-            !ChildForms.isDone(s.Id, c.field, !!(trackingData[s.Id] || {})[c.field],
-                String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI'));
-        return { student: s, missing: missing };
-    }).filter(x => x.missing.length);
-
-    if (!perChild.length) {
-        return syBlock(program + ' \u2014 each child\u2019s remaining items', null,
-            '<div class="sy-done">Every teacher item is complete for all ' + roster.length
-            + ' active ' + program + ' children.</div>');
-    }
-
-    // Group by room, youngest room first (same ordering as the roster grid), and
-    // sort children within a room by name.
-    perChild.sort((a, b) => sortByRoomThenName(a.student, b.student));
-    const byRoom = [];
-    perChild.forEach(x => {
-        const room = getRoom(x.student.RoomNumber) || '\u2014';
-        let g = byRoom.find(r => r.room === room);
-        if (!g) { g = { room: room, kids: [] }; byRoom.push(g); }
-        g.kids.push(x);
-    });
-
-    const body = byRoom.map(g => {
-        const rows = g.kids.map(x => {
-            const chips = x.missing.map(c => {
-                const label = c.label.replace(/<br>/g, ' ');
-                const open = worklistOpenFor(c, x.student.Id);
-                return open
-                    ? '<a class="sy-chip" href="#" onclick="event.preventDefault();' + open + '">' + label + '</a>'
-                    : '<span class="sy-chip sy-chip-noform" title="Printed and sent home \u2014 no form to open here">' + label + '</span>';
-            }).join(' ');
-            return '<tr><td>' + nameOf(x.student) + '</td>'
-                + '<td class="sy-count">' + x.missing.length + '</td>'
-                + '<td class="sy-chips">' + chips + '</td></tr>';
-        }).join('');
-        return '<div class="sy-room-group"><div class="sy-room-name">' + g.room + '</div>'
-            + '<table class="sy-table"><thead><tr><th>Child</th><th>Left</th><th>Still needs</th></tr></thead><tbody>'
-            + rows + '</tbody></table></div>';
-    }).join('');
-
-    return syBlock(program + ' \u2014 each child\u2019s remaining items',
-        'For working one child\u2019s file at a time. Grouped by room, youngest first. Click an item to open its form. Report cards are printed and sent, so they have no link.',
-        body);
-}
-
-function renderStartYear() {
-    const isCurrent = activeSchoolYear === getSchoolYear();
-    const pfa = activeRoster('PFA').length;
-    const pi = activeRoster('PI').length;
-    let html = '';
-
-    html += '<div class="sy-header">'
-        + '<div><div class="sy-year">' + activeSchoolYear + (isCurrent ? '' : ' (prior year)') + '</div>'
-        + '<div class="sy-year-sub">' + pfa + ' active PFA &middot; ' + pi + ' active PI. '
-        + 'Everything below is for this school year only.</div></div></div>';
-
-    // License alert first — an expired or soon-to-expire DCFS license is a hard
-    // monitoring finding and is not tied to the school year.
-    const ls = licenseStatus();
-    if (ls.state === 'expired' || ls.state === 'expiring') {
-        const num = siteSettings[LICENSE_KEYS.number] || '';
-        html += syBlock('DCFS license ' + (ls.state === 'expired' ? 'EXPIRED' : 'expiring'),
-            'Update the license on the CB2 item once the renewal arrives.',
-            '<div class="sy-license sy-' + (ls.state === 'expired' ? 'overdue' : 'due') + '">'
-            + (num ? 'License ' + num + ' \u2014 ' : '') + ls.text
-            + ' <a href="#" onclick="event.preventDefault();setProgram(\'piCompliance\')">open CB2</a></div>');
-    }
-
-    // 1. Regulatory clocks.
-    const sixMonth = sixMonthWatch();
-
-    // Beginning-of-year screening batch, per program, plus any late enrollees.
-    ['PFA', 'PI'].forEach(program => {
-        if (!activeRoster(program).length) return;
-        const st = beginningScreeningStatus(program);
-        const b = st.batch;
-        let rows = '';
-
-        if (b.total) {
-            const left = b.left;
-            const when = b.deadline
-                ? (left === null ? '' : left < 0 ? Math.abs(left) + ' days past the batch date'
-                    : left + ' days until the batch date (' + shortDate(b.deadline) + ')')
-                : '';
-            const pill = b.done >= b.total
-                ? '<span class="sy-pill sy-ok">complete</span>'
-                : '<span class="sy-pill sy-' + b.state + '">' + b.done + ' of ' + b.total + ' done</span>';
-            rows += '<tr><td><strong>Start-of-year batch</strong><div class="sy-names">'
-                + 'All children on the roster at the start of the year, screened together.</div></td>'
-                + '<td>' + pill + '</td><td class="sy-names">' + when + '</td></tr>';
-        }
-
-        st.late.forEach(w => {
-            rows += '<tr><td>' + nameOf(w.student) + ' <span class="sy-names">(enrolled after the batch)</span></td>'
-                + '<td><span class="sy-pill sy-' + w.state + '">' + w.type + ' \u2014 ' + w.text + '</span></td>'
-                + '<td><a href="#" onclick="event.preventDefault();openScreening(' + w.student.Id
-                + ',\'' + w.type + '\',\'Beginning\')">enter scores</a></td></tr>';
-        });
-
-        if (rows && (b.done < b.total || st.late.length)) {
-            html += syBlock(program + ' beginning screenings (ASQ &amp; ASE)',
-                'Screened as one batch at the start of the year. Children enrolled after the window get an individual 45-day clock.',
-                '<table class="sy-table"><thead><tr><th>Who</th><th>Status</th><th></th></tr></thead><tbody>'
-                + rows + '</tbody></table>');
-        }
-    });
-
-    // Say why the list is quiet, rather than showing nothing at all.
-    if (noticesSuppressed(activeSchoolYear)) {
-        html += syBlock('Reminders are on hold', null, noticeGraceNote(activeSchoolYear));
-    }
-
-    if (sixMonth.length) {
-        const rows = sixMonth.map(w =>
-            '<tr><td>' + nameOf(w.student) + '</td><td>' + getRoom(w.student.RoomNumber) + '</td>'
-            + '<td>' + w.label + '</td>'
-            + '<td><span class="sy-pill sy-' + w.state + '">' + w.text + '</span></td>'
-            + '<td><a href="#" onclick="event.preventDefault();openDocForm(\'' + w.form + '\',' + w.student.Id + ')">open form</a></td></tr>').join('');
-        html += syBlock('Six-month PI documents due',
-            'PICC PI6 requires the Family Centered Assessment and Individual Family Goal Plan within 6 months of enrollment.',
-            '<table class="sy-table"><thead><tr><th>Child</th><th>Room</th><th>Document</th><th>Status</th><th></th></tr></thead><tbody>'
-            + rows + '</tbody></table>');
-    }
-
-    // 2. Outstanding paperwork, grouped by task.
-    ['PFA', 'PI'].forEach(program => {
-        const tasks = outstandingByTask(program);
-        if (!activeRoster(program).length) return;
-        if (!tasks.length) {
-            html += syBlock(program + ' paperwork', null,
-                '<div class="sy-done">Every checklist item is complete for all ' + activeRoster(program).length
-                + ' active ' + program + ' children.</div>');
-            return;
-        }
-        const rows = tasks.map(t => {
-            const label = t.col.label.replace(/<br>/g, ' ');
-            const names = t.missing.slice(0, 4).map(nameOf).join(' &middot; ')
-                + (t.missing.length > 4 ? ' &middot; +' + (t.missing.length - 4) + ' more' : '');
-            const printAll = columnHasForm(t.col)
-                ? '<a href="#" onclick="event.preventDefault();printAllForColumn(\'' + t.col.field + '\')">print all</a>'
-                : '';
-            return '<tr><td><strong>' + label + '</strong></td>'
-                + '<td class="sy-count">' + t.missing.length + ' of ' + t.total + '</td>'
-                + '<td class="sy-names">' + names + '</td>'
-                + '<td>' + printAll + '</td></tr>';
-        }).join('');
-        html += syBlock(program + ' paperwork outstanding',
-            'Grouped by task, since these are done in batches. Counts are for active children only.',
-            '<table class="sy-table"><thead><tr><th>Task</th><th>Outstanding</th><th>Children</th><th></th></tr></thead><tbody>'
-            + rows + '</tbody></table>');
-    });
-
-    // 2b. Same outstanding work, but child-first — for a teacher finishing one
-    // file at a time rather than batching a task across the roster.
-    ['PFA', 'PI'].forEach(program => {
-        if (!activeRoster(program).length) return;
-        html += renderStartYearWorklist(program);
-    });
-
-    // 3. Program-level PICC items with nothing recorded.
-    html += '<div id="syPiccBlock"></div>';
-
-    // 4. Data problems that make the above unreliable.
-    const gaps = dataGaps();
-    if (gaps.length) {
-        const rows = gaps.map(g => '<tr><td>' + nameOf(g.student) + '</td><td>' + g.program + '</td><td>' + g.issue + '</td></tr>').join('');
-        html += syBlock('Records needing attention',
-            'These gaps stop the deadline checks above from being trustworthy for those children.',
-            '<table class="sy-table"><thead><tr><th>Child</th><th>Program</th><th>Issue</th></tr></thead><tbody>'
-            + rows + '</tbody></table>');
-    }
-
-    document.getElementById('startYearBody').innerHTML = html;
-    renderStartYearPicc();
-    updateStartYearCount();
-}
-
-// PICC readiness needs the compliance record, which is a separate fetch.
-async function renderStartYearPicc() {
-    const host = document.getElementById('syPiccBlock');
-    if (!host) return;
-    let data = {};
-    try {
-        const res = await apiFetch('/api/compliance?year=' + encodeURIComponent(activeSchoolYear));
-        data = await res.json();
-    } catch (e) { host.innerHTML = ''; return; }
-
-    const open = PICC_ITEMS.filter(item => {
-        const st = piccChildStats(item);
-        if (st) return !(st.total && st.complete === st.total);
-        return !data['PI_' + item.num];
-    });
-
-    if (!open.length) {
-        host.innerHTML = syBlock('PICC checklist', null,
-            '<div class="sy-done">All ' + PICC_ITEMS.length + ' checklist items have evidence recorded.</div>');
-        return;
-    }
-
-    const rows = open.map(item => {
-        const st = piccChildStats(item);
-        const status = st
-            ? (st.total ? st.complete + ' of ' + st.total + ' files complete' : 'no active PI children')
-            : 'no evidence recorded';
-        return '<tr><td><span class="picc-num">' + item.num + '</span></td>'
-            + '<td><strong>' + item.title + '</strong></td>'
-            + '<td class="sy-names">' + status + '</td></tr>';
-    }).join('');
-
-    host.innerHTML = syBlock('PICC items still open',
-        open.length + ' of ' + PICC_ITEMS.length + ' items need evidence. Open PI Compliance to record it.',
-        '<table class="sy-table"><thead><tr><th></th><th>Item</th><th>Status</th></tr></thead><tbody>'
-        + rows + '</tbody></table>');
-}
-
-// Sidebar badge: total outstanding tasks across both programs, so the count
-// reflects work items rather than children.
-function updateStartYearCount() {
-    const el = document.getElementById('startYearCount');
-    if (!el) return;
-    // Scoped to the selected program (the PFA⇄PI toggle), not the sum of both, so the
-    // count matches what the What Needs Doing panel actually shows for that program.
-    const n = outstandingByTask(activeProgram).reduce((a, t) => a + t.missing.length, 0);
-    el.textContent = n ? n + ' outstanding' : 'all clear';
-}
-
 // ── PICC checklist ──
 
 /* Site-level settings (DCFS license, etc.). Loaded once and cached; not scoped
@@ -5039,9 +4398,8 @@ function licensePanelHtml() {
 
 function saveLicenseField(which, value) {
     saveSiteSetting(LICENSE_KEYS[which], value);
-    // Re-render so the status pill and any What-Needs-Doing flag update at once.
+    // Re-render so the status pill updates at once.
     if (activeComplianceProgram === 'piCompliance') loadCompliance();
-    updateStartYearCount();
 }
 
 /* Live per-child evidence roll-up for an item backed by roster columns.
