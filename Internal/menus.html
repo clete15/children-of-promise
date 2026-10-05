@@ -147,9 +147,14 @@ const ART = (() => {
             + `<circle cx="30" cy="36" r="1.5" fill="${c}"/><circle cx="30" cy="42" r="1.5" fill="${c}"/>`
             + `<path d="M18 32 L8 28 M42 32 L52 28" stroke="${c}" stroke-width="2" fill="none"/></g>`),
         leaf: (s, c = 'currentColor', o = 1) => wrap(s,
-            `<g opacity="${o}"><path d="M10 50C10 50 20 10 50 10C50 10 40 30 30 40C20 50 10 50 10 50Z" fill="${c}"/>`
-            + `<path d="M15 45L45 15" stroke="#fff" stroke-width="1.5" opacity="0.5" fill="none"/>`
-            + `<path d="M25 35C25 35 30 25 40 20" stroke="#fff" stroke-width="1" opacity="0.4" fill="none"/></g>`),
+            `<g opacity="${o}">`
+            // Maple-leaf silhouette: lobed top/side points around a center, plus a stem.
+            + `<path d="M30 7 L34 17 L43 13 L40 23 L52 24 L43 31 L50 39 L39 38 L40 48 `
+            + `L32 42 L30 53 L28 42 L20 48 L21 38 L10 39 L17 31 L8 24 L20 23 L17 13 `
+            + `L26 17 Z" fill="${c}" stroke="${c}" stroke-width="1" stroke-linejoin="round"/>`
+            + `<line x1="30" y1="22" x2="30" y2="53" stroke="#fff" stroke-width="1.4" opacity="0.5"/>`
+            + `<line x1="30" y1="30" x2="40" y2="26" stroke="#fff" stroke-width="1" opacity="0.4"/>`
+            + `<line x1="30" y1="30" x2="20" y2="26" stroke="#fff" stroke-width="1" opacity="0.4"/></g>`),
         acorn: (s, c = 'currentColor', o = 1) => wrap(s,
             `<g opacity="${o}"><ellipse cx="30" cy="38" rx="13" ry="15" fill="${c}"/>`
             + `<path d="M16 28 Q30 18 44 28 Q44 34 16 34 Z" fill="#78350f"/>`
@@ -174,11 +179,18 @@ const ART = (() => {
             + `<circle cx="38" cy="42" r="9" fill="${c}" opacity="0.6"/>`
             + `<circle cx="30" cy="30" r="6" fill="#f59e0b"/></g>`),
         butterfly: (s, c = 'currentColor', o = 1) => wrap(s,
-            `<g opacity="${o}"><path d="M30 30 Q12 10 10 26 Q8 40 30 32 Z" fill="${c}"/>`
-            + `<path d="M30 30 Q48 10 50 26 Q52 40 30 32 Z" fill="${c}"/>`
-            + `<path d="M30 32 Q14 44 16 52 Q26 52 30 36 Z" fill="${c}" opacity="0.7"/>`
-            + `<path d="M30 32 Q46 44 44 52 Q34 52 30 36 Z" fill="${c}" opacity="0.7"/>`
-            + `<line x1="30" y1="26" x2="30" y2="50" stroke="#374151" stroke-width="2"/></g>`),
+            `<g opacity="${o}">`
+            // Upper wings (large, rounded) + lower wings (smaller, teardrop),
+            // mirrored around a central body. Small dots give it detail at size.
+            + `<g stroke="${c}" stroke-width="1">`
+            + `<path d="M30 30 C18 8 2 12 8 24 C11 31 22 31 30 30Z" fill="${c}"/>`
+            + `<path d="M30 30 C42 8 58 12 52 24 C49 31 38 31 30 30Z" fill="${c}"/>`
+            + `<path d="M30 31 C20 38 8 40 12 50 C16 56 26 50 30 34Z" fill="${c}" opacity="0.75"/>`
+            + `<path d="M30 31 C40 38 52 40 48 50 C44 56 34 50 30 34Z" fill="${c}" opacity="0.75"/></g>`
+            + `<circle cx="18" cy="20" r="2.4" fill="#fff" opacity="0.8"/>`
+            + `<circle cx="42" cy="20" r="2.4" fill="#fff" opacity="0.8"/>`
+            + `<ellipse cx="30" cy="33" rx="2.4" ry="12" fill="#374151"/>`      // body
+            + `<path d="M30 22 q-4 -8 -8 -10 M30 22 q4 -8 8 -10" stroke="#374151" stroke-width="1.5" fill="none" stroke-linecap="round"/></g>`), // antennae
         heart: (s, c = 'currentColor', o = 1) => wrap(s,
             `<path opacity="${o}" d="M30 52C30 52 3 36 3 19C3 10 10 3 19 3C24 3 28 6 30 11C32 6 36 3 41 3C50 3 57 10 57 19C57 36 30 52 30 52Z" fill="${c}"/>`),
         star: (s, c = 'currentColor', o = 1) => wrap(s,
@@ -205,17 +217,22 @@ const ART = (() => {
             + `<circle cx="24" cy="26" r="3" fill="${c}"/><circle cx="36" cy="26" r="3" fill="${c}"/>`
             + `<ellipse cx="30" cy="34" rx="3" ry="4" fill="${c}"/></g>`),
         turkey: (s, c = 'currentColor', o = 1) => wrap(s,
-            `<g opacity="${o}"><g>`
-            + `<ellipse cx="30" cy="18" rx="6" ry="12" fill="#b45309"/>`
-            + `<ellipse cx="16" cy="22" rx="5" ry="11" fill="#d97706" transform="rotate(-30 16 22)"/>`
-            + `<ellipse cx="44" cy="22" rx="5" ry="11" fill="#d97706" transform="rotate(30 44 22)"/>`
-            + `<ellipse cx="22" cy="18" rx="5" ry="11" fill="#f59e0b" transform="rotate(-15 22 18)"/>`
-            + `<ellipse cx="38" cy="18" rx="5" ry="11" fill="#f59e0b" transform="rotate(15 38 18)"/></g>`
-            + `<ellipse cx="30" cy="42" rx="13" ry="14" fill="${c}"/>`
-            + `<circle cx="30" cy="34" r="7" fill="#92400e"/>`
-            + `<circle cx="27" cy="33" r="1.3" fill="#fff"/><circle cx="33" cy="33" r="1.3" fill="#fff"/>`
-            + `<polygon points="30,35 35,37 30,39" fill="#f59e0b"/>`
-            + `<path d="M30 38 q3 3 1 6" stroke="#dc2626" stroke-width="2" fill="none"/></g>`),
+            `<g opacity="${o}">`
+            // Fanned tail: five fat feather "petals" radiating behind the body,
+            // alternating warm colours so the fan still reads when small.
+            + `<g stroke="#92400e" stroke-width="1" stroke-linejoin="round">`
+            + `<path d="M30 34 L14 10 Q22 18 30 34Z" fill="#d97706"/>`
+            + `<path d="M30 34 L46 10 Q38 18 30 34Z" fill="#d97706"/>`
+            + `<path d="M30 34 L21 7 Q27 17 30 34Z" fill="#f59e0b"/>`
+            + `<path d="M30 34 L39 7 Q33 17 30 34Z" fill="#f59e0b"/>`
+            + `<path d="M30 34 L30 5 Q31 18 30 34Z" fill="#b45309"/></g>`
+            // Round body + head, kept simple and bold.
+            + `<ellipse cx="30" cy="44" rx="12" ry="12" fill="${c}"/>`
+            + `<circle cx="30" cy="36" r="6" fill="#7c2d12"/>`
+            + `<circle cx="28" cy="35" r="1.2" fill="#fff"/><circle cx="32" cy="35" r="1.2" fill="#fff"/>`
+            + `<polygon points="30,37 35,39 30,41" fill="#f59e0b"/>`         // beak
+            + `<path d="M30 39 q4 2 2 6" stroke="#dc2626" stroke-width="2" fill="none"/>` // wattle
+            + `<path d="M22 50 l-3 4 M26 52 l-1 4 M34 52 l1 4 M38 50 l3 4" stroke="#f59e0b" stroke-width="1.5"/></g>`),
         egg: (s, c = 'currentColor', o = 1) => wrap(s,
             `<g opacity="${o}"><ellipse cx="30" cy="32" rx="18" ry="24" fill="${c}"/>`
             + `<path d="M12 26h36" stroke="#fff" stroke-width="2.5"/>`
@@ -232,11 +249,13 @@ const ART = (() => {
             + `<circle cx="25" cy="38" r="1.6" fill="#374151"/><circle cx="35" cy="38" r="1.6" fill="#374151"/>`
             + `<path d="M30 42 l-2 2 h4 Z" fill="#f9a8d4"/></g>`),
         shamrock: (s, c = 'currentColor', o = 1) => wrap(s,
-            `<g opacity="${o}" fill="${c}"><path d="M30 28 Q20 18 26 12 Q34 14 30 28Z"/>`
-            + `<path d="M30 28 Q40 18 34 12 Q26 14 30 28Z"/>`
-            + `<path d="M30 28 Q18 30 20 40 Q30 38 30 28Z"/>`
-            + `<path d="M30 28 Q42 30 40 40 Q30 38 30 28Z"/>`
-            + `<path d="M30 28 Q29 42 32 52" stroke="${c}" stroke-width="2.5" fill="none"/></g>`),
+            `<g opacity="${o}" fill="${c}">`
+            // Three heart-shaped leaves meeting at the centre (28,30), + a stem.
+            // Each leaf is a heart drawn small and rotated into place.
+            + `<path d="M28 30 C20 20 12 24 16 15 C19 9 27 11 28 22 C29 11 37 9 40 15 C44 24 36 20 28 30Z" transform="translate(2 -8)"/>`
+            + `<path d="M28 30 C18 30 14 38 20 44 C25 49 30 44 28 34 C26 44 20 48 14 43 C9 38 13 30 24 30Z" transform="translate(-6 2)"/>`
+            + `<path d="M28 30 C38 30 42 38 36 44 C31 49 26 44 28 34 C30 44 36 48 42 43 C47 38 43 30 32 30Z" transform="translate(6 2)"/>`
+            + `<path d="M28 32 Q30 46 34 54" stroke="${c}" stroke-width="2.5" fill="none" stroke-linecap="round"/></g>`),
         rainbow: (s, c = 'currentColor', o = 1) => wrap(s,
             `<g opacity="${o}" fill="none" stroke-width="4">`
             + `<path d="M8 46 a22 22 0 0 1 44 0" stroke="#dc2626"/>`
