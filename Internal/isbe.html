@@ -1841,8 +1841,8 @@ const COLUMNS = [
        Results Shared (PICC PI10.H) is NOT an admin column: it is a teacher requirement
        captured in the report-card pills on the classroom card, so it does not appear on
        this admin sheet. */
-    { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment', docForm: 'familyAssessment', programs: ['PI'], title: 'PICC PI6.A - published, research-based Family Centered Assessment conducted within 6 months of enrollment (LSP, Baby TALK, FROG).' },
-    { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan', docForm: 'familyGoalPlan', programs: ['PI'], title: 'PICC PI6.B - Individual Family Goal Plan developed within 6 months of enrollment and updated annually thereafter.' },
+    { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASQ)</span>', docForm: 'familyAssessment', programs: ['PI','PFA'], title: 'PICC PI6.A - published, research-based Family Centered Assessment conducted within 6 months of enrollment (LSP, Baby TALK, FROG).' },
+    { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASE)</span>', docForm: 'familyGoalPlan', programs: ['PI','PFA'], title: 'PICC PI6.B - Individual Family Goal Plan developed within 6 months of enrollment and updated annually thereafter.' },
     { field: 'TransitionPlan', label: 'Transition<br>Plan', docForm: 'transitionPlan', programs: ['PI'], title: 'PICC PI7.A - written individualized Transition Plan so children and families experience a seamless transition of services.' },
     { field: 'Referral', label: 'Referral', docForm: 'referral', programs: ['PI'], title: 'PICC PI7.B and PI10.I - referral to community resources when needed, and referral for further evaluation when a screening flags a concern.' },
     /* "Remove from SIS" was dropped from the roster on request — it is an end-of-year
