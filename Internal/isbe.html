@@ -3721,6 +3721,23 @@ const PI_FY27_MONITORING = {
     monitor: 'The Vander Weele Group, LLC (contracted by IDEC)',
     contact: 'DEC.EarlyChi@Illinois.gov',
     notifiedVia: 'primary contact on the EUNA PI application',
+    /* Assigned monitoring schedule, per Kaye Viecelli's email of 24 Sep 2026.
+       These are the actionable dates — the broad grant window above is the
+       regulatory frame; these are when our visit actually happens. The order of
+       `schedule` is the order they occur, so the banner can show the next step. */
+    coordinator: 'Kaye Viecelli, Vander Weele Group — kaye@vanderweelegroup.net · 872/250-0349',
+    schedule: [
+        { date: '2027-01-04', label: 'Virtual Preparation meeting', detail: '9:00 AM via TEAMS. They demo how to upload PICC + PIQET docs to SharePoint and send the secure SharePoint folder link. The enrollment spreadsheet is emailed before this meeting.' },
+        { date: '2027-01-04', label: 'SharePoint upload window opens', detail: 'Organize and upload all required PICC/PIQET documentation. If anything cannot be submitted virtually, notify them BEFORE the window starts.' },
+        { date: '2027-01-08', label: 'SharePoint upload window closes', detail: 'Access is removed at end of day 1/8/27. Everything submittable virtually must be uploaded by then.' },
+        { date: '2027-01-20', label: 'Exit Site Visit (in person)', detail: 'At 2980 IMBS Station Rd, Millstadt. They select remaining child/family files to upload and review outstanding documentation — a final chance to submit. Exact arrival time set after the prep meeting.' },
+    ],
+    // Observations/interviews that float across the window rather than a fixed date.
+    floating: [
+        { name: 'ITERS-3 observation', detail: 'Officially any open day from the prep meeting (1/4) to the exit visit (1/20), with NO advance notice. In practice at the last monitoring visit they did it on the exit-visit day and drew the classroom to observe at random — so expect it on 1/20, but have every classroom observation-ready beforehand.' },
+        { name: 'PIQET-3 supervisor interview', detail: 'Virtual at an arranged time before the exit visit, or in person during it.' },
+        { name: 'Anonymous staff surveys', detail: 'Emailed to staff during the monitoring window.' },
+    ],
     // The PICC assesses compliance against these four sources.
     basis: [
         '23 Ill. Admin. Code Part 2050',
@@ -4261,20 +4278,51 @@ function renderPIMonitoringBanner() {
     el.style.display = 'block';
 
     const m = PI_FY27_MONITORING;
-    // Days remaining in the monitoring window; the visit can land any time inside it.
+    const today = new Date();
+    const fmtDate = iso => {
+        const d = new Date(iso + 'T00:00:00');
+        return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    // The next assigned milestone still ahead of us, and how many days until it.
+    const upcoming = (m.schedule || []).filter(s => new Date(s.date + 'T00:00:00') >= today);
+    const next = upcoming[0] || null;
+    const daysToNext = next ? Math.ceil((new Date(next.date + 'T00:00:00') - today) / 86400000) : null;
+    // Days remaining in the broad grant window (regulatory frame).
     const end = new Date('2027-05-31');
-    const daysLeft = Math.ceil((end - new Date()) / 86400000);
+    const daysLeft = Math.ceil((end - today) / 86400000);
 
     el.innerHTML = `
         <div style="border-left:4px solid #2563eb;background:#eff6ff;border-radius:0 8px 8px 0;padding:14px 18px;margin-bottom:18px;">
             <div style="font-size:0.85rem;font-weight:800;color:#1e3a8a;margin-bottom:6px;">
-                FY27 PI Monitoring Visit — window is open
+                FY27 PI Monitoring Visit — dates assigned
             </div>
+            ${next ? `<div style="font-size:0.78rem;font-weight:700;color:#b45309;margin-bottom:8px;">
+                Next: ${next.label} — ${fmtDate(next.date)}${daysToNext >= 0 ? ` (${daysToNext === 0 ? 'today' : daysToNext + ' day' + (daysToNext === 1 ? '' : 's') + ' away'})` : ''}
+            </div>` : ''}
             <div style="font-size:0.75rem;color:#334155;line-height:1.6;">
-                <strong>Window:</strong> ${m.window}${daysLeft > 0 ? ` · <span style="color:#b45309;font-weight:700;">${daysLeft} days remain</span>` : ''}<br>
                 <strong>Monitor:</strong> ${m.monitor}<br>
+                <strong>Coordinator:</strong> ${m.coordinator}<br>
+                <strong>Grant window:</strong> ${m.window}${daysLeft > 0 ? ` · ${daysLeft} days remain` : ''}<br>
                 <strong>Questions:</strong> ${m.contact} · notified via ${m.notifiedVia}
             </div>
+            <div style="margin-top:12px;">
+                <div style="font-size:0.74rem;font-weight:700;color:#1e3a8a;margin-bottom:6px;">Assigned schedule</div>
+                <ul style="margin:0 0 0 2px;padding:0;list-style:none;font-size:0.72rem;color:#334155;line-height:1.5;">
+                    ${m.schedule.map(s => {
+                        const past = new Date(s.date + 'T00:00:00') < today;
+                        return `<li style="margin-bottom:7px;padding-left:10px;border-left:2px solid ${past ? '#cbd5e1' : '#2563eb'};${past ? 'opacity:0.6;' : ''}">
+                            <strong>${fmtDate(s.date)} — ${s.label}</strong>
+                            <div style="color:#64748b;">${s.detail}</div>
+                        </li>`;
+                    }).join('')}
+                </ul>
+            </div>
+            <details style="margin-top:10px;">
+                <summary style="font-size:0.74rem;font-weight:700;color:#1e3a8a;cursor:pointer;">Observations &amp; interviews during the window (${m.floating.length})</summary>
+                <ul style="margin:8px 0 0 18px;padding:0;font-size:0.72rem;color:#475569;line-height:1.6;">
+                    ${m.floating.map(f => `<li style="margin-bottom:6px;"><strong>${f.name}</strong><div style="color:#64748b;">${f.detail}</div></li>`).join('')}
+                </ul>
+            </details>
             <div style="font-size:0.72rem;color:#334155;margin-top:10px;">
                 <strong>PICC assesses compliance against:</strong> ${m.basis.join(' · ')}
             </div>
