@@ -2260,6 +2260,57 @@ function cellClass(student, field) {
     return st === 'form' ? 'cf-form' : st === 'tick-only' ? 'cf-tick-only' : '';
 }
 
+/* Resolve the saved file (PDF or scan) behind an "on file" pill, so clicking the
+   pill opens the actual document a monitor would review.
+
+   Two sources, in order:
+     1. A signed-form PDF: /api/child-signed-form files the whole form as a PDF and
+        records its RelPath in ChildSignatures (loaded into `signatures`). Either
+        role (staff/parent) points at the same PDF, so the first found wins.
+     2. An uploaded scan: report cards, parent questionnaires and scanned interview
+        forms are tracked by ChildForms.fileFor(field, kind) with a relPath.
+   Returns { rel, name } or null when nothing resolvable is on file (e.g. a PFA tick
+   whose evidence is the physical folder, not a file here). */
+function childFormFileRel(student, field) {
+    const id = student.Id;
+    // 1. Signed-form PDF via the signatures index (staff first, then parent).
+    for (const role of ['staff', 'parent']) {
+        const sig = (typeof signatureFor === 'function') ? signatureFor(id, field, role) : null;
+        if (sig && sig.RelPath) {
+            return { rel: sig.RelPath, name: (sig.RelPath.split('/').pop() || 'document') };
+        }
+    }
+    // 2. Uploaded scan, by the kinds each field can carry.
+    if (window.ChildForms && ChildForms.fileFor) {
+        const KINDS = {
+            MidYearReport: ['report'], EndYearReport: ['report'],
+            BegASQ: ['testsheet', 'questionnaire'], EndASQ: ['testsheet', 'questionnaire'],
+            BegASE: ['testsheet', 'questionnaire'], EndASE: ['testsheet', 'questionnaire'],
+            ParentInterview: ['interviewform']
+        };
+        for (const kind of (KINDS[field] || [])) {
+            const f = ChildForms.fileFor(id, field, kind);
+            if (f && f.relPath) return { rel: f.relPath, name: f.name || (f.relPath.split('/').pop() || 'document') };
+        }
+    }
+    return null;
+}
+
+/* An "on file" pill that opens the saved document when we can resolve its path, and
+   is a plain non-clickable pill otherwise. `label` is the pill text (✓ on file / ✓
+   done). Preview in a new tab via the same openDoc() plumbing the child drawer uses. */
+function onFilePill(student, field, label, tip) {
+    const file = childFormFileRel(student, field);
+    const safeTip = (tip || 'On file').replace(/"/g, '&quot;');
+    if (file) {
+        const openTip = safeTip + ' Click to open the saved document.';
+        return '<a class="cf-pill" href="#" title="' + openTip + '"'
+            + ' onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.rel).replace(/'/g, "\\'")
+            + '\',\'' + escapeHtml(file.name).replace(/'/g, "\\'") + '\',true)">' + label + '</a>';
+    }
+    return '<span class="cf-pill" title="' + safeTip + '">' + label + '</span>';
+}
+
 /* Teacher columns are now completed entirely in the staff portal's My Classroom card,
    so the roster shows them read-only: a green "on file" pill ONLY when the child has
    real evidence for that item (state 'form'), and nothing otherwise. No checkbox, no
@@ -2274,11 +2325,11 @@ function teacherPill(student, field, extra) {
     if (st === 'form') {
         const d = ChildForms.formDate(student.Id, field);
         const tip = 'On file' + (d ? ', dated ' + d : '') + '. Entered by the teacher in the classroom card.';
-        return '<span class="cf-pill" title="' + tip.replace(/"/g, '&quot;') + '">\u2713 on file</span>'
-            + (extra || '');
+        return onFilePill(student, field, '\u2713 on file', tip) + (extra || '');
     }
     if (st === 'tick') {
-        return '<span class="cf-pill" title="Checked off by the teacher. For PFA the evidence lives in the child\u2019s physical folder.">\u2713 done</span>'
+        return onFilePill(student, field, '\u2713 done',
+            'Checked off by the teacher. For PFA the evidence lives in the child\u2019s physical folder.')
             + (extra || '');
     }
     if (st === 'partial') {
@@ -2514,7 +2565,8 @@ function renderRoster() {
                     !!(trackingData[s.Id] || {})[f]) === 'form';
                 const label = f === 'TransitionPlan' ? 'Transition plan' : 'Referral';
                 const cell = done
-                    ? '<span class="cf-pill" title="' + label + ' is on file \u2014 filled out in Child Files (Administrative).">\u2713 on file</span>'
+                    ? onFilePill(s, f, '\u2713 on file',
+                        label + ' is on file \u2014 filled out in Child Files (Administrative).')
                     : '<span class="cf-pill" style="opacity:0.6;" title="Not on file yet. Fill it out in Child Files (Administrative).">not on file</span>';
                 return '<td class="' + ('cf-doc' + divide).trim() + '">' + cell + '</td>';
             }
