@@ -316,7 +316,6 @@
         .pi-repeat .pi-rowdel { background:none;border:none;color:#b91c1c;cursor:pointer;font-size:1rem;padding:0 6px;line-height:1; }
         .pi-repeat-add { margin-top:6px;font-size:0.76rem;font-weight:600;color:#2563eb;background:none;border:1px dashed #93c5fd;border-radius:6px;padding:6px 12px;cursor:pointer; }
         .pi-prefilled input, .pi-prefilled textarea, .pi-prefilled select { background:#f0f7ff; }
-        .pi-followup { margin-top:6px; }
         /* Which checklist item this form satisfies, so staff can trace it back to the PICC */
         .doc-picc { font-size:0.74rem;color:#374151;background:#f8fafc;border-left:3px solid #2563eb;padding:10px 12px;border-radius:0 6px 6px 0;margin-bottom:16px;line-height:1.5; }
         .doc-picc strong { color:#1d4ed8; }
@@ -1310,7 +1309,6 @@ async function setSchoolYear(year) {
     } catch (e) {
         console.error('Failed to load data for ' + year, e);
     }
-    updateFollowUpCount();
     refreshActiveView();
 }
 /* ── Signatures ────────────────────────────────────────────────────────────
@@ -1523,7 +1521,6 @@ async function init() {
         } catch (e) { /* summary is additive; roster still works without it */ }
         // Update counts
         updateRosterCount();
-        updateFollowUpCount();
         /* Deep link. Accepts the new ?program=PFA|PI and ?view=roster|compliance|
            childFiles, and still understands the OLD merged strings
            (?view=PFA, pfaCompliance, piChildFiles, …) so existing bookmarks keep working. */
@@ -1565,16 +1562,15 @@ function refreshActiveView() {
     if (activeView === 'roster') renderRoster();
     else if (activeView === 'childFiles') renderChildFilesGrid(activeProgram);
     else if (activeView === 'compliance') loadCompliance(activeProgram === 'PFA' ? 'pfaCompliance' : 'piCompliance');
-    updateFollowUpCount();
 }
 
-/* Program (PFA/PI) and view (roster/compliance/childFiles/followUp/startYear) are now
+/* Program (PFA/PI) and view (roster/compliance/childFiles) are now
    two independent axes instead of one merged string. activeProgram stays STRICTLY
    'PFA'/'PI' (onRoster, visibleColumns, libraryHref, the reload branches all depend on
    that); activeView says which panel is on screen. The old setProgram('pfaCompliance')
    style calls are gone — the PFA⇄PI toggle sets the program, the sidebar buttons set the
    view, and both re-render through renderActiveView(). */
-let activeView = 'roster';   // roster | compliance | childFiles | followUp | startYear
+let activeView = 'roster';   // roster | compliance | childFiles
 
 // The PFA⇄PI toggle. Keeps whatever view is open, just flips which program it shows.
 function setProgramProgram(p) {
@@ -1651,36 +1647,6 @@ function renderActiveView() {
     }
 }
 
-// Every screening across PFA/PI that flagged a concern or monitoring zone.
-function collectFollowUps() {
-    const out = [];
-    students
-        .filter(s => (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') && (s.Active === 'Yes' || s.Active === 'YES'))
-        .forEach(s => {
-            const recs = screeningData[s.Id] || {};
-            Object.keys(recs).forEach(key => {
-                const r = recs[key];
-                if (r.Flag !== 'concern' && r.Flag !== 'monitor') return;
-                out.push({ student: s, key: key, rec: r });
-            });
-        });
-    // Concerns first, then unreferred before referred, then by child name.
-    return out.sort((a, b) => {
-        if (a.rec.Flag !== b.rec.Flag) return a.rec.Flag === 'concern' ? -1 : 1;
-        const ar = String(a.rec.ReferralMade).toLowerCase() === 'yes' ? 1 : 0;
-        const br = String(b.rec.ReferralMade).toLowerCase() === 'yes' ? 1 : 0;
-        if (ar !== br) return ar - br;
-        return sortByName(a.student, b.student);
-    });
-}
-
-function updateFollowUpCount() {
-    const items = collectFollowUps();
-    const open = items.filter(i => String(i.rec.ReferralMade).toLowerCase() !== 'yes').length;
-    const el = document.getElementById('followUpCount');
-    if (el) el.textContent = items.length ? (open + ' need action') : 'none open';
-}
-
 // The Roster button's count now reflects the ACTIVE program (the PFA⇄PI toggle), since
 // there is one Roster button instead of separate PFA/PI ones.
 function updateRosterCount() {
@@ -1689,43 +1655,6 @@ function updateRosterCount() {
     const n = students.filter(s => s.PFA_PI_na === activeProgram
         && (s.Active === 'Yes' || s.Active === 'YES')).length;
     el.textContent = n + ' students';
-}
-
-function renderFollowUp() {
-    const body = document.getElementById('followUpBody');
-    if (!body) return;   // The Screening Follow-Up panel was removed.
-    const items = collectFollowUps();
-    if (!items.length) {
-        body.innerHTML = '<p style="color:#16a34a;font-weight:600;font-size:0.9rem;">No screening concerns recorded. '
-            + 'Note this only reflects screenings that have been entered with scores.</p>';
-        return;
-    }
-    body.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
-        <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb;">
-            <th style="padding:8px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#64748b;">Student</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#64748b;">Program</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#64748b;">Screening</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#64748b;">Date</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#64748b;">Result</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#64748b;">Referral</th>
-            <th style="padding:8px 10px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#64748b;">Open</th>
-        </tr></thead>
-        <tbody>${items.map(i => {
-            const [type, period] = i.key.split('|');
-            const referred = String(i.rec.ReferralMade).toLowerCase() === 'yes';
-            return `<tr style="border-bottom:1px solid #f3f4f6;">
-                <td style="padding:7px 10px;font-weight:600;">${i.student.Last_Name}, ${i.student.First_Name}</td>
-                <td style="padding:7px 10px;color:#64748b;">${i.student.PFA_PI_na}</td>
-                <td style="padding:7px 10px;">${type} <span style="color:#94a3b8;">(${period})</span></td>
-                <td style="padding:7px 10px;">${shortDate(i.rec.ScreeningDate) || '—'}</td>
-                <td style="padding:7px 10px;"><span class="scr-flag ${i.rec.Flag}">${i.rec.Flag === 'concern' ? 'concern' : 'monitor'}</span></td>
-                <td style="padding:7px 10px;">${referred
-                    ? '<span class="scr-flag referred">referred</span>'
-                    : '<span style="color:#b91c1c;font-weight:700;font-size:0.72rem;">not documented</span>'}</td>
-                <td style="padding:7px 10px;text-align:center;"><a href="#" style="font-size:0.68rem;color:#2563eb;text-decoration:none;font-weight:700;" onclick="event.preventDefault();openScreening(${i.student.Id},'${type}','${period}')">[form]</a></td>
-            </tr>`;
-        }).join('')}</tbody>
-    </table>`;
 }
 
 /* Roster checklist columns.
@@ -3968,8 +3897,7 @@ const PICC_ITEMS = [
             'I. Children identified with concerns referred for further evaluation'
         ],
         childFields: ['PermissionSlip', 'BegASQ', 'BegASE', 'ScreeningResultsShared'],
-        guidance: 'More than one tool may be needed for a comprehensive screening; ASQ-3 plus ASQ:SE-2 together satisfy it. Permission forms are valid July 1 to June 30 and must exist for every child screened. The results-shared documentation needs seven components: child name, tool used, evidence shared, shared with whom, date screened, date shared, and screener name.',
-        followUpLink: true
+        guidance: 'More than one tool may be needed for a comprehensive screening; ASQ-3 plus ASQ:SE-2 together satisfy it. Permission forms are valid July 1 to June 30 and must exist for every child screened. The results-shared documentation needs seven components: child name, tool used, evidence shared, shared with whom, date screened, date shared, and screener name.'
     }
 ];
 
