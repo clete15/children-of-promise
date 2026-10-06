@@ -464,12 +464,15 @@ function rosterPanel(roomName) {
             ${inner}
         </div>`;
 
-    return `<div class="at-rosters">
-        ${card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-               'No children currently in this room.', {})}
-        ${card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-               'No children seated here.', { markNew: actualNames })}
-    </div>`;
+    // Show only the roster for the current view: Actual shows the Actual card alone;
+    // Projected shows the Projected card (its row accents still compare against Actual).
+    const cards = view === 'projected'
+        ? card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
+               'No children seated here.', { markNew: actualNames })
+        : card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
+               'No children currently in this room.', {});
+
+    return `<div class="at-rosters">${cards}</div>`;
 }
 
 /* Fetch a single view's data (cached per view). The actual view also pulls its per-room
