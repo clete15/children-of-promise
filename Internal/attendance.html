@@ -257,15 +257,19 @@ function renderSidebar() {
         const note = view === 'projected'
             ? `Capacity ${cap}${over ? ' · ' + over + ' over' : ''}`
             : `Capacity ${cap} &middot; ${enrolled} enrolled`;
-        // PI/PFA count line, in BOTH views. Actual = PI/PFA children currently in the room.
+        // Program count line, in BOTH views. Actual = PI/PFA children currently in the room.
         // Projected = where they'd land once the whole waiting list is seated. Green when the
         // room itself is a PI or PFA room (those children belong there); red otherwise
         // (INCCRA or n/a), flagging a PI/PFA child sitting in a room that isn't theirs.
+        // The LABEL names the room's own program — "PI" or "PFA" — rather than the generic
+        // "PI/PFA", so the sidebar reads e.g. "3 PI" or "15 PFA". A room that is neither
+        // (INCCRA / n/a) but holds such children keeps the generic "PI/PFA" red flag.
         let badge = '';
         if (r.pfaPi > 0) {
             const roomIsPfaPi = (r.type === 'PI' || r.type === 'PFA');
             const color = roomIsPfaPi ? 'var(--sp-good-fg, #16a34a)' : 'var(--sp-bad-fg, #dc2626)';
-            badge = `<div class="at-room-cap" style="color:${color};font-weight:700;">${r.pfaPi} PI/PFA</div>`;
+            const label = roomIsPfaPi ? r.type : 'PI/PFA';
+            badge = `<div class="at-room-cap" style="color:${color};font-weight:700;">${r.pfaPi} ${label}</div>`;
         }
         return `<button id="atRoom${i}" onclick="showRoom(${i})">
             <div>${esc(r.room)}</div>
