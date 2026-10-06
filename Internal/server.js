@@ -8931,7 +8931,7 @@ ELSE
             enrolledChildren: `SELECT e.Id, e.First_Name, e.Last_Name, ISNULL(CONVERT(NVARCHAR(10),e.Birth_date,120),'') AS BirthDate, ISNULL(e.Days_Old,0) AS DaysOld, ISNULL(e.RoomNumber,0) AS RoomNumber, ISNULL(e.Monday,0) AS Mon, ISNULL(e.Tuesday,0) AS Tue, ISNULL(e.Wednesday,0) AS Wed, ISNULL(e.Thursday,0) AS Thu, ISNULL(e.Friday,0) AS Fri, ISNULL(e.PFA_PI_na,'') AS Program, ISNULL(CONVERT(NVARCHAR(10),e.Start_Date,120),'') AS StartDate FROM rptMasterEnrollment e WHERE e.Active='Yes' OR e.Active='YES'`,
             // One row per PENDING waiting-list child: age, the program applied for, and the
             // days requested. The projection seats these alongside the enrolled children.
-            waitlistChildren: `SELECT p.Id, ISNULL(p.ChildName,'') AS ChildName, ISNULL(CONVERT(NVARCHAR(10),p.ChildBirthDate,120),'') AS BirthDate, ISNULL(p.AgeGroup,'') AS AgeGroup, ISNULL(p.DaysRequested,'') AS DaysRequested, ISNULL(CAST(p.Score AS NVARCHAR),'') AS Score FROM PreEnrollment p WHERE ISNULL(p.WaitlistStatus,'Pending') NOT IN ('Enrolled','Declined')`,
+            waitlistChildren: `SELECT p.Id, ISNULL(p.ChildName,'') AS ChildName, ISNULL(CONVERT(NVARCHAR(10),p.ChildBirthDate,120),'') AS BirthDate, ISNULL(p.AgeGroup,'') AS AgeGroup, ISNULL(p.DaysRequested,'') AS DaysRequested, ISNULL(CAST(p.Score AS NVARCHAR),'') AS Score, ISNULL(CONVERT(NVARCHAR(10),p.ChildStartDate,120),'') AS StartDate FROM PreEnrollment p WHERE ISNULL(p.WaitlistStatus,'Pending') NOT IN ('Enrolled','Declined')`,
         };
         /* Each query below is a separate synchronous sqlcmd.exe spawn, and this handler
            runs them serially on the single Node thread — so a caller that needs only one

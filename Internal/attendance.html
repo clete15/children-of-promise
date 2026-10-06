@@ -84,12 +84,18 @@
         /* No internal scroll — the whole roster is shown. */
         .at-rscroll { overflow:visible; }
 
-        /* ── The table itself — compact ── */
+        /* ── The roster table — compact and calm ── */
         .at-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.8rem; }
         .at-table thead th {
             background:var(--sp-surface-2);
             font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.03em;
-            color:var(--sp-quiet);padding:6px 3px;border-bottom:1px solid var(--sp-border);
+            color:var(--sp-quiet);padding:7px 3px;border-bottom:1px solid var(--sp-border);
+        }
+        /* The weekday header is the key to reading the grid, so give it emphasis: an accent
+           tint band and accent-coloured day letters set it apart from the Child column. */
+        .at-table thead th.at-tc-day {
+            background:var(--sp-accent-soft);color:var(--sp-accent);font-size:0.64rem;
+            border-bottom:2px solid var(--sp-accent);
         }
         .at-table th.at-tc-name, .at-table td.at-tc-name { text-align:left;padding-left:12px; }
         .at-table th.at-tc-day,  .at-table td.at-tc-day  { text-align:center;width:26px; }
@@ -102,8 +108,7 @@
         .at-tc-name .nm { font-weight:700;font-size:0.82rem; }
         .at-tc-name .ag { font-weight:600;color:var(--sp-muted);font-size:0.68rem;margin-top:1px;font-variant-numeric:tabular-nums; }
 
-        /* Weekday mark: a plain "1" on days the child is in the room, blank otherwise.
-           Quiet by design — no chips, so a full grid doesn't read as busy. */
+        /* Weekday mark: a plain "1" on days the child is in the room, blank otherwise. */
         .at-on { font-weight:700;color:var(--sp-text);font-size:0.78rem; }
 
         /* Row accents: moved in (green left edge) / couldn't seat (red left edge). */
@@ -113,44 +118,65 @@
         .at-table tbody tr.at-overflow td.at-tc-name .nm { color:var(--sp-bad-fg); }
         .at-table tbody tr.at-overflow td.at-tc-name .ag::after { content:' · no seat';color:var(--sp-bad-fg);font-weight:700; }
 
-        /* Totals footer. */
+        /* Totals footer — a strong rule across the top sets it apart, and the per-day
+           counts are bold. The total is its own standout number. */
         .at-table tfoot td {
-            background:var(--sp-surface-2);padding:7px 3px;border-top:2px solid var(--sp-border);
-            font-weight:800;font-size:0.72rem;color:var(--sp-text);font-variant-numeric:tabular-nums;text-align:center;
+            background:var(--sp-surface-2);padding:9px 3px 10px;
+            border-top:2px solid var(--sp-text-2);
+            font-weight:800;font-size:0.82rem;color:var(--sp-text);font-variant-numeric:tabular-nums;text-align:center;
         }
-        .at-table tfoot td.at-tc-name { padding-left:12px;text-align:left;color:var(--sp-text-2);text-transform:uppercase;letter-spacing:0.03em;font-size:0.62rem; }
+        .at-table tfoot td.at-tc-name { padding-left:12px;text-align:left;color:var(--sp-text-2);text-transform:uppercase;letter-spacing:0.04em;font-size:0.64rem;font-weight:800; }
         .at-table tfoot td.at-dtot.over { color:var(--sp-bad-fg); }
 
         .at-roster-empty { font-size:0.82rem;color:var(--sp-muted);padding:20px 14px;text-align:center; }
 
-        /* ── Roster filter (beside the Projected card) ────────────────────────
-           Each enrolled child with their room + start date and a checkbox. Unticking
-           a child re-runs the projection without them. */
+        /* ── Waiting-list filter (beside the Projected card) ──────────────────
+           Each waiting-list child: first name, target room, requested start date, and a
+           checkbox. Ticking seats them in the projection. */
         .at-filter {
             display:flex;flex-direction:column;
             background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:12px;overflow:hidden;
+            box-shadow:0 1px 2px rgba(0,0,0,0.04);
         }
         .at-filter-head {
             display:flex;align-items:center;justify-content:space-between;gap:8px;
-            padding:11px 14px;border-bottom:1px solid var(--sp-border);background:var(--sp-surface-2);
+            padding:12px 14px;border-bottom:1px solid var(--sp-border);
+            background:linear-gradient(var(--sp-surface-2),var(--sp-surface));
         }
-        .at-filter-title { font-size:0.82rem;font-weight:800;color:var(--sp-text); }
-        .at-filter-sub { font-size:0.68rem;color:var(--sp-muted);padding:7px 14px 2px; }
+        .at-filter-title { font-size:0.86rem;font-weight:800;color:var(--sp-text);letter-spacing:0.01em; }
+        /* How many of the waiting list are currently seated, as a pill. */
+        .at-filter-count {
+            font-size:0.68rem;font-weight:800;color:var(--sp-accent);background:var(--sp-accent-soft);
+            border:1px solid var(--sp-accent);border-radius:999px;padding:2px 9px;font-variant-numeric:tabular-nums;
+        }
+        .at-filter-sub {
+            font-size:0.68rem;color:var(--sp-muted);padding:8px 14px;
+            border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;gap:8px;
+        }
         .at-filter-reset {
-            font-size:0.66rem;font-weight:700;color:var(--sp-accent);background:none;border:none;cursor:pointer;padding:2px 4px;
+            font-size:0.66rem;font-weight:800;color:var(--sp-accent);background:none;border:none;cursor:pointer;
+            padding:2px 4px;white-space:nowrap;
         }
         .at-filter-reset:hover { text-decoration:underline; }
-        .at-filter-list { list-style:none;margin:0;padding:6px; }
+        .at-filter-list { list-style:none;margin:0;padding:6px;overflow-y:auto; }
         .at-filter-item {
-            display:flex;align-items:flex-start;gap:9px;padding:6px 8px;border-radius:7px;cursor:pointer;
+            display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:9px;cursor:pointer;
+            transition:background 0.1s;
         }
-        .at-filter-item:hover { background:var(--sp-surface-2); }
-        .at-filter-item input { margin-top:2px;accent-color:var(--sp-accent);width:15px;height:15px;flex-shrink:0;cursor:pointer; }
+        .at-filter-item:hover { background:var(--sp-accent-soft); }
+        .at-filter-item input {
+            margin:0;accent-color:var(--sp-accent);width:16px;height:16px;flex-shrink:0;cursor:pointer;
+        }
+        /* An unticked child recedes: struck name, dimmed meta — clearly "not in the projection". */
+        .at-filter-item.off { opacity:0.6; }
         .at-filter-item.off .at-filter-name { text-decoration:line-through;color:var(--sp-quiet); }
-        .at-filter-body { min-width:0;line-height:1.25; }
-        .at-filter-name { font-size:0.8rem;font-weight:700;color:var(--sp-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
-        .at-filter-meta { font-size:0.66rem;color:var(--sp-muted);margin-top:1px; }
-        .at-filter-empty { font-size:0.8rem;color:var(--sp-muted);padding:16px 14px;text-align:center; }
+        .at-filter-body { min-width:0;line-height:1.3; }
+        .at-filter-name { font-size:0.84rem;font-weight:700;color:var(--sp-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .at-filter-meta { font-size:0.68rem;color:var(--sp-muted);margin-top:2px;display:flex;align-items:center;gap:6px;white-space:nowrap; }
+        /* The target room reads as a quiet tag; the dot separates it from the start date. */
+        .at-filter-room { font-weight:700;color:var(--sp-text-2); }
+        .at-filter-dot { color:var(--sp-quiet); }
+        .at-filter-empty { font-size:0.8rem;color:var(--sp-muted);padding:18px 14px;text-align:center; }
     </style>
 </head>
 <body>
@@ -478,7 +504,7 @@ function rosterPanel(roomName) {
         const dayTotals = td.map(v => `<td class="at-dtot${capNum != null && v > capNum ? ' over' : ''}">${v}</td>`).join('');
         const table = `<div class="at-rscroll"><table class="at-table">
             <thead><tr><th class="at-tc-name">Child</th>
-                <th class="at-tc-day">M</th><th class="at-tc-day">T</th><th class="at-tc-day">W</th><th class="at-tc-day">T</th><th class="at-tc-day">F</th></tr></thead>
+                <th class="at-tc-day">M</th><th class="at-tc-day">T</th><th class="at-tc-day">W</th><th class="at-tc-day">Th</th><th class="at-tc-day">F</th></tr></thead>
             <tbody>${body}</tbody>
             <tfoot><tr><td class="at-tc-name">Per day \u00b7 ${list.length} total</td>${dayTotals}</tr></tfoot>
         </table></div>`;
@@ -527,21 +553,26 @@ function renderFilter() {
         </div>`;
         return;
     }
+    const seated = waitlistAll.length - excludedIds.size;
     const items = waitlistAll.map(c => {
         const off = excludedIds.has(c.id);
+        const start = c.startDate ? fmtDate(c.startDate) : '\u2014';
         return `<li class="at-filter-item${off ? ' off' : ''}">
             <input type="checkbox" ${off ? '' : 'checked'} onchange="toggleChild('${c.id}', this.checked)">
             <span class="at-filter-body">
                 <span class="at-filter-name">${esc(c.name)}</span>
-                <span class="at-filter-meta">${esc(fmtAge(c.birthDate, c.ageDays))}${c.group ? ' \u00b7 ' + esc(c.group) : ''}</span>
+                <span class="at-filter-meta"><span class="at-filter-room">${esc(c.room || '\u2014')}</span><span class="at-filter-dot">\u00b7</span>starts ${esc(start)}</span>
             </span>
         </li>`;
     }).join('');
     const resetBtn = excludedIds.size
         ? '<button type="button" class="at-filter-reset" onclick="resetFilter()">Show all</button>' : '';
     box.innerHTML = `<div class="at-filter">
-        <div class="at-filter-head"><span class="at-filter-title">Waiting list</span>${resetBtn}</div>
-        <div class="at-filter-sub">Tick to seat a child in the projection.</div>
+        <div class="at-filter-head">
+            <span class="at-filter-title">Waiting list</span>
+            <span class="at-filter-count">${seated}/${waitlistAll.length}</span>
+        </div>
+        <div class="at-filter-sub">Tick a child to seat them in the projection.${resetBtn}</div>
         <ul class="at-filter-list">${items}</ul>
     </div>`;
 }
@@ -598,16 +629,24 @@ async function fetchProjected() {
     }
 }
 
-/* The waiting-list rows -> stable filter entries. Columns: [Id, ChildName, BirthDate,
-   AgeGroup, DaysRequested, Score]. Youngest-first to match the projection's lens. */
+/* The waiting-list rows -> stable filter entries. Columns:
+   [Id, ChildName, BirthDate, AgeGroup, DaysRequested, Score, StartDate].
+   Youngest-first to match the projection's lens. The target ROOM is derived from the
+   age group the family applied for (a waitlist child has no assigned room yet). */
 function waitlistFromRows(rows) {
-    const AGE_LABEL = { '0-2': 'Infant / Toddler', '2-3': '2 Year Old', '3-5': 'Pre-School (PFA)', 'ba': 'Before & After' };
+    const AGE_ROOM = { '0-2': 'Infant / Toddler', '2-3': '2 Year Old', '3-5': 'Pre-School', 'ba': 'Before & After' };
+    // First name only; junk/placeholder names ("na", "unknown", blank) show as "??".
+    const firstName = raw => {
+        const first = String(raw || '').trim().split(/\s+/)[0] || '';
+        return /^(na|n\/a|unknown|unk|\?+)$/i.test(first) || !first ? '\u2047' : first;  // ⁇
+    };
     return (rows || []).map(r => ({
         id: 'w' + (parseInt(r[0], 10) || 0),
-        name: (r[1] || '').trim() || 'Waiting-list child',
+        name: firstName(r[1]),
         birthDate: String(r[2] || '').trim(),
         ageDays: (function () { const t = Date.parse(String(r[2] || '').trim()); return isNaN(t) ? Infinity : Math.floor((Date.now() - t) / 86400000); })(),
-        group: AGE_LABEL[String(r[3] || '').trim()] || (r[3] || ''),
+        room: AGE_ROOM[String(r[3] || '').trim()] || (r[3] || '\u2014'),
+        startDate: String(r[6] || '').trim(),
     })).sort((a, b) => (a.ageDays || 0) - (b.ageDays || 0));
 }
 
