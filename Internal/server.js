@@ -4011,21 +4011,27 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             type: roomByNum[n].type,
             occupancy: [0, 0, 0, 0, 0], overflow: [0, 0, 0, 0, 0], pfaPi: [0, 0, 0, 0, 0],
             // The children this room holds across the week, for the roster comparison. A
-            // child is added once (the first day it lands here); a child who never fits any
-            // room is recorded on the last room with overflow:true so it is still visible.
-            roster: [], _seen: new Set(),
+            // The children this room holds, each with the days they occupied THIS room.
+            // _byKid maps the child object -> its roster entry so we can accumulate the
+            // specific days it was seated here (not the child's global attendance pattern —
+            // a child can be seated in a different room on a day this room is full).
+            roster: [], _byKid: new Map(),
         }));
         if (!chain.length) return chain;
-        // Push a child into a room's roster at most once (keyed by object identity).
-        const addToRoster = (room, k, overflow) => {
-            if (room._seen.has(k)) return;
-            room._seen.add(k);
-            room.roster.push({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
-                               source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow,
-                               // The weekday pattern this child attends ([Mon..Fri] 0/1), so the
-                               // UI can show that a weekly roster of N can still be ≤ capacity on
-                               // any single day — a part-time child only occupies a seat some days.
-                               days: (k.days || [1, 1, 1, 1, 1]).map(x => x ? 1 : 0) });
+        // Record that child k occupied THIS room on day d. The entry's `days` is therefore
+        // the days the child is actually in this room, so the per-day peak the UI computes
+        // from it can never exceed the room's seated occupancy for that day.
+        const markInRoom = (room, k, d, overflow) => {
+            let entry = room._byKid.get(k);
+            if (!entry) {
+                entry = { name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
+                          source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow,
+                          days: [0, 0, 0, 0, 0] };
+                room._byKid.set(k, entry);
+                room.roster.push(entry);
+            }
+            entry.days[d] = 1;
+            if (overflow) entry.overflow = true;   // flagged if it ever overflowed
         };
         kids.sort((a, b) => a.age - b.age); // youngest first
         for (let d = 0; d < 5; d++) {
@@ -4044,16 +4050,16 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             kids.forEach(k => {
                 if (!k.days[d]) return; // not present this day
                 const idx = free.findIndex(f => f > 0);
-                if (idx === -1) { const last = chain[chain.length - 1]; last.overflow[d]++; addToRoster(last, k, true); return; }
+                if (idx === -1) { const last = chain[chain.length - 1]; last.overflow[d]++; markInRoom(last, k, d, true); return; }
                 free[idx]--; chain[idx].occupancy[d]++;
-                addToRoster(chain[idx], k, false);
+                markInRoom(chain[idx], k, d, false);
                 if (k.pfaPi) chain[idx].pfaPi[d]++;   // count PI/PFA kids where they land
             });
         }
-        // Sort each room's roster youngest-first and drop the internal dedupe set.
+        // Sort each room's roster youngest-first and drop the internal per-child map.
         chain.forEach(r => {
             r.roster.sort((a, b) => a.ageDays - b.ageDays);
-            delete r._seen;
+            delete r._byKid;
         });
         return chain;
     }
@@ -4067,9 +4073,15 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     // (all of them — PFA is a PI/PFA program), tracked per day so the ladder pass can add it in.
     const pfaFilledPfaPi = { [PROJ_PRESCHOOL_ROOM]: [0, 0, 0, 0, 0] };
     let pfaOverflow = [0, 0, 0, 0, 0];
-    // The PFA children actually seated in Pre-School (deduped across the week) and those who
-    // overflowed, so they appear in the Pre-School roster alongside the ladder children.
-    const pfaSeatedRoster = [], pfaOverflowRoster = [], pfaSeen = new Set();
+    // Per PFA child, the days it actually OCCUPIES Pre-School (seated) and the days it
+    // overflowed, so the Pre-School roster shows each child's true in-room days — not its
+    // global attendance — and the per-day peak the UI computes matches the seated bars.
+    const pfaRoomDays = new Map();   // kid -> { days:[5] seated here, over:[5] overflowed }
+    const pfaRoomDaysFor = k => {
+        let e = pfaRoomDays.get(k);
+        if (!e) { e = { days: [0, 0, 0, 0, 0], over: [0, 0, 0, 0, 0] }; pfaRoomDays.set(k, e); }
+        return e;
+    };
     if (preschool) {
         for (let d = 0; d < 5; d++) {
             let seated = 0, seatedPfaPi = 0;
@@ -4077,10 +4089,10 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
                 if (!k.days[d]) return;
                 if (seated < preschool.capacity) {
                     seated++; if (k.pfaPi) seatedPfaPi++;
-                    if (!pfaSeen.has(k)) { pfaSeen.add(k); pfaSeatedRoster.push(k); }
+                    pfaRoomDaysFor(k).days[d] = 1;
                 } else {
                     pfaOverflow[d]++;
-                    if (!pfaSeen.has(k)) { pfaSeen.add(k); pfaOverflowRoster.push(k); }
+                    pfaRoomDaysFor(k).over[d] = 1;
                 }
             });
             pfaFilled[PROJ_PRESCHOOL_ROOM][d] = seated;
@@ -4099,11 +4111,17 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     if (roomsOut[PROJ_PRESCHOOL_ROOM]) {
         const ps = roomsOut[PROJ_PRESCHOOL_ROOM];
         for (let d = 0; d < 5; d++) ps.overflow[d] += pfaOverflow[d];
-        const asRow = (k, overflow) => ({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
-            source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow,
-            days: (k.days || [1, 1, 1, 1, 1]).map(x => x ? 1 : 0) });
-        pfaSeatedRoster.forEach(k => ps.roster.push(asRow(k, false)));
-        pfaOverflowRoster.forEach(k => ps.roster.push(asRow(k, true)));
+        // Add each PFA child once, with the days it actually occupied Pre-School (seated days).
+        // A child seated some days and overflowed others shows its seated days and is flagged
+        // overflow; a child that only ever overflowed shows no in-room days but is listed so
+        // the capacity pressure is visible.
+        pfaRoomDays.forEach((rd, k) => {
+            const seatedDays = rd.days;
+            const everOverflowed = rd.over.some(Boolean);
+            ps.roster.push({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
+                source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: everOverflowed,
+                days: seatedDays.map(x => x ? 1 : 0) });
+        });
         ps.roster.sort((a, b) => a.ageDays - b.ageDays);
     }
     seat(PROJ_STANDALONE_ROOMS, standaloneKids).forEach(r => { roomsOut[r.roomNumber] = r; });

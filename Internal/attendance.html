@@ -368,8 +368,8 @@ function rosterPanel(roomName) {
     };
     const dayDots = c => {
         const d = c.days || [1, 1, 1, 1, 1];
-        // A full-time child (all five) gets no clutter; part-timers show their days.
-        if (d.every(x => x)) return '';
+        // Show the weekday pattern for EVERY child (full-time and part-time alike) so the
+        // days a child occupies this room are always visible and the per-day count is checkable.
         return '<span class="at-roster-days">' +
             DAY_LETTERS.map((L, i) => `<span class="at-dd${d[i] ? ' on' : ''}">${L}</span>`).join('') +
             '</span>';
