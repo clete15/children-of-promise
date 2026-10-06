@@ -77,55 +77,81 @@
         .at-cap-chip.over { background:var(--sp-bad-bg);color:var(--sp-bad-fg);border-color:var(--sp-bad-br); }
         .at-cap-chip.ok   { background:var(--sp-good-bg);color:var(--sp-good-fg);border-color:var(--sp-good-br); }
 
-        /* The scroll area so a long roster scrolls inside its own card, never the page. */
-        .at-rscroll { overflow:auto;max-height:min(60vh,520px); }
+        /* No internal scroll — the whole roster is shown. */
+        .at-rscroll { overflow:visible; }
 
-        /* ── The table itself ── */
-        .at-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.82rem; }
+        /* ── The table itself — compact ── */
+        .at-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.8rem; }
         .at-table thead th {
-            position:sticky;top:0;z-index:1;background:var(--sp-surface-2);
-            font-size:0.64rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;
-            color:var(--sp-quiet);padding:8px 6px;border-bottom:1px solid var(--sp-border);
+            background:var(--sp-surface-2);
+            font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.03em;
+            color:var(--sp-quiet);padding:6px 3px;border-bottom:1px solid var(--sp-border);
         }
-        .at-table th.at-tc-name, .at-table td.at-tc-name { text-align:left;padding-left:14px; }
-        .at-table th.at-tc-age,  .at-table td.at-tc-age  { text-align:right;padding-right:14px; }
-        .at-table th.at-tc-day,  .at-table td.at-tc-day  { text-align:center;width:34px; }
-        .at-table tbody td { padding:7px 6px;border-bottom:1px solid var(--sp-border); }
+        .at-table th.at-tc-name, .at-table td.at-tc-name { text-align:left;padding-left:12px; }
+        .at-table th.at-tc-day,  .at-table td.at-tc-day  { text-align:center;width:26px; }
+        .at-table tbody td { padding:5px 3px;border-bottom:1px solid var(--sp-border);vertical-align:middle; }
         .at-table tbody tr:last-child td { border-bottom:none; }
         .at-table tbody tr:nth-child(even) td { background:var(--sp-surface-2); }
         .at-table tbody tr:hover td { background:var(--sp-accent-soft); }
-        .at-tc-name { font-weight:700;color:var(--sp-text);white-space:nowrap; }
-        .at-tc-age { font-weight:600;color:var(--sp-muted);font-size:0.76rem;white-space:nowrap;font-variant-numeric:tabular-nums; }
+        /* Name on top, age (y/m/d) beneath — frees the Age column entirely. */
+        .at-tc-name { color:var(--sp-text);white-space:nowrap;line-height:1.2; }
+        .at-tc-name .nm { font-weight:700;font-size:0.82rem; }
+        .at-tc-name .ag { font-weight:600;color:var(--sp-muted);font-size:0.68rem;margin-top:1px;font-variant-numeric:tabular-nums; }
 
-        /* Weekday chip: a filled accent pill on days the child is in the room, a quiet
-           hollow dot on days they are not — so the attendance pattern reads at a glance. */
+        /* Weekday chip: a small filled accent square on days the child is in the room, a
+           quiet dot otherwise. Smaller than before to tighten the whole table. */
         .at-chip {
             display:inline-flex;align-items:center;justify-content:center;
-            width:24px;height:24px;border-radius:7px;font-size:0.66rem;font-weight:800;
+            width:18px;height:18px;border-radius:5px;font-size:0.58rem;font-weight:800;
         }
         .at-chip.on  { background:var(--sp-accent);color:#fff; }
         .at-chip.off { color:var(--sp-quiet); }
-        .at-chip.off::after { content:'·';font-size:1rem;line-height:0; }
+        .at-chip.off::after { content:'·';font-size:0.9rem;line-height:0; }
 
-        /* Row accents: a child the projection moved IN (green left edge), or could not
-           seat (red left edge + muted name). Kept to the name cell so the day chips stay
-           legible rather than washing the whole row in colour. */
-        .at-table tbody tr.at-moved-in td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-good-fg); color:var(--sp-good-fg); }
-        .at-table tbody tr.at-overflow td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-bad-fg); color:var(--sp-bad-fg); }
-        .at-table tbody tr.at-overflow td.at-tc-age::after { content:' · no seat';color:var(--sp-bad-fg);font-weight:700;font-size:0.66rem; }
+        /* Row accents: moved in (green left edge) / couldn't seat (red left edge). */
+        .at-table tbody tr.at-moved-in td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-good-fg); }
+        .at-table tbody tr.at-moved-in td.at-tc-name .nm { color:var(--sp-good-fg); }
+        .at-table tbody tr.at-overflow td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-bad-fg); }
+        .at-table tbody tr.at-overflow td.at-tc-name .nm { color:var(--sp-bad-fg); }
+        .at-table tbody tr.at-overflow td.at-tc-name .ag::after { content:' · no seat';color:var(--sp-bad-fg);font-weight:700; }
 
-        /* Totals footer — a distinct bar with per-day counts and the peak-vs-capacity. */
+        /* Totals footer. */
         .at-table tfoot td {
-            position:sticky;bottom:0;background:var(--sp-surface-2);
-            padding:9px 6px;border-top:2px solid var(--sp-border);
-            font-weight:800;font-size:0.74rem;color:var(--sp-text);font-variant-numeric:tabular-nums;
+            background:var(--sp-surface-2);padding:7px 3px;border-top:2px solid var(--sp-border);
+            font-weight:800;font-size:0.72rem;color:var(--sp-text);font-variant-numeric:tabular-nums;text-align:center;
         }
-        .at-table tfoot td.at-tc-name { padding-left:14px;color:var(--sp-text-2);text-transform:uppercase;letter-spacing:0.03em;font-size:0.66rem; }
-        .at-table tfoot td.at-tc-age  { padding-right:14px;text-align:right;color:var(--sp-muted);font-size:0.72rem; }
-        .at-table tfoot td.at-dtot { text-align:center;color:var(--sp-text-2); }
+        .at-table tfoot td.at-tc-name { padding-left:12px;text-align:left;color:var(--sp-text-2);text-transform:uppercase;letter-spacing:0.03em;font-size:0.62rem; }
         .at-table tfoot td.at-dtot.over { color:var(--sp-bad-fg); }
 
         .at-roster-empty { font-size:0.82rem;color:var(--sp-muted);padding:20px 14px;text-align:center; }
+
+        /* ── Roster filter (beside the Projected card) ────────────────────────
+           Each enrolled child with their room + start date and a checkbox. Unticking
+           a child re-runs the projection without them. */
+        .at-filter {
+            flex:1 1 240px;min-width:220px;display:flex;flex-direction:column;
+            background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:12px;overflow:hidden;
+        }
+        .at-filter-head {
+            display:flex;align-items:center;justify-content:space-between;gap:8px;
+            padding:11px 14px;border-bottom:1px solid var(--sp-border);background:var(--sp-surface-2);
+        }
+        .at-filter-title { font-size:0.82rem;font-weight:800;color:var(--sp-text); }
+        .at-filter-reset {
+            font-size:0.66rem;font-weight:700;color:var(--sp-accent);background:none;border:none;cursor:pointer;padding:2px 4px;
+        }
+        .at-filter-reset:hover { text-decoration:underline; }
+        .at-filter-list { list-style:none;margin:0;padding:6px; }
+        .at-filter-item {
+            display:flex;align-items:flex-start;gap:9px;padding:6px 8px;border-radius:7px;cursor:pointer;
+        }
+        .at-filter-item:hover { background:var(--sp-surface-2); }
+        .at-filter-item input { margin-top:2px;accent-color:var(--sp-accent);width:15px;height:15px;flex-shrink:0;cursor:pointer; }
+        .at-filter-item.off .at-filter-name { text-decoration:line-through;color:var(--sp-quiet); }
+        .at-filter-body { min-width:0;line-height:1.25; }
+        .at-filter-name { font-size:0.8rem;font-weight:700;color:var(--sp-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        .at-filter-meta { font-size:0.66rem;color:var(--sp-muted);margin-top:1px; }
+        .at-filter-empty { font-size:0.8rem;color:var(--sp-muted);padding:16px 14px;text-align:center; }
     </style>
 </head>
 <body>
@@ -217,6 +243,8 @@ const CHART_H = 220;
 let view = 'actual';                 // 'actual' | 'projected'
 let activeRoom = 0;
 const cache = { actual: null, projected: null };   // null = not yet loaded
+// Enrolled child Ids the roster filter has UNCHECKED — excluded from the projection.
+const excludedIds = new Set();
 
 function esc(v) {
     return String(v == null ? '' : v)
@@ -233,7 +261,7 @@ function fmtAge(birthDate, ageDays) {
     if (bd) { const t = Date.parse(bd); if (!isNaN(t)) from = new Date(t); }
     if (!from) {
         const d = parseInt(ageDays, 10);
-        if (isNaN(d) || d < 0) return '—';
+        if (isNaN(d) || d < 0) return 'unknown';
         from = new Date(Date.now() - d * 86400000);
     }
     const now = new Date();
@@ -246,8 +274,15 @@ function fmtAge(birthDate, ageDays) {
         days += prevMonth; months--;
     }
     if (months < 0) { months += 12; years--; }
-    if (years < 0) return '—';
+    if (years < 0) return 'unknown';
     return years + 'y ' + months + 'm ' + days + 'd';
+}
+
+/* "2026-01-19" -> "Jan 19, 2026". Blank/invalid -> "—". */
+function fmtDate(s) {
+    const t = Date.parse(String(s || '').trim());
+    if (isNaN(t)) return '\u2014';
+    return new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 /* Normalise both report shapes to one internal per-room row so the sidebar and chart
@@ -409,11 +444,10 @@ function rosterPanel(roomName) {
         return t;
     };
 
-    // One table row per child: name, a weekday chip per day (filled when present), and age.
-    // Row accents only: green = moved in by the projection, red = couldn't be seated.
+    // One table row per child: a two-line name cell (name over age y/m/d) then a weekday
+    // chip per day. Row accents: green = moved in by the projection, red = couldn't seat.
     const rowHtml = (c, opts) => {
         opts = opts || {};
-        // "Moved in" = seated here in the projection but NOT in the actual roster of this room.
         const movedIn = opts.markNew && !opts.markNew.has(c.name);
         const cls = [];
         if (movedIn && !c.overflow) cls.push('at-moved-in');
@@ -421,13 +455,11 @@ function rosterPanel(roomName) {
         const dayCells = (c.days || [1, 1, 1, 1, 1]).map((on, i) =>
             `<td class="at-tc-day"><span class="at-chip ${on ? 'on' : 'off'}">${on ? DAY_LETTERS[i] : ''}</span></td>`).join('');
         return `<tr class="${cls.join(' ')}">
-            <td class="at-tc-name">${esc(c.name)}</td>
+            <td class="at-tc-name"><div class="nm">${esc(c.name)}</div><div class="ag">${esc(fmtAge(c.birthDate, c.ageDays))}</div></td>
             ${dayCells}
-            <td class="at-tc-age">${esc(fmtAge(c.birthDate, c.ageDays))}</td>
         </tr>`;
     };
 
-    // A roster card: header (title + capacity chip), the scrollable table, totals footer.
     const card = (title, list, cap, present, missingMsg, opts) => {
         if (!present) return cardShell(title, '', '<div class="at-roster-empty">Loading…</div>');
         if (!list.length) return cardShell(title, '', '<div class="at-roster-empty">' + missingMsg + '</div>');
@@ -435,7 +467,6 @@ function rosterPanel(roomName) {
         const peak = Math.max(0, ...td);
         const capNum = (typeof cap === 'number' && !isNaN(cap)) ? cap : null;
         const over = capNum != null && peak > capNum;
-        // Capacity chip in the header: green within capacity, red when a day exceeds it.
         const chipCls = capNum == null ? '' : (over ? 'over' : 'ok');
         const chip = `<span class="at-cap-chip ${chipCls}">${peak}${capNum != null ? '/' + capNum : ''} peak</span>`;
         const sub = `${list.length} ${list.length === 1 ? 'child this week' : 'children this week'}`;
@@ -443,14 +474,9 @@ function rosterPanel(roomName) {
         const dayTotals = td.map(v => `<td class="at-dtot${capNum != null && v > capNum ? ' over' : ''}">${v}</td>`).join('');
         const table = `<div class="at-rscroll"><table class="at-table">
             <thead><tr><th class="at-tc-name">Child</th>
-                <th class="at-tc-day">M</th><th class="at-tc-day">T</th><th class="at-tc-day">W</th><th class="at-tc-day">T</th><th class="at-tc-day">F</th>
-                <th class="at-tc-age">Age</th></tr></thead>
+                <th class="at-tc-day">M</th><th class="at-tc-day">T</th><th class="at-tc-day">W</th><th class="at-tc-day">T</th><th class="at-tc-day">F</th></tr></thead>
             <tbody>${body}</tbody>
-            <tfoot><tr>
-                <td class="at-tc-name">Per day</td>
-                ${dayTotals}
-                <td class="at-tc-age">${list.length} total</td>
-            </tr></tfoot>
+            <tfoot><tr><td class="at-tc-name">Per day \u00b7 ${list.length} total</td>${dayTotals}</tr></tfoot>
         </table></div>`;
         return cardShell(title, chip, table, sub);
     };
@@ -464,15 +490,83 @@ function rosterPanel(roomName) {
             ${inner}
         </div>`;
 
-    // Show only the roster for the current view: Actual shows the Actual card alone;
-    // Projected shows the Projected card (its row accents still compare against Actual).
-    const cards = view === 'projected'
-        ? card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-               'No children seated here.', { markNew: actualNames })
-        : card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-               'No children currently in this room.', {});
+    // Show only the roster for the current view. The Projected view also gets the roster
+    // FILTER beside it: every enrolled child with their room + start date and a checkbox.
+    if (view === 'projected') {
+        return `<div class="at-rosters">
+            ${card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
+                   'No children seated here.', { markNew: actualNames })}
+            ${filterPanel()}
+        </div>`;
+    }
+    return `<div class="at-rosters">
+        ${card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
+               'No children currently in this room.', {})}
+    </div>`;
+}
 
-    return `<div class="at-rosters">${cards}</div>`;
+/* The roster filter: every CURRENTLY ENROLLED child (across all rooms) with their room
+   and start date, each with a checkbox. Unchecking a child excludes them from the
+   projection and re-seats the rooms. Built from the actual roster (which carries id, room
+   and startDate for every enrolled child). */
+function enrolledChildrenList() {
+    const out = [];
+    (cache.actual || []).forEach(r => (r.roster || []).forEach(c => {
+        if (c.id) out.push(c);
+    }));
+    // Youngest-first, same lens as the projection.
+    return out.sort((a, b) => (a.ageDays || 0) - (b.ageDays || 0));
+}
+
+function filterPanel() {
+    const kids = enrolledChildrenList();
+    if (!kids.length) {
+        return `<div class="at-filter">
+            <div class="at-filter-head"><span class="at-filter-title">Roster filter</span></div>
+            <div class="at-filter-empty">Loading the enrolled roster\u2026</div>
+        </div>`;
+    }
+    const items = kids.map(c => {
+        const off = excludedIds.has(c.id);
+        return `<li class="at-filter-item${off ? ' off' : ''}">
+            <input type="checkbox" ${off ? '' : 'checked'} onchange="toggleChild(${c.id}, this.checked)">
+            <span class="at-filter-body">
+                <span class="at-filter-name">${esc(c.name)}</span>
+                <span class="at-filter-meta">${esc(c.room || '\u2014')} \u00b7 starts ${esc(fmtDate(c.startDate))}</span>
+            </span>
+        </li>`;
+    }).join('');
+    const resetBtn = excludedIds.size
+        ? '<button type="button" class="at-filter-reset" onclick="resetFilter()">Reset</button>' : '';
+    return `<div class="at-filter">
+        <div class="at-filter-head"><span class="at-filter-title">Roster filter</span>${resetBtn}</div>
+        <ul class="at-filter-list">${items}</ul>
+    </div>`;
+}
+
+/* Toggle a child in/out of the projection, then re-fetch the projection and re-render
+   the open room. Debounced so dragging through several checkboxes fires one fetch. */
+let _filterTimer = null;
+function toggleChild(id, checked) {
+    id = parseInt(id, 10);
+    if (!id) return;
+    if (checked) excludedIds.delete(id); else excludedIds.add(id);
+    // Reflect the strike-through immediately without waiting for the fetch.
+    renderCurrent();
+    clearTimeout(_filterTimer);
+    _filterTimer = setTimeout(reprojectAndRender, 180);
+}
+
+function resetFilter() {
+    excludedIds.clear();
+    renderCurrent();
+    clearTimeout(_filterTimer);
+    _filterTimer = setTimeout(reprojectAndRender, 0);
+}
+
+async function reprojectAndRender() {
+    try { await fetchProjected(); } catch (e) { /* keep the last projection on error */ }
+    if (view === 'projected') renderCurrent();
 }
 
 /* Fetch a single view's data (cached per view). The actual view also pulls its per-room
@@ -484,10 +578,18 @@ async function fetchView(which) {
         const data = await res.json();
         cache.actual = actualRows(data && data.byRoomDaily, data && data.actualRoster);
     } else {
-        const res = await apiFetch('/api/reports?only=projectedAttendance');
-        const data = await res.json();
-        cache.projected = projectedRows(data && data.projectedAttendance);
+        await fetchProjected();
     }
+}
+
+/* Fetch the projection, honouring the roster filter's excluded children. Always runs
+   (not cached) so toggling a child re-seats the rooms. */
+async function fetchProjected() {
+    const ex = Array.from(excludedIds);
+    const qs = '/api/reports?only=projectedAttendance' + (ex.length ? '&excludeIds=' + ex.join(',') : '');
+    const res = await apiFetch(qs);
+    const data = await res.json();
+    cache.projected = projectedRows(data && data.projectedAttendance);
 }
 
 /* Load what the current view needs, then render. BOTH datasets are loaded because the

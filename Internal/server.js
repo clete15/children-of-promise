@@ -3936,7 +3936,7 @@ function ageInDays(birthDate, daysOldFallback) {
      { roomNumber, room, capacity,
        occupancy:[5],   // projected children seated per weekday
        overflow:[5] }   // children the ladder cannot seat (last ladder room only) */
-function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
+function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeIds) {
     if (!Array.isArray(roomRows)) return [];
 
     // Index rooms by number.
@@ -3961,11 +3961,16 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     const standaloneKids = [];  // Before & After — its own program
 
     (Array.isArray(enrolledRows) ? enrolledRows : []).forEach(e => {
+        const id = parseInt(e[0], 10) || 0;
+        // The filter can exclude specific enrolled children (e.g. "what if this child
+        // weren't here?"); an excluded child is left out of the seating entirely.
+        if (excludeIds && excludeIds.has(id)) return;
         const roomNum = parseInt(e[5], 10);
         if (!inScope.has(roomNum)) return; // in a room the projection does not cover
         const prog = String(e[11] || '').trim().toUpperCase();
         const name = ((e[1] || '') + ' ' + (e[2] || '')).trim() || 'Child';
         const kid = {
+            id: id,
             name: name,
             // Raw birth date kept so the client can show age in years/months/days; age (days)
             // is the youngest-first sort key.
@@ -4030,7 +4035,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         const markInRoom = (room, k, d, overflow) => {
             let entry = room._byKid.get(k);
             if (!entry) {
-                entry = { name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
+                entry = { id: k.id || 0, name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
                           source: k.source || 'enrolled', pfaPi: !!k.pfaPi, program: k.program || '',
                           overflow: !!overflow, days: [0, 0, 0, 0, 0] };
                 room._byKid.set(k, entry);
@@ -4161,12 +4166,16 @@ function buildActualRoster(roomRows, enrolledRows) {
         if (!byNum[num]) return; // child in a room not in the list (or unassigned)
         const prog = String(e[11] || '').trim().toUpperCase();
         byNum[num].roster.push({
+            id: parseInt(e[0], 10) || 0,
             name: (((e[1] || '') + ' ' + (e[2] || '')).trim() || 'Child'),
             birthDate: String(e[3] || '').trim(),
             ageDays: ageInDays(e[3], e[4]),
             pfaPi: (prog === 'PI' || prog === 'PFA'),
             program: (prog === 'PI' || prog === 'PFA') ? prog : '',
             days: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
+            // Room name + start date for the roster filter list.
+            room: byNum[num].room,
+            startDate: String(e[12] || '').trim(),
         });
     });
     Object.values(byNum).forEach(r => r.roster.sort((a, b) => a.ageDays - b.ageDays));
@@ -8913,7 +8922,7 @@ ELSE
             projRooms:     `SELECT r.RoomNumber, r.Room, r.DCFSCapacity, ISNULL(r.Type,'') AS Type FROM dimClassrooms r ORDER BY ${ROOM_AGE_ORDER}`,
             // One row per ACTIVE enrolled child: age (birth date), current room, and the
             // days they attend. The projection sorts these youngest-first and seats them.
-            enrolledChildren: `SELECT e.Id, e.First_Name, e.Last_Name, ISNULL(CONVERT(NVARCHAR(10),e.Birth_date,120),'') AS BirthDate, ISNULL(e.Days_Old,0) AS DaysOld, ISNULL(e.RoomNumber,0) AS RoomNumber, ISNULL(e.Monday,0) AS Mon, ISNULL(e.Tuesday,0) AS Tue, ISNULL(e.Wednesday,0) AS Wed, ISNULL(e.Thursday,0) AS Thu, ISNULL(e.Friday,0) AS Fri, ISNULL(e.PFA_PI_na,'') AS Program FROM rptMasterEnrollment e WHERE e.Active='Yes' OR e.Active='YES'`,
+            enrolledChildren: `SELECT e.Id, e.First_Name, e.Last_Name, ISNULL(CONVERT(NVARCHAR(10),e.Birth_date,120),'') AS BirthDate, ISNULL(e.Days_Old,0) AS DaysOld, ISNULL(e.RoomNumber,0) AS RoomNumber, ISNULL(e.Monday,0) AS Mon, ISNULL(e.Tuesday,0) AS Tue, ISNULL(e.Wednesday,0) AS Wed, ISNULL(e.Thursday,0) AS Thu, ISNULL(e.Friday,0) AS Fri, ISNULL(e.PFA_PI_na,'') AS Program, ISNULL(CONVERT(NVARCHAR(10),e.Start_Date,120),'') AS StartDate FROM rptMasterEnrollment e WHERE e.Active='Yes' OR e.Active='YES'`,
             // One row per PENDING waiting-list child: age, the program applied for, and the
             // days requested. The projection seats these alongside the enrolled children.
             waitlistChildren: `SELECT p.Id, ISNULL(p.ChildName,'') AS ChildName, ISNULL(CONVERT(NVARCHAR(10),p.ChildBirthDate,120),'') AS BirthDate, ISNULL(p.AgeGroup,'') AS AgeGroup, ISNULL(p.DaysRequested,'') AS DaysRequested, ISNULL(CAST(p.Score AS NVARCHAR),'') AS Score FROM PreEnrollment p WHERE ISNULL(p.WaitlistStatus,'Pending') NOT IN ('Enrolled','Declined')`,
@@ -8958,8 +8967,14 @@ ELSE
            capacity pressure the director wants to see. Done per weekday, because a child
            only occupies a seat on the days they attend/requested. */
         if (!wanted || wanted.has('projectedAttendance')) {
+            // Optional ?excludeIds=1,2,3 — enrolled children to leave OUT of the seating,
+            // so the roster filter can ask "what would the rooms look like without these?".
+            const exParam = new URLSearchParams(req.url.split('?')[1] || '').get('excludeIds');
+            const excludeIds = exParam
+                ? new Set(exParam.split(',').map(s => parseInt(s, 10)).filter(Boolean))
+                : null;
             results.projectedAttendance = buildProjectedAttendance(
-                results.projRooms, results.enrolledChildren, results.waitlistChildren);
+                results.projRooms, results.enrolledChildren, results.waitlistChildren, excludeIds);
         }
 
         /* actualRoster — one row per room (youngest-first room order, same as projRooms)
