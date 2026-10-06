@@ -4021,7 +4021,11 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             if (room._seen.has(k)) return;
             room._seen.add(k);
             room.roster.push({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
-                               source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow });
+                               source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow,
+                               // The weekday pattern this child attends ([Mon..Fri] 0/1), so the
+                               // UI can show that a weekly roster of N can still be ≤ capacity on
+                               // any single day — a part-time child only occupies a seat some days.
+                               days: (k.days || [1, 1, 1, 1, 1]).map(x => x ? 1 : 0) });
         };
         kids.sort((a, b) => a.age - b.age); // youngest first
         for (let d = 0; d < 5; d++) {
@@ -4096,7 +4100,8 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         const ps = roomsOut[PROJ_PRESCHOOL_ROOM];
         for (let d = 0; d < 5; d++) ps.overflow[d] += pfaOverflow[d];
         const asRow = (k, overflow) => ({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
-            source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow });
+            source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow,
+            days: (k.days || [1, 1, 1, 1, 1]).map(x => x ? 1 : 0) });
         pfaSeatedRoster.forEach(k => ps.roster.push(asRow(k, false)));
         pfaOverflowRoster.forEach(k => ps.roster.push(asRow(k, true)));
         ps.roster.sort((a, b) => a.ageDays - b.ageDays);
@@ -4136,6 +4141,7 @@ function buildActualRoster(roomRows, enrolledRows) {
             birthDate: String(e[3] || '').trim(),
             ageDays: ageInDays(e[3], e[4]),
             pfaPi: (prog === 'PI' || prog === 'PFA'),
+            days: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
         });
     });
     Object.values(byNum).forEach(r => r.roster.sort((a, b) => a.ageDays - b.ageDays));

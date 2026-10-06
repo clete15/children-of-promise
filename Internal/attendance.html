@@ -68,7 +68,14 @@
             padding:5px 9px;border-radius:6px;background:var(--sp-surface-2);font-size:0.8rem;
         }
         .at-roster-name { font-weight:700;color:var(--sp-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-        .at-roster-age { font-weight:600;color:var(--sp-muted);font-size:0.74rem;white-space:nowrap;flex-shrink:0; }
+        .at-roster-meta { display:flex;align-items:center;gap:7px;flex-shrink:0; }
+        .at-roster-age { font-weight:600;color:var(--sp-muted);font-size:0.74rem;white-space:nowrap; }
+        /* Per-child weekday pattern. Shown only for part-time children (a full-time child
+           has no dots), so the roster explains why N children fit a smaller per-day capacity. */
+        .at-roster-days { display:inline-flex;gap:1px; }
+        .at-dd { font-size:0.6rem;font-weight:800;width:11px;height:13px;line-height:13px;text-align:center;
+                 border-radius:2px;color:var(--sp-quiet);background:transparent; }
+        .at-dd.on { color:#fff;background:var(--sp-accent); }
         /* A child the projection moved into this room (not here in Actual): highlighted so
            the before/after difference is obvious. */
         .at-roster-item.at-moved-in { background:var(--sp-good-bg);border:1px solid var(--sp-good-br); }
@@ -349,6 +356,25 @@ function rosterPanel(roomName) {
     // Names currently in this room (actual), so the projected column can flag new arrivals.
     const actualNames = new Set(actualList.map(c => c.name));
 
+    // The seats a child occupies vary by day, so a weekly roster of N can exceed the room's
+    // per-day capacity while no single day does. Show each child's weekday pattern, and in
+    // the header show the PEAK single-day count next to the weekly total so the roster and
+    // the 8/8 bars line up ("8/day · 14 this week") instead of looking contradictory.
+    const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F'];
+    const peakDay = list => {
+        const per = [0, 0, 0, 0, 0];
+        list.forEach(c => { const d = c.days || [1, 1, 1, 1, 1]; for (let i = 0; i < 5; i++) if (d[i]) per[i]++; });
+        return Math.max(0, ...per);
+    };
+    const dayDots = c => {
+        const d = c.days || [1, 1, 1, 1, 1];
+        // A full-time child (all five) gets no clutter; part-timers show their days.
+        if (d.every(x => x)) return '';
+        return '<span class="at-roster-days">' +
+            DAY_LETTERS.map((L, i) => `<span class="at-dd${d[i] ? ' on' : ''}">${L}</span>`).join('') +
+            '</span>';
+    };
+
     const itemHtml = (c, opts) => {
         opts = opts || {};
         const cls = ['at-roster-item'];
@@ -357,13 +383,22 @@ function rosterPanel(roomName) {
         if (c.source === 'waitlist') cls.push('at-waitlist');
         return `<li class="${cls.join(' ')}">
             <span class="at-roster-name">${c.pfaPi ? '<span class="at-pip" title="PI/PFA"></span>' : ''}${esc(c.name)}</span>
-            <span class="at-roster-age">${esc(fmtAge(c.birthDate, c.ageDays))}</span>
+            <span class="at-roster-meta">${dayDots(c)}<span class="at-roster-age">${esc(fmtAge(c.birthDate, c.ageDays))}</span></span>
         </li>`;
     };
 
-    const col = (title, listHtml, count, missingMsg) => `
+    // Header count: peak day / weekly total, so it reconciles with the per-day bars.
+    const countLabel = (list, cap) => {
+        if (!list.length) return '0';
+        const peak = peakDay(list);
+        const capNum = (typeof cap === 'number' && !isNaN(cap)) ? cap : null;
+        const peakTxt = capNum != null ? peak + '/' + capNum + ' peak day' : peak + ' peak day';
+        return list.length === peak ? String(list.length) : (peakTxt + ' · ' + list.length + ' this week');
+    };
+
+    const col = (title, listHtml, countTxt, missingMsg) => `
         <div class="at-roster-col">
-            <div class="at-roster-h"><span>${title}</span><span class="at-roster-count">${count}</span></div>
+            <div class="at-roster-h"><span>${title}</span><span class="at-roster-count">${countTxt}</span></div>
             ${listHtml || '<div class="at-roster-empty">' + missingMsg + '</div>'}
         </div>`;
 
@@ -375,9 +410,9 @@ function rosterPanel(roomName) {
         : null;
 
     return `<div class="at-rosters">
-        ${col('Actual (now)', actualHtml, actual ? actualList.length : '',
+        ${col('Actual (now)', actualHtml, actual ? countLabel(actualList, actual.capacity) : '',
               actual ? 'No children currently in this room.' : 'Loading…')}
-        ${col('Projected (youngest-first)', projHtml, projected ? projList.length : '',
+        ${col('Projected (youngest-first)', projHtml, projected ? countLabel(projList, projected.capacity) : '',
               projected ? 'No children seated here.' : 'Loading…')}
     </div>`;
 }
