@@ -253,6 +253,19 @@ function projectedRows(projectedAttendance) {
 
 function rows() { return cache[view] || []; }
 
+/* The PI/PFA badge label for a room, named by the CHILDREN it holds (from the roster),
+   not the room's own program. All the PI/PFA children PI -> "PI", all PFA -> "PFA", a mix
+   (or unknown, e.g. roster not loaded) -> "PI/PFA". This is what makes an INCCRA room
+   holding 3 PI children read "3 PI". */
+function pfaPiLabel(r) {
+    const progs = new Set();
+    (r.roster || []).forEach(c => { if (c.program === 'PI' || c.program === 'PFA') progs.add(c.program); });
+    if (progs.size === 1) return progs.values().next().value;   // all one program
+    if (progs.size >= 2) return 'PI/PFA';                        // genuinely mixed
+    // No per-child program available: fall back to the room's own program when it is PI/PFA.
+    return (r.type === 'PI' || r.type === 'PFA') ? r.type : 'PI/PFA';
+}
+
 function renderSidebar() {
     const box = document.getElementById('atSidebar');
     box.innerHTML = rows().map((r, i) => {
@@ -264,18 +277,16 @@ function renderSidebar() {
         const note = view === 'projected'
             ? `Capacity ${cap}${over ? ' · ' + over + ' over' : ''}`
             : `Capacity ${cap} &middot; ${enrolled} enrolled`;
-        // Program count line, in BOTH views. Actual = PI/PFA children currently in the room.
-        // Projected = where they'd land once the whole waiting list is seated. Green when the
-        // room itself is a PI or PFA room (those children belong there); red otherwise
-        // (INCCRA or n/a), flagging a PI/PFA child sitting in a room that isn't theirs.
-        // The LABEL names the room's own program — "PI" or "PFA" — rather than the generic
-        // "PI/PFA", so the sidebar reads e.g. "3 PI" or "15 PFA". A room that is neither
-        // (INCCRA / n/a) but holds such children keeps the generic "PI/PFA" red flag.
+        // Program count line, in BOTH views. Green when the room itself is a PI or PFA room
+        // (those children belong there); red otherwise (INCCRA / n/a), flagging PI/PFA
+        // children in a room that isn't theirs. The LABEL names what the CHILDREN are, read
+        // from the roster: all PI -> "3 PI", all PFA -> "3 PFA", a mix -> "3 PI/PFA". So the
+        // Toddlers room (INCCRA) holding 3 PI children reads "3 PI", not "3 PI/PFA".
         let badge = '';
         if (r.pfaPi > 0) {
             const roomIsPfaPi = (r.type === 'PI' || r.type === 'PFA');
             const color = roomIsPfaPi ? 'var(--sp-good-fg, #16a34a)' : 'var(--sp-bad-fg, #dc2626)';
-            const label = roomIsPfaPi ? r.type : 'PI/PFA';
+            const label = pfaPiLabel(r);
             badge = `<div class="at-room-cap" style="color:${color};font-weight:700;">${r.pfaPi} ${label}</div>`;
         }
         return `<button id="atRoom${i}" onclick="showRoom(${i})">

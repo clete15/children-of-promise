@@ -3975,6 +3975,9 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             source: 'enrolled',       // where this child comes from, for the roster view
             // Whether this child counts toward a room's PI/PFA tally in the projection.
             pfaPi: (prog === 'PI' || prog === 'PFA'),
+            // The specific program ('PI' / 'PFA' / '') so the sidebar can label a room by
+            // the children it holds — e.g. 3 PI children in an INCCRA room reads "3 PI".
+            program: (prog === 'PI' || prog === 'PFA') ? prog : '',
         };
         if (PROJ_STANDALONE_ROOMS.indexOf(roomNum) !== -1) { standaloneKids.push(kid); return; }
         const isPFA = prog === 'PFA';
@@ -3994,6 +3997,9 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             days: parseRequestedDays(w[4]),
             source: 'waitlist',       // a pending pre-enrollment child, seated by requested days
             pfaPi: isPFA,
+            // A waiting-list child's only program designation is PFA (applied for '3-5'); PI
+            // is assigned at enrollment, so a non-PFA waitlist child has no program label yet.
+            program: isPFA ? 'PFA' : '',
         };
         if (group === 'ba') { standaloneKids.push(kid); return; }
         (isPFA ? pfaKids : ladderKids).push(kid);
@@ -4025,8 +4031,8 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             let entry = room._byKid.get(k);
             if (!entry) {
                 entry = { name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
-                          source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow,
-                          days: [0, 0, 0, 0, 0] };
+                          source: k.source || 'enrolled', pfaPi: !!k.pfaPi, program: k.program || '',
+                          overflow: !!overflow, days: [0, 0, 0, 0, 0] };
                 room._byKid.set(k, entry);
                 room.roster.push(entry);
             }
@@ -4119,8 +4125,8 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             const seatedDays = rd.days;
             const everOverflowed = rd.over.some(Boolean);
             ps.roster.push({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
-                source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: everOverflowed,
-                days: seatedDays.map(x => x ? 1 : 0) });
+                source: k.source || 'enrolled', pfaPi: !!k.pfaPi, program: k.program || '',
+                overflow: everOverflowed, days: seatedDays.map(x => x ? 1 : 0) });
         });
         ps.roster.sort((a, b) => a.ageDays - b.ageDays);
     }
@@ -4159,6 +4165,7 @@ function buildActualRoster(roomRows, enrolledRows) {
             birthDate: String(e[3] || '').trim(),
             ageDays: ageInDays(e[3], e[4]),
             pfaPi: (prog === 'PI' || prog === 'PFA'),
+            program: (prog === 'PI' || prog === 'PFA') ? prog : '',
             days: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
         });
     });
