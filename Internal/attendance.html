@@ -8,8 +8,12 @@
     <style>
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
         /* Left-aligned, but inset 15% from the left to match the sub-nav links above. */
-        .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px 20px 20px 15%; }
-        .at-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1320px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        /* Card on the left, the waiting-list filter (projected view only) to its right. */
+        .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;gap:18px;padding:20px 20px 20px 15%;flex-wrap:wrap; }
+        .at-wrapper { display:flex;max-height:calc(100vh - 130px);flex:1 1 auto;min-width:0;max-width:1320px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        /* The filter container beside the card; empty (and hidden) outside the projected view. */
+        #atFilter:empty { display:none; }
+        #atFilter { flex:0 0 260px;max-width:300px; }
         .at-sidebar { width:200px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
         .at-sidebar button {
             display:block;width:100%;text-align:left;padding:11px 16px;border:none;cursor:pointer;
@@ -123,7 +127,7 @@
            Each enrolled child with their room + start date and a checkbox. Unticking
            a child re-runs the projection without them. */
         .at-filter {
-            flex:1 1 240px;min-width:220px;display:flex;flex-direction:column;
+            display:flex;flex-direction:column;
             background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:12px;overflow:hidden;
         }
         .at-filter-head {
@@ -131,6 +135,7 @@
             padding:11px 14px;border-bottom:1px solid var(--sp-border);background:var(--sp-surface-2);
         }
         .at-filter-title { font-size:0.82rem;font-weight:800;color:var(--sp-text); }
+        .at-filter-sub { font-size:0.68rem;color:var(--sp-muted);padding:7px 14px 2px; }
         .at-filter-reset {
             font-size:0.66rem;font-weight:700;color:var(--sp-accent);background:none;border:none;cursor:pointer;padding:2px 4px;
         }
@@ -212,6 +217,9 @@
             </div>
         </div>
     </div>
+    <!-- The waiting-list roster filter lives OUTSIDE the attendance card, beside it. Only
+         shown in the Projected view; populated by renderFilter(). -->
+    <div id="atFilter"></div>
 </div>
 
 <script src="app.js"></script>
@@ -237,7 +245,10 @@ const CHART_H = 220;
 let view = 'actual';                 // 'actual' | 'projected'
 let activeRoom = 0;
 const cache = { actual: null, projected: null };   // null = not yet loaded
-// Enrolled child Ids the roster filter has UNCHECKED — excluded from the projection.
+// The full waiting-list roster (stable, for the filter list) — fetched once.
+// Each: { id:'w'+Id, name, birthDate, ageDays, days:[5], program }.
+let waitlistAll = null;
+// Waiting-list filter keys ('w'+Id) that are UNCHECKED — excluded from the projection.
 const excludedIds = new Set();
 
 function esc(v) {
@@ -483,76 +494,73 @@ function rosterPanel(roomName) {
             ${inner}
         </div>`;
 
-    // Show only the roster for the current view. The Projected view also gets the roster
-    // FILTER beside it: every enrolled child with their room + start date and a checkbox.
-    if (view === 'projected') {
-        return `<div class="at-rosters">
-            ${card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-                   'No children seated here.', { markNew: actualNames })}
-            ${filterPanel()}
-        </div>`;
-    }
-    return `<div class="at-rosters">
-        ${card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-               'No children currently in this room.', {})}
-    </div>`;
+    // Only the roster for the current view. The waiting-list filter is rendered SEPARATELY
+    // into #atFilter (outside this card) by renderFilter().
+    const theCard = view === 'projected'
+        ? card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
+               'No children seated here.', { markNew: actualNames })
+        : card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
+               'No children currently in this room.', {});
+    return `<div class="at-rosters">${theCard}</div>`;
 }
 
-/* The roster filter: every CURRENTLY ENROLLED child (across all rooms) with their room
-   and start date, each with a checkbox. Unchecking a child excludes them from the
-   projection and re-seats the rooms. Built from the actual roster (which carries id, room
-   and startDate for every enrolled child). */
-function enrolledChildrenList() {
-    const out = [];
-    (cache.actual || []).forEach(r => (r.roster || []).forEach(c => {
-        if (c.id) out.push(c);
-    }));
-    // Youngest-first, same lens as the projection.
-    return out.sort((a, b) => (a.ageDays || 0) - (b.ageDays || 0));
-}
+/* The waiting-list roster filter, rendered OUTSIDE the attendance card into #atFilter.
+   Every waiting-list child with their age-group, each with a checkbox. A child is seated
+   in the projection only while CHECKED; unchecking excludes them and re-seats the rooms.
+   Hidden entirely outside the projected view. */
+function renderFilter() {
+    const box = document.getElementById('atFilter');
+    if (!box) return;
+    if (view !== 'projected') { box.innerHTML = ''; return; }
 
-function filterPanel() {
-    const kids = enrolledChildrenList();
-    if (!kids.length) {
-        return `<div class="at-filter">
-            <div class="at-filter-head"><span class="at-filter-title">Roster filter</span></div>
-            <div class="at-filter-empty">Loading the enrolled roster\u2026</div>
+    if (!waitlistAll) {
+        box.innerHTML = `<div class="at-filter">
+            <div class="at-filter-head"><span class="at-filter-title">Waiting list</span></div>
+            <div class="at-filter-empty">Loading the waiting list\u2026</div>
         </div>`;
+        return;
     }
-    const items = kids.map(c => {
+    if (!waitlistAll.length) {
+        box.innerHTML = `<div class="at-filter">
+            <div class="at-filter-head"><span class="at-filter-title">Waiting list</span></div>
+            <div class="at-filter-empty">No one on the waiting list.</div>
+        </div>`;
+        return;
+    }
+    const items = waitlistAll.map(c => {
         const off = excludedIds.has(c.id);
         return `<li class="at-filter-item${off ? ' off' : ''}">
-            <input type="checkbox" ${off ? '' : 'checked'} onchange="toggleChild(${c.id}, this.checked)">
+            <input type="checkbox" ${off ? '' : 'checked'} onchange="toggleChild('${c.id}', this.checked)">
             <span class="at-filter-body">
                 <span class="at-filter-name">${esc(c.name)}</span>
-                <span class="at-filter-meta">${esc(c.room || '\u2014')} \u00b7 starts ${esc(fmtDate(c.startDate))}</span>
+                <span class="at-filter-meta">${esc(fmtAge(c.birthDate, c.ageDays))}${c.group ? ' \u00b7 ' + esc(c.group) : ''}</span>
             </span>
         </li>`;
     }).join('');
     const resetBtn = excludedIds.size
-        ? '<button type="button" class="at-filter-reset" onclick="resetFilter()">Reset</button>' : '';
-    return `<div class="at-filter">
-        <div class="at-filter-head"><span class="at-filter-title">Roster filter</span>${resetBtn}</div>
+        ? '<button type="button" class="at-filter-reset" onclick="resetFilter()">Show all</button>' : '';
+    box.innerHTML = `<div class="at-filter">
+        <div class="at-filter-head"><span class="at-filter-title">Waiting list</span>${resetBtn}</div>
+        <div class="at-filter-sub">Tick to seat a child in the projection.</div>
         <ul class="at-filter-list">${items}</ul>
     </div>`;
 }
 
-/* Toggle a child in/out of the projection, then re-fetch the projection and re-render
-   the open room. Debounced so dragging through several checkboxes fires one fetch. */
+/* Toggle a waiting-list child in/out of the projection, then re-fetch and re-render.
+   Debounced so ticking through several children fires one fetch. Keys are 'w'+Id strings. */
 let _filterTimer = null;
 function toggleChild(id, checked) {
-    id = parseInt(id, 10);
+    id = String(id);
     if (!id) return;
     if (checked) excludedIds.delete(id); else excludedIds.add(id);
-    // Reflect the strike-through immediately without waiting for the fetch.
-    renderCurrent();
+    renderFilter();   // reflect the strike-through immediately
     clearTimeout(_filterTimer);
     _filterTimer = setTimeout(reprojectAndRender, 180);
 }
 
 function resetFilter() {
     excludedIds.clear();
-    renderCurrent();
+    renderFilter();
     clearTimeout(_filterTimer);
     _filterTimer = setTimeout(reprojectAndRender, 0);
 }
@@ -576,13 +584,31 @@ async function fetchView(which) {
 }
 
 /* Fetch the projection, honouring the roster filter's excluded children. Always runs
-   (not cached) so toggling a child re-seats the rooms. */
+   (not cached) so toggling a child re-seats the rooms. Also pulls the full waiting-list
+   once, as the stable source for the filter list (so an unchecked child doesn't vanish). */
 async function fetchProjected() {
     const ex = Array.from(excludedIds);
-    const qs = '/api/reports?only=projectedAttendance' + (ex.length ? '&excludeIds=' + ex.join(',') : '');
+    const only = waitlistAll ? 'projectedAttendance' : 'projectedAttendance,waitlistChildren';
+    const qs = '/api/reports?only=' + only + (ex.length ? '&excludeIds=' + ex.join(',') : '');
     const res = await apiFetch(qs);
     const data = await res.json();
     cache.projected = projectedRows(data && data.projectedAttendance);
+    if (!waitlistAll && data && data.waitlistChildren) {
+        waitlistAll = waitlistFromRows(data.waitlistChildren);
+    }
+}
+
+/* The waiting-list rows -> stable filter entries. Columns: [Id, ChildName, BirthDate,
+   AgeGroup, DaysRequested, Score]. Youngest-first to match the projection's lens. */
+function waitlistFromRows(rows) {
+    const AGE_LABEL = { '0-2': 'Infant / Toddler', '2-3': '2 Year Old', '3-5': 'Pre-School (PFA)', 'ba': 'Before & After' };
+    return (rows || []).map(r => ({
+        id: 'w' + (parseInt(r[0], 10) || 0),
+        name: (r[1] || '').trim() || 'Waiting-list child',
+        birthDate: String(r[2] || '').trim(),
+        ageDays: (function () { const t = Date.parse(String(r[2] || '').trim()); return isNaN(t) ? Infinity : Math.floor((Date.now() - t) / 86400000); })(),
+        group: AGE_LABEL[String(r[3] || '').trim()] || (r[3] || ''),
+    })).sort((a, b) => (a.ageDays || 0) - (b.ageDays || 0));
 }
 
 /* Load what the current view needs, then render. BOTH datasets are loaded because the
@@ -613,6 +639,7 @@ function ensureOther() {
 }
 
 function renderCurrent() {
+    renderFilter();   // the waiting-list filter (shown only in the projected view)
     const list = rows();
     if (!list.length) {
         document.getElementById('atSidebar').innerHTML = '';

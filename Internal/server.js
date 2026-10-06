@@ -3962,9 +3962,10 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
 
     (Array.isArray(enrolledRows) ? enrolledRows : []).forEach(e => {
         const id = parseInt(e[0], 10) || 0;
-        // The filter can exclude specific enrolled children (e.g. "what if this child
-        // weren't here?"); an excluded child is left out of the seating entirely.
-        if (excludeIds && excludeIds.has(id)) return;
+        // Filter keys are namespaced ('e'+id enrolled, 'w'+id waitlist) so the two id
+        // spaces never collide. Enrolled children are always seated (the roster filter
+        // only toggles waitlist children), but the exclusion is honoured if ever sent.
+        if (excludeIds && excludeIds.has('e' + id)) return;
         const roomNum = parseInt(e[5], 10);
         if (!inScope.has(roomNum)) return; // in a room the projection does not cover
         const prog = String(e[11] || '').trim().toUpperCase();
@@ -3989,6 +3990,10 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         (isPFA ? pfaKids : ladderKids).push(kid);
     });
     (Array.isArray(waitlistRows) ? waitlistRows : []).forEach(w => {
+        const wid = parseInt(w[0], 10) || 0;
+        // The roster filter is a list of WAITING-LIST children; a waitlist child is seated
+        // only when their 'w'+id key is NOT excluded (i.e. the box is checked).
+        if (excludeIds && excludeIds.has('w' + wid)) return;
         const group = String(w[3] || '').trim();
         // Before & After (AgeGroup 'ba') is standalone; the Pre-School program ('3-5') is PFA
         // and goes straight to Pre-School; everything else feeds the age ladder.
@@ -3996,6 +4001,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         // preschool program ('3-5'), so only those count toward the PI/PFA tally.
         const isPFA = group === '3-5';
         const kid = {
+            id: 'w' + wid,            // namespaced key for the roster filter
             name: (String(w[1] || '').trim() || 'Waiting-list child'),
             birthDate: String(w[2] || '').trim(),
             age: ageInDays(w[2], 0),
@@ -8967,11 +8973,13 @@ ELSE
            capacity pressure the director wants to see. Done per weekday, because a child
            only occupies a seat on the days they attend/requested. */
         if (!wanted || wanted.has('projectedAttendance')) {
-            // Optional ?excludeIds=1,2,3 — enrolled children to leave OUT of the seating,
-            // so the roster filter can ask "what would the rooms look like without these?".
+            // Optional ?excludeIds=w3,w7 — children to leave OUT of the seating, so the
+            // roster filter can ask "what would the rooms look like without these?". Keys are
+            // namespaced strings ('e'+id enrolled, 'w'+id waitlist) to keep the two id spaces
+            // apart; the roster filter sends waitlist keys (unchecked = excluded).
             const exParam = new URLSearchParams(req.url.split('?')[1] || '').get('excludeIds');
             const excludeIds = exParam
-                ? new Set(exParam.split(',').map(s => parseInt(s, 10)).filter(Boolean))
+                ? new Set(exParam.split(',').map(s => s.trim()).filter(Boolean))
                 : null;
             results.projectedAttendance = buildProjectedAttendance(
                 results.projRooms, results.enrolledChildren, results.waitlistChildren, excludeIds);
