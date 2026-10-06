@@ -695,8 +695,11 @@
     a.cls-chip-done:hover { background:var(--sp-good-bg);border-color:var(--sp-good-br);color:var(--sp-good-fg); }
     .cls-dl { font-size:0.62rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px; }
     .cls-paper { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--sp-warn-bg);color:var(--sp-warn-fg);cursor:help; }
-    /* A screening with only one of its two required items: real progress, not done. */
-    .cls-chip-partial { border-style:dashed; }
+    /* A screening with only one of its two required items on file (scored summary OR
+       original test sheets, not both): real progress, not done. Bright yellow, matching
+       the admin ISBE roster's partial pill, so teacher and director see the same thing. */
+    .cls-chip-partial { background:#fef3c7;border-color:#f59e0b;color:#92400e; }
+    a.cls-chip-partial:hover { background:#fde68a;border-color:#f59e0b;color:#92400e; }
     .cls-partial { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--sp-warn-bg);color:var(--sp-warn-fg);cursor:help; }
     .cls-dl-overdue { background:var(--sp-bad-bg);color:var(--sp-bad-fg); }
     .cls-dl-due { background:var(--sp-warn-bg);color:var(--sp-warn-fg); }
