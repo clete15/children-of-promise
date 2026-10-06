@@ -1096,7 +1096,7 @@
             ? 'Required for PI children: upload the parent\u2019s completed Ages & Stages '
                 + 'questionnaire (PDF or a clear photo). The scored summary alone does not '
                 + 'complete this screening until the questionnaire is on file.'
-            : 'Optional. The scored summary above completes the screening on its own. If a '
+            : 'Optional. The scored summary below completes the screening on its own. If a '
                 + 'parent completed an Ages & Stages questionnaire, you can attach the scan or a '
                 + 'clear photo (PDF or image) to keep it in the child\u2019s folder \u2014 but it '
                 + 'is not required.';
@@ -1588,6 +1588,15 @@
         '<div class="pi-field"><label>Age at Screening</label><div class="pi-value" id="scrAge"></div></div></div>',
         '<div class="pi-grid" style="margin-top:10px;"><div class="pi-field"><label>Screening Type</label><div class="pi-value" id="scrType"></div></div>',
         '<div class="pi-field"><label>Period</label><div class="pi-value" id="scrPeriod"></div></div></div></div>',
+        // The parent-completed questionnaire sits ABOVE the score so a teacher sees the
+        // required upload before entering scores, not buried at the bottom. For a PI
+        // beginning screening it is REQUIRED, and the .scr-quest-required class gives it
+        // a bright amber callout so it is impossible to miss.
+        '<div class="pi-section" id="scrQuestSection"><h4 id="scrQuestHeading">Parent\u2019s Completed Questionnaire (optional)</h4>',
+        '<div class="doc-note" id="scrQuestNote">Optional. The scored summary below completes the screening on its own. If a parent completed an Ages &amp; Stages questionnaire, you can attach the scan or a clear photo (PDF or image) to keep it in the child\u2019s folder &mdash; but it is not required.</div>',
+        '<div class="cls-upload-row"><input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">',
+        '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload questionnaire</button>',
+        '<span id="scrQuestStatus" class="cls-upload-status"></span></div></div>',
         '<div class="pi-section" id="scrASQDomains"><h4>ASQ-3 Domain Scores</h4>',
         '<p style="font-size:0.72rem;color:#6b7280;margin-bottom:10px;">Enter the score for each domain (0-60). Mark cutoff status based on the scoring guide for the child\'s age interval.</p>',
         '<div class="pi-grid">',
@@ -1612,15 +1621,6 @@
         '<div class="pi-field"><label>Questionnaire Interval</label><input type="text" id="scrInterval" placeholder="e.g. 36 month, 48 month"></div>',
         '<div class="pi-field"><label>Referral Made?</label><select id="scrReferral"><option value="No">No</option><option value="Yes">Yes</option></select></div>',
         '<div class="pi-field pi-full"><label>Notes / Follow-up</label><textarea id="scrNotes" placeholder="Any concerns, referral details, follow-up actions..."></textarea></div></div></div>',
-        // Optional. The teacher-scored summary above completes the screening on its
-        // own (staff-administered). If a parent filled in a paper questionnaire, it can
-        // be scanned/photographed and attached here for the child\u2019s folder, but it
-        // is not required.
-        '<div class="pi-section" id="scrQuestSection"><h4 id="scrQuestHeading">Parent\u2019s Completed Questionnaire (optional)</h4>',
-        '<div class="doc-note" id="scrQuestNote">Optional. The scored summary above completes the screening on its own. If a parent completed an Ages &amp; Stages questionnaire, you can attach the scan or a clear photo (PDF or image) to keep it in the child\u2019s folder &mdash; but it is not required.</div>',
-        '<div class="cls-upload-row"><input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">',
-        '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload questionnaire</button>',
-        '<span id="scrQuestStatus" class="cls-upload-status"></span></div></div>',
         '<div class="pi-section"><h4>Signatures</h4>',
         '<div class="doc-note">Sign the scored summary here. Signing files a PDF of the scores into the child\u2019s folder; re-signing files a fresh copy and keeps the old one.</div>',
         '<div class="pi-grid">',
@@ -1713,6 +1713,13 @@
         '.pi-flags { display:flex;flex-wrap:wrap;gap:6px;padding:4px 0; }',
         '.pi-flag { padding:3px 9px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:0.7rem;font-weight:700;white-space:nowrap; }',
         '.doc-note { font-size:0.72rem;color:#6b7280;margin:-4px 0 10px 0;line-height:1.5; }',
+        /* The parent-questionnaire section when it is REQUIRED (PI beginning screening):
+           a bright amber callout box so a teacher cannot miss that an upload is needed
+           before the screening is complete. Only applied when scr-quest-required is set. */
+        '#scrQuestSection.scr-quest-required { background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(245,158,11,0.25); }',
+        '#scrQuestSection.scr-quest-required h4 { color:#92400e;border-bottom-color:#fde68a; }',
+        '#scrQuestSection.scr-quest-required h4::before { content:"\\26A0 ";font-size:0.95rem; }',
+        '#scrQuestSection.scr-quest-required .doc-note { color:#92400e;font-weight:600; }',
         /* Weighted eligibility criteria table — grouped sections with subtotals and
            highlighted qualifying rows. Shipped here so the modal is styled on any page
            that injects the shared modals (isbe.html defines its own inline copy). */
