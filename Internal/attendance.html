@@ -98,15 +98,9 @@
         .at-tc-name .nm { font-weight:700;font-size:0.82rem; }
         .at-tc-name .ag { font-weight:600;color:var(--sp-muted);font-size:0.68rem;margin-top:1px;font-variant-numeric:tabular-nums; }
 
-        /* Weekday chip: a small filled accent square on days the child is in the room, a
-           quiet dot otherwise. Smaller than before to tighten the whole table. */
-        .at-chip {
-            display:inline-flex;align-items:center;justify-content:center;
-            width:18px;height:18px;border-radius:5px;font-size:0.58rem;font-weight:800;
-        }
-        .at-chip.on  { background:var(--sp-accent);color:#fff; }
-        .at-chip.off { color:var(--sp-quiet); }
-        .at-chip.off::after { content:'·';font-size:0.9rem;line-height:0; }
+        /* Weekday mark: a plain "1" on days the child is in the room, blank otherwise.
+           Quiet by design — no chips, so a full grid doesn't read as busy. */
+        .at-on { font-weight:700;color:var(--sp-text);font-size:0.78rem; }
 
         /* Row accents: moved in (green left edge) / couldn't seat (red left edge). */
         .at-table tbody tr.at-moved-in td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-good-fg); }
@@ -436,7 +430,6 @@ function rosterPanel(roomName) {
     // Names currently in this room (actual), so the projected table can flag new arrivals.
     const actualNames = new Set(actualList.map(c => c.name));
 
-    const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F'];
     // Per-weekday totals across a roster — how many children occupy the room each day.
     const perDay = list => {
         const t = [0, 0, 0, 0, 0];
@@ -452,8 +445,8 @@ function rosterPanel(roomName) {
         const cls = [];
         if (movedIn && !c.overflow) cls.push('at-moved-in');
         if (c.overflow) cls.push('at-overflow');
-        const dayCells = (c.days || [1, 1, 1, 1, 1]).map((on, i) =>
-            `<td class="at-tc-day"><span class="at-chip ${on ? 'on' : 'off'}">${on ? DAY_LETTERS[i] : ''}</span></td>`).join('');
+        const dayCells = (c.days || [1, 1, 1, 1, 1]).map(on =>
+            `<td class="at-tc-day">${on ? '<span class="at-on">1</span>' : ''}</td>`).join('');
         return `<tr class="${cls.join(' ')}">
             <td class="at-tc-name"><div class="nm">${esc(c.name)}</div><div class="ag">${esc(fmtAge(c.birthDate, c.ageDays))}</div></td>
             ${dayCells}
