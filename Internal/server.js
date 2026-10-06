@@ -2278,7 +2278,52 @@ function fileChildSignedForm(d) {
         signatures.push({ role: role, label: String(s.label || ''), name: String(s.name || ''),
                           date: String(s.date || ''), jpeg: bytes });
     }
-    if (!signatures.length) return { status: 400, body: { error: 'Nothing was signed, so there is nothing to file' } };
+
+    /* Editing an already-signed form (Option A): when the caller sends NO new
+       signatures but a signed copy already exists, reuse the EXISTING signature
+       images so the regenerated PDF keeps its signatures while picking up the edited
+       content. Without this, a teacher who fixes an ASQ score without re-signing
+       updated the database but left the filed PDF showing the old scores — the record
+       and the evidence silently diverged. We reuse the stored SigImagePath JPEGs,
+       keyed by role, from the ChildSignatures rows for this (student, year, field).
+       `reusedSignatures` is set so the ChildSignatures rows are RE-POINTED at the new
+       PDF below (not inserted fresh), preserving SignedName/SignedAt. */
+    let reusedSignatures = false;
+    if (!signatures.length) {
+        const existing = runSQLRows(
+            `SELECT Role, ISNULL(SignedName,'') AS SignedName, ISNULL(SigImagePath,'') AS SigImagePath,
+                    ISNULL(CONVERT(NVARCHAR(20),SignedAt,120),'') AS SignedAt
+             FROM ChildSignatures
+             WHERE StudentId=${studentId} AND SchoolYear=${esc(year)} AND FormField=${esc(d.field)}
+               AND ISNULL(SigImagePath,'') <> ''`,
+            childSignatureEnsureSQL());
+        if (existing.ok && existing.rows.length) {
+            const DR0 = findDocRoot();
+            existing.rows.forEach(r => {
+                if (!DR0) return;
+                const abs = path.join(DR0, r.SigImagePath);
+                let jpeg = null;
+                try { if (fs.existsSync(abs)) jpeg = fs.readFileSync(abs); } catch (e) { jpeg = null; }
+                if (jpeg && jpeg.length) {
+                    signatures.push({
+                        role: r.Role === 'staff' ? 'staff' : 'parent',
+                        label: r.Role === 'staff' ? 'Staff signature' : 'Parent/Guardian signature',
+                        name: r.SignedName, date: (r.SignedAt || '').slice(0, 10), jpeg: jpeg
+                    });
+                }
+            });
+            if (signatures.length) reusedSignatures = true;
+        }
+    }
+
+    /* Normally a form is only worth filing once signed. allowUnsigned lets a caller
+       file the PDF anyway (the Parent Interview does this: the program wants a filed
+       document for every completed interview, signed on a pad or not, so there is
+       always evidence in the child's folder). With no signatures the PDF simply draws
+       its signature lines blank and no ChildSignatures rows are written. */
+    if (!signatures.length && !d.allowUnsigned) {
+        return { status: 400, body: { error: 'Nothing was signed, so there is nothing to file' } };
+    }
 
     const folder = childSubFolder(studentId, 'Teacher');
     if (folder.error) return { status: 400, body: { error: folder.error } };
@@ -2301,8 +2346,11 @@ function fileChildSignedForm(d) {
 
     const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
     const stamp = new Date().toISOString().slice(0, 10);
+    // "signed <date>" when there is a signature; "completed <date>" when filed unsigned,
+    // so the filename does not claim a signature the document does not carry.
+    const dateTag = (signatures.length ? 'signed ' : 'completed ') + stamp;
     const base = [safe(d.childName) || ('Student ' + studentId),
-                  safe(d.formTitle || d.field), year, 'signed ' + stamp].join(' - ');
+                  safe(d.formTitle || d.field), year, dateTag].join(' - ');
     let target = path.join(folder.path, base + '.pdf');
     let n = 2;
     while (fs.existsSync(target) && n < 50) { target = path.join(folder.path, base + ' (' + n + ').pdf'); n++; }

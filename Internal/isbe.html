@@ -1419,13 +1419,27 @@ function mountSigPad(hostId, studentId, field, role, opts) {
 
    Returns a list of problems rather than throwing, so a document that cannot be
    filed never makes a successful save of the form look like it failed. */
-async function fileSignedForm(studentId, field, content) {
+/* fileEvenIfUnsigned: file a PDF into the child's folder even when nobody drew a
+   signature. Default false, so forms that are only meaningful once signed (the
+   permission slip, the screening summary) behave exactly as before — no signature,
+   nothing filed. The Parent Interview passes true: the program wants a filed PDF for
+   EVERY completed interview, signed on a pad or not, so there is always a document in
+   the child's folder to upload to SharePoint. An unsigned PDF simply prints its
+   signature lines blank, the same as a printed form awaiting ink. */
+async function fileSignedForm(studentId, field, content, fileEvenIfUnsigned) {
     const drawn = Object.keys(sigPads)
         .map(k => sigPads[k])
         .filter(e => e.field === field && e.pad.drawn);
-    if (!drawn.length) return [];        // nothing new signed, nothing to file
+    if (!drawn.length && !fileEvenIfUnsigned) return [];   // nothing signed, nothing to file
 
     const student = students.find(s => String(s.Id) === String(studentId));
+    /* allowUnsigned = file a blank-signature PDF for a form that has NEVER been signed.
+       Only the Parent Interview wants that (always have a document). A screening passes
+       fileEvenIfUnsigned too, but to REFILE an already-signed one with edited scores —
+       NOT to create a blank unsigned screening PDF — so it does not set allowUnsigned.
+       The server reuses the existing signature when one exists; if none exists it reports
+       nothing to file, which we swallow quietly below. */
+    const allowUnsigned = field === 'ParentInterview';
     const payload = {
         studentId: studentId,
         year: activeSchoolYear,
@@ -1436,6 +1450,7 @@ async function fileSignedForm(studentId, field, content) {
         rows: content.rows || [],
         blocks: content.blocks || [],
         capturedOn: navigator.userAgent.slice(0, 55),
+        allowUnsigned: allowUnsigned,
         signatures: []
     };
     drawn.forEach(e => {
@@ -1448,7 +1463,8 @@ async function fileSignedForm(studentId, field, content) {
             dataUrl: url
         });
     });
-    if (!payload.signatures.length) return [];
+    // Only bail for want of a signature when the caller did not ask to file regardless.
+    if (!payload.signatures.length && !fileEvenIfUnsigned) return [];
 
     try {
         const res = await apiFetch('/api/child-signed-form', {
@@ -1456,16 +1472,35 @@ async function fileSignedForm(studentId, field, content) {
         });
         const d = await res.json();
         if (!res.ok || !d.success) {
+            /* A re-file attempt on a never-signed form (no drawn signature, nothing to
+               reuse) comes back as "nothing to file". That is not a failure — there is
+               simply no signed PDF to refresh yet — so swallow it silently when the
+               caller asked to file-if-possible rather than alarming the user. */
+            if (fileEvenIfUnsigned && !drawn.length
+                && /nothing to file/i.test((d && d.error) || '')) {
+                return [];
+            }
             drawn.forEach(e => e.pad.setStatus('\u26a0 Not filed', '#b91c1c'));
             return [(d && d.error) || 'the signed document was not filed'];
         }
-        payload.signatures.forEach(s => {
-            signatures[sigKey(studentId, field, s.role)] = {
-                StudentId: String(studentId), FormField: field, Role: s.role,
-                SignedName: s.name, RelPath: d.relPath,
+        // Record each role's signature so the roster can resolve the PDF's path. With
+        // no signatures (unsigned filing) record a path-only marker under a synthetic
+        // 'form' role so childFormFileRel still finds the filed PDF for the pill.
+        if (payload.signatures.length) {
+            payload.signatures.forEach(s => {
+                signatures[sigKey(studentId, field, s.role)] = {
+                    StudentId: String(studentId), FormField: field, Role: s.role,
+                    SignedName: s.name, RelPath: d.relPath,
+                    SignedAt: new Date().toISOString().slice(0, 10)
+                };
+            });
+        } else if (d.relPath) {
+            signatures[sigKey(studentId, field, 'staff')] = {
+                StudentId: String(studentId), FormField: field, Role: 'staff',
+                SignedName: '', RelPath: d.relPath,
                 SignedAt: new Date().toISOString().slice(0, 10)
             };
-        });
+        }
         drawn.forEach(e => e.pad.setStatus('\u2713 Filed as ' + d.name, '#166534'));
         // The PDF is a new file in the child's folder, so the drawer's count is stale.
         docIndexState = 'idle';
@@ -2913,7 +2948,7 @@ async function saveInterview() {
                 // Every answered field, grouped by section, so the filed PDF is the
                 // whole interview and not just the summary boxes.
                 blocks: interviewFormBlocks(formData)
-            });
+            }, true);   // file the PDF even when no signature was drawn on the pad
             refreshActiveView();
             if (sigProblems.length) {
                 alert('The interview was saved, but the signed copy was not filed:\n\n'
@@ -3644,10 +3679,14 @@ async function saveScreening() {
                 Flag: computeScreeningFlag(currentScrType, body),
             };
 
-            // If anything was signed, file the scored summary as a PDF into the
-            // child's folder — re-signing later files a fresh copy.
+            /* File/refresh the scored-summary PDF. Pass fileEvenIfUnsigned so that
+               EDITING an already-signed screening (Option A) re-files the PDF with the
+               new scores while the server reuses the existing signature — otherwise the
+               filed document would keep the old scores. For a never-signed screening the
+               server simply reports nothing to file, which is treated as a no-op (not an
+               error) by fileSignedForm, so a normal unsigned save stays quiet. */
             var sigProblems = await fileSignedForm(currentScrStudentId, fieldName,
-                buildScreeningContent(body));
+                buildScreeningContent(body), true);
             if (sigProblems.length) {
                 alert('The scores were saved, but the signed copy was not filed:\n\n'
                     + sigProblems.join('\n'));

@@ -319,11 +319,11 @@
         requestAnimationFrame(function () { requestAnimationFrame(doFit); });
     }
 
-    async function fileSignedForm(studentId, field, content) {
+    async function fileSignedForm(studentId, field, content, fileEvenIfUnsigned) {
         var drawn = Object.keys(sigPads)
             .map(function (k) { return sigPads[k]; })
             .filter(function (e) { return e.field === field && e.pad.drawn; });
-        if (!drawn.length) return [];
+        if (!drawn.length && !fileEvenIfUnsigned) return [];
 
         var student = students().find(function (s) { return String(s.Id) === String(studentId); });
         var payload = {
@@ -336,6 +336,9 @@
             rows: content.rows || [],
             blocks: content.blocks || [],
             capturedOn: navigator.userAgent.slice(0, 55),
+            // Only the Parent Interview files a blank-signature PDF; a screening re-file
+            // reuses the existing signature server-side (Option A) rather than filing blank.
+            allowUnsigned: field === 'ParentInterview',
             signatures: []
         };
         drawn.forEach(function (e) {
@@ -348,7 +351,7 @@
                 dataUrl: url
             });
         });
-        if (!payload.signatures.length) return [];
+        if (!payload.signatures.length && !fileEvenIfUnsigned) return [];
 
         try {
             var res = await apiFetch('/api/child-signed-form', {
@@ -356,6 +359,11 @@
             });
             var d = await res.json();
             if (!res.ok || !d.success) {
+                // Re-file of a never-signed form: nothing to refresh yet, not a failure.
+                if (fileEvenIfUnsigned && !drawn.length
+                    && /nothing to file/i.test((d && d.error) || '')) {
+                    return [];
+                }
                 drawn.forEach(function (e) { e.pad.setStatus('\u26a0 Not filed', '#b91c1c'); });
                 return [(d && d.error) || 'the signed document was not filed'];
             }
@@ -1185,11 +1193,13 @@
                     Flag: computeScreeningFlag(currentScrType, body)
                 };
 
-                /* If anything was signed, file the scored summary as a PDF into the
-                   child's folder — the same route the other forms use. Re-signing
-                   later files a fresh copy, so the scores stay editable in the app. */
+                /* File/refresh the scored-summary PDF. The `true` means: when EDITING an
+                   already-signed screening (Option A), re-file it with the corrected
+                   scores and the server reuses the existing signature, so the filed PDF
+                   never lags the record. A never-signed screening has nothing to refile,
+                   which fileSignedForm treats as a quiet no-op. */
                 var sigProblems = await fileSignedForm(currentScrStudentId, fieldName,
-                    buildScreeningContent(body));
+                    buildScreeningContent(body), true);
                 if (sigProblems.length) {
                     alert('The scores were saved, but the signed copy was not filed:\n\n'
                         + sigProblems.join('\n'));
