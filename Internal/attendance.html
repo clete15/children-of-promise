@@ -9,7 +9,7 @@
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
         /* Left-aligned, but inset 15% from the left to match the sub-nav links above. */
         .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px 20px 20px 15%; }
-        .at-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:960px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        .at-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1320px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
         .at-sidebar { width:200px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
         .at-sidebar button {
             display:block;width:100%;text-align:left;padding:11px 16px;border:none;cursor:pointer;
@@ -50,6 +50,41 @@
         .at-note { margin-top:14px;font-size:0.76rem;color:var(--sp-muted);text-align:center;line-height:1.5; }
         .at-over-flag { color:var(--sp-bad-fg);font-weight:800; }
         .at-count .at-over-n { color:var(--sp-bad-fg);font-weight:800; }
+        /* Chart + roster side by side. The chart keeps its width; the roster comparison
+           sits to its right and wraps underneath on a narrow screen. */
+        .at-split { display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap; }
+        .at-split-chart { flex:1 1 360px;min-width:320px; }
+        .at-rosters { flex:1 1 420px;min-width:300px;display:flex;gap:16px; }
+        .at-roster-col { flex:1;min-width:0; }
+        .at-roster-h {
+            font-size:0.74rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;
+            color:var(--sp-text-2);padding-bottom:6px;margin-bottom:8px;border-bottom:1px solid var(--sp-border);
+            display:flex;align-items:center;justify-content:space-between;gap:8px;
+        }
+        .at-roster-h .at-roster-count { font-weight:700;color:var(--sp-muted);font-size:0.72rem; }
+        .at-roster-list { list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:3px; }
+        .at-roster-item {
+            display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+            padding:5px 9px;border-radius:6px;background:var(--sp-surface-2);font-size:0.8rem;
+        }
+        .at-roster-name { font-weight:700;color:var(--sp-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+        .at-roster-age { font-weight:600;color:var(--sp-muted);font-size:0.74rem;white-space:nowrap;flex-shrink:0; }
+        /* A child the projection moved into this room (not here in Actual): highlighted so
+           the before/after difference is obvious. */
+        .at-roster-item.at-moved-in { background:var(--sp-good-bg);border:1px solid var(--sp-good-br); }
+        .at-roster-item.at-moved-in .at-roster-name { color:var(--sp-good-fg); }
+        /* A waiting-list child seated by the projection (not yet enrolled). */
+        .at-roster-item.at-waitlist .at-roster-name::after {
+            content:" · waitlist";font-weight:700;color:var(--sp-accent);font-size:0.68rem;
+        }
+        /* A child the projection could not seat (over capacity). */
+        .at-roster-item.at-overflow { background:var(--sp-bad-bg);border:1px solid var(--sp-bad-br); }
+        .at-roster-item.at-overflow .at-roster-name { color:var(--sp-bad-fg); }
+        .at-roster-item.at-overflow .at-roster-name::after {
+            content:" · no seat";font-weight:700;color:var(--sp-bad-fg);font-size:0.68rem;
+        }
+        .at-roster-empty { font-size:0.78rem;color:var(--sp-muted);padding:8px 4px;font-style:italic; }
+        .at-pip { display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--sp-accent);margin-right:5px;vertical-align:middle; }
     </style>
 </head>
 <body>
@@ -148,10 +183,39 @@ function esc(v) {
 }
 function n(v) { return parseInt(v, 10) || 0; }
 
+/* Age as "Ny Mm Dd" from a birth date (preferred) or a fallback age-in-days. The roster
+   compares actual vs projected ages, so the day precision matters — two children a few
+   days apart can land either side of a capacity cutoff. */
+function fmtAge(birthDate, ageDays) {
+    const bd = String(birthDate || '').trim();
+    let from = null;
+    if (bd) { const t = Date.parse(bd); if (!isNaN(t)) from = new Date(t); }
+    if (!from) {
+        const d = parseInt(ageDays, 10);
+        if (isNaN(d) || d < 0) return '—';
+        from = new Date(Date.now() - d * 86400000);
+    }
+    const now = new Date();
+    let years = now.getFullYear() - from.getFullYear();
+    let months = now.getMonth() - from.getMonth();
+    let days = now.getDate() - from.getDate();
+    if (days < 0) {
+        // Borrow days from the previous month (its own day count).
+        const prevMonth = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+        days += prevMonth; months--;
+    }
+    if (months < 0) { months += 12; years--; }
+    if (years < 0) return '—';
+    return years + 'y ' + months + 'm ' + days + 'd';
+}
+
 /* Normalise both report shapes to one internal per-room row so the sidebar and chart
    render identically regardless of view:
-     { room, capacity, counts:[5], overflow:[5] }  (overflow all-zero for the actual view) */
-function actualRows(byRoomDaily) {
+     { room, capacity, counts:[5], overflow:[5], roster:[...] } (overflow all-zero for actual) */
+function actualRows(byRoomDaily, actualRoster) {
+    // Match the per-room roster to each row by room name (both are in the same room order).
+    const rosterByRoom = {};
+    (actualRoster || []).forEach(r => { rosterByRoom[r.room] = r.roster || []; });
     // Columns: [Room, Capacity, Mon..Fri, Type, PfaPi]. Type/PfaPi drive the PI/PFA badge.
     return (byRoomDaily || []).map(r => ({
         room: r[0] || 'Unknown',
@@ -160,6 +224,7 @@ function actualRows(byRoomDaily) {
         overflow: [0, 0, 0, 0, 0],
         type: (r[7] || '').toString().trim().toUpperCase(),   // PI | PFA | INCCRA | (blank)
         pfaPi: n(r[8]),                                        // active PI/PFA kids in the room
+        roster: rosterByRoom[r[0]] || [],
     }));
 }
 function projectedRows(projectedAttendance) {
@@ -174,6 +239,7 @@ function projectedRows(projectedAttendance) {
             overflow: (r.overflow || [0, 0, 0, 0, 0]).map(n),
             type: (r.type || '').toString().trim().toUpperCase(),
             pfaPi: Math.max(0, ...pfaPiDays),
+            roster: r.roster || [],
         };
     });
 }
@@ -253,32 +319,105 @@ function showRoom(idx) {
 
     document.getElementById('atBody').innerHTML = `
         <div class="at-room-name">${esc(room)}</div>
-        <div class="at-chart" style="height:${CHART_H + 56}px;">${cols}</div>
-        ${legend}${note}`;
+        <div class="at-split">
+            <div class="at-split-chart">
+                <div class="at-chart" style="height:${CHART_H + 56}px;">${cols}</div>
+                ${legend}${note}
+            </div>
+            ${rosterPanel(room)}
+        </div>`;
 }
 
-/* Lazily fetch a view's data the first time it's shown, then render. Each view asks the
-   server for only its own report section (see /api/reports?only=). */
+/* Find a room's row (by name) in a given view's cached rows. */
+function roomInView(which, roomName) {
+    return (cache[which] || []).find(r => r.room === roomName) || null;
+}
+
+/* The side-by-side Actual vs Projected roster for one room, youngest-first, with the
+   ages that make the fill test meaningful. A child only in the projected list is a
+   "moved in"; a waiting-list child and an unseated (overflow) child are flagged too. */
+function rosterPanel(roomName) {
+    const actual = roomInView('actual', roomName);
+    const projected = roomInView('projected', roomName);
+    const actualList = (actual && actual.roster) || [];
+    const projList = (projected && projected.roster) || [];
+
+    // Names currently in this room (actual), so the projected column can flag new arrivals.
+    const actualNames = new Set(actualList.map(c => c.name));
+
+    const itemHtml = (c, opts) => {
+        opts = opts || {};
+        const cls = ['at-roster-item'];
+        if (opts.movedIn && !c.overflow) cls.push('at-moved-in');
+        if (c.overflow) cls.push('at-overflow');
+        if (c.source === 'waitlist') cls.push('at-waitlist');
+        return `<li class="${cls.join(' ')}">
+            <span class="at-roster-name">${c.pfaPi ? '<span class="at-pip" title="PI/PFA"></span>' : ''}${esc(c.name)}</span>
+            <span class="at-roster-age">${esc(fmtAge(c.birthDate, c.ageDays))}</span>
+        </li>`;
+    };
+
+    const col = (title, listHtml, count, missingMsg) => `
+        <div class="at-roster-col">
+            <div class="at-roster-h"><span>${title}</span><span class="at-roster-count">${count}</span></div>
+            ${listHtml || '<div class="at-roster-empty">' + missingMsg + '</div>'}
+        </div>`;
+
+    const actualHtml = actual
+        ? (actualList.length ? '<ul class="at-roster-list">' + actualList.map(c => itemHtml(c)).join('') + '</ul>' : '')
+        : null;
+    const projHtml = projected
+        ? (projList.length ? '<ul class="at-roster-list">' + projList.map(c => itemHtml(c, { movedIn: !actualNames.has(c.name) })).join('') + '</ul>' : '')
+        : null;
+
+    return `<div class="at-rosters">
+        ${col('Actual (now)', actualHtml, actual ? actualList.length : '',
+              actual ? 'No children currently in this room.' : 'Loading…')}
+        ${col('Projected (youngest-first)', projHtml, projected ? projList.length : '',
+              projected ? 'No children seated here.' : 'Loading…')}
+    </div>`;
+}
+
+/* Fetch a single view's data (cached per view). The actual view also pulls its per-room
+   roster; the projected rooms already carry their roster. */
+async function fetchView(which) {
+    if (cache[which]) return;
+    if (which === 'actual') {
+        const res = await apiFetch('/api/reports?only=byRoomDaily,actualRoster');
+        const data = await res.json();
+        cache.actual = actualRows(data && data.byRoomDaily, data && data.actualRoster);
+    } else {
+        const res = await apiFetch('/api/reports?only=projectedAttendance');
+        const data = await res.json();
+        cache.projected = projectedRows(data && data.projectedAttendance);
+    }
+}
+
+/* Load what the current view needs, then render. BOTH datasets are loaded because the
+   roster panel always compares actual vs projected for the selected room — the user's
+   whole point is seeing what changed. The non-active dataset failing is non-fatal: the
+   bars still render, the missing side of the roster just shows a short note. */
 async function loadView() {
     const body = document.getElementById('atBody');
-    if (cache[view]) { renderCurrent(); return; }
+    if (cache[view]) { ensureOther(); renderCurrent(); return; }
     body.innerHTML = '<div class="at-empty">Loading…</div>';
     document.getElementById('atSidebar').innerHTML = '';
     try {
-        if (view === 'actual') {
-            const res = await apiFetch('/api/reports?only=byRoomDaily');
-            const data = await res.json();
-            cache.actual = actualRows(data && data.byRoomDaily);
-        } else {
-            const res = await apiFetch('/api/reports?only=projectedAttendance');
-            const data = await res.json();
-            cache.projected = projectedRows(data && data.projectedAttendance);
-        }
+        await fetchView(view);
     } catch (e) {
         body.innerHTML = '<div class="at-empty">Could not load attendance: ' + esc(e && e.message ? e.message : e) + '</div>';
         return;
     }
     renderCurrent();
+    ensureOther();
+}
+
+/* Load the OTHER view's data in the background so the roster comparison has both sides,
+   then re-render the open room so the second column fills in when it arrives. */
+function ensureOther() {
+    const other = view === 'actual' ? 'projected' : 'actual';
+    if (cache[other]) return;
+    fetchView(other).then(() => { if (rows().length) showRoom(activeRoom); }).catch(() => {});
 }
 
 function renderCurrent() {

@@ -3964,9 +3964,15 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         const roomNum = parseInt(e[5], 10);
         if (!inScope.has(roomNum)) return; // in a room the projection does not cover
         const prog = String(e[11] || '').trim().toUpperCase();
+        const name = ((e[1] || '') + ' ' + (e[2] || '')).trim() || 'Child';
         const kid = {
+            name: name,
+            // Raw birth date kept so the client can show age in years/months/days; age (days)
+            // is the youngest-first sort key.
+            birthDate: String(e[3] || '').trim(),
             age: ageInDays(e[3], e[4]),
             days: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
+            source: 'enrolled',       // where this child comes from, for the roster view
             // Whether this child counts toward a room's PI/PFA tally in the projection.
             pfaPi: (prog === 'PI' || prog === 'PFA'),
         };
@@ -3981,7 +3987,14 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         // A waiting-list child has no PI/PFA designation yet UNLESS they applied for the PFA
         // preschool program ('3-5'), so only those count toward the PI/PFA tally.
         const isPFA = group === '3-5';
-        const kid = { age: ageInDays(w[2], 0), days: parseRequestedDays(w[4]), pfaPi: isPFA };
+        const kid = {
+            name: (String(w[1] || '').trim() || 'Waiting-list child'),
+            birthDate: String(w[2] || '').trim(),
+            age: ageInDays(w[2], 0),
+            days: parseRequestedDays(w[4]),
+            source: 'waitlist',       // a pending pre-enrollment child, seated by requested days
+            pfaPi: isPFA,
+        };
         if (group === 'ba') { standaloneKids.push(kid); return; }
         (isPFA ? pfaKids : ladderKids).push(kid);
     });
@@ -3997,8 +4010,19 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             roomNumber: n, room: roomByNum[n].room, capacity: roomByNum[n].capacity,
             type: roomByNum[n].type,
             occupancy: [0, 0, 0, 0, 0], overflow: [0, 0, 0, 0, 0], pfaPi: [0, 0, 0, 0, 0],
+            // The children this room holds across the week, for the roster comparison. A
+            // child is added once (the first day it lands here); a child who never fits any
+            // room is recorded on the last room with overflow:true so it is still visible.
+            roster: [], _seen: new Set(),
         }));
         if (!chain.length) return chain;
+        // Push a child into a room's roster at most once (keyed by object identity).
+        const addToRoster = (room, k, overflow) => {
+            if (room._seen.has(k)) return;
+            room._seen.add(k);
+            room.roster.push({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
+                               source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow });
+        };
         kids.sort((a, b) => a.age - b.age); // youngest first
         for (let d = 0; d < 5; d++) {
             // Free seats this day = capacity minus anything the PFA pass already placed here.
@@ -4016,11 +4040,17 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
             kids.forEach(k => {
                 if (!k.days[d]) return; // not present this day
                 const idx = free.findIndex(f => f > 0);
-                if (idx === -1) { chain[chain.length - 1].overflow[d]++; return; }
+                if (idx === -1) { const last = chain[chain.length - 1]; last.overflow[d]++; addToRoster(last, k, true); return; }
                 free[idx]--; chain[idx].occupancy[d]++;
+                addToRoster(chain[idx], k, false);
                 if (k.pfaPi) chain[idx].pfaPi[d]++;   // count PI/PFA kids where they land
             });
         }
+        // Sort each room's roster youngest-first and drop the internal dedupe set.
+        chain.forEach(r => {
+            r.roster.sort((a, b) => a.ageDays - b.ageDays);
+            delete r._seen;
+        });
         return chain;
     }
 
@@ -4033,12 +4063,21 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     // (all of them — PFA is a PI/PFA program), tracked per day so the ladder pass can add it in.
     const pfaFilledPfaPi = { [PROJ_PRESCHOOL_ROOM]: [0, 0, 0, 0, 0] };
     let pfaOverflow = [0, 0, 0, 0, 0];
+    // The PFA children actually seated in Pre-School (deduped across the week) and those who
+    // overflowed, so they appear in the Pre-School roster alongside the ladder children.
+    const pfaSeatedRoster = [], pfaOverflowRoster = [], pfaSeen = new Set();
     if (preschool) {
         for (let d = 0; d < 5; d++) {
             let seated = 0, seatedPfaPi = 0;
             pfaKids.forEach(k => {
                 if (!k.days[d]) return;
-                if (seated < preschool.capacity) { seated++; if (k.pfaPi) seatedPfaPi++; } else { pfaOverflow[d]++; }
+                if (seated < preschool.capacity) {
+                    seated++; if (k.pfaPi) seatedPfaPi++;
+                    if (!pfaSeen.has(k)) { pfaSeen.add(k); pfaSeatedRoster.push(k); }
+                } else {
+                    pfaOverflow[d]++;
+                    if (!pfaSeen.has(k)) { pfaSeen.add(k); pfaOverflowRoster.push(k); }
+                }
             });
             pfaFilled[PROJ_PRESCHOOL_ROOM][d] = seated;
             pfaFilledPfaPi[PROJ_PRESCHOOL_ROOM][d] = seatedPfaPi;
@@ -4051,9 +4090,16 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
     const roomsOut = {};
     // Pass 2 — the age ladder fills every room, using only the Pre-School seats PFA left free.
     seat(PROJ_LADDER_ROOMS, ladderKids, pfaFilled, pfaFilledPfaPi).forEach(r => { roomsOut[r.roomNumber] = r; });
-    // Fold PFA overflow into Pre-School's overflow (both are "couldn't be seated in Pre-School").
+    // Fold PFA overflow into Pre-School's overflow (both are "couldn't be seated in Pre-School"),
+    // and add the PFA children to the Pre-School roster so it shows everyone it holds.
     if (roomsOut[PROJ_PRESCHOOL_ROOM]) {
-        for (let d = 0; d < 5; d++) roomsOut[PROJ_PRESCHOOL_ROOM].overflow[d] += pfaOverflow[d];
+        const ps = roomsOut[PROJ_PRESCHOOL_ROOM];
+        for (let d = 0; d < 5; d++) ps.overflow[d] += pfaOverflow[d];
+        const asRow = (k, overflow) => ({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
+            source: k.source || 'enrolled', pfaPi: !!k.pfaPi, overflow: !!overflow });
+        pfaSeatedRoster.forEach(k => ps.roster.push(asRow(k, false)));
+        pfaOverflowRoster.forEach(k => ps.roster.push(asRow(k, true)));
+        ps.roster.sort((a, b) => a.ageDays - b.ageDays);
     }
     seat(PROJ_STANDALONE_ROOMS, standaloneKids).forEach(r => { roomsOut[r.roomNumber] = r; });
 
@@ -4064,6 +4110,36 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows) {
         .map(r => parseInt(r[0], 10))
         .filter(num => roomsOut[num])
         .map(num => roomsOut[num]);
+}
+
+/* Build the ACTUAL per-room roster: the children currently assigned to each room, with
+   their age, so the client can show actual-vs-projected side by side. One row per room in
+   the SAME youngest-first order the projection uses (roomRows = projRooms), each with a
+   roster:[{name, birthDate, ageDays, pfaPi}] sorted youngest-first.
+
+   roomRows     : [[RoomNumber, Room, DCFSCapacity, Type], ...]
+   enrolledRows : [[Id,First,Last,BirthDate,DaysOld,RoomNumber,Mon..Fri,Program], ...] */
+function buildActualRoster(roomRows, enrolledRows) {
+    if (!Array.isArray(roomRows)) return [];
+    const byNum = {};
+    roomRows.forEach(r => {
+        const num = parseInt(r[0], 10);
+        if (!num) return;
+        byNum[num] = { roomNumber: num, room: r[1] || ('Room ' + num), roster: [] };
+    });
+    (Array.isArray(enrolledRows) ? enrolledRows : []).forEach(e => {
+        const num = parseInt(e[5], 10);
+        if (!byNum[num]) return; // child in a room not in the list (or unassigned)
+        const prog = String(e[11] || '').trim().toUpperCase();
+        byNum[num].roster.push({
+            name: (((e[1] || '') + ' ' + (e[2] || '')).trim() || 'Child'),
+            birthDate: String(e[3] || '').trim(),
+            ageDays: ageInDays(e[3], e[4]),
+            pfaPi: (prog === 'PI' || prog === 'PFA'),
+        });
+    });
+    Object.values(byNum).forEach(r => r.roster.sort((a, b) => a.ageDays - b.ageDays));
+    return roomRows.map(r => parseInt(r[0], 10)).filter(num => byNum[num]).map(num => byNum[num]);
 }
 function sqlRows(raw, columns) {
     return sqlCells(raw).map(v => {
@@ -8826,6 +8902,11 @@ ELSE
             if (wanted.has('projectedAttendance')) {
                 wanted.add('projRooms'); wanted.add('enrolledChildren'); wanted.add('waitlistChildren');
             }
+            // actualRoster (per-room list of currently enrolled children, with ages) is
+            // derived in Node from the room list + enrolled children, like projectedAttendance.
+            if (wanted.has('actualRoster')) {
+                wanted.add('projRooms'); wanted.add('enrolledChildren');
+            }
         }
 
         const results = {};
@@ -8848,6 +8929,14 @@ ELSE
         if (!wanted || wanted.has('projectedAttendance')) {
             results.projectedAttendance = buildProjectedAttendance(
                 results.projRooms, results.enrolledChildren, results.waitlistChildren);
+        }
+
+        /* actualRoster — one row per room (youngest-first room order, same as projRooms)
+           with the children CURRENTLY assigned to that room and their age, so the client
+           can show "actual vs projected" side by side. Mirror shape to projectedAttendance's
+           roster entries: { roomNumber, room, roster:[{name, birthDate, ageDays, pfaPi}] }. */
+        if (!wanted || wanted.has('actualRoster')) {
+            results.actualRoster = buildActualRoster(results.projRooms, results.enrolledChildren);
         }
 
         return sendJSON(res, 200, results);
