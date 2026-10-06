@@ -50,47 +50,82 @@
         .at-note { margin-top:14px;font-size:0.76rem;color:var(--sp-muted);text-align:center;line-height:1.5; }
         .at-over-flag { color:var(--sp-bad-fg);font-weight:800; }
         .at-count .at-over-n { color:var(--sp-bad-fg);font-weight:800; }
-        /* Chart + roster side by side. The chart keeps its width; the roster comparison
-           sits to its right and wraps underneath on a narrow screen. */
-        .at-split { display:flex;gap:24px;align-items:flex-start;flex-wrap:wrap; }
-        .at-split-chart { flex:1 1 360px;min-width:320px; }
-        .at-rosters { flex:1 1 420px;min-width:300px;display:flex;gap:16px; }
-        .at-roster-col { flex:1;min-width:0; }
-        .at-roster-h {
-            font-size:0.74rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;
-            color:var(--sp-text-2);padding-bottom:6px;margin-bottom:8px;border-bottom:1px solid var(--sp-border);
+        /* ── Chart + roster comparison, side by side ──────────────────────────
+           The day bars keep their width on the left; the two roster panels sit to the
+           right and drop below on a narrow screen. */
+        .at-split { display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap; }
+        .at-split-chart { flex:0 0 340px;min-width:300px; }
+        .at-rosters { flex:1 1 460px;min-width:320px;display:flex;gap:18px;flex-wrap:wrap; }
+
+        /* Each roster is a self-contained card: header strip, scrollable table, footer. */
+        .at-rcard {
+            flex:1 1 300px;min-width:280px;display:flex;flex-direction:column;
+            background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:12px;
+            overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04);
         }
-        /* Roster tables: one row per child, a column per weekday, and a totals footer. */
-        .at-table { width:100%;border-collapse:collapse;font-size:0.78rem; }
-        .at-table th, .at-table td { padding:4px 6px;text-align:center;white-space:nowrap; }
+        .at-rcard-head {
+            display:flex;align-items:center;justify-content:space-between;gap:10px;
+            padding:11px 14px;border-bottom:1px solid var(--sp-border);background:var(--sp-surface-2);
+        }
+        .at-rcard-title { font-size:0.82rem;font-weight:800;color:var(--sp-text);letter-spacing:0.01em; }
+        .at-rcard-sub { font-size:0.68rem;font-weight:600;color:var(--sp-muted);margin-top:1px; }
+        /* Capacity chip in the header: neutral when within capacity, red when a day is over. */
+        .at-cap-chip {
+            font-size:0.7rem;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap;
+            background:var(--sp-pill-bg,var(--sp-surface));color:var(--sp-muted);border:1px solid var(--sp-border);
+        }
+        .at-cap-chip.over { background:var(--sp-bad-bg);color:var(--sp-bad-fg);border-color:var(--sp-bad-br); }
+        .at-cap-chip.ok   { background:var(--sp-good-bg);color:var(--sp-good-fg);border-color:var(--sp-good-br); }
+
+        /* The scroll area so a long roster scrolls inside its own card, never the page. */
+        .at-rscroll { overflow:auto;max-height:min(60vh,520px); }
+
+        /* ── The table itself ── */
+        .at-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.82rem; }
         .at-table thead th {
-            font-size:0.64rem;font-weight:800;text-transform:uppercase;letter-spacing:0.03em;
-            color:var(--sp-quiet);border-bottom:1px solid var(--sp-border);
+            position:sticky;top:0;z-index:1;background:var(--sp-surface-2);
+            font-size:0.64rem;font-weight:800;text-transform:uppercase;letter-spacing:0.04em;
+            color:var(--sp-quiet);padding:8px 6px;border-bottom:1px solid var(--sp-border);
         }
-        .at-table tbody tr { border-bottom:1px solid var(--sp-border); }
-        .at-table tbody tr:last-child { border-bottom:none; }
-        .at-tc-name { text-align:left;font-weight:700;color:var(--sp-text); }
-        .at-tc-age { text-align:right;font-weight:600;color:var(--sp-muted);font-size:0.74rem; }
-        /* Weekday cell: lit when the child is in the room that day. */
-        .at-dcell { color:var(--sp-quiet);font-size:0.62rem;font-weight:800;width:20px; }
-        .at-dcell.on { color:#fff;background:var(--sp-accent); }
-        /* Program tag + waitlist tag inline after the name. */
-        .at-prog-tag { margin-left:6px;font-size:0.6rem;font-weight:800;color:var(--sp-accent);
-            border:1px solid var(--sp-accent);border-radius:4px;padding:0 4px;vertical-align:middle; }
-        .at-wl-tag { margin-left:6px;font-size:0.6rem;font-weight:800;color:#fff;background:var(--sp-accent);
-            border-radius:4px;padding:1px 5px;vertical-align:middle;text-transform:uppercase;letter-spacing:0.03em; }
-        /* A child the projection MOVED IN (seated here but not in the actual roster): green. */
-        .at-table tr.at-moved-in td { background:var(--sp-good-bg); }
-        .at-table tr.at-moved-in .at-tc-name { color:var(--sp-good-fg); }
-        /* A child the projection could not seat (over capacity): red. */
-        .at-table tr.at-overflow td { background:var(--sp-bad-bg); }
-        .at-table tr.at-overflow .at-tc-name { color:var(--sp-bad-fg); }
-        /* Totals footer. */
-        .at-table tfoot td { border-top:2px solid var(--sp-border);font-weight:800;color:var(--sp-text);
-            font-size:0.72rem;padding-top:6px; }
-        .at-table tfoot .at-dtot { color:var(--sp-text-2); }
-        .at-table tfoot .at-dtot.over { color:var(--sp-bad-fg); }
-        .at-roster-empty { font-size:0.78rem;color:var(--sp-muted);padding:8px 4px;font-style:italic; }
+        .at-table th.at-tc-name, .at-table td.at-tc-name { text-align:left;padding-left:14px; }
+        .at-table th.at-tc-age,  .at-table td.at-tc-age  { text-align:right;padding-right:14px; }
+        .at-table th.at-tc-day,  .at-table td.at-tc-day  { text-align:center;width:34px; }
+        .at-table tbody td { padding:7px 6px;border-bottom:1px solid var(--sp-border); }
+        .at-table tbody tr:last-child td { border-bottom:none; }
+        .at-table tbody tr:nth-child(even) td { background:var(--sp-surface-2); }
+        .at-table tbody tr:hover td { background:var(--sp-accent-soft); }
+        .at-tc-name { font-weight:700;color:var(--sp-text);white-space:nowrap; }
+        .at-tc-age { font-weight:600;color:var(--sp-muted);font-size:0.76rem;white-space:nowrap;font-variant-numeric:tabular-nums; }
+
+        /* Weekday chip: a filled accent pill on days the child is in the room, a quiet
+           hollow dot on days they are not — so the attendance pattern reads at a glance. */
+        .at-chip {
+            display:inline-flex;align-items:center;justify-content:center;
+            width:24px;height:24px;border-radius:7px;font-size:0.66rem;font-weight:800;
+        }
+        .at-chip.on  { background:var(--sp-accent);color:#fff; }
+        .at-chip.off { color:var(--sp-quiet); }
+        .at-chip.off::after { content:'·';font-size:1rem;line-height:0; }
+
+        /* Row accents: a child the projection moved IN (green left edge), or could not
+           seat (red left edge + muted name). Kept to the name cell so the day chips stay
+           legible rather than washing the whole row in colour. */
+        .at-table tbody tr.at-moved-in td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-good-fg); color:var(--sp-good-fg); }
+        .at-table tbody tr.at-overflow td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-bad-fg); color:var(--sp-bad-fg); }
+        .at-table tbody tr.at-overflow td.at-tc-age::after { content:' · no seat';color:var(--sp-bad-fg);font-weight:700;font-size:0.66rem; }
+
+        /* Totals footer — a distinct bar with per-day counts and the peak-vs-capacity. */
+        .at-table tfoot td {
+            position:sticky;bottom:0;background:var(--sp-surface-2);
+            padding:9px 6px;border-top:2px solid var(--sp-border);
+            font-weight:800;font-size:0.74rem;color:var(--sp-text);font-variant-numeric:tabular-nums;
+        }
+        .at-table tfoot td.at-tc-name { padding-left:14px;color:var(--sp-text-2);text-transform:uppercase;letter-spacing:0.03em;font-size:0.66rem; }
+        .at-table tfoot td.at-tc-age  { padding-right:14px;text-align:right;color:var(--sp-muted);font-size:0.72rem; }
+        .at-table tfoot td.at-dtot { text-align:center;color:var(--sp-text-2); }
+        .at-table tfoot td.at-dtot.over { color:var(--sp-bad-fg); }
+
+        .at-roster-empty { font-size:0.82rem;color:var(--sp-muted);padding:20px 14px;text-align:center; }
     </style>
 </head>
 <body>
@@ -374,64 +409,66 @@ function rosterPanel(roomName) {
         return t;
     };
 
-    // One table row per child: name (+ program tag), a dot per weekday they're in the room,
-    // and age. Flags: green = moved in by the projection, red = couldn't be seated, and a
-    // waitlist tag for pending pre-enrollment children.
+    // One table row per child: name, a weekday chip per day (filled when present), and age.
+    // Row accents only: green = moved in by the projection, red = couldn't be seated.
     const rowHtml = (c, opts) => {
         opts = opts || {};
-        // "Moved in" = this child is seated here in the projection but is NOT in the actual
-        // roster of this room. Evaluated per child against the actual-names set.
+        // "Moved in" = seated here in the projection but NOT in the actual roster of this room.
         const movedIn = opts.markNew && !opts.markNew.has(c.name);
         const cls = [];
         if (movedIn && !c.overflow) cls.push('at-moved-in');
         if (c.overflow) cls.push('at-overflow');
-        const prog = c.program ? `<span class="at-prog-tag">${esc(c.program)}</span>` : '';
-        const wl = c.source === 'waitlist' ? '<span class="at-wl-tag">waitlist</span>' : '';
         const dayCells = (c.days || [1, 1, 1, 1, 1]).map((on, i) =>
-            `<td class="at-dcell${on ? ' on' : ''}">${on ? DAY_LETTERS[i] : ''}</td>`).join('');
+            `<td class="at-tc-day"><span class="at-chip ${on ? 'on' : 'off'}">${on ? DAY_LETTERS[i] : ''}</span></td>`).join('');
         return `<tr class="${cls.join(' ')}">
-            <td class="at-tc-name">${esc(c.name)}${prog}${wl}</td>
+            <td class="at-tc-name">${esc(c.name)}</td>
             ${dayCells}
             <td class="at-tc-age">${esc(fmtAge(c.birthDate, c.ageDays))}</td>
         </tr>`;
     };
 
-    // A full roster table with a totals footer: child count, per-day occupancy, and the
-    // peak day vs capacity so it reconciles with the N/N day bars.
-    const tableHtml = (list, cap, opts) => {
-        opts = opts || {};
+    // A roster card: header (title + capacity chip), the scrollable table, totals footer.
+    const card = (title, list, cap, present, missingMsg, opts) => {
+        if (!present) return cardShell(title, '', '<div class="at-roster-empty">Loading…</div>');
+        if (!list.length) return cardShell(title, '', '<div class="at-roster-empty">' + missingMsg + '</div>');
         const td = perDay(list);
         const peak = Math.max(0, ...td);
         const capNum = (typeof cap === 'number' && !isNaN(cap)) ? cap : null;
-        const peakTxt = capNum != null ? `${peak}/${capNum}` : String(peak);
+        const over = capNum != null && peak > capNum;
+        // Capacity chip in the header: green within capacity, red when a day exceeds it.
+        const chipCls = capNum == null ? '' : (over ? 'over' : 'ok');
+        const chip = `<span class="at-cap-chip ${chipCls}">${peak}${capNum != null ? '/' + capNum : ''} peak</span>`;
+        const sub = `${list.length} ${list.length === 1 ? 'child this week' : 'children this week'}`;
         const body = list.map(c => rowHtml(c, opts)).join('');
-        const dayTotals = td.map((v, i) =>
-            `<td class="at-dtot${capNum != null && v > capNum ? ' over' : ''}">${v}</td>`).join('');
-        return `<table class="at-table">
+        const dayTotals = td.map(v => `<td class="at-dtot${capNum != null && v > capNum ? ' over' : ''}">${v}</td>`).join('');
+        const table = `<div class="at-rscroll"><table class="at-table">
             <thead><tr><th class="at-tc-name">Child</th>
-                <th>M</th><th>T</th><th>W</th><th>T</th><th>F</th>
+                <th class="at-tc-day">M</th><th class="at-tc-day">T</th><th class="at-tc-day">W</th><th class="at-tc-day">T</th><th class="at-tc-day">F</th>
                 <th class="at-tc-age">Age</th></tr></thead>
             <tbody>${body}</tbody>
             <tfoot><tr>
-                <td class="at-tc-name">${list.length} ${list.length === 1 ? 'child' : 'children'}</td>
+                <td class="at-tc-name">Per day</td>
                 ${dayTotals}
-                <td class="at-tc-age">peak ${peakTxt}</td>
+                <td class="at-tc-age">${list.length} total</td>
             </tr></tfoot>
-        </table>`;
+        </table></div>`;
+        return cardShell(title, chip, table, sub);
     };
 
-    const panel = (title, list, cap, present, missingMsg, opts) => `
-        <div class="at-roster-col">
-            <div class="at-roster-h"><span>${title}</span></div>
-            ${!present ? '<div class="at-roster-empty">Loading…</div>'
-                : (list.length ? tableHtml(list, cap, opts) : '<div class="at-roster-empty">' + missingMsg + '</div>')}
+    const cardShell = (title, chip, inner, sub) => `
+        <div class="at-rcard">
+            <div class="at-rcard-head">
+                <div><div class="at-rcard-title">${title}</div>${sub ? '<div class="at-rcard-sub">' + sub + '</div>' : ''}</div>
+                ${chip || ''}
+            </div>
+            ${inner}
         </div>`;
 
     return `<div class="at-rosters">
-        ${panel('Actual (now)', actualList, actual && actual.capacity, !!actual,
-                'No children currently in this room.', {})}
-        ${panel('Projected (youngest-first)', projList, projected && projected.capacity, !!projected,
-                'No children seated here.', { markNew: actualNames })}
+        ${card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
+               'No children currently in this room.', {})}
+        ${card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
+               'No children seated here.', { markNew: actualNames })}
     </div>`;
 }
 
