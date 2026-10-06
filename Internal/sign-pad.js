@@ -69,6 +69,12 @@
         var strokes = [];           // points in CSS pixels, so a resize can redraw
         var currentStroke = null;
         var ratio = 1;
+        /* An on-file signature image to redraw UNDER every replay. Kept as a
+           persistent background rather than painted once, because fit()/replay()
+           clear the canvas (on modal open, resize, first touch) and would otherwise
+           wipe a signature that showExisting() had drawn a single time — the race
+           that made an on-file signature "sometimes show, sometimes not". */
+        var existingImg = null;
 
         function setStatus(text, colour) {
             status.textContent = text || '';
@@ -98,6 +104,13 @@
 
         function replay() {
             ctx.clearRect(0, 0, canvas.width / ratio, canvas.height / ratio);
+            // The on-file signature sits underneath, redrawn on every pass so a resize
+            // or refresh can never erase it. New strokes (a re-sign) layer on top.
+            if (existingImg) {
+                var cw = canvas.width / ratio, ch = canvas.height / ratio;
+                var sc = Math.min(cw / existingImg.width, ch / existingImg.height, 1);
+                ctx.drawImage(existingImg, 4, 4, existingImg.width * sc, existingImg.height * sc);
+            }
             strokes.forEach(function (stroke) {
                 if (stroke.length === 1) {
                     // A single tap is a dot, and a dot is a legitimate mark.
@@ -190,6 +203,7 @@
             strokes = [];
             currentStroke = null;
             drawn = false;
+            existingImg = null;   // drop the on-file image so the pad is a clean slate
             hint.style.display = '';
             replay();
             setStatus('');
@@ -247,17 +261,21 @@
             setStatus: setStatus,
             // Shows a signature already on file. Read-only until Clear is pressed,
             // so reopening a signed form does not invite an accidental re-signature.
-            showExisting: function (url) {
+            showExisting: function (url, onFail) {
                 strokes = [];
                 drawn = false;
                 hint.style.display = 'none';
                 var img = new Image();
                 img.onload = function () {
+                    // Store as the persistent background and redraw through replay(),
+                    // so later fit()/replay() passes keep it instead of clearing it.
+                    existingImg = img;
                     fit();
-                    var scale = Math.min(canvas.width / ratio / img.width,
-                                         canvas.height / ratio / img.height, 1);
-                    ctx.drawImage(img, 4, 4, img.width * scale, img.height * scale);
                 };
+                // A missing file or a non-image blob (e.g. a PDF handed in by mistake)
+                // never fires onload — report it rather than leave a blank pad that
+                // still claims to be signed.
+                img.onerror = function () { if (onFail) onFail(); };
                 img.src = url;
             }
         };

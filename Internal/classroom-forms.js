@@ -270,25 +270,38 @@
                             label: opts.label || '', printedName: opts.printedName || '',
                             dateField: opts.dateField || '' };
         var existing = signatureFor(studentId, field, role);
-        /* Prefer the standalone signature IMAGE (SigImagePath). RelPath is the whole
-           signed form as a PDF, and the pad draws its on-file signature into an <img>,
-           which a PDF cannot populate — so pointing the pad at RelPath left it blank.
-           Fall back to RelPath only when there is no image (older rows filed before the
-           image was kept), where it will still fail to render but does no harm. */
-        var onFileRel = (existing && existing.SigImagePath) ? existing.SigImagePath
-                      : (existing && existing.RelPath) ? existing.RelPath : '';
-        if (onFileRel) {
+        /* The standalone signature IMAGE (SigImagePath) is the only thing the pad can
+           redraw — RelPath is the whole signed form as a PDF, which an <img> cannot
+           render. We no longer fall back to RelPath for display: a PDF never loads, so
+           it left the pad blank while the status still claimed "Signed" — the confusing
+           blank-but-signed box. When there IS an image we draw it; when a row is signed
+           but has no usable image, we say so honestly and offer the filed PDF. */
+        var sigImg = (existing && existing.SigImagePath) ? existing.SigImagePath : '';
+        var signedStamp = existing && existing.SignedAt ? ' ' + existing.SignedAt.slice(0, 10) : '';
+        if (sigImg) {
             /* Fetch the on-file signature WITH credentials and hand the pad a blob URL.
                A bare <img src="/api/doc-file?..."> is a plain GET that carries no auth
                header, so the thumbnail came back Unauthorized and showed blank. */
             (function (p, rel) {
                 apiFetch('/api/doc-file?path=' + encodeURIComponent(rel))
                     .then(function (r) { return r.ok ? r.blob() : null; })
-                    .then(function (b) { if (b) p.showExisting(URL.createObjectURL(b)); })
-                    .catch(function () { /* leave the pad empty on failure */ });
-            })(pad, onFileRel);
-            pad.setStatus('Signed' + (existing.SignedAt ? ' ' + existing.SignedAt.slice(0, 10) : '')
-                + ' \u2014 press Clear to sign again', '#166534');
+                    .then(function (b) {
+                        if (b) p.showExisting(URL.createObjectURL(b), function () {
+                            p.setStatus('Signed' + signedStamp + ' \u2014 on file (open the filed copy to view). '
+                                + 'Press Clear to sign again.', '#166534');
+                        });
+                        else p.setStatus('Signed' + signedStamp + ' \u2014 on file. Press Clear to sign again.', '#166534');
+                    })
+                    .catch(function () {
+                        p.setStatus('Signed' + signedStamp + ' \u2014 on file. Press Clear to sign again.', '#166534');
+                    });
+            })(pad, sigImg);
+            pad.setStatus('Signed' + signedStamp + ' \u2014 press Clear to sign again', '#166534');
+        } else if (existing && existing.SignedAt) {
+            // Signed (there's a dated row) but no drawn image to redisplay — an older
+            // row filed before the signature image was kept. Be honest, don't fake ink.
+            pad.setStatus('Signed' + signedStamp + ' \u2014 on file as a signed PDF (no on-screen copy to show). '
+                + 'Press Clear to sign again.', '#166534');
         } else if (field === 'PermissionSlip') {
             // The Permission Slip has no Print button (sign-and-save only, no paper
             // copy), so the note only mentions the on-screen signature.
