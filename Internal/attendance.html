@@ -631,9 +631,38 @@ function rosterPanel(roomNames) {
     // own roster already is), so the merged list reads like a single room's. Stamp each child
     // with its SOURCE ROOM's program type so a PI/PFA tag can be coloured by whether the child
     // sits in a program room (green = belongs) or not (red = PI/PFA child in an INCCRA room).
+    //
+    // A child who FLEXES between the two rooms of a combined pair is seated by the server as
+    // TWO roster entries — one per room, each carrying only the days spent in THAT room. Left
+    // un-merged they double the child up and each shows partial days, so the Projected count
+    // disagrees with Actual (the bug Stella/Lei'Lani showed). Merge entries for the same child
+    // into one, OR-ing their day arrays so the child's FULL week of attendance shows once; the
+    // client's own per-day room split still colours which side each day falls on.
     const byAge = (a, b) => (a.ageDays || 0) - (b.ageDays || 0);
-    const flattenWithRoomType = rooms => rooms.flatMap(r =>
-        (r.roster || []).map(c => Object.assign({ roomType: (r.type || '').toString().trim().toUpperCase() }, c)));
+    const identKey = c => (c && c.id) ? ('id' + c.id) : ('nm' + String((c && c.name) || '').toLowerCase().trim());
+    const flattenWithRoomType = rooms => {
+        const order = [];           // keys in first-seen order
+        const merged = {};          // key -> combined child
+        rooms.forEach(r => {
+            const roomType = (r.type || '').toString().trim().toUpperCase();
+            (r.roster || []).forEach(c => {
+                const k = identKey(c);
+                if (!merged[k]) {
+                    order.push(k);
+                    merged[k] = Object.assign({ roomType: roomType }, c, { days: (c.days || [1, 1, 1, 1, 1]).slice() });
+                } else {
+                    const m = merged[k];
+                    const d = c.days || [1, 1, 1, 1, 1];
+                    for (let i = 0; i < 5; i++) if (d[i]) m.days[i] = 1;   // OR the attending days
+                    m.overflow = m.overflow || !!c.overflow;
+                    m.movedUnit = m.movedUnit || !!c.movedUnit;
+                    // Prefer a PROGRAM room's type so the PI/PFA tag reads "in a program room".
+                    if (roomType === 'PI' || roomType === 'PFA') m.roomType = roomType;
+                }
+            });
+        });
+        return order.map(k => merged[k]);
+    };
     const actualList = flattenWithRoomType(actuals).sort(byAge);
     const projList = flattenWithRoomType(projecteds).sort(byAge);
 
