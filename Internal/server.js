@@ -3869,6 +3869,16 @@ const PROJ_LADDER_ROOMS = [1, 2, 3, 4, 5, 7, 6];
 const PROJ_PRESCHOOL_ROOM = 6;          // the last ladder room, and the PFA room
 const PROJ_STANDALONE_ROOMS = [8];
 
+/* The age ladder as UNITS, youngest-first. A child is assigned to ONE unit for the whole
+   week and never changes units day to day; crossing out of a unit up the ladder is a
+   permanent promotion. Two units are PAIRS of rooms that flex internally (a child may sit
+   in either room of the pair on a given day — same age band, not a real move):
+     • {1 Infant, 2 Infants/Toddlers}
+     • {4 Toddlers/2yr, 5 2 Year Olds}
+   The rest are singletons: 3 Toddlers, 7 2 & 3 Year Olds, 6 Pre-School (the PFA + last unit).
+   Confirmed with the director (Oct 2026). */
+const PROJ_LADDER_UNITS = [[1, 2], [3], [4, 5], [7], [6]];
+
 /* The display order of rooms, youngest-first — the SAME age ladder as PROJ_LADDER_ROOMS
    (plus Before & After last). RoomNumber alone sorts 6 (Pre-School) before 7 (2 & 3 Year
    Olds), which is the wrong age order, so every room-ordered query sorts by this CASE
@@ -4016,69 +4026,107 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         (isPFA ? pfaKids : ladderKids).push(kid);
     });
 
-    // Seat one pool of children into an ordered list of rooms, youngest-first, per weekday.
-    // Overflow past the last room is charged to that last room's overflow[]. `preFilled`, when
-    // supplied, is a per-room [5]-day count of seats already taken (by the PFA pass) so the
-    // ladder only uses the seats that remain.
-    // `preFilledPfaPi`, like `preFilled`, is a per-room [5]-day count — of PI/PFA children
-    // the PFA pass already seated — so a room's pfaPi tally includes them.
-    function seat(roomNums, kids, preFilled, preFilledPfaPi) {
-        const chain = roomNums.filter(n => roomByNum[n]).map(n => ({
-            roomNumber: n, room: roomByNum[n].room, capacity: roomByNum[n].capacity,
-            type: roomByNum[n].type,
-            occupancy: [0, 0, 0, 0, 0], overflow: [0, 0, 0, 0, 0], pfaPi: [0, 0, 0, 0, 0],
-            // The children this room holds across the week, for the roster comparison. A
-            // The children this room holds, each with the days they occupied THIS room.
-            // _byKid maps the child object -> its roster entry so we can accumulate the
-            // specific days it was seated here (not the child's global attendance pattern —
-            // a child can be seated in a different room on a day this room is full).
-            roster: [], _byKid: new Map(),
-        }));
-        if (!chain.length) return chain;
-        // Record that child k occupied THIS room on day d. The entry's `days` is therefore
-        // the days the child is actually in this room, so the per-day peak the UI computes
-        // from it can never exceed the room's seated occupancy for that day.
-        const markInRoom = (room, k, d, overflow) => {
-            let entry = room._byKid.get(k);
-            if (!entry) {
-                entry = { id: k.id || 0, name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
-                          source: k.source || 'enrolled', pfaPi: !!k.pfaPi, program: k.program || '',
-                          overflow: !!overflow, days: [0, 0, 0, 0, 0] };
-                room._byKid.set(k, entry);
-                room.roster.push(entry);
-            }
-            entry.days[d] = 1;
-            if (overflow) entry.overflow = true;   // flagged if it ever overflowed
-        };
-        kids.sort((a, b) => a.age - b.age); // youngest first
-        for (let d = 0; d < 5; d++) {
-            // Free seats this day = capacity minus anything the PFA pass already placed here.
-            const free = chain.map(r => {
-                const taken = (preFilled && preFilled[r.roomNumber]) ? preFilled[r.roomNumber][d] : 0;
-                return Math.max(r.capacity - taken, 0);
-            });
-            // Reflect the pre-filled PFA children in this room's shown occupancy + PI/PFA tally.
-            chain.forEach(r => {
-                const taken = (preFilled && preFilled[r.roomNumber]) ? preFilled[r.roomNumber][d] : 0;
-                r.occupancy[d] += taken;
-                const takenPfaPi = (preFilledPfaPi && preFilledPfaPi[r.roomNumber]) ? preFilledPfaPi[r.roomNumber][d] : 0;
-                r.pfaPi[d] += takenPfaPi;
-            });
-            kids.forEach(k => {
-                if (!k.days[d]) return; // not present this day
-                const idx = free.findIndex(f => f > 0);
-                if (idx === -1) { const last = chain[chain.length - 1]; last.overflow[d]++; markInRoom(last, k, d, true); return; }
-                free[idx]--; chain[idx].occupancy[d]++;
-                markInRoom(chain[idx], k, d, false);
-                if (k.pfaPi) chain[idx].pfaPi[d]++;   // count PI/PFA kids where they land
-            });
-        }
-        // Sort each room's roster youngest-first and drop the internal per-child map.
-        chain.forEach(r => {
-            r.roster.sort((a, b) => a.ageDays - b.ageDays);
-            delete r._byKid;
+    /* Build an empty per-room output object. */
+    function makeRoomOut(n) {
+        return { roomNumber: n, room: roomByNum[n].room, capacity: roomByNum[n].capacity,
+                 type: roomByNum[n].type,
+                 occupancy: [0, 0, 0, 0, 0], overflow: [0, 0, 0, 0, 0], pfaPi: [0, 0, 0, 0, 0],
+                 roster: [] };
+    }
+
+    /* Seat children into an ordered list of UNITS, youngest-first, assigning each child to
+       ONE unit for the WHOLE WEEK — no child ever changes units day to day. A unit is one
+       or more rooms that flex internally (a child may sit in either room of a pair on a
+       given day, which is not a real move), but crossing OUT of a unit up the ladder is a
+       permanent promotion.
+
+       Rules (confirmed with the director):
+         • A child fits a unit only if, for EVERY day they attend, the unit still has a free
+           seat that day (busiest-day check). Unit day-capacity = sum of its rooms' DCFS
+           capacities minus any seats the PFA pass already took in that room.
+         • Children are seated youngest-first; whoever cannot fit a unit is promoted to the
+           next unit up the ladder — so the OLDEST are the ones pushed up, permanently.
+         • The last unit absorbs the final overflow (charged to its last room's overflow[]).
+       Within a unit, a seated child's day presence is placed into a specific room (fill the
+       first room of the unit, spill into the next) so per-room occupancy and rosters render.
+
+       units          : [[roomNum,...], ...]  ordered youngest-first
+       preFilled      : per-room [5] seats already taken (PFA pass), subtracted from capacity
+       preFilledPfaPi : per-room [5] PI/PFA already seated, added into a room's pfaPi tally */
+    function seatUnits(units, kids, preFilled, preFilledPfaPi) {
+        // Materialise every room in these units as an output object.
+        const unitRooms = units.map(u => u.filter(n => roomByNum[n]));
+        unitRooms.flat().forEach(n => { if (!roomsOut[n]) roomsOut[n] = makeRoomOut(n); });
+
+        // Per-room running free seats, per day — capacity minus PFA pre-fill. Mutated as we seat.
+        const freeByRoom = {};
+        unitRooms.flat().forEach(n => {
+            const taken = (preFilled && preFilled[n]) ? preFilled[n] : [0, 0, 0, 0, 0];
+            freeByRoom[n] = [0, 1, 2, 3, 4].map(d => Math.max((roomByNum[n].capacity || 0) - (taken[d] || 0), 0));
+            // Reflect PFA pre-fill into this room's shown occupancy + PI/PFA tally up front.
+            const tp = (preFilledPfaPi && preFilledPfaPi[n]) ? preFilledPfaPi[n] : [0, 0, 0, 0, 0];
+            for (let d = 0; d < 5; d++) { roomsOut[n].occupancy[d] += (taken[d] || 0); roomsOut[n].pfaPi[d] += (tp[d] || 0); }
         });
-        return chain;
+
+        // Does unit u (index) have a free seat on EVERY day this child attends?
+        const unitFits = (uIdx, kid) => {
+            const rooms = unitRooms[uIdx];
+            if (!rooms.length) return false;
+            for (let d = 0; d < 5; d++) {
+                if (!kid.days[d]) continue;
+                let freeThatDay = 0;
+                rooms.forEach(n => { freeThatDay += freeByRoom[n][d]; });
+                if (freeThatDay <= 0) return false;   // no seat in the whole unit this day
+            }
+            return true;
+        };
+
+        // Place a seated child into the unit: for each attending day, take a seat from the
+        // first room in the unit with space (so a pair fills room 1 then spills to room 2),
+        // record the room-day occupancy and the child's in-room days for that room's roster.
+        const placeInUnit = (uIdx, kid) => {
+            const rooms = unitRooms[uIdx];
+            const perRoomDays = {};   // roomNum -> [5] days this child sits in THAT room
+            for (let d = 0; d < 5; d++) {
+                if (!kid.days[d]) continue;
+                const n = rooms.find(rn => freeByRoom[rn][d] > 0) || rooms[rooms.length - 1];
+                freeByRoom[n][d] = Math.max(freeByRoom[n][d] - 1, 0);
+                const ro = roomsOut[n];
+                ro.occupancy[d]++;
+                if (kid.pfaPi) ro.pfaPi[d]++;
+                (perRoomDays[n] = perRoomDays[n] || [0, 0, 0, 0, 0])[d] = 1;
+            }
+            Object.keys(perRoomDays).forEach(n => addRoster(roomsOut[n], kid, perRoomDays[n], false));
+        };
+
+        // Charge an unseated child to the last unit's last room as overflow (whole week).
+        const chargeOverflow = kid => {
+            const lastRooms = unitRooms[unitRooms.length - 1] || [];
+            const n = lastRooms[lastRooms.length - 1];
+            if (!n) return;
+            const ro = roomsOut[n];
+            for (let d = 0; d < 5; d++) if (kid.days[d]) ro.overflow[d]++;
+            addRoster(ro, kid, kid.days.map(x => x ? 1 : 0), true);
+        };
+
+        // One roster entry per child per room, with the days the child occupies THAT room.
+        const addRoster = (ro, kid, inRoomDays, overflow) => {
+            ro.roster.push({ id: kid.id || 0, name: kid.name, birthDate: kid.birthDate || '',
+                ageDays: kid.age, source: kid.source || 'enrolled', pfaPi: !!kid.pfaPi,
+                program: kid.program || '', overflow: !!overflow, days: inRoomDays });
+        };
+
+        // Seat youngest-first: each child takes the FIRST unit (youngest) that fits every
+        // day they attend; if none fits, they are charged as overflow on the last unit.
+        kids.slice().sort((a, b) => a.age - b.age).forEach(kid => {
+            let placed = false;
+            for (let u = 0; u < unitRooms.length; u++) {
+                if (unitFits(u, kid)) { placeInUnit(u, kid); placed = true; break; }
+            }
+            if (!placed) chargeOverflow(kid);
+        });
+
+        unitRooms.flat().forEach(n => roomsOut[n].roster.sort((a, b) => a.ageDays - b.ageDays));
     }
 
     // Pass 1 — PFA children fill Pre-School regardless of age. Anything past Pre-School's
@@ -4121,8 +4169,9 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
     }
 
     const roomsOut = {};
-    // Pass 2 — the age ladder fills every room, using only the Pre-School seats PFA left free.
-    seat(PROJ_LADDER_ROOMS, ladderKids, pfaFilled, pfaFilledPfaPi).forEach(r => { roomsOut[r.roomNumber] = r; });
+    // Pass 2 — the age ladder seats everyone youngest-first by UNIT (whole-week placement,
+    // paired rooms flex internally), using only the Pre-School seats the PFA pass left free.
+    seatUnits(PROJ_LADDER_UNITS, ladderKids, pfaFilled, pfaFilledPfaPi);
     // Fold PFA overflow into Pre-School's overflow (both are "couldn't be seated in Pre-School"),
     // and add the PFA children to the Pre-School roster so it shows everyone it holds.
     if (roomsOut[PROJ_PRESCHOOL_ROOM]) {
@@ -4135,13 +4184,14 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         pfaRoomDays.forEach((rd, k) => {
             const seatedDays = rd.days;
             const everOverflowed = rd.over.some(Boolean);
-            ps.roster.push({ name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
+            ps.roster.push({ id: k.id || 0, name: k.name, birthDate: k.birthDate || '', ageDays: k.age,
                 source: k.source || 'enrolled', pfaPi: !!k.pfaPi, program: k.program || '',
                 overflow: everOverflowed, days: seatedDays.map(x => x ? 1 : 0) });
         });
         ps.roster.sort((a, b) => a.ageDays - b.ageDays);
     }
-    seat(PROJ_STANDALONE_ROOMS, standaloneKids).forEach(r => { roomsOut[r.roomNumber] = r; });
+    // Before & Afterschool — its own standalone unit, seated whole-week within itself.
+    seatUnits([PROJ_STANDALONE_ROOMS], standaloneKids);
 
     // One row per room, in the same order roomRows (projRooms) arrived — now the
     // youngest-first age ladder, so 2 & 3 Year Olds sits before Pre-School — mirroring
