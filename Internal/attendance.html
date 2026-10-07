@@ -735,25 +735,41 @@ function rosterPanel(roomNames) {
         </div>`;
 
     /* ── Which side of a COMBINED pair each child falls in, per day ──
-       Only for a combined set (two rooms). Fill the FIRST room to its capacity each day in
-       the roster's own order (youngest-first), then spill into the second room. For each
-       child we build a [5] array: 1 = first room that day, 2 = second room that day, 0 = not
-       in. The child's "1" is tinted pink on day d when side[d] === 2. */
+       Only for a combined set (two rooms). For each weekday, split that day's children
+       (roster order = youngest-first) between the two rooms: fill BOTH rooms to their own
+       capacity first, then split any OVER-capacity children EVENLY, the first room taking
+       the extra odd one. So on a day with 10 children in a 4+4 pair, each room runs 1 over
+       → 5 in the first room (white) and 5 in the second (pink), rather than 4 white / 6 pink.
+       Each child gets a [5] array: 1 = first room that day, 2 = second room, 0 = not in; the
+       "1" is tinted pink when side[d] === 2. */
     const firstRoomName = roomNames[0];
-    const firstRoomCap = roomNames.length > 1
-        ? (((roomInView('projected', firstRoomName) || roomInView('actual', firstRoomName) || {}).capacity) || 0)
-        : 0;
+    const secondRoomNm = roomNames.length > 1 ? roomNames[roomNames.length - 1] : '';
+    const capOf = nm => (((roomInView('projected', nm) || roomInView('actual', nm) || {}).capacity) || 0);
+    const cap1 = roomNames.length > 1 ? capOf(firstRoomName) : 0;
+    const cap2 = roomNames.length > 1 ? capOf(secondRoomNm) : 0;
+    // How many of a day's `total` children sit in the FIRST room (the rest are second room):
+    // both rooms filled to capacity, then the overage split evenly (first room takes the odd).
+    const firstRoomCountFor = total => {
+        if (total <= cap1) return total;                 // all fit in room 1
+        const over = total - cap1 - cap2;                // children beyond both rooms' capacity
+        if (over <= 0) return cap1;                      // room 1 full, rest go to room 2
+        return cap1 + Math.ceil(over / 2);               // split the overage, room 1 takes the odd one
+    };
     const sideMap = list => {
         const m = {};
-        if (!(roomNames.length > 1) || !firstRoomCap) return m;   // only meaningful when combined
-        const seen = [0, 0, 0, 0, 0];   // children already placed in room 1 that day
+        if (!(roomNames.length > 1) || (!cap1 && !cap2)) return m;   // only meaningful when combined
+        // First pass: how many children attend each weekday → the per-day room-1 cutoff.
+        const totals = [0, 0, 0, 0, 0];
+        list.forEach(c => { const d = c.days || [1, 1, 1, 1, 1]; for (let i = 0; i < 5; i++) if (d[i]) totals[i]++; });
+        const cutoff = totals.map(firstRoomCountFor);    // children at index <= cutoff[d] are room 1
+        const seen = [0, 0, 0, 0, 0];                    // running count placed so far that day
         list.forEach(c => {
             const days = c.days || [1, 1, 1, 1, 1];
             const side = [0, 0, 0, 0, 0];
             for (let d = 0; d < 5; d++) {
                 if (!days[d]) continue;
                 seen[d]++;
-                side[d] = seen[d] <= firstRoomCap ? 1 : 2;
+                side[d] = seen[d] <= cutoff[d] ? 1 : 2;
             }
             m[childKey(c)] = side;
         });
@@ -768,9 +784,8 @@ function rosterPanel(roomNames) {
     // is on one side only), so the eye can compare actual vs projected per child.
     // (Filter renders into #atFilter.)
     // A one-line key for the pink mark, shown only when a pair is combined.
-    const secondRoomName = roomNames.length > 1 ? roomNames[roomNames.length - 1] : '';
-    const sideLegend = (roomNames.length > 1 && firstRoomCap)
-        ? `<div class="at-side-legend"><span class="at-on at-room2">1</span> = spills into <strong>${esc(secondRoomName)}</strong> that day (first ${firstRoomCap} fill ${esc(firstRoomName)})</div>`
+    const sideLegend = (roomNames.length > 1 && (cap1 || cap2))
+        ? `<div class="at-side-legend"><span class="at-on at-room2">1</span> = <strong>${esc(secondRoomNm)}</strong> that day (rooms fill evenly; over-capacity split between the two)</div>`
         : '';
 
     if (view === 'projected') {
