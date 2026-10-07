@@ -29,7 +29,16 @@
         .at-body { overflow-y:auto;flex:1;padding:20px 24px; }
         .at-room-name { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-bottom:4px;text-align:center; }
         /* Age range under the room title (e.g. "0 - 20 M" for a combined set). */
-        .at-room-age { font-size:0.78rem;font-weight:700;color:var(--sp-muted);text-align:center;margin-bottom:16px;letter-spacing:0.02em; }
+        .at-room-age { font-size:0.78rem;font-weight:700;color:var(--sp-muted);text-align:center;margin-bottom:10px;letter-spacing:0.02em; }
+        /* Combine toggle for a paired room — a small pill button, centred under the title. */
+        .at-combine { text-align:center;margin-bottom:16px; }
+        .at-combine-btn {
+            border:1px solid var(--sp-accent);background:transparent;color:var(--sp-accent);
+            font-size:0.72rem;font-weight:700;padding:4px 12px;border-radius:999px;cursor:pointer;
+            transition:background 0.12s,color 0.12s;
+        }
+        .at-combine-btn:hover { background:var(--sp-accent-soft); }
+        .at-combine-btn.on { background:var(--sp-accent);color:#fff; }
         .at-chart { display:flex;align-items:flex-end;gap:14px;padding:0 8px; }
         .at-col { display:flex;flex-direction:column;align-items:center;gap:8px;flex:1; }
         .at-count { font-size:0.9rem;font-weight:800;color:var(--sp-text); }
@@ -105,6 +114,11 @@
         .at-table tbody tr:last-child td { border-bottom:none; }
         .at-table tbody tr:nth-child(even) td { background:var(--sp-surface-2); }
         .at-table tbody tr:hover td { background:var(--sp-accent-soft); }
+        /* Blank spacer row (holds a slot where this column has no child, so the other column
+           stays lined up). Neutral — no stripe, no hover highlight. */
+        .at-table tbody tr.at-blank td,
+        .at-table tbody tr.at-blank:hover td,
+        .at-table tbody tr.at-blank:nth-child(even) td { background:transparent; }
         /* Name on top, age (y/m/d) beneath — frees the Age column entirely. */
         .at-tc-name { color:var(--sp-text);white-space:nowrap;line-height:1.2; }
         .at-tc-name .nm { font-weight:700;font-size:0.82rem; }
@@ -273,6 +287,10 @@ const CHART_H = 220;
 
 let view = 'actual';                 // 'actual' | 'projected'
 let activeRoom = 0;
+// When the active room is in a paired set, whether to COMBINE the pair into one view. The
+// director can see one room alone or both merged, toggled per selection. Off by default:
+// clicking a room shows just that room.
+let combined = false;
 const cache = { actual: null, projected: null };   // null = not yet loaded
 // The full waiting-list roster (stable, for the filter list) — fetched once.
 // Each: { id:'w'+Id, name, birthDate, ageDays, days:[5], program }.
@@ -282,8 +300,8 @@ const excludedIds = new Set();
 
 /* Paired room SETS, matching the server's PROJ_LADDER_UNITS pairs ({1 Infant,
    2 Infants/Toddlers} and {4 Toddlers/2yr, 5 2 Year Olds}): the two rooms of a set share an
-   age band and a child flexes between them, so the director wants to see them TOGETHER.
-   Selecting either room of a set shows BOTH, the partner stacked directly beneath. Keyed by
+   age band and a child flexes between them. The director can view either room on its own OR
+   combine the pair into one merged view (a "Combine" toggle in the room header). Keyed by
    normalised room NAME (both views carry the name; only projected carries a number). */
 const ROOM_SETS = [
     ['Infant', 'Infants / Toddlers'],
@@ -476,12 +494,22 @@ function renderSidebar() {
     }).join('');
 }
 
-function showRoom(idx) {
+/* Whether the room at `idx` belongs to a paired set (so a Combine toggle makes sense). */
+function isPairedRoom(idx) {
+    const r = rows()[idx];
+    return !!(r && ROOM_SET_BY_KEY[roomKey(r.room)]);
+}
+
+function showRoom(idx, keepCombined) {
+    // Changing to a room that isn't in the SAME set as before resets the combine toggle, so a
+    // fresh selection starts single. Staying within the set (or an explicit keep) preserves it.
+    const prevSet = new Set(isPairedRoom(activeRoom) ? setIndices(activeRoom) : [activeRoom]);
     activeRoom = idx;
-    // A paired room shows its whole SET COMBINED into one view (merged chart + one roster
-    // spanning both rooms). The sidebar lights up every member of the set, not just the one
-    // clicked. A room in no set is just itself.
-    const group = setIndices(idx);
+    if (!keepCombined && !prevSet.has(idx)) combined = false;
+    if (!isPairedRoom(idx)) combined = false;   // a singleton can never be combined
+
+    // Which rows this view shows: the whole set when combined, else just the clicked room.
+    const group = (combined && isPairedRoom(idx)) ? setIndices(idx) : [idx];
     const groupSet = new Set(group);
     rows().forEach((_, i) => {
         const btn = document.getElementById('atRoom' + i);
@@ -491,6 +519,12 @@ function showRoom(idx) {
     const html = roomBlock(group);
     if (!html) return;
     document.getElementById('atBody').innerHTML = html;
+}
+
+/* Flip the combine toggle for the active paired set and re-render. */
+function toggleCombine() {
+    combined = !combined;
+    showRoom(activeRoom, true);
 }
 
 /* Heading (+ age range) + chart + roster panel for a selected unit. `idxs` is the row
@@ -542,9 +576,20 @@ function roomBlock(idxs) {
     const ageRange = ageRangeLabel(roomNames);
     const ageLine = ageRange ? `<div class="at-room-age">${esc(ageRange)}</div>` : '';
 
+    // Combine toggle — only for a paired room. "Combine with X" when viewing one room alone;
+    // "Show separately" when the pair is merged. Clicking flips `combined` and re-renders.
+    let combineToggle = '';
+    if (isPairedRoom(activeRoom)) {
+        const setIdx = setIndices(activeRoom);
+        const partnerName = setIdx.map(i => (list[i] || {}).room).filter(nm => nm && roomKey(nm) !== roomKey(list[activeRoom].room))[0];
+        const label = combined ? 'Show separately' : ('Combine with ' + (partnerName || 'pair'));
+        combineToggle = `<div class="at-combine"><button type="button" class="at-combine-btn${combined ? ' on' : ''}" onclick="toggleCombine()">${esc(label)}</button></div>`;
+    }
+
     return `
         <div class="at-room-name">${esc(title)}</div>
         ${ageLine}
+        ${combineToggle}
         <div class="at-split">
             <div class="at-split-chart">
                 <div class="at-chart" style="height:${CHART_H + 56}px;">${cols}</div>
@@ -602,7 +647,46 @@ function rosterPanel(roomNames) {
         </tr>`;
     };
 
-    const card = (title, list, cap, present, missingMsg, opts) => {
+    // A child's identity across the two lists: the DB Id when present, else the name. Lets
+    // us tell "the same child, in both columns" from "two different children".
+    const childKey = c => (c && c.id) ? ('id' + c.id) : ('nm' + String((c && c.name) || '').toLowerCase().trim());
+    // A spacer row that occupies the same height as a real one, so the OTHER column's child
+    // on this slot stays lined up. Empty name + five empty day cells.
+    const blankRow = () => `<tr class="at-blank"><td class="at-tc-name"><div class="nm">&nbsp;</div><div class="ag">&nbsp;</div></td><td></td><td></td><td></td><td></td><td></td></tr>`;
+
+    /* Merge the two rosters into aligned SLOTS so a child in BOTH columns sits on the same
+       row. Each slot is { a, p } (either may be null). A child shared by both columns gets
+       ONE slot holding both; a child on one side only gets a slot with the other side blank.
+       Slots are ordered youngest-first by the child's age (shared children carry the same
+       age on both sides). This pairs by identity (childKey) regardless of each list's
+       internal order, so a child the projection moved to a different position still lines up. */
+    const alignedSlots = (aList, pList) => {
+        const pByKey = {};
+        pList.forEach(p => { pByKey[childKey(p)] = p; });
+        const slots = [];
+        const seen = {};
+        // Every actual child: paired with its projected twin when present.
+        aList.forEach(a => {
+            const k = childKey(a);
+            seen[k] = true;
+            slots.push({ a, p: pByKey[k] || null, age: a.ageDays || 0 });
+        });
+        // Projected-only children (not already paired above).
+        pList.forEach(p => {
+            const k = childKey(p);
+            if (seen[k]) return;
+            slots.push({ a: null, p, age: p.ageDays || 0 });
+        });
+        // Stable youngest-first order across the merged set.
+        return slots.sort((x, y) => x.age - y.age);
+    };
+
+    // Body for one side of an aligned pair of tables: render the slot's child for `side`
+    // ('a' or 'p'), or a blank spacer where this side has no child on that slot.
+    const alignedBody = (slots, side, opts) =>
+        slots.map(s => s[side] ? rowHtml(s[side], opts) : blankRow()).join('');
+
+    const card = (title, list, cap, present, missingMsg, opts, bodyOverride) => {
         if (!present) return cardShell(title, '', '<div class="at-roster-empty">Loading…</div>');
         if (!list.length) return cardShell(title, '', '<div class="at-roster-empty">' + missingMsg + '</div>');
         const td = perDay(list);
@@ -612,7 +696,8 @@ function rosterPanel(roomNames) {
         const chipCls = capNum == null ? '' : (over ? 'over' : 'ok');
         const chip = `<span class="at-cap-chip ${chipCls}">${peak}${capNum != null ? '/' + capNum : ''} peak</span>`;
         const sub = `${list.length} ${list.length === 1 ? 'child this week' : 'children this week'}`;
-        const body = list.map(c => rowHtml(c, opts)).join('');
+        // bodyOverride (aligned slot rows) when comparing side by side; else one row per child.
+        const body = bodyOverride != null ? bodyOverride : list.map(c => rowHtml(c, opts)).join('');
         const dayTotals = td.map(v => `<td class="at-dtot${capNum != null && v > capNum ? ' over' : ''}">${v}</td>`).join('');
         const table = `<div class="at-rscroll"><table class="at-table">
             <thead><tr><th class="at-tc-name">Child</th>
@@ -633,14 +718,16 @@ function rosterPanel(roomNames) {
         </div>`;
 
     // Actual view: just the Actual roster.
-    // Projected view: Actual (left) and Projected (right), each listing its OWN children
-    // youngest-first — no blank spacer rows (they read as dead space). Both are age-sorted,
-    // so a shared child naturally lands near the same spot. (Filter renders into #atFilter.)
+    // Projected view: Actual (left) and Projected (right). Both are age-sorted, and we LINE
+    // UP a child that appears in both columns onto the same row (blank spacer where a child
+    // is on one side only), so the eye can compare actual vs projected per child.
+    // (Filter renders into #atFilter.)
     if (view === 'projected') {
+        const slots = alignedSlots(actualList, projList);
         const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-                                 'No children currently in this room.', {});
+                                 'No children currently in this room.', {}, alignedBody(slots, 'a', {}));
         const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-                              'No children seated here.', { markGreen: true });
+                              'No children seated here.', { markGreen: true }, alignedBody(slots, 'p', { markGreen: true }));
         return `<div class="at-rosters">${actualCard}${projCard}</div>`;
     }
     const theCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
