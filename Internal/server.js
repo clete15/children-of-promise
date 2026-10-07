@@ -3906,6 +3906,21 @@ function parseRequestedDays(text) {
     return [1, 1, 1, 1, 1]; // full time / unspecified → every day
 }
 
+/* The UPPER bound of a room's AgeRange, in MONTHS. Used to decide the youngest room a
+   child still "belongs" in (their home unit), so an older child is never seated below their
+   age band when a younger room happens to have empty seats. Handles "0 - 12 Months",
+   "8 - 20 Months", "18 - 36 Months", "3 to 5 yrs", "3 to 5 years", "5 to 12 yrs". If the
+   range names years, the number is multiplied to months. Unparseable → Infinity (no ceiling,
+   so it never wrongly excludes a child). */
+function ageRangeMaxMonths(text) {
+    const s = String(text || '').toLowerCase();
+    const nums = (s.match(/\d+/g) || []).map(Number);
+    if (!nums.length) return Infinity;
+    const hi = Math.max.apply(null, nums);
+    // "yr"/"year" anywhere means the numbers are years; otherwise months.
+    return /\byr|\byear/.test(s) ? hi * 12 : hi;
+}
+
 /* Age key for youngest-first ordering. Smaller = younger. Prefers the birth date
    (a child born later is younger, so a larger date string sorts as older — we invert
    by returning the date's time so ascending = oldest; callers sort ascending by AGE so
@@ -3955,8 +3970,21 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         const num = parseInt(r[0], 10);
         if (!num) return;
         roomByNum[num] = { roomNumber: num, room: r[1] || ('Room ' + num), capacity: parseInt(r[2], 10) || 0,
-                           type: String(r[3] || '').trim() };
+                           type: String(r[3] || '').trim(), maxMonths: ageRangeMaxMonths(r[4]) };
     });
+
+    /* Each ladder unit's AGE CEILING in months = the largest upper-bound across its rooms.
+       A child whose age exceeds a unit's ceiling is too old for it and must start no lower
+       than the first unit whose ceiling still includes them (their "home unit"). */
+    const unitMaxMonths = PROJ_LADDER_UNITS.map(u =>
+        Math.max.apply(null, u.map(n => (roomByNum[n] ? roomByNum[n].maxMonths : Infinity))));
+    // The home unit for a child of `months`: the first (youngest) unit whose ceiling fits.
+    // If the child is older than every unit's ceiling, home is the last unit (Pre-School).
+    const homeUnitIndex = months => {
+        if (!isFinite(months)) return 0;   // unknown age → start youngest, let it climb
+        for (let u = 0; u < unitMaxMonths.length; u++) if (months <= unitMaxMonths[u]) return u;
+        return unitMaxMonths.length - 1;
+    };
 
     // Which rooms are "in scope" for the projection at all (the ladder + the standalones).
     const inScope = new Set([].concat(PROJ_LADDER_ROOMS, PROJ_STANDALONE_ROOMS));
@@ -3994,6 +4022,9 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             // The specific program ('PI' / 'PFA' / '') so the sidebar can label a room by
             // the children it holds — e.g. 3 PI children in an INCCRA room reads "3 PI".
             program: (prog === 'PI' || prog === 'PFA') ? prog : '',
+            // Youngest unit this child still belongs in by age — never seated below it
+            // (except as a last resort when every unit is full). ageInDays → months.
+            home: homeUnitIndex(ageInDays(e[3], e[4]) / 30.44),
         };
         if (PROJ_STANDALONE_ROOMS.indexOf(roomNum) !== -1) { standaloneKids.push(kid); return; }
         const isPFA = prog === 'PFA';
@@ -4021,6 +4052,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             // A waiting-list child's only program designation is PFA (applied for '3-5'); PI
             // is assigned at enrollment, so a non-PFA waitlist child has no program label yet.
             program: isPFA ? 'PFA' : '',
+            home: homeUnitIndex(ageInDays(w[2], 0) / 30.44),
         };
         if (group === 'ba') { standaloneKids.push(kid); return; }
         (isPFA ? pfaKids : ladderKids).push(kid);
@@ -4116,12 +4148,21 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
                 program: kid.program || '', overflow: !!overflow, days: inRoomDays });
         };
 
-        // Seat youngest-first: each child takes the FIRST unit (youngest) that fits every
-        // day they attend; if none fits, they are charged as overflow on the last unit.
+        // Seat youngest-first. A child starts at their HOME unit (the youngest unit their
+        // age still belongs in) and climbs UP the ladder to the first unit that fits every
+        // day they attend — so an older child is never seated below their age band. Only if
+        // NO unit from home upward has room do we fall back DOWN below home into any open
+        // seat (the "unless we're at capacity everywhere" exception); failing that, overflow.
         kids.slice().sort((a, b) => a.age - b.age).forEach(kid => {
+            const home = Math.min(Math.max(kid.home || 0, 0), unitRooms.length - 1);
             let placed = false;
-            for (let u = 0; u < unitRooms.length; u++) {
+            for (let u = home; u < unitRooms.length; u++) {
                 if (unitFits(u, kid)) { placeInUnit(u, kid); placed = true; break; }
+            }
+            if (!placed) {   // last resort: any unit below home with a free seat
+                for (let u = home - 1; u >= 0; u--) {
+                    if (unitFits(u, kid)) { placeInUnit(u, kid); placed = true; break; }
+                }
             }
             if (!placed) chargeOverflow(kid);
         });
@@ -8975,7 +9016,7 @@ ELSE
             // The rooms themselves (number, name, capacity), in youngest-first order.
             // The projection fills these seats by age, so it needs every room — including
             // empty ones — and their DCFS capacity.
-            projRooms:     `SELECT r.RoomNumber, r.Room, r.DCFSCapacity, ISNULL(r.Type,'') AS Type FROM dimClassrooms r ORDER BY ${ROOM_AGE_ORDER}`,
+            projRooms:     `SELECT r.RoomNumber, r.Room, r.DCFSCapacity, ISNULL(r.Type,'') AS Type, ISNULL(r.AgeRange,'') AS AgeRange FROM dimClassrooms r ORDER BY ${ROOM_AGE_ORDER}`,
             // One row per ACTIVE enrolled child: age (birth date), current room, and the
             // days they attend. The projection sorts these youngest-first and seats them.
             enrolledChildren: `SELECT e.Id, e.First_Name, e.Last_Name, ISNULL(CONVERT(NVARCHAR(10),e.Birth_date,120),'') AS BirthDate, ISNULL(e.Days_Old,0) AS DaysOld, ISNULL(e.RoomNumber,0) AS RoomNumber, ISNULL(e.Monday,0) AS Mon, ISNULL(e.Tuesday,0) AS Tue, ISNULL(e.Wednesday,0) AS Wed, ISNULL(e.Thursday,0) AS Thu, ISNULL(e.Friday,0) AS Fri, ISNULL(e.PFA_PI_na,'') AS Program, ISNULL(CONVERT(NVARCHAR(10),e.Start_Date,120),'') AS StartDate FROM rptMasterEnrollment e WHERE e.Active='Yes' OR e.Active='YES'`,
