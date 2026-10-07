@@ -839,6 +839,39 @@ function calcScore(d) {
     return score;
 }
 
+/* POST one child's pre-enrollment, retrying briefly if the server is momentarily
+   unreachable — e.g. during a short server restart/deploy. A parent who finishes a long
+   form should never lose it just because the server bounced for a few seconds: the data
+   stays in their browser the whole time and we keep trying for ~12s before giving up.
+
+   We only retry a genuine CONNECTION failure (fetch rejects) or a 5xx/transient status —
+   NOT a 4xx (a real validation rejection the parent must fix), and not a clean success. */
+async function submitWithRetry(data, attempts = 4) {
+    const delays = [1500, 3000, 5000];   // ~9.5s of retries across 4 tries
+    let lastErr = null;
+    for (let i = 0; i < attempts; i++) {
+        try {
+            const res = await fetch('/api/preenrollment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            // A 5xx or 502/503/504 is a server that is up but not ready (restarting) —
+            // worth retrying. A 4xx is the parent's input and must not be retried.
+            if (res.status >= 500) throw new Error('server not ready (' + res.status + ')');
+            const json = await res.json();
+            if (!res.ok || !json.success) throw new Error(json.error || ('HTTP ' + res.status));
+            return;   // success
+        } catch (err) {
+            lastErr = err;
+            // Don't retry a validation rejection the server actually returned (4xx-shaped).
+            if (/HTTP 4\d\d/.test(String(err && err.message))) break;
+            if (i < attempts - 1) await new Promise(r => setTimeout(r, delays[i] || 5000));
+        }
+    }
+    throw lastErr || new Error('submission failed');
+}
+
 document.getElementById('preEnrollForm').addEventListener('submit', async e => {
     e.preventDefault();
 
@@ -891,13 +924,7 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
         data.score = calcScore(data);
 
         try {
-            const res = await fetch('/api/preenrollment', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
-            const json = await res.json();
-            if (!res.ok || !json.success) throw new Error(json.error || `HTTP ${res.status}`);
+            await submitWithRetry(data);
             successCount++;
         } catch (err) {
             errors.push(`${child.childName}: ${err.message}`);
