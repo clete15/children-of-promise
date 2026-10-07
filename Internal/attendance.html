@@ -128,6 +128,11 @@
         .at-table tfoot td.at-tc-name { padding-left:12px;text-align:left;color:var(--sp-text-2);text-transform:uppercase;letter-spacing:0.04em;font-size:0.64rem;font-weight:800; }
         .at-table tfoot td.at-dtot.over { color:var(--sp-bad-fg); }
 
+        /* Blank spacer row — holds the same height as a real two-line (name + age) row so
+           the same child stays on the same horizontal line across the Actual/Projected pair. */
+        .at-table tbody tr.at-blank td { height:33px; }
+        .at-table tbody tr.at-blank:hover td { background:inherit; }
+
         .at-roster-empty { font-size:0.82rem;color:var(--sp-muted);padding:20px 14px;text-align:center; }
 
         /* ── Waiting-list filter (beside the Projected card) ──────────────────
@@ -521,15 +526,63 @@ function rosterPanel(roomName) {
             ${inner}
         </div>`;
 
+    // A blank spacer row, so a child present in only ONE table still leaves a gap in the
+    // other — keeping the same child on the same horizontal line across both tables.
+    const blankRow = '<tr class="at-blank"><td class="at-tc-name">&nbsp;</td>'
+        + '<td class="at-tc-day"></td><td class="at-tc-day"></td><td class="at-tc-day"></td><td class="at-tc-day"></td><td class="at-tc-day"></td></tr>';
+
+    /* Build an Actual + Projected card pair whose ROWS are ALIGNED: a child in both tables
+       sits on the same line; the shared order is the union of both lists, youngest-first.
+       A table missing a child renders a blank row in that slot. */
+    const alignedCards = () => {
+        // Union of children by id (fall back to name when a row has no id), youngest-first.
+        const keyOf = c => (c.id ? 'id:' + c.id : 'nm:' + c.name);
+        const order = [];
+        const seen = new Set();
+        [].concat(actualList, projList).forEach(c => {
+            const k = keyOf(c);
+            if (seen.has(k)) return;
+            seen.add(k);
+            order.push({ key: k, age: c.ageDays });
+        });
+        order.sort((a, b) => (a.age || 0) - (b.age || 0));
+        const actualBy = {}; actualList.forEach(c => { actualBy[keyOf(c)] = c; });
+        const projBy = {}; projList.forEach(c => { projBy[keyOf(c)] = c; });
+
+        const sideCard = (title, cap, present, byKey, missingMsg, opts) => {
+            if (!present) return cardShell(title, '', '<div class="at-roster-empty">Loading…</div>');
+            const list = order.map(o => byKey[o.key]).filter(Boolean);
+            if (!list.length) return cardShell(title, '', '<div class="at-roster-empty">' + missingMsg + '</div>');
+            const td = perDay(list);
+            const peak = Math.max(0, ...td);
+            const capNum = (typeof cap === 'number' && !isNaN(cap)) ? cap : null;
+            const over = capNum != null && peak > capNum;
+            const chip = `<span class="at-cap-chip ${capNum == null ? '' : (over ? 'over' : 'ok')}">${peak}${capNum != null ? '/' + capNum : ''} peak</span>`;
+            const sub = `${list.length} ${list.length === 1 ? 'child this week' : 'children this week'}`;
+            // Walk the shared order: real row where this table has the child, blank otherwise.
+            const body = order.map(o => byKey[o.key] ? rowHtml(byKey[o.key], opts) : blankRow).join('');
+            const dayTotals = td.map(v => `<td class="at-dtot${capNum != null && v > capNum ? ' over' : ''}">${v}</td>`).join('');
+            const table = `<div class="at-rscroll"><table class="at-table">
+                <thead><tr><th class="at-tc-name">Child</th>
+                    <th class="at-tc-day">M</th><th class="at-tc-day">T</th><th class="at-tc-day">W</th><th class="at-tc-day">Th</th><th class="at-tc-day">F</th></tr></thead>
+                <tbody>${body}</tbody>
+                <tfoot><tr><td class="at-tc-name">Per day \u00b7 ${list.length} total</td>${dayTotals}</tr></tfoot>
+            </table></div>`;
+            return cardShell(title, chip, table, sub);
+        };
+
+        const a = sideCard('Actual \u2014 now', actual && actual.capacity, !!actual, actualBy,
+                           'No children currently in this room.', {});
+        const p = sideCard('Projected \u2014 youngest-first', projected && projected.capacity, !!projected, projBy,
+                           'No children seated here.', { markGreen: true });
+        return a + p;
+    };
+
     // Actual view: just the Actual roster.
-    // Projected view: Actual on the LEFT, Projected on the RIGHT, so the two compare side by
-    // side. (The waiting-list filter is rendered separately into #atFilter, further right.)
+    // Projected view: Actual (left) and Projected (right) with ALIGNED rows so the same
+    // child is on the same line. (The waiting-list filter renders separately into #atFilter.)
     if (view === 'projected') {
-        const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-                                 'No children currently in this room.', {});
-        const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-                              'No children seated here.', { markGreen: true });
-        return `<div class="at-rosters">${actualCard}${projCard}</div>`;
+        return `<div class="at-rosters">${alignedCards()}</div>`;
     }
     const theCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
                          'No children currently in this room.', {});
