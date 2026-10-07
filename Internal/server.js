@@ -4188,6 +4188,28 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         unitRooms.flat().forEach(n => roomsOut[n].roster.sort((a, b) => a.ageDays - b.ageDays));
     }
 
+    /* SHORT-CIRCUIT: when the waiting list is cleared (no waitlist child is seated), the
+       projection must equal the ACTUAL arrangement exactly — every enrolled child shown in
+       the room they are really in, no re-seating. The youngest-first unit logic below only
+       runs once at least one waiting-list child is selected (then it may bump/promote). */
+    const anyWaitlist = [].concat(ladderKids, pfaKids, standaloneKids).some(k => k.source === 'waitlist');
+    if (!anyWaitlist) {
+        const out = {};
+        [].concat(ladderKids, pfaKids, standaloneKids).forEach(kid => {
+            const n = parseInt(kid.actualRoom, 10);
+            if (!roomByNum[n]) return;   // room not in scope / unknown
+            if (!out[n]) out[n] = makeRoomOut(n);
+            const ro = out[n];
+            const days = (kid.days || [1, 1, 1, 1, 1]).map(x => x ? 1 : 0);
+            for (let d = 0; d < 5; d++) { if (days[d]) { ro.occupancy[d]++; if (kid.pfaPi) ro.pfaPi[d]++; } }
+            ro.roster.push({ id: kid.id || 0, name: kid.name, birthDate: kid.birthDate || '',
+                ageDays: kid.age, source: 'enrolled', pfaPi: !!kid.pfaPi, program: kid.program || '',
+                overflow: false, movedUnit: false, days: days });
+        });
+        Object.values(out).forEach(r => r.roster.sort((a, b) => a.ageDays - b.ageDays));
+        return roomRows.map(r => parseInt(r[0], 10)).filter(num => out[num]).map(num => out[num]);
+    }
+
     // Pass 1 — PFA children fill Pre-School regardless of age. Anything past Pre-School's
     // capacity is Pre-School overflow. Record how many PFA seats each day consumes so the
     // ladder pass only sees the remainder.
