@@ -26,12 +26,12 @@
         .at-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;max-height:calc(100vh - 130px); }
         .at-head { padding:12px 20px;border-bottom:1px solid var(--sp-border); }
         .at-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
-        .at-body { overflow-y:auto;flex:1;padding:20px 24px; }
-        .at-room-name { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-bottom:4px;text-align:center; }
+        .at-body { overflow-y:auto;flex:1;padding:14px 18px; }
+        .at-room-name { font-size:1.02rem;font-weight:800;color:var(--sp-text);margin-bottom:3px;text-align:center; }
         /* Age range under the room title (e.g. "0 - 20 M" for a combined set). */
-        .at-room-age { font-size:0.78rem;font-weight:700;color:var(--sp-muted);text-align:center;margin-bottom:10px;letter-spacing:0.02em; }
+        .at-room-age { font-size:0.76rem;font-weight:700;color:var(--sp-muted);text-align:center;margin-bottom:8px;letter-spacing:0.02em; }
         /* Combine toggle for a paired room — a small pill button, centred under the title. */
-        .at-combine { text-align:center;margin-bottom:16px; }
+        .at-combine { text-align:center;margin-bottom:12px; }
         .at-combine-btn {
             border:1px solid var(--sp-accent);background:transparent;color:var(--sp-accent);
             font-size:0.72rem;font-weight:700;padding:4px 12px;border-radius:999px;cursor:pointer;
@@ -68,17 +68,17 @@
         /* ── Chart + roster comparison, side by side ──────────────────────────
            The day bars keep their width on the left; the two roster panels sit to the
            right and drop below on a narrow screen. */
-        .at-split { display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap; }
-        .at-split-chart { flex:0 0 340px;min-width:300px; }
-        .at-rosters-wrap { flex:1 1 460px;min-width:320px;display:flex;flex-direction:column;gap:10px; }
-        .at-rosters { display:flex;gap:18px;flex-wrap:wrap; }
+        .at-split { display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap; }
+        .at-split-chart { flex:0 0 300px;min-width:280px; }
+        .at-rosters-wrap { flex:1 1 480px;min-width:340px;display:flex;flex-direction:column;gap:10px;min-width:0; }
+        .at-rosters { display:flex;gap:14px;flex-wrap:nowrap;min-width:0; }
         /* Key for the pink second-room mark on a combined pair. */
         .at-side-legend { font-size:0.74rem;color:var(--sp-muted);display:flex;align-items:center;gap:7px;padding:2px 2px 0; }
         .at-side-legend strong { color:var(--sp-text-2);font-weight:700; }
 
         /* Each roster is a self-contained card: header strip, scrollable table, footer. */
         .at-rcard {
-            flex:1 1 300px;min-width:280px;display:flex;flex-direction:column;
+            flex:1 1 0;min-width:0;display:flex;flex-direction:column;
             background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:12px;
             overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,0.04);
         }
@@ -100,7 +100,10 @@
         .at-rscroll { overflow:visible; }
 
         /* ── The roster table — compact and calm ── */
-        .at-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.8rem; }
+        /* table-layout:fixed + the day columns' fixed widths let the Child column absorb all
+           the slack and TRUNCATE, so the five day columns always fit inside the card instead
+           of pushing Friday off the right edge. */
+        .at-table { width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;font-size:0.8rem; }
         .at-table thead th {
             background:var(--sp-surface-2);
             font-size:0.6rem;font-weight:800;text-transform:uppercase;letter-spacing:0.03em;
@@ -112,9 +115,9 @@
             background:var(--sp-accent-soft);color:var(--sp-accent);font-size:0.64rem;
             border-bottom:2px solid var(--sp-accent);
         }
-        .at-table th.at-tc-name, .at-table td.at-tc-name { text-align:left;padding-left:12px; }
-        .at-table th.at-tc-day,  .at-table td.at-tc-day  { text-align:center;width:26px; }
-        .at-table tbody td { padding:5px 3px;border-bottom:1px solid var(--sp-border);vertical-align:middle; }
+        .at-table th.at-tc-name, .at-table td.at-tc-name { text-align:left;padding-left:10px;width:auto; }
+        .at-table th.at-tc-day,  .at-table td.at-tc-day  { text-align:center;width:22px; }
+        .at-table tbody td { padding:3px 2px;border-bottom:1px solid var(--sp-border);vertical-align:middle; }
         .at-table tbody tr:last-child td { border-bottom:none; }
         .at-table tbody tr:nth-child(even) td { background:var(--sp-surface-2); }
         .at-table tbody tr:hover td { background:var(--sp-accent-soft); }
@@ -124,8 +127,10 @@
         .at-table tbody tr.at-blank:hover td,
         .at-table tbody tr.at-blank:nth-child(even) td { background:transparent; }
         /* Name on top, age (y/m/d) beneath — frees the Age column entirely. */
-        .at-tc-name { color:var(--sp-text);white-space:nowrap;line-height:1.2; }
-        .at-tc-name .nm { font-weight:700;font-size:0.82rem; }
+        .at-tc-name { color:var(--sp-text);white-space:nowrap;line-height:1.2;overflow:hidden; }
+        /* The name row: name truncates with an ellipsis if long, the PI/PFA tag stays put. */
+        .at-tc-name .nm { font-weight:700;font-size:0.82rem;display:flex;align-items:center;gap:4px;min-width:0; }
+        .at-tc-name .nm .nmtxt { overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0; }
         /* PI / PFA tag beside a name: green = in a program room (belongs), red = PI/PFA child
            sitting in a non-program (INCCRA) room. */
         .at-prog { font-size:0.6rem;font-weight:800;letter-spacing:0.03em;padding:1px 5px;border-radius:999px;vertical-align:middle; }
@@ -149,7 +154,7 @@
         /* Totals footer — a strong rule across the top sets it apart, and the per-day
            counts are bold. The total is its own standout number. */
         .at-table tfoot td {
-            background:var(--sp-surface-2);padding:9px 3px 10px;
+            background:var(--sp-surface-2);padding:6px 2px 7px;
             border-top:2px solid var(--sp-text-2);
             font-weight:800;font-size:0.82rem;color:var(--sp-text);font-variant-numeric:tabular-nums;text-align:center;
         }
@@ -703,7 +708,7 @@ function rosterPanel(roomNames) {
             tag = ` <span class="at-prog ${inProgramRoom ? 'ok' : 'bad'}">${prog}</span>`;
         }
         return `<tr class="${cls.join(' ')}">
-            <td class="at-tc-name"><div class="nm">${esc(c.name)}${tag}</div><div class="ag">${esc(fmtAge(c.birthDate, c.ageDays))}</div></td>
+            <td class="at-tc-name"><div class="nm"><span class="nmtxt">${esc(c.name)}</span>${tag}</div><div class="ag">${esc(fmtAge(c.birthDate, c.ageDays))}</div></td>
             ${dayCells}
         </tr>`;
     };
