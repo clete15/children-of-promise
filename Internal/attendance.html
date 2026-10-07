@@ -655,30 +655,36 @@ function rosterPanel(roomNames) {
     const blankRow = () => `<tr class="at-blank"><td class="at-tc-name"><div class="nm">&nbsp;</div><div class="ag">&nbsp;</div></td><td></td><td></td><td></td><td></td><td></td></tr>`;
 
     /* Merge the two rosters into aligned SLOTS so a child in BOTH columns sits on the same
-       row. Each slot is { a, p } (either may be null). A child shared by both columns gets
-       ONE slot holding both; a child on one side only gets a slot with the other side blank.
-       Slots are ordered youngest-first by the child's age (shared children carry the same
-       age on both sides). This pairs by identity (childKey) regardless of each list's
-       internal order, so a child the projection moved to a different position still lines up. */
+       row. Each slot is { a, p } (either may be null): a shared child fills one slot on both
+       sides; a one-sided child gets a slot with the other side blank.
+
+       Ordering rule: MATCHED children first (youngest-first), THEN the one-sided children at
+       the bottom (actual-only, then projected-only, each youngest-first). This guarantees a
+       blank spacer is never placed ABOVE a filled row on the opposite column — the matched
+       block (what you actually compare) stays gap-free, and an extra child the projection
+       seated (e.g. a waiting-list move-in) sinks below the last match instead of pushing a
+       blank in front of everyone. Pairing is by identity (childKey), so a child the
+       projection moved to a different position still lines up. */
     const alignedSlots = (aList, pList) => {
         const pByKey = {};
         pList.forEach(p => { pByKey[childKey(p)] = p; });
-        const slots = [];
-        const seen = {};
-        // Every actual child: paired with its projected twin when present.
+        const aByKey = {};
+        aList.forEach(a => { aByKey[childKey(a)] = a; });
+        const byAge = (x, y) => (x.age || 0) - (y.age || 0);
+
+        const matched = [], actualOnly = [], projectedOnly = [];
         aList.forEach(a => {
             const k = childKey(a);
-            seen[k] = true;
-            slots.push({ a, p: pByKey[k] || null, age: a.ageDays || 0 });
+            if (pByKey[k]) matched.push({ a, p: pByKey[k], age: a.ageDays || 0 });
+            else actualOnly.push({ a, p: null, age: a.ageDays || 0 });
         });
-        // Projected-only children (not already paired above).
         pList.forEach(p => {
             const k = childKey(p);
-            if (seen[k]) return;
-            slots.push({ a: null, p, age: p.ageDays || 0 });
+            if (!aByKey[k]) projectedOnly.push({ a: null, p, age: p.ageDays || 0 });
         });
-        // Stable youngest-first order across the merged set.
-        return slots.sort((x, y) => x.age - y.age);
+        matched.sort(byAge); actualOnly.sort(byAge); projectedOnly.sort(byAge);
+        // Matched block first, then the one-sided tails — so no blank sits above a match.
+        return matched.concat(actualOnly, projectedOnly);
     };
 
     // Body for one side of an aligned pair of tables: render the slot's child for `side`
