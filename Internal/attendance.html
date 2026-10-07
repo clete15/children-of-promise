@@ -650,13 +650,19 @@ async function fetchProjected() {
     cache.projected = projectedRows(data && data.projectedAttendance);
     if (!waitlistAll && data && data.waitlistChildren) {
         waitlistAll = waitlistFromRows(data.waitlistChildren);
+        // Default: every waiting-list child UNCHECKED (not seated). The director ticks the
+        // ones to try. On this first build we exclude them all, then re-fetch the projection
+        // so the opening view shows enrolled-only (== actual).
+        const needReproject = waitlistAll.some(c => !excludedIds.has(c.id));
+        waitlistAll.forEach(c => excludedIds.add(c.id));
+        if (needReproject) { try { await fetchProjected(); } catch (e) {} }
     }
 }
 
 /* The waiting-list rows -> stable filter entries. Columns:
    [Id, ChildName, BirthDate, AgeGroup, DaysRequested, Score, StartDate].
-   Youngest-first to match the projection's lens. The target ROOM is derived from the
-   age group the family applied for (a waitlist child has no assigned room yet). */
+   Ordered by requested START DATE (soonest first); entries with no start date fall to the
+   BOTTOM. The target ROOM is derived from the age group the family applied for. */
 function waitlistFromRows(rows) {
     const AGE_ROOM = { '0-2': 'Infant / Toddler', '2-3': '2 Year Old', '3-5': 'Pre-School', 'ba': 'Before & After' };
     // First name only; junk/placeholder names ("na", "unknown", blank) show as "??".
@@ -664,6 +670,9 @@ function waitlistFromRows(rows) {
         const first = String(raw || '').trim().split(/\s+/)[0] || '';
         return /^(na|n\/a|unknown|unk|\?+)$/i.test(first) || !first ? '\u2047' : first;  // ⁇
     };
+    // A sort key from the start date: parseable date → its time (soonest = smallest);
+    // missing/invalid → +Infinity so those rows sink to the bottom.
+    const startKey = s => { const t = Date.parse(String(s || '').trim()); return isNaN(t) ? Infinity : t; };
     return (rows || []).map(r => ({
         id: 'w' + (parseInt(r[0], 10) || 0),
         name: firstName(r[1]),
@@ -671,7 +680,11 @@ function waitlistFromRows(rows) {
         ageDays: (function () { const t = Date.parse(String(r[2] || '').trim()); return isNaN(t) ? Infinity : Math.floor((Date.now() - t) / 86400000); })(),
         room: AGE_ROOM[String(r[3] || '').trim()] || (r[3] || '\u2014'),
         startDate: String(r[6] || '').trim(),
-    })).sort((a, b) => (a.ageDays || 0) - (b.ageDays || 0));
+    })).sort((a, b) => {
+        const ka = startKey(a.startDate), kb = startKey(b.startDate);
+        if (ka !== kb) return ka - kb;              // soonest start first; no-date last
+        return (a.ageDays || 0) - (b.ageDays || 0); // tie-break youngest-first
+    });
 }
 
 /* Load what the current view needs, then render. BOTH datasets are loaded because the
