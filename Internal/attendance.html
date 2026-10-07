@@ -126,6 +126,11 @@
         /* Name on top, age (y/m/d) beneath — frees the Age column entirely. */
         .at-tc-name { color:var(--sp-text);white-space:nowrap;line-height:1.2; }
         .at-tc-name .nm { font-weight:700;font-size:0.82rem; }
+        /* PI / PFA tag beside a name: green = in a program room (belongs), red = PI/PFA child
+           sitting in a non-program (INCCRA) room. */
+        .at-prog { font-size:0.6rem;font-weight:800;letter-spacing:0.03em;padding:1px 5px;border-radius:999px;vertical-align:middle; }
+        .at-prog.ok  { color:var(--sp-good-fg,#16a34a);background:var(--sp-good-bg,rgba(22,163,74,0.14));border:1px solid var(--sp-good-br,rgba(22,163,74,0.4)); }
+        .at-prog.bad { color:var(--sp-bad-fg,#dc2626);background:var(--sp-bad-bg,rgba(220,38,38,0.12));border:1px solid var(--sp-bad-br,rgba(220,38,38,0.4)); }
         .at-tc-name .ag { font-weight:600;color:var(--sp-muted);font-size:0.68rem;margin-top:1px;font-variant-numeric:tabular-nums; }
 
         /* Weekday mark: a plain "1" on days the child is in the room, blank otherwise. */
@@ -623,10 +628,14 @@ function rosterPanel(roomNames) {
     const actual = actuals.length ? { capacity: actuals.reduce((s, r) => s + (r.capacity || 0), 0) } : null;
     const projected = projecteds.length ? { capacity: projecteds.reduce((s, r) => s + (r.capacity || 0), 0) } : null;
     // Union each side's children across the rooms, then sort youngest-first (as each room's
-    // own roster already is), so the merged list reads like a single room's.
+    // own roster already is), so the merged list reads like a single room's. Stamp each child
+    // with its SOURCE ROOM's program type so a PI/PFA tag can be coloured by whether the child
+    // sits in a program room (green = belongs) or not (red = PI/PFA child in an INCCRA room).
     const byAge = (a, b) => (a.ageDays || 0) - (b.ageDays || 0);
-    const actualList = actuals.flatMap(r => r.roster || []).slice().sort(byAge);
-    const projList = projecteds.flatMap(r => r.roster || []).slice().sort(byAge);
+    const flattenWithRoomType = rooms => rooms.flatMap(r =>
+        (r.roster || []).map(c => Object.assign({ roomType: (r.type || '').toString().trim().toUpperCase() }, c)));
+    const actualList = flattenWithRoomType(actuals).sort(byAge);
+    const projList = flattenWithRoomType(projecteds).sort(byAge);
 
     // Per-weekday totals across a roster — how many children occupy the room each day.
     const perDay = list => {
@@ -655,8 +664,17 @@ function rosterPanel(roomNames) {
             const second = side && side[d] === 2;
             return `<td class="at-tc-day"><span class="at-on${second ? ' at-room2' : ''}">1</span></td>`;
         }).join('');
+        // PI / PFA tag next to the name. GREEN when the child sits in a program room of their
+        // kind (they belong there); RED when they're a PI/PFA child in a non-program room
+        // (INCCRA / n/a) — the mismatch worth flagging.
+        const prog = (c.program || '').toString().trim().toUpperCase();
+        let tag = '';
+        if (prog === 'PI' || prog === 'PFA') {
+            const inProgramRoom = (c.roomType === 'PI' || c.roomType === 'PFA');
+            tag = ` <span class="at-prog ${inProgramRoom ? 'ok' : 'bad'}">${prog}</span>`;
+        }
         return `<tr class="${cls.join(' ')}">
-            <td class="at-tc-name"><div class="nm">${esc(c.name)}</div><div class="ag">${esc(fmtAge(c.birthDate, c.ageDays))}</div></td>
+            <td class="at-tc-name"><div class="nm">${esc(c.name)}${tag}</div><div class="ag">${esc(fmtAge(c.birthDate, c.ageDays))}</div></td>
             ${dayCells}
         </tr>`;
     };
