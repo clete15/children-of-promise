@@ -4111,22 +4111,35 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             for (let d = 0; d < 5; d++) { roomsOut[n].occupancy[d] += (taken[d] || 0); roomsOut[n].pfaPi[d] += (tp[d] || 0); }
         });
 
-        // Does unit u (index) have a free seat on EVERY day this child attends?
+        /* PAIRED-UNIT overflow tolerance (director's rule, Oct 2026): a PAIR of rooms may run
+           ONE child over its combined daily capacity on at most TWO days of the week. Singleton
+           units and Pre-School get NO tolerance. Tracked per unit:
+             overUsed[uIdx][d] — the single +1 slot on day d has been taken (day is +1 over).
+             overDays[uIdx]    — how many distinct days have used their +1 (hard cap: 2). */
+        const isPair = uIdx => unitRooms[uIdx].length > 1;
+        const overUsed = unitRooms.map(() => [0, 0, 0, 0, 0]);
+        const overDays = unitRooms.map(() => 0);
+
+        // Does unit u fit this child on EVERY day they attend (normal seat or allowed +1)?
         const unitFits = (uIdx, kid) => {
-            const rooms = unitRooms[uIdx];
-            if (!rooms.length) return false;
+            if (!unitRooms[uIdx].length) return false;
+            // Count how many NEW over-days this child would need, so two over-days aren't
+            // over-promised across the child's days.
+            let wouldUse = overDays[uIdx];
             for (let d = 0; d < 5; d++) {
                 if (!kid.days[d]) continue;
-                let freeThatDay = 0;
-                rooms.forEach(n => { freeThatDay += freeByRoom[n][d]; });
-                if (freeThatDay <= 0) return false;   // no seat in the whole unit this day
+                let free = 0; unitRooms[uIdx].forEach(n => { free += freeByRoom[n][d]; });
+                if (free > 0) continue;                      // normal seat
+                if (!isPair(uIdx)) return false;             // singleton with no seat → no fit
+                if (overUsed[uIdx][d]) return false;         // this day already at +1 (can't go +2)
+                if (wouldUse >= 2) return false;             // would exceed the 2-over-day budget
+                wouldUse++;                                   // tentatively spend one over-day
             }
             return true;
         };
 
-        // Place a seated child into the unit: for each attending day, take a seat from the
-        // first room in the unit with space (so a pair fills room 1 then spills to room 2),
-        // record the room-day occupancy and the child's in-room days for that room's roster.
+        // Place a seated child into the unit: each attending day takes a normal seat from the
+        // first room with space, or (paired, within budget) a +1 over-seat in the fuller room.
         const placeInUnit = (uIdx, kid) => {
             const rooms = unitRooms[uIdx];
             // "Moved" = seated in a UNIT that does NOT contain the child's actual room. Shifting
@@ -4136,8 +4149,14 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             const perRoomDays = {};   // roomNum -> [5] days this child sits in THAT room
             for (let d = 0; d < 5; d++) {
                 if (!kid.days[d]) continue;
-                const n = rooms.find(rn => freeByRoom[rn][d] > 0) || rooms[rooms.length - 1];
-                freeByRoom[n][d] = Math.max(freeByRoom[n][d] - 1, 0);
+                let n = rooms.find(rn => freeByRoom[rn][d] > 0);
+                if (n != null) {
+                    freeByRoom[n][d] = Math.max(freeByRoom[n][d] - 1, 0);
+                } else {
+                    // No normal seat — spend a +1 over-slot (paired units only; unitFits guards this).
+                    n = rooms[rooms.length - 1];             // put the extra in the pair's larger/last room
+                    if (!overUsed[uIdx][d]) { overUsed[uIdx][d] = 1; overDays[uIdx]++; }
+                }
                 const ro = roomsOut[n];
                 ro.occupancy[d]++;
                 if (kid.pfaPi) ro.pfaPi[d]++;
