@@ -27,10 +27,9 @@
         .at-head { padding:12px 20px;border-bottom:1px solid var(--sp-border); }
         .at-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
         .at-body { overflow-y:auto;flex:1;padding:20px 24px; }
-        .at-room-name { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-bottom:16px;text-align:center; }
-        /* Stacked rooms of a paired set: the second (and any further) member sits directly
-           beneath the first, separated by a hairline so each still reads as its own room. */
-        .at-roomblock-next { margin-top:24px;padding-top:24px;border-top:1px dashed var(--sp-border); }
+        .at-room-name { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-bottom:4px;text-align:center; }
+        /* Age range under the room title (e.g. "0 - 20 M" for a combined set). */
+        .at-room-age { font-size:0.78rem;font-weight:700;color:var(--sp-muted);text-align:center;margin-bottom:16px;letter-spacing:0.02em; }
         .at-chart { display:flex;align-items:flex-end;gap:14px;padding:0 8px; }
         .at-col { display:flex;flex-direction:column;align-items:center;gap:8px;flex:1; }
         .at-count { font-size:0.9rem;font-weight:800;color:var(--sp-text); }
@@ -304,21 +303,57 @@ const ROOM_SET_BY_KEY = (() => {
     });
     return m;
 })();
-/* The sidebar-row indices that make up the set the room at `idx` belongs to, SELF FIRST
-   then the other members in set order, filtered to rooms that actually exist in this view.
-   A room in no set returns just [idx]. */
+/* The sidebar-row indices that make up the set the room at `idx` belongs to, in age-ladder
+   (youngest-first) order, filtered to rooms that actually exist in this view. A room in no
+   set returns just [idx]. Combining a set means merging these rooms into one view, so the
+   order is the ladder order, not "the clicked room first". */
 function setIndices(idx) {
     const list = rows();
     const r = list[idx];
     if (!r) return [idx];
     const setKeys = ROOM_SET_BY_KEY[roomKey(r.room)];
     if (!setKeys) return [idx];
-    // Map each set member name to its row index in this view; keep the selected room first.
+    // Map each set member name to its row index in this view, kept in set (ladder) order.
     const byKey = {};
     list.forEach((row, i) => { byKey[roomKey(row.room)] = i; });
-    const ordered = [idx].concat(setKeys.map(k => byKey[k]).filter(i => i != null && i !== idx));
-    // De-dupe while preserving order.
-    return ordered.filter((v, i) => ordered.indexOf(v) === i);
+    const ordered = setKeys.map(k => byKey[k]).filter(i => i != null);
+    return ordered.length ? ordered : [idx];
+}
+
+/* Each room's age range in MONTHS, mirroring dimClassrooms.AgeRange (see
+   Internal/setup_classrooms.sql / rename_rooms_2026.sql — the authoritative source). Keyed
+   by normalised room name. Year-based rooms (Pre-School, Before & After) carry a display
+   string instead of month bounds, since "3 - 5 yrs" shouldn't be shown as "36 - 60 M".
+   {lo,hi} are inclusive month bounds; `text` overrides with a literal label. */
+const ROOM_AGE_RANGE = {
+    [roomKey('Infant')]:                  { lo: 0,  hi: 12 },
+    [roomKey('Infants / Toddlers')]:      { lo: 8,  hi: 20 },
+    [roomKey('Toddlers')]:                { lo: 15, hi: 24 },
+    [roomKey('Toddlers / 2 Year Olds')]:  { lo: 18, hi: 36 },
+    [roomKey('2 Year Olds')]:             { lo: 24, hi: 36 },
+    [roomKey('2 & 3 Year Olds')]:         { lo: 24, hi: 48 },
+    [roomKey('Pre-School')]:              { text: '3 - 5 yrs' },
+    [roomKey('Before and Afterschool')]:  { text: '5 - 12 yrs' },
+};
+/* A display age range for one or more rooms. For month-bounded rooms it spans the lowest
+   low to the highest high across the given room names and reads "N - M M" (e.g. combining
+   Infant 0-12 + Infants/Toddlers 8-20 -> "0 - 20 M"). If every room shares one literal
+   `text`, that is shown; a mix of month-bounds and text rooms falls back to the month span
+   it can compute, else ''. */
+function ageRangeLabel(roomNames) {
+    const defs = roomNames.map(nm => ROOM_AGE_RANGE[roomKey(nm)]).filter(Boolean);
+    if (!defs.length) return '';
+    const texts = defs.filter(d => d.text);
+    const bounds = defs.filter(d => d.lo != null);
+    if (texts.length && !bounds.length) {
+        // All literal — show the single label if they agree, else join distinct ones.
+        const uniq = Array.from(new Set(texts.map(d => d.text)));
+        return uniq.join(' / ');
+    }
+    if (!bounds.length) return '';
+    const lo = Math.min.apply(null, bounds.map(d => d.lo));
+    const hi = Math.max.apply(null, bounds.map(d => d.hi));
+    return lo + ' - ' + hi + ' M';
 }
 
 function esc(v) {
@@ -443,9 +478,9 @@ function renderSidebar() {
 
 function showRoom(idx) {
     activeRoom = idx;
-    // A paired room shows its whole SET — the selected room first, its partner stacked
-    // directly beneath (the director's "line them up together"). The sidebar lights up
-    // every member of the set, not just the one clicked.
+    // A paired room shows its whole SET COMBINED into one view (merged chart + one roster
+    // spanning both rooms). The sidebar lights up every member of the set, not just the one
+    // clicked. A room in no set is just itself.
     const group = setIndices(idx);
     const groupSet = new Set(group);
     rows().forEach((_, i) => {
@@ -453,25 +488,31 @@ function showRoom(idx) {
         if (btn) btn.classList.toggle('on', groupSet.has(i));
     });
 
-    const parts = group.map(i => roomBlock(i)).filter(Boolean);
-    if (!parts.length) return;
-    // Stacked set members get a hairline divider between them so each reads as its own room.
-    const html = parts.map((b, i) => `<div class="at-roomblock${i ? ' at-roomblock-next' : ''}">${b}</div>`).join('');
+    const html = roomBlock(group);
+    if (!html) return;
     document.getElementById('atBody').innerHTML = html;
 }
 
-/* One room's heading + chart + roster panel. Rendered once per selected single room, and
-   once per member of a paired set (stacked). Returns '' if the row is missing. */
-function roomBlock(idx) {
-    const r = rows()[idx];
-    if (!r) return '';
-    const room = r.room;
-    const capacity = Math.max(isNaN(r.capacity) ? 1 : r.capacity, 1);
-    let anyOver = false;
+/* Heading (+ age range) + chart + roster panel for a selected unit. `idxs` is the row
+   indices of the one room, or of a whole set to COMBINE: per-day counts/overflow are
+   summed, capacities added, the title joins the room names, and the roster spans every
+   room. Returns '' if no row is present. */
+function roomBlock(idxs) {
+    const list = rows();
+    const sel = idxs.map(i => list[i]).filter(Boolean);
+    if (!sel.length) return '';
 
+    const roomNames = sel.map(r => r.room);
+    const title = roomNames.join(' + ');
+    const capacity = Math.max(sel.reduce((s, r) => s + (isNaN(r.capacity) ? 0 : r.capacity), 0), 1);
+    // Combined per-day occupancy + overflow across every room in the set.
+    const counts = [0, 0, 0, 0, 0], overflow = [0, 0, 0, 0, 0];
+    sel.forEach(r => { for (let d = 0; d < 5; d++) { counts[d] += (r.counts[d] || 0); overflow[d] += (r.overflow[d] || 0); } });
+
+    let anyOver = false;
     const cols = DAYS.map((day, i) => {
-        const count = r.counts[i] || 0;
-        const over = r.overflow[i] || 0;
+        const count = counts[i] || 0;
+        const over = overflow[i] || 0;
         // Actual: over is "count exceeds capacity". Projected: over is the ladder overflow.
         const isOver = view === 'projected' ? over > 0 : count > capacity;
         if (isOver) anyOver = true;
@@ -498,14 +539,18 @@ function roomBlock(idx) {
         ? '<div class="at-note"><span class="at-over-flag">Over capacity — the age ladder cannot seat everyone on the flagged days. This only shows on Pre-School, the last room; the overflow are the oldest children.</span></div>'
         : '';
 
+    const ageRange = ageRangeLabel(roomNames);
+    const ageLine = ageRange ? `<div class="at-room-age">${esc(ageRange)}</div>` : '';
+
     return `
-        <div class="at-room-name">${esc(room)}</div>
+        <div class="at-room-name">${esc(title)}</div>
+        ${ageLine}
         <div class="at-split">
             <div class="at-split-chart">
                 <div class="at-chart" style="height:${CHART_H + 56}px;">${cols}</div>
                 ${legend}${note}
             </div>
-            ${rosterPanel(room)}
+            ${rosterPanel(roomNames)}
         </div>`;
 }
 
@@ -514,14 +559,22 @@ function roomInView(which, roomName) {
     return (cache[which] || []).find(r => r.room === roomName) || null;
 }
 
-/* The side-by-side Actual vs Projected roster for one room, youngest-first, with the
-   ages that make the fill test meaningful. A child only in the projected list is a
-   "moved in"; a waiting-list child and an unseated (overflow) child are flagged too. */
-function rosterPanel(roomName) {
-    const actual = roomInView('actual', roomName);
-    const projected = roomInView('projected', roomName);
-    const actualList = (actual && actual.roster) || [];
-    const projList = (projected && projected.roster) || [];
+/* The side-by-side Actual vs Projected roster for one room OR a combined set, youngest-first,
+   with the ages that make the fill test meaningful. A child only in the projected list is a
+   "moved in"; a waiting-list child and an unseated (overflow) child are flagged too.
+   `roomNames` is one room, or every room of a set to merge — the rosters and capacities are
+   unioned so a combined set reads as one list. */
+function rosterPanel(roomNames) {
+    if (typeof roomNames === 'string') roomNames = [roomNames];
+    const actuals = roomNames.map(nm => roomInView('actual', nm)).filter(Boolean);
+    const projecteds = roomNames.map(nm => roomInView('projected', nm)).filter(Boolean);
+    const actual = actuals.length ? { capacity: actuals.reduce((s, r) => s + (r.capacity || 0), 0) } : null;
+    const projected = projecteds.length ? { capacity: projecteds.reduce((s, r) => s + (r.capacity || 0), 0) } : null;
+    // Union each side's children across the rooms, then sort youngest-first (as each room's
+    // own roster already is), so the merged list reads like a single room's.
+    const byAge = (a, b) => (a.ageDays || 0) - (b.ageDays || 0);
+    const actualList = actuals.flatMap(r => r.roster || []).slice().sort(byAge);
+    const projList = projecteds.flatMap(r => r.roster || []).slice().sort(byAge);
 
     // Per-weekday totals across a roster — how many children occupy the room each day.
     const perDay = list => {
