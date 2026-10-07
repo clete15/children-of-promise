@@ -153,6 +153,7 @@
             font-size:0.68rem;color:var(--sp-muted);padding:8px 14px;
             border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;gap:8px;
         }
+        .at-filter-actions { display:inline-flex;gap:10px;flex-shrink:0; }
         .at-filter-reset {
             font-size:0.66rem;font-weight:800;color:var(--sp-accent);background:none;border:none;cursor:pointer;
             padding:2px 4px;white-space:nowrap;
@@ -565,14 +566,21 @@ function renderFilter() {
             </span>
         </li>`;
     }).join('');
-    const resetBtn = excludedIds.size
+    // Two quick actions: "Clear" unchecks everyone (none seated); "Show all" re-checks
+    // everyone. Each shows only when it would do something.
+    const clearBtn = seated > 0
+        ? '<button type="button" class="at-filter-reset" onclick="clearFilter()">Clear</button>' : '';
+    const showAllBtn = excludedIds.size
         ? '<button type="button" class="at-filter-reset" onclick="resetFilter()">Show all</button>' : '';
     box.innerHTML = `<div class="at-filter">
         <div class="at-filter-head">
             <span class="at-filter-title">Waiting list</span>
             <span class="at-filter-count">${seated}/${waitlistAll.length}</span>
         </div>
-        <div class="at-filter-sub">Tick a child to seat them in the projection.${resetBtn}</div>
+        <div class="at-filter-sub">
+            <span>Tick a child to seat them in the projection.</span>
+            <span class="at-filter-actions">${showAllBtn}${clearBtn}</span>
+        </div>
         <ul class="at-filter-list">${items}</ul>
     </div>`;
 }
@@ -591,6 +599,16 @@ function toggleChild(id, checked) {
 
 function resetFilter() {
     excludedIds.clear();
+    renderFilter();
+    clearTimeout(_filterTimer);
+    _filterTimer = setTimeout(reprojectAndRender, 0);
+}
+
+/* Clear = uncheck every waiting-list child, so NONE are seated in the projection — the
+   rooms show just the currently enrolled children. */
+function clearFilter() {
+    excludedIds.clear();
+    (waitlistAll || []).forEach(c => excludedIds.add(c.id));
     renderFilter();
     clearTimeout(_filterTimer);
     _filterTimer = setTimeout(reprojectAndRender, 0);
