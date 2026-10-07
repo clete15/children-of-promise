@@ -521,13 +521,18 @@ function rosterPanel(roomName) {
             ${inner}
         </div>`;
 
-    // Only the roster for the current view. The waiting-list filter is rendered SEPARATELY
-    // into #atFilter (outside this card) by renderFilter().
-    const theCard = view === 'projected'
-        ? card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-               'No children seated here.', { markNew: actualNames })
-        : card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-               'No children currently in this room.', {});
+    // Actual view: just the Actual roster.
+    // Projected view: Actual on the LEFT, Projected on the RIGHT, so the two compare side by
+    // side. (The waiting-list filter is rendered separately into #atFilter, further right.)
+    if (view === 'projected') {
+        const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
+                                 'No children currently in this room.', {});
+        const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
+                              'No children seated here.', { markNew: actualNames });
+        return `<div class="at-rosters">${actualCard}${projCard}</div>`;
+    }
+    const theCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
+                         'No children currently in this room.', {});
     return `<div class="at-rosters">${theCard}</div>`;
 }
 
