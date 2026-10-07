@@ -654,37 +654,49 @@ function rosterPanel(roomNames) {
     // on this slot stays lined up. Empty name + five empty day cells.
     const blankRow = () => `<tr class="at-blank"><td class="at-tc-name"><div class="nm">&nbsp;</div><div class="ag">&nbsp;</div></td><td></td><td></td><td></td><td></td><td></td></tr>`;
 
-    /* Merge the two rosters into aligned SLOTS so a child in BOTH columns sits on the same
-       row. Each slot is { a, p } (either may be null): a shared child fills one slot on both
-       sides; a one-sided child gets a slot with the other side blank.
+    /* Merge the two rosters into aligned SLOTS so the columns read side by side. Each slot is
+       { a, p } (either may be null).
 
-       Ordering rule: MATCHED children first (youngest-first), THEN the one-sided children at
-       the bottom (actual-only, then projected-only, each youngest-first). This guarantees a
-       blank spacer is never placed ABOVE a filled row on the opposite column — the matched
-       block (what you actually compare) stays gap-free, and an extra child the projection
-       seated (e.g. a waiting-list move-in) sinks below the last match instead of pushing a
-       blank in front of everyone. Pairing is by identity (childKey), so a child the
-       projection moved to a different position still lines up. */
+       A child in BOTH columns is an ANCHOR: it fills one slot on both sides and holds that
+       row. Between anchors (and before the first / after the last), the leftover one-sided
+       children are ZIPPED positionally: the first actual-only child shares a row with the
+       first projected-only child, the second with the second, and so on. A blank appears
+       only where one side's segment runs out — i.e. BELOW the filled rows of that segment,
+       never above a filled row. (So e.g. after the last shared child, Daniel lines up with
+       the first projected-only child, Brayden with the second.)
+
+       Shared children sit in the same relative order in both lists (both are age-sorted and
+       a shared child carries the same age on each side), so splitting each list at the
+       anchors yields matching segments. Pairing is by identity (childKey). */
     const alignedSlots = (aList, pList) => {
-        const pByKey = {};
-        pList.forEach(p => { pByKey[childKey(p)] = p; });
-        const aByKey = {};
-        aList.forEach(a => { aByKey[childKey(a)] = a; });
-        const byAge = (x, y) => (x.age || 0) - (y.age || 0);
+        const inA = {}; aList.forEach(a => { inA[childKey(a)] = true; });
+        const inP = {}; pList.forEach(p => { inP[childKey(p)] = true; });
+        const shared = c => inA[childKey(c)] && inP[childKey(c)];
 
-        const matched = [], actualOnly = [], projectedOnly = [];
-        aList.forEach(a => {
-            const k = childKey(a);
-            if (pByKey[k]) matched.push({ a, p: pByKey[k], age: a.ageDays || 0 });
-            else actualOnly.push({ a, p: null, age: a.ageDays || 0 });
-        });
-        pList.forEach(p => {
-            const k = childKey(p);
-            if (!aByKey[k]) projectedOnly.push({ a: null, p, age: p.ageDays || 0 });
-        });
-        matched.sort(byAge); actualOnly.sort(byAge); projectedOnly.sort(byAge);
-        // Matched block first, then the one-sided tails — so no blank sits above a match.
-        return matched.concat(actualOnly, projectedOnly);
+        // Split a list into [segment, anchor, segment, anchor, ..., segment] where anchors
+        // are the shared children (in order) and segments are the one-sided runs between.
+        const split = list => {
+            const segs = [[]], anchors = [];
+            list.forEach(c => {
+                if (shared(c)) { anchors.push(c); segs.push([]); }
+                else segs[segs.length - 1].push(c);
+            });
+            return { segs, anchors };
+        };
+        const A = split(aList), P = split(pList);
+
+        const slots = [];
+        const nSeg = Math.max(A.segs.length, P.segs.length);
+        for (let s = 0; s < nSeg; s++) {
+            const aSeg = A.segs[s] || [], pSeg = P.segs[s] || [];
+            // Zip the one-sided children of this segment positionally; blank fills the shorter.
+            const rows = Math.max(aSeg.length, pSeg.length);
+            for (let i = 0; i < rows; i++) slots.push({ a: aSeg[i] || null, p: pSeg[i] || null });
+            // The anchor that closes this segment (shared child on both sides).
+            const anchor = A.anchors[s];
+            if (anchor) slots.push({ a: anchor, p: P.anchors[s] || anchor });
+        }
+        return slots;
     };
 
     // Body for one side of an aligned pair of tables: render the slot's child for `side`
