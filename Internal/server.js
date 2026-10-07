@@ -4017,6 +4017,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             age: ageInDays(e[3], e[4]),
             days: [parseInt(e[6], 10) ? 1 : 0, parseInt(e[7], 10) ? 1 : 0, parseInt(e[8], 10) ? 1 : 0, parseInt(e[9], 10) ? 1 : 0, parseInt(e[10], 10) ? 1 : 0],
             source: 'enrolled',       // where this child comes from, for the roster view
+            actualRoom: roomNum,      // the room the child is actually in now (for "moved" flag)
             // Whether this child counts toward a room's PI/PFA tally in the projection.
             pfaPi: (prog === 'PI' || prog === 'PFA'),
             // The specific program ('PI' / 'PFA' / '') so the sidebar can label a room by
@@ -4118,6 +4119,10 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         // record the room-day occupancy and the child's in-room days for that room's roster.
         const placeInUnit = (uIdx, kid) => {
             const rooms = unitRooms[uIdx];
+            // "Moved" = seated in a UNIT that does NOT contain the child's actual room. Shifting
+            // between the two rooms of a paired unit is NOT a move (same unit), so it does not
+            // flag. A waitlist child has no actualRoom, so they always read as moved (new).
+            const moved = rooms.indexOf(kid.actualRoom) === -1;
             const perRoomDays = {};   // roomNum -> [5] days this child sits in THAT room
             for (let d = 0; d < 5; d++) {
                 if (!kid.days[d]) continue;
@@ -4128,7 +4133,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
                 if (kid.pfaPi) ro.pfaPi[d]++;
                 (perRoomDays[n] = perRoomDays[n] || [0, 0, 0, 0, 0])[d] = 1;
             }
-            Object.keys(perRoomDays).forEach(n => addRoster(roomsOut[n], kid, perRoomDays[n], false));
+            Object.keys(perRoomDays).forEach(n => addRoster(roomsOut[n], kid, perRoomDays[n], false, moved));
         };
 
         // Charge an unseated child to the last unit's last room as overflow (whole week).
@@ -4137,15 +4142,18 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             const n = lastRooms[lastRooms.length - 1];
             if (!n) return;
             const ro = roomsOut[n];
+            const moved = lastRooms.indexOf(kid.actualRoom) === -1;
             for (let d = 0; d < 5; d++) if (kid.days[d]) ro.overflow[d]++;
-            addRoster(ro, kid, kid.days.map(x => x ? 1 : 0), true);
+            addRoster(ro, kid, kid.days.map(x => x ? 1 : 0), true, moved);
         };
 
         // One roster entry per child per room, with the days the child occupies THAT room.
-        const addRoster = (ro, kid, inRoomDays, overflow) => {
+        // `moved` is true only for a genuine cross-UNIT move (not a within-pair shift), so
+        // the client highlights only real promotions, not pair flex.
+        const addRoster = (ro, kid, inRoomDays, overflow, moved) => {
             ro.roster.push({ id: kid.id || 0, name: kid.name, birthDate: kid.birthDate || '',
                 ageDays: kid.age, source: kid.source || 'enrolled', pfaPi: !!kid.pfaPi,
-                program: kid.program || '', overflow: !!overflow, days: inRoomDays });
+                program: kid.program || '', overflow: !!overflow, movedUnit: !!moved, days: inRoomDays });
         };
 
         // Seat youngest-first. A child starts at their HOME unit (the youngest unit their

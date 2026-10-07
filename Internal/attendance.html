@@ -465,9 +465,6 @@ function rosterPanel(roomName) {
     const actualList = (actual && actual.roster) || [];
     const projList = (projected && projected.roster) || [];
 
-    // Names currently in this room (actual), so the projected table can flag new arrivals.
-    const actualNames = new Set(actualList.map(c => c.name));
-
     // Per-weekday totals across a roster — how many children occupy the room each day.
     const perDay = list => {
         const t = [0, 0, 0, 0, 0];
@@ -479,7 +476,10 @@ function rosterPanel(roomName) {
     // chip per day. Row accents: green = moved in by the projection, red = couldn't seat.
     const rowHtml = (c, opts) => {
         opts = opts || {};
-        const movedIn = opts.markNew && !opts.markNew.has(c.name);
+        // Green only for a genuine cross-UNIT move the server flagged — shifting between the
+        // two rooms of a paired set is NOT a move and must not highlight. (opts.markGreen
+        // gates this to the projected card only.)
+        const movedIn = opts.markGreen && c.movedUnit;
         const cls = [];
         if (movedIn && !c.overflow) cls.push('at-moved-in');
         if (c.overflow) cls.push('at-overflow');
@@ -528,7 +528,7 @@ function rosterPanel(roomName) {
         const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
                                  'No children currently in this room.', {});
         const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-                              'No children seated here.', { markNew: actualNames });
+                              'No children seated here.', { markGreen: true });
         return `<div class="at-rosters">${actualCard}${projCard}</div>`;
     }
     const theCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
