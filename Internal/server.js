@@ -3985,6 +3985,13 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         for (let u = 0; u < unitMaxMonths.length; u++) if (months <= unitMaxMonths[u]) return u;
         return unitMaxMonths.length - 1;
     };
+    // The ladder-unit index that contains a given room number, or -1 if the room is not on
+    // the ladder (e.g. a standalone room). Used to floor an enrolled child's home at the
+    // unit they are ALREADY in, so the projection never demotes a child to a younger room.
+    const unitIndexOfRoom = roomNum => {
+        for (let u = 0; u < PROJ_LADDER_UNITS.length; u++) if (PROJ_LADDER_UNITS[u].indexOf(roomNum) !== -1) return u;
+        return -1;
+    };
 
     // Which rooms are "in scope" for the projection at all (the ladder + the standalones).
     const inScope = new Set([].concat(PROJ_LADDER_ROOMS, PROJ_STANDALONE_ROOMS));
@@ -4023,9 +4030,12 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             // The specific program ('PI' / 'PFA' / '') so the sidebar can label a room by
             // the children it holds — e.g. 3 PI children in an INCCRA room reads "3 PI".
             program: (prog === 'PI' || prog === 'PFA') ? prog : '',
-            // Youngest unit this child still belongs in by age — never seated below it
-            // (except as a last resort when every unit is full). ageInDays → months.
-            home: homeUnitIndex(ageInDays(e[3], e[4]) / 30.44),
+            // Youngest unit this child may be seated in. By age they belong no lower than
+            // their age-home; but an ENROLLED child is also never demoted below the unit
+            // they are ALREADY in — so a 19-month-old already in a 2-year-old room stays at
+            // that unit, not pulled back down into Infants/Toddlers. Take the higher of the
+            // two. (Rooms off the ladder give -1, which never raises the floor.)
+            home: Math.max(homeUnitIndex(ageInDays(e[3], e[4]) / 30.44), unitIndexOfRoom(roomNum)),
         };
         if (PROJ_STANDALONE_ROOMS.indexOf(roomNum) !== -1) { standaloneKids.push(kid); return; }
         const isPFA = prog === 'PFA';
