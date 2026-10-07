@@ -3879,6 +3879,22 @@ const PROJ_STANDALONE_ROOMS = [8];
    Confirmed with the director (Oct 2026). */
 const PROJ_LADDER_UNITS = [[1, 2], [3], [4, 5], [7], [6]];
 
+/* Per-UNIT over-capacity tolerance for the projection (director's planning allowance — how
+   far a unit may be seated OVER its combined DCFS capacity before a child overflows).
+   Keyed by the unit's room numbers joined with '-'. Each entry:
+     perDay  — how many children a unit may run over its combined daily capacity.
+     maxDays — on how many distinct weekdays that over-fill is allowed (so a part-week rule
+               can be expressed; use 5 to allow it every day, which is what a FULL-TIME extra
+               child needs).
+   Unlisted paired units fall back to the default below; singleton units get NO tolerance.
+     • {1 Infant, 2 Infants/Toddlers}: the director confirmed (Oct 2026) this pair can run
+       TWO over, every day — i.e. a second full-time child still fits in the projection.
+     • {4 Toddlers/2yr, 5 2 Year Olds}: the earlier +1-on-at-most-2-days rule (default). */
+const PROJ_PAIR_OVER_DEFAULT = { perDay: 1, maxDays: 2 };
+const PROJ_UNIT_OVER = {
+    '1-2': { perDay: 2, maxDays: 5 },
+};
+
 /* The display order of rooms, youngest-first — the SAME age ladder as PROJ_LADDER_ROOMS
    (plus Before & After last). RoomNumber alone sorts 6 (Pre-School) before 7 (2 & 3 Year
    Olds), which is the wrong age order, so every room-ordered query sorts by this CASE
@@ -4111,29 +4127,39 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             for (let d = 0; d < 5; d++) { roomsOut[n].occupancy[d] += (taken[d] || 0); roomsOut[n].pfaPi[d] += (tp[d] || 0); }
         });
 
-        /* PAIRED-UNIT overflow tolerance (director's rule, Oct 2026): a PAIR of rooms may run
-           ONE child over its combined daily capacity on at most TWO days of the week. Singleton
-           units and Pre-School get NO tolerance. Tracked per unit:
-             overUsed[uIdx][d] — the single +1 slot on day d has been taken (day is +1 over).
-             overDays[uIdx]    — how many distinct days have used their +1 (hard cap: 2). */
+        /* PAIRED-UNIT overflow tolerance (director's rule): a PAIR of rooms may run a few
+           children OVER its combined daily capacity, within a per-unit budget (PROJ_UNIT_OVER
+           / PROJ_PAIR_OVER_DEFAULT): `perDay` extra children per day, on at most `maxDays`
+           distinct weekdays. Singleton units and Pre-School get NO tolerance. Tracked per unit:
+             overUsed[uIdx][d] — how many over-slots day d has spent so far (0..perDay).
+             overDays[uIdx]    — how many distinct days have gone over at all (cap: maxDays). */
         const isPair = uIdx => unitRooms[uIdx].length > 1;
+        // The tolerance for a unit: look up its room-set key, else the paired default, else none.
+        const overCfg = uIdx => {
+            if (!isPair(uIdx)) return { perDay: 0, maxDays: 0 };
+            const key = unitRooms[uIdx].join('-');
+            return PROJ_UNIT_OVER[key] || PROJ_PAIR_OVER_DEFAULT;
+        };
         const overUsed = unitRooms.map(() => [0, 0, 0, 0, 0]);
         const overDays = unitRooms.map(() => 0);
 
-        // Does unit u fit this child on EVERY day they attend (normal seat or allowed +1)?
+        // Does unit u fit this child on EVERY day they attend (normal seat or an allowed over-slot)?
         const unitFits = (uIdx, kid) => {
             if (!unitRooms[uIdx].length) return false;
-            // Count how many NEW over-days this child would need, so two over-days aren't
-            // over-promised across the child's days.
-            let wouldUse = overDays[uIdx];
+            const cfg = overCfg(uIdx);
+            // Track, within THIS child's placement, the over-slots we'd tentatively spend so a
+            // single child can't over-promise beyond the per-day or the whole-week budget.
+            let wouldDays = overDays[uIdx];               // distinct over-days used so far
+            const wouldUsed = overUsed[uIdx].slice();     // per-day over-count, mutated tentatively
             for (let d = 0; d < 5; d++) {
                 if (!kid.days[d]) continue;
                 let free = 0; unitRooms[uIdx].forEach(n => { free += freeByRoom[n][d]; });
                 if (free > 0) continue;                      // normal seat
-                if (!isPair(uIdx)) return false;             // singleton with no seat → no fit
-                if (overUsed[uIdx][d]) return false;         // this day already at +1 (can't go +2)
-                if (wouldUse >= 2) return false;             // would exceed the 2-over-day budget
-                wouldUse++;                                   // tentatively spend one over-day
+                if (!cfg.perDay) return false;               // no tolerance (singleton) → no fit
+                if (wouldUsed[d] >= cfg.perDay) return false;    // this day already at its +perDay cap
+                if (wouldUsed[d] === 0 && wouldDays >= cfg.maxDays) return false;  // a NEW over-day beyond budget
+                if (wouldUsed[d] === 0) wouldDays++;         // first over on this day uses an over-day
+                wouldUsed[d]++;                              // tentatively spend one over-slot
             }
             return true;
         };
@@ -4153,9 +4179,10 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
                 if (n != null) {
                     freeByRoom[n][d] = Math.max(freeByRoom[n][d] - 1, 0);
                 } else {
-                    // No normal seat — spend a +1 over-slot (paired units only; unitFits guards this).
+                    // No normal seat — spend an over-slot (paired units only; unitFits guards this).
                     n = rooms[rooms.length - 1];             // put the extra in the pair's larger/last room
-                    if (!overUsed[uIdx][d]) { overUsed[uIdx][d] = 1; overDays[uIdx]++; }
+                    if (!overUsed[uIdx][d]) overDays[uIdx]++;   // first over on this day uses an over-day
+                    overUsed[uIdx][d]++;                        // count the over-slot (may reach perDay)
                 }
                 const ro = roomsOut[n];
                 ro.occupancy[d]++;
