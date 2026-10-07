@@ -28,6 +28,9 @@
         .at-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
         .at-body { overflow-y:auto;flex:1;padding:20px 24px; }
         .at-room-name { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-bottom:16px;text-align:center; }
+        /* Stacked rooms of a paired set: the second (and any further) member sits directly
+           beneath the first, separated by a hairline so each still reads as its own room. */
+        .at-roomblock-next { margin-top:24px;padding-top:24px;border-top:1px dashed var(--sp-border); }
         .at-chart { display:flex;align-items:flex-end;gap:14px;padding:0 8px; }
         .at-col { display:flex;flex-direction:column;align-items:center;gap:8px;flex:1; }
         .at-count { font-size:0.9rem;font-weight:800;color:var(--sp-text); }
@@ -278,6 +281,46 @@ let waitlistAll = null;
 // Waiting-list filter keys ('w'+Id) that are UNCHECKED — excluded from the projection.
 const excludedIds = new Set();
 
+/* Paired room SETS, matching the server's PROJ_LADDER_UNITS pairs ({1 Infant,
+   2 Infants/Toddlers} and {4 Toddlers/2yr, 5 2 Year Olds}): the two rooms of a set share an
+   age band and a child flexes between them, so the director wants to see them TOGETHER.
+   Selecting either room of a set shows BOTH, the partner stacked directly beneath. Keyed by
+   normalised room NAME (both views carry the name; only projected carries a number). */
+const ROOM_SETS = [
+    ['Infant', 'Infants / Toddlers'],
+    ['Toddlers / 2 Year Olds', '2 Year Olds'],
+];
+// Normalise a room name for matching: lowercase, collapse runs of spaces/slashes to one space.
+function roomKey(name) {
+    return String(name || '').toLowerCase().replace(/[\s/]+/g, ' ').trim();
+}
+// Build a lookup: normalised room name -> the normalised names of its full set (self first),
+// or null when the room is not in any set.
+const ROOM_SET_BY_KEY = (() => {
+    const m = {};
+    ROOM_SETS.forEach(set => {
+        const keys = set.map(roomKey);
+        keys.forEach(k => { m[k] = keys; });
+    });
+    return m;
+})();
+/* The sidebar-row indices that make up the set the room at `idx` belongs to, SELF FIRST
+   then the other members in set order, filtered to rooms that actually exist in this view.
+   A room in no set returns just [idx]. */
+function setIndices(idx) {
+    const list = rows();
+    const r = list[idx];
+    if (!r) return [idx];
+    const setKeys = ROOM_SET_BY_KEY[roomKey(r.room)];
+    if (!setKeys) return [idx];
+    // Map each set member name to its row index in this view; keep the selected room first.
+    const byKey = {};
+    list.forEach((row, i) => { byKey[roomKey(row.room)] = i; });
+    const ordered = [idx].concat(setKeys.map(k => byKey[k]).filter(i => i != null && i !== idx));
+    // De-dupe while preserving order.
+    return ordered.filter((v, i) => ordered.indexOf(v) === i);
+}
+
 function esc(v) {
     return String(v == null ? '' : v)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -400,13 +443,28 @@ function renderSidebar() {
 
 function showRoom(idx) {
     activeRoom = idx;
+    // A paired room shows its whole SET — the selected room first, its partner stacked
+    // directly beneath (the director's "line them up together"). The sidebar lights up
+    // every member of the set, not just the one clicked.
+    const group = setIndices(idx);
+    const groupSet = new Set(group);
     rows().forEach((_, i) => {
         const btn = document.getElementById('atRoom' + i);
-        if (btn) btn.classList.toggle('on', i === idx);
+        if (btn) btn.classList.toggle('on', groupSet.has(i));
     });
 
+    const parts = group.map(i => roomBlock(i)).filter(Boolean);
+    if (!parts.length) return;
+    // Stacked set members get a hairline divider between them so each reads as its own room.
+    const html = parts.map((b, i) => `<div class="at-roomblock${i ? ' at-roomblock-next' : ''}">${b}</div>`).join('');
+    document.getElementById('atBody').innerHTML = html;
+}
+
+/* One room's heading + chart + roster panel. Rendered once per selected single room, and
+   once per member of a paired set (stacked). Returns '' if the row is missing. */
+function roomBlock(idx) {
     const r = rows()[idx];
-    if (!r) return;
+    if (!r) return '';
     const room = r.room;
     const capacity = Math.max(isNaN(r.capacity) ? 1 : r.capacity, 1);
     let anyOver = false;
@@ -440,7 +498,7 @@ function showRoom(idx) {
         ? '<div class="at-note"><span class="at-over-flag">Over capacity — the age ladder cannot seat everyone on the flagged days. This only shows on Pre-School, the last room; the overflow are the oldest children.</span></div>'
         : '';
 
-    document.getElementById('atBody').innerHTML = `
+    return `
         <div class="at-room-name">${esc(room)}</div>
         <div class="at-split">
             <div class="at-split-chart">
