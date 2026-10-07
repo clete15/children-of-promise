@@ -70,7 +70,11 @@
            right and drop below on a narrow screen. */
         .at-split { display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap; }
         .at-split-chart { flex:0 0 340px;min-width:300px; }
-        .at-rosters { flex:1 1 460px;min-width:320px;display:flex;gap:18px;flex-wrap:wrap; }
+        .at-rosters-wrap { flex:1 1 460px;min-width:320px;display:flex;flex-direction:column;gap:10px; }
+        .at-rosters { display:flex;gap:18px;flex-wrap:wrap; }
+        /* Key for the pink second-room mark on a combined pair. */
+        .at-side-legend { font-size:0.74rem;color:var(--sp-muted);display:flex;align-items:center;gap:7px;padding:2px 2px 0; }
+        .at-side-legend strong { color:var(--sp-text-2);font-weight:700; }
 
         /* Each roster is a self-contained card: header strip, scrollable table, footer. */
         .at-rcard {
@@ -126,6 +130,9 @@
 
         /* Weekday mark: a plain "1" on days the child is in the room, blank otherwise. */
         .at-on { font-weight:700;color:var(--sp-text);font-size:0.78rem; }
+        /* In a combined pair, a child who spills into the SECOND room that day: light pink
+           "1" so the director can see which side of the room they fall on. */
+        .at-on.at-room2 { color:#ec4899;background:rgba(236,72,153,0.16);border-radius:4px;padding:0 5px; }
 
         /* Row accents: moved in (green left edge) / couldn't seat (red left edge). */
         .at-table tbody tr.at-moved-in td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-good-fg); }
@@ -639,8 +646,15 @@ function rosterPanel(roomNames) {
         const cls = [];
         if (movedIn && !c.overflow) cls.push('at-moved-in');
         if (c.overflow) cls.push('at-overflow');
-        const dayCells = (c.days || [1, 1, 1, 1, 1]).map(on =>
-            `<td class="at-tc-day">${on ? '<span class="at-on">1</span>' : ''}</td>`).join('');
+        // In a COMBINED set, each attending child falls into the first OR second room of the
+        // pair on a given day (fill the first room to capacity, then the next). `side[d]` is
+        // 2 when this child spills into the SECOND room that day — mark its "1" light pink.
+        const side = (opts.sideByKey && opts.sideByKey[childKey(c)]) || null;
+        const dayCells = (c.days || [1, 1, 1, 1, 1]).map((on, d) => {
+            if (!on) return '<td class="at-tc-day"></td>';
+            const second = side && side[d] === 2;
+            return `<td class="at-tc-day"><span class="at-on${second ? ' at-room2' : ''}">1</span></td>`;
+        }).join('');
         return `<tr class="${cls.join(' ')}">
             <td class="at-tc-name"><div class="nm">${esc(c.name)}</div><div class="ag">${esc(fmtAge(c.birthDate, c.ageDays))}</div></td>
             ${dayCells}
@@ -720,22 +734,58 @@ function rosterPanel(roomNames) {
             ${inner}
         </div>`;
 
+    /* ── Which side of a COMBINED pair each child falls in, per day ──
+       Only for a combined set (two rooms). Fill the FIRST room to its capacity each day in
+       the roster's own order (youngest-first), then spill into the second room. For each
+       child we build a [5] array: 1 = first room that day, 2 = second room that day, 0 = not
+       in. The child's "1" is tinted pink on day d when side[d] === 2. */
+    const firstRoomName = roomNames[0];
+    const firstRoomCap = roomNames.length > 1
+        ? (((roomInView('projected', firstRoomName) || roomInView('actual', firstRoomName) || {}).capacity) || 0)
+        : 0;
+    const sideMap = list => {
+        const m = {};
+        if (!(roomNames.length > 1) || !firstRoomCap) return m;   // only meaningful when combined
+        const seen = [0, 0, 0, 0, 0];   // children already placed in room 1 that day
+        list.forEach(c => {
+            const days = c.days || [1, 1, 1, 1, 1];
+            const side = [0, 0, 0, 0, 0];
+            for (let d = 0; d < 5; d++) {
+                if (!days[d]) continue;
+                seen[d]++;
+                side[d] = seen[d] <= firstRoomCap ? 1 : 2;
+            }
+            m[childKey(c)] = side;
+        });
+        return m;
+    };
+    const actualSide = sideMap(actualList);
+    const projSide = sideMap(projList);
+
     // Actual view: just the Actual roster.
     // Projected view: Actual (left) and Projected (right). Both are age-sorted, and we LINE
     // UP a child that appears in both columns onto the same row (blank spacer where a child
     // is on one side only), so the eye can compare actual vs projected per child.
     // (Filter renders into #atFilter.)
+    // A one-line key for the pink mark, shown only when a pair is combined.
+    const secondRoomName = roomNames.length > 1 ? roomNames[roomNames.length - 1] : '';
+    const sideLegend = (roomNames.length > 1 && firstRoomCap)
+        ? `<div class="at-side-legend"><span class="at-on at-room2">1</span> = spills into <strong>${esc(secondRoomName)}</strong> that day (first ${firstRoomCap} fill ${esc(firstRoomName)})</div>`
+        : '';
+
     if (view === 'projected') {
         const slots = alignedSlots(actualList, projList);
+        const aOpts = { sideByKey: actualSide };
+        const pOpts = { markGreen: true, sideByKey: projSide };
         const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-                                 'No children currently in this room.', {}, alignedBody(slots, 'a', {}));
+                                 'No children currently in this room.', aOpts, alignedBody(slots, 'a', aOpts));
         const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-                              'No children seated here.', { markGreen: true }, alignedBody(slots, 'p', { markGreen: true }));
-        return `<div class="at-rosters">${actualCard}${projCard}</div>`;
+                              'No children seated here.', pOpts, alignedBody(slots, 'p', pOpts));
+        return `<div class="at-rosters-wrap"><div class="at-rosters">${actualCard}${projCard}</div>${sideLegend}</div>`;
     }
     const theCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-                         'No children currently in this room.', {});
-    return `<div class="at-rosters">${theCard}</div>`;
+                         'No children currently in this room.', { sideByKey: actualSide });
+    return `<div class="at-rosters-wrap"><div class="at-rosters">${theCard}</div>${sideLegend}</div>`;
 }
 
 /* The waiting-list roster filter, rendered OUTSIDE the attendance card into #atFilter.
