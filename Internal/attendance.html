@@ -39,6 +39,14 @@
         }
         .at-combine-btn:hover { background:var(--sp-accent-soft); }
         .at-combine-btn.on { background:var(--sp-accent);color:#fff; }
+        /* "Replace w/ Infant" what-if scenario toggle in the header. */
+        .at-scenario-btn {
+            border:1px solid var(--sp-accent);background:transparent;color:var(--sp-accent);
+            font-size:0.74rem;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer;
+            transition:background 0.12s,color 0.12s;
+        }
+        .at-scenario-btn:hover { background:var(--sp-accent-soft); }
+        .at-scenario-btn.on { background:var(--sp-accent);color:#fff; }
         .at-chart { display:flex;align-items:flex-end;gap:14px;padding:0 8px; }
         .at-col { display:flex;flex-direction:column;align-items:center;gap:8px;flex:1; }
         .at-count { font-size:0.9rem;font-weight:800;color:var(--sp-text); }
@@ -280,9 +288,15 @@
         <div class="at-card">
             <div class="at-head" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                 <div class="at-title" id="atTitle">Actual Attendance by Room</div>
-                <div class="at-toggle" role="tablist" aria-label="Attendance view">
-                    <button type="button" id="atTabActual" class="at-tab on" role="tab" aria-selected="true" onclick="setView('actual')">Actual</button>
-                    <button type="button" id="atTabProjected" class="at-tab" role="tab" aria-selected="false" onclick="setView('projected')">Projected</button>
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <!-- What-if scenario (Projected only): convert the 2 & 3 Year Olds room into a
+                         second Infant room (identical to room 1) and re-run the projection. Toggles;
+                         nothing is saved to the database. -->
+                    <button type="button" id="atScenarioBtn" class="at-scenario-btn" style="display:none;" onclick="toggleScenario()" title="What-if: treat the 2 & 3 Year Olds room as a second Infant room (cap 4) and re-seat the projection. Nothing is saved.">Replace w/ Infant</button>
+                    <div class="at-toggle" role="tablist" aria-label="Attendance view">
+                        <button type="button" id="atTabActual" class="at-tab on" role="tab" aria-selected="true" onclick="setView('actual')">Actual</button>
+                        <button type="button" id="atTabProjected" class="at-tab" role="tab" aria-selected="false" onclick="setView('projected')">Projected</button>
+                    </div>
                 </div>
             </div>
             <div class="at-body" id="atBody">
@@ -321,6 +335,10 @@ let activeRoom = 0;
 // director can see one room alone or both merged, toggled per selection. Off by default:
 // clicking a room shows just that room.
 let combined = false;
+// What-if scenario for the Projected view: '' = normal, 'convert7toInfant' = treat the
+// 2 & 3 Year Olds room as a second Infant room and re-seat. Passed to the projection fetch;
+// never written to the database.
+let scenario = '';
 const cache = { actual: null, projected: null };   // null = not yet loaded
 // The full waiting-list roster (stable, for the filter list) — fetched once.
 // Each: { id:'w'+Id, name, birthDate, ageDays, days:[5], program }.
@@ -564,6 +582,24 @@ function showRoom(idx, keepCombined) {
 function toggleCombine() {
     combined = !combined;
     showRoom(activeRoom, true);
+}
+
+/* The "Replace w/ Infant" what-if toggle: flip the scenario on/off, re-fetch the projection
+   (the server reshapes the ladder for that one response), and re-render. Projected view only. */
+function toggleScenario() {
+    scenario = scenario === 'convert7toInfant' ? '' : 'convert7toInfant';
+    syncScenarioBtn();
+    reprojectAndRender();
+}
+
+/* Show the scenario button only in the Projected view, and reflect its on/off state. */
+function syncScenarioBtn() {
+    const btn = document.getElementById('atScenarioBtn');
+    if (!btn) return;
+    btn.style.display = (view === 'projected') ? '' : 'none';
+    const on = scenario === 'convert7toInfant';
+    btn.classList.toggle('on', on);
+    btn.textContent = on ? 'Infant scenario: ON' : 'Replace w/ Infant';
 }
 
 /* Heading (+ age range) + chart + roster panel for a selected unit. `idxs` is the row
@@ -987,7 +1023,9 @@ async function fetchView(which) {
 async function fetchProjected() {
     const ex = Array.from(excludedIds);
     const only = waitlistAll ? 'projectedAttendance' : 'projectedAttendance,waitlistChildren';
-    const qs = '/api/reports?only=' + only + (ex.length ? '&excludeIds=' + ex.join(',') : '');
+    const qs = '/api/reports?only=' + only
+        + (ex.length ? '&excludeIds=' + ex.join(',') : '')
+        + (scenario ? '&scenario=' + encodeURIComponent(scenario) : '');
     const res = await apiFetch(qs);
     const data = await res.json();
     cache.projected = projectedRows(data && data.projectedAttendance);
@@ -1060,6 +1098,7 @@ function ensureOther() {
 
 function renderCurrent() {
     renderFilter();   // the waiting-list filter (shown only in the projected view)
+    syncScenarioBtn();   // the "Replace w/ Infant" button (projected view only)
     const list = rows();
     if (!list.length) {
         document.getElementById('atSidebar').innerHTML = '';
@@ -1080,6 +1119,8 @@ function setView(v) {
     // Default combine state for the new view: combined in Projected, separate in Actual.
     // (showRoom still lets the user toggle, and preserves their choice within a set.)
     combined = (v === 'projected');
+    // The what-if scenario is a Projected-only tool; leaving Projected clears it.
+    if (v !== 'projected') scenario = '';
     document.getElementById('atTitle').textContent =
         (v === 'projected' ? 'Projected' : 'Actual') + ' Attendance by Room';
     const actualTab = document.getElementById('atTabActual');

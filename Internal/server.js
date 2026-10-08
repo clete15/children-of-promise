@@ -3977,7 +3977,7 @@ function ageInDays(birthDate, daysOldFallback) {
      { roomNumber, room, capacity,
        occupancy:[5],   // projected children seated per weekday
        overflow:[5] }   // children the ladder cannot seat (last ladder room only) */
-function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeIds) {
+function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeIds, scenario) {
     if (!Array.isArray(roomRows)) return [];
 
     // Index rooms by number.
@@ -3989,10 +3989,35 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
                            type: String(r[3] || '').trim(), maxMonths: ageRangeMaxMonths(r[4]) };
     });
 
+    /* The age ladder, as a LOCAL copy so a what-if scenario can reshape it without touching
+       the shared constant or the database. Normally this is PROJ_LADDER_UNITS. */
+    let ladderUnits = PROJ_LADDER_UNITS.map(u => u.slice());
+
+    /* SCENARIO "convert7toInfant" (the "Replace w/ Infant" button, Projected tab only):
+       pretend the 2 & 3 Year Olds room (7) has been converted into a second INFANT room —
+       identical to room 1 (PI, capacity 4, 0–12 months). Room 7 joins the youngest Infant
+       unit and leaves its old standalone [7] position, so the children re-sort down the
+       ladder as if that room were now for infants. Nothing is written; this only shapes
+       this one projection response. */
+    if (scenario === 'convert7toInfant' && roomByNum[7] && roomByNum[1]) {
+        roomByNum[7] = {
+            roomNumber: 7,
+            room: roomByNum[1].room + ' (converted)',
+            capacity: roomByNum[1].capacity,     // identical to room 1 (4)
+            type: roomByNum[1].type,             // PI
+            maxMonths: roomByNum[1].maxMonths,   // 0–12 months
+        };
+        // Fold room 7 into the youngest Infant unit and drop its old [7] unit.
+        ladderUnits = ladderUnits
+            .map(u => u.filter(n => n !== 7))
+            .filter(u => u.length);
+        if (ladderUnits[0] && ladderUnits[0].indexOf(7) === -1) ladderUnits[0].push(7);
+    }
+
     /* Each ladder unit's AGE CEILING in months = the largest upper-bound across its rooms.
        A child whose age exceeds a unit's ceiling is too old for it and must start no lower
        than the first unit whose ceiling still includes them (their "home unit"). */
-    const unitMaxMonths = PROJ_LADDER_UNITS.map(u =>
+    const unitMaxMonths = ladderUnits.map(u =>
         Math.max.apply(null, u.map(n => (roomByNum[n] ? roomByNum[n].maxMonths : Infinity))));
     // The home unit for a child of `months`: the first (youngest) unit whose ceiling fits.
     // If the child is older than every unit's ceiling, home is the last unit (Pre-School).
@@ -4005,7 +4030,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
     // the ladder (e.g. a standalone room). Used to floor an enrolled child's home at the
     // unit they are ALREADY in, so the projection never demotes a child to a younger room.
     const unitIndexOfRoom = roomNum => {
-        for (let u = 0; u < PROJ_LADDER_UNITS.length; u++) if (PROJ_LADDER_UNITS[u].indexOf(roomNum) !== -1) return u;
+        for (let u = 0; u < ladderUnits.length; u++) if (ladderUnits[u].indexOf(roomNum) !== -1) return u;
         return -1;
     };
 
@@ -4212,6 +4237,23 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
                 program: kid.program || '', overflow: !!overflow, movedUnit: !!moved, days: inRoomDays });
         };
 
+        /* A PI-funded child may not be PROMOTED above the "2 Year Olds" unit — the unit that
+           holds room 5. Everything above it on the ladder (2 & 3 Year Olds, Pre-School) is
+           INCCRA or PFA, not PI-funded, so a PI child caps out at the 2 Year Olds / Toddlers-2s
+           unit. Encoded by UNIT POSITION (the highest unit containing room 5), so it stays
+           correct even when a scenario reshapes the ladder — e.g. the converted-infant room,
+           now PI, sits BELOW this cap and is allowed. Layered on top of unitFits so it blocks
+           both the upward climb and the downward fallback. */
+        const piCeilingIdx = (function () {
+            for (let u = unitRooms.length - 1; u >= 0; u--) if (unitRooms[u].indexOf(5) !== -1) return u;
+            return unitRooms.length - 1;   // no 2-year room in these units: no extra cap
+        })();
+        const unitAllowedForKid = (uIdx, kid) => {
+            if (kid.program !== 'PI') return true;   // rule applies to PI children only
+            return uIdx <= piCeilingIdx;             // never above the 2 Year Olds unit
+        };
+        const canSeat = (uIdx, kid) => unitAllowedForKid(uIdx, kid) && unitFits(uIdx, kid);
+
         // Seat youngest-first. A child starts at their HOME unit (the youngest unit their
         // age still belongs in) and climbs UP the ladder to the first unit that fits every
         // day they attend — so an older child is never seated below their age band. Only if
@@ -4221,11 +4263,11 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             const home = Math.min(Math.max(kid.home || 0, 0), unitRooms.length - 1);
             let placed = false;
             for (let u = home; u < unitRooms.length; u++) {
-                if (unitFits(u, kid)) { placeInUnit(u, kid); placed = true; break; }
+                if (canSeat(u, kid)) { placeInUnit(u, kid); placed = true; break; }
             }
             if (!placed) {   // last resort: any unit below home with a free seat
                 for (let u = home - 1; u >= 0; u--) {
-                    if (unitFits(u, kid)) { placeInUnit(u, kid); placed = true; break; }
+                    if (canSeat(u, kid)) { placeInUnit(u, kid); placed = true; break; }
                 }
             }
             if (!placed) chargeOverflow(kid);
@@ -4298,7 +4340,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
     const roomsOut = {};
     // Pass 2 — the age ladder seats everyone youngest-first by UNIT (whole-week placement,
     // paired rooms flex internally), using only the Pre-School seats the PFA pass left free.
-    seatUnits(PROJ_LADDER_UNITS, ladderKids, pfaFilled, pfaFilledPfaPi);
+    seatUnits(ladderUnits, ladderKids, pfaFilled, pfaFilledPfaPi);
     // Fold PFA overflow into Pre-School's overflow (both are "couldn't be seated in Pre-School"),
     // and add the PFA children to the Pre-School roster so it shows everyone it holds.
     if (roomsOut[PROJ_PRESCHOOL_ROOM]) {
@@ -9154,12 +9196,16 @@ ELSE
             // roster filter can ask "what would the rooms look like without these?". Keys are
             // namespaced strings ('e'+id enrolled, 'w'+id waitlist) to keep the two id spaces
             // apart; the roster filter sends waitlist keys (unchecked = excluded).
-            const exParam = new URLSearchParams(req.url.split('?')[1] || '').get('excludeIds');
+            const qs = new URLSearchParams(req.url.split('?')[1] || '');
+            const exParam = qs.get('excludeIds');
             const excludeIds = exParam
                 ? new Set(exParam.split(',').map(s => s.trim()).filter(Boolean))
                 : null;
+            // Optional what-if ?scenario=convert7toInfant — reshapes the ladder for this one
+            // response (never the DB). Any other value is ignored (normal projection).
+            const scenario = qs.get('scenario') || null;
             results.projectedAttendance = buildProjectedAttendance(
-                results.projRooms, results.enrolledChildren, results.waitlistChildren, excludeIds);
+                results.projRooms, results.enrolledChildren, results.waitlistChildren, excludeIds, scenario);
         }
 
         /* actualRoster — one row per room (youngest-first room order, same as projRooms)
