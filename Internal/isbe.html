@@ -4671,6 +4671,13 @@ function loadDocIndex(program) {
             if (activeComplianceProgram === 'piCompliance'
                 || activeComplianceProgram === 'pfaCompliance') loadCompliance();
             else refreshActiveView();
+            // If the child-files drawer is open on its "still reading…" state, redraw it now
+            // that the index has arrived — otherwise it stays stuck until closed and reopened.
+            if (currentChildFilesId != null
+                && document.getElementById('cfilesOverlay')
+                && document.getElementById('cfilesOverlay').classList.contains('open')) {
+                openChildFiles(currentChildFilesId);
+            }
         })
         .catch(function () {
             docIndexState = 'failed';
