@@ -150,6 +150,8 @@
         .at-table tbody tr.at-overflow td.at-tc-name { box-shadow:inset 3px 0 0 var(--sp-bad-fg); }
         .at-table tbody tr.at-overflow td.at-tc-name .nm { color:var(--sp-bad-fg); }
         .at-table tbody tr.at-overflow td.at-tc-name .ag::after { content:' · no seat';color:var(--sp-bad-fg);font-weight:700; }
+        /* Actual card: a child who is NOT in the projection (dropped / not seated) — red name. */
+        .at-table tbody tr.at-dropped td.at-tc-name .nm { color:var(--sp-bad-fg); }
 
         /* Totals footer — a strong rule across the top sets it apart, and the per-day
            counts are bold. The total is its own standout number. */
@@ -689,6 +691,9 @@ function rosterPanel(roomNames) {
         const cls = [];
         if (movedIn && !c.overflow) cls.push('at-moved-in');
         if (c.overflow) cls.push('at-overflow');
+        // Actual card only: a child in Actual but NOT in Projected (opts.projKeys is the set
+        // of projected children) — the projection didn't seat them. Flag the name red.
+        if (opts.projKeys && !opts.projKeys.has(childKey(c))) cls.push('at-dropped');
         // In a COMBINED set, each attending child falls into the first OR second room of the
         // pair on a given day (fill the first room to capacity, then the next). `side[d]` is
         // 2 when this child spills into the SECOND room that day — mark its "1" light pink.
@@ -842,7 +847,10 @@ function rosterPanel(roomNames) {
 
     if (view === 'projected') {
         const slots = alignedSlots(actualList, projList);
-        const aOpts = { sideByKey: actualSide };
+        // Children in Actual but NOT in Projected — the projection dropped/didn't seat them.
+        // Their name is coloured red in the Actual card (opts.projKeys = who IS projected).
+        const projKeys = new Set(projList.map(childKey));
+        const aOpts = { sideByKey: actualSide, projKeys: projKeys };
         const pOpts = { markGreen: true, sideByKey: projSide };
         const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
                                  'No children currently in this room.', aOpts, alignedBody(slots, 'a', aOpts));
