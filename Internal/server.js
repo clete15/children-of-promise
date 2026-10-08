@@ -4230,13 +4230,25 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             Object.keys(perRoomDays).forEach(n => addRoster(roomsOut[n], kid, perRoomDays[n], false, moved));
         };
 
-        // Charge an unseated child to the last unit's last room as overflow (whole week).
+        /* Charge an unseated child as overflow (whole week). Normally that lands on the LAST
+           ladder room (Pre-School). But a PI child may not be promoted above the 2 Year Olds
+           unit, so charging them to Pre-School would wrongly flag Pre-School "+1 over" while
+           it still has seats. A PI child instead overflows WITHIN their highest ALLOWED unit —
+           their current/home unit, capped at the 2 Year Olds unit — so they show as over in
+           the room they'd actually be stuck in (Toddlers/2s or 2 Year Olds), not Pre-School. */
         const chargeOverflow = kid => {
-            const lastRooms = unitRooms[unitRooms.length - 1] || [];
-            const n = lastRooms[lastRooms.length - 1];
+            let uIdx = unitRooms.length - 1;
+            if (kid.program === 'PI') {
+                const home = Math.min(Math.max(kid.home || 0, 0), unitRooms.length - 1);
+                uIdx = Math.min(home, piCeilingIdx);   // highest allowed unit for this PI child
+            }
+            // Prefer a room this child may use within that unit (per-room eligibility), last one.
+            const allowed = eligibleRooms(uIdx, kid);
+            const rooms = allowed.length ? allowed : (unitRooms[uIdx] || []);
+            const n = rooms[rooms.length - 1];
             if (!n) return;
             const ro = roomsOut[n];
-            const moved = lastRooms.indexOf(kid.actualRoom) === -1;
+            const moved = (unitRooms[uIdx] || []).indexOf(kid.actualRoom) === -1;
             for (let d = 0; d < 5; d++) if (kid.days[d]) ro.overflow[d]++;
             addRoster(ro, kid, kid.days.map(x => x ? 1 : 0), true, moved);
         };
