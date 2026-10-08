@@ -228,6 +228,10 @@
     <div class="header-actions">
         <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
         <a class="header-back" href="/staff/">← Staff Portal</a>
+        <!-- Deploy sits under the theme + Staff Portal buttons. Shown only to an IT admin
+             (Clete); the server also enforces checkITAdmin on /api/deploy. Pulls the latest
+             code from GitHub; server.js changes still need a Restart afterward. -->
+        <button type="button" class="header-theme-btn" id="hdrDeploy" style="display:none;" title="Pull the latest code from GitHub. Page/script changes take effect on reload; server.js changes need a Restart.">🚀 Deploy</button>
     </div>
 </header>
 
@@ -1077,6 +1081,45 @@ if ((location.hash || '').toLowerCase().indexOf('projected') !== -1) {
 } else {
     loadView();
 }
+</script>
+
+<!-- Header Deploy button. Same action and auth as the portal's deploy, living in the header
+     next to the theme + Staff Portal buttons. Shown only to an IT admin (whoAmI().itAdmin,
+     falling back to .admin on an older server); the server enforces checkITAdmin on
+     /api/deploy regardless, so visibility is not authority. -->
+<script>
+(function () {
+    function wire() {
+        var btn = document.getElementById('hdrDeploy');
+        if (!btn || !window.CofpAuth || !CofpAuth.whoAmI) return;
+        CofpAuth.whoAmI().then(function (who) {
+            if (!who) return;
+            var show = (typeof who.itAdmin === 'boolean') ? who.itAdmin : !!who.admin;
+            if (!show) return;
+            btn.style.display = '';
+            btn.addEventListener('click', function () {
+                if (!confirm('Pull the latest code from GitHub?\n\nPage and script changes take effect when you reload. If server.js changed, use the Restart control afterward.')) return;
+                var orig = btn.textContent;
+                btn.disabled = true; btn.textContent = '\u23F3 Deploying\u2026';
+                var hdrs = {};
+                var t = CofpAuth.token && CofpAuth.token(); if (t) hdrs['X-Staff-Token'] = t;
+                var basic = CofpAuth.header && CofpAuth.header(); if (basic) hdrs['Authorization'] = basic;
+                fetch('/api/deploy', { method: 'POST', headers: hdrs })
+                    .then(function (res) { return res.json().then(function (j) { return { ok: res.ok, j: j, status: res.status }; }); })
+                    .then(function (r) {
+                        if (r.ok && r.j && r.j.success !== false) { btn.textContent = '\u2713 Deployed'; }
+                        else { throw new Error((r.j && r.j.error) || ('HTTP ' + r.status)); }
+                    })
+                    .catch(function (e) { btn.textContent = '\u2717 Failed'; alert('Deploy failed: ' + e.message); })
+                    .finally(function () {
+                        setTimeout(function () { btn.disabled = false; btn.textContent = orig; }, 3500);
+                    });
+            });
+        }).catch(function () {});
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+    else wire();
+})();
 </script>
 </body>
 </html>
