@@ -856,25 +856,21 @@ function rosterPanel(roomNames) {
     const projSide = sideMap(projList);
 
     // Actual view: just the Actual roster.
-    // Projected view: Actual (left) and Projected (right). Both are age-sorted, and we LINE
-    // UP a child that appears in both columns onto the same row (blank spacer where a child
-    // is on one side only), so the eye can compare actual vs projected per child.
-    // (Filter renders into #atFilter.)
+    // Projected view: the FULL Actual roster (left) beside the full Projected roster (right).
+    // No name alignment between them — the two lists are independent, youngest-first. The only
+    // cross-reference is colour: a child in Actual but NOT in Projected shows a RED name
+    // (opts.projKeys = who IS projected). (Filter renders into #atFilter.)
     // A one-line key for the pink mark, shown only when a pair is combined.
     const sideLegend = (roomNames.length > 1 && (cap1 || cap2))
         ? `<div class="at-side-legend"><span class="at-on at-room2">1</span> = <strong>${esc(secondRoomNm)}</strong> that day (rooms fill evenly; over-capacity split between the two)</div>`
         : '';
 
     if (view === 'projected') {
-        // The Actual card is FILTERED to only the children in Actual but NOT in Projected —
-        // the ones the projection dropped/couldn't seat (shown with a red name). The Projected
-        // card stays the full seated roster. No row-alignment: the two lists are independent.
         const projKeys = new Set(projList.map(childKey));
-        const droppedList = actualList.filter(c => !projKeys.has(childKey(c)));
         const aOpts = { sideByKey: actualSide, projKeys: projKeys };
         const pOpts = { markGreen: true, sideByKey: projSide };
-        const actualCard = card('Actual \u2014 not in projection', droppedList, null, !!actual,
-                                 'Every current child fits the projection.', aOpts);
+        const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
+                                 'No children currently in this room.', aOpts);
         const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
                               'No children seated here.', pOpts);
         return `<div class="at-rosters-wrap"><div class="at-rosters">${actualCard}${projCard}</div>${sideLegend}</div>`;
