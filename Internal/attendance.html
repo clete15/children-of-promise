@@ -538,11 +538,13 @@ function isPairedRoom(idx) {
 }
 
 function showRoom(idx, keepCombined) {
-    // Changing to a room that isn't in the SAME set as before resets the combine toggle, so a
-    // fresh selection starts single. Staying within the set (or an explicit keep) preserves it.
+    // Changing to a room that isn't in the SAME set as before RESETS the combine toggle to its
+    // default; staying within the set (or an explicit keep) preserves the user's choice.
+    // Default: COMBINED in the Projected view (the director wants the pair merged there),
+    // SEPARATE in the Actual view. Either way the user can toggle it per selection.
     const prevSet = new Set(isPairedRoom(activeRoom) ? setIndices(activeRoom) : [activeRoom]);
     activeRoom = idx;
-    if (!keepCombined && !prevSet.has(idx)) combined = false;
+    if (!keepCombined && !prevSet.has(idx)) combined = (view === 'projected');
     if (!isPairedRoom(idx)) combined = false;   // a singleton can never be combined
 
     // Which rows this view shows: the whole set when combined, else just the clicked room.
@@ -1079,6 +1081,9 @@ function setView(v) {
     if (v === view) return;
     view = v;
     activeRoom = 0;
+    // Default combine state for the new view: combined in Projected, separate in Actual.
+    // (showRoom still lets the user toggle, and preserves their choice within a set.)
+    combined = (v === 'projected');
     document.getElementById('atTitle').textContent =
         (v === 'projected' ? 'Projected' : 'Actual') + ' Attendance by Room';
     const actualTab = document.getElementById('atTabActual');
