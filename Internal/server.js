@@ -4230,25 +4230,13 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             Object.keys(perRoomDays).forEach(n => addRoster(roomsOut[n], kid, perRoomDays[n], false, moved));
         };
 
-        /* Charge an unseated child as overflow (whole week). Normally that lands on the LAST
-           ladder room (Pre-School). But a PI child may not be promoted above the 2 Year Olds
-           unit, so charging them to Pre-School would wrongly flag Pre-School "+1 over" while
-           it still has seats. A PI child instead overflows WITHIN their highest ALLOWED unit —
-           their current/home unit, capped at the 2 Year Olds unit — so they show as over in
-           the room they'd actually be stuck in (Toddlers/2s or 2 Year Olds), not Pre-School. */
+        // Charge an unseated child to the last unit's last room as overflow (whole week).
         const chargeOverflow = kid => {
-            let uIdx = unitRooms.length - 1;
-            if (kid.program === 'PI') {
-                const home = Math.min(Math.max(kid.home || 0, 0), unitRooms.length - 1);
-                uIdx = Math.min(home, piCeilingIdx);   // highest allowed unit for this PI child
-            }
-            // Prefer a room this child may use within that unit (per-room eligibility), last one.
-            const allowed = eligibleRooms(uIdx, kid);
-            const rooms = allowed.length ? allowed : (unitRooms[uIdx] || []);
-            const n = rooms[rooms.length - 1];
+            const lastRooms = unitRooms[unitRooms.length - 1] || [];
+            const n = lastRooms[lastRooms.length - 1];
             if (!n) return;
             const ro = roomsOut[n];
-            const moved = (unitRooms[uIdx] || []).indexOf(kid.actualRoom) === -1;
+            const moved = lastRooms.indexOf(kid.actualRoom) === -1;
             for (let d = 0; d < 5; d++) if (kid.days[d]) ro.overflow[d]++;
             addRoster(ro, kid, kid.days.map(x => x ? 1 : 0), true, moved);
         };
@@ -4262,37 +4250,22 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
                 program: kid.program || '', overflow: !!overflow, movedUnit: !!moved, days: inRoomDays });
         };
 
-        /* A PI-funded child may not be PROMOTED above the "2 Year Olds" unit — the unit that
-           holds room 5. Everything above it on the ladder (2 & 3 Year Olds, Pre-School) is
-           INCCRA or PFA, not PI-funded, so a PI child caps out at the 2 Year Olds / Toddlers-2s
-           unit. Encoded by UNIT POSITION (the highest unit containing room 5), so it stays
-           correct even when a scenario reshapes the ladder — e.g. the converted-infant room,
-           now PI, sits BELOW this cap and is allowed. Layered on top of unitFits so it blocks
-           both the upward climb and the downward fallback. */
-        const piCeilingIdx = (function () {
-            for (let u = unitRooms.length - 1; u >= 0; u--) if (unitRooms[u].indexOf(5) !== -1) return u;
-            return unitRooms.length - 1;   // no 2-year room in these units: no extra cap
-        })();
-        const unitAllowedForKid = (uIdx, kid) => {
-            if (kid.program !== 'PI') return true;   // rule applies to PI children only
-            return uIdx <= piCeilingIdx;             // never above the 2 Year Olds unit
-        };
-        const canSeat = (uIdx, kid) => unitAllowedForKid(uIdx, kid) && unitFits(uIdx, kid);
-
         // Seat youngest-first. A child starts at their HOME unit (the youngest unit their
         // age still belongs in) and climbs UP the ladder to the first unit that fits every
-        // day they attend — so an older child is never seated below their age band. Only if
-        // NO unit from home upward has room do we fall back DOWN below home into any open
-        // seat (the "unless we're at capacity everywhere" exception); failing that, overflow.
+        // day they attend — so an older child is never seated below their age band. PI children
+        // promote up the ladder like anyone else. (The ONLY program-based limit is per-room, in
+        // the convert-to-infant scenario: PI children are kept out of the converted room, which
+        // unitFits/placeInUnit enforce via eligibleRooms.) Only if NO unit from home upward has
+        // room do we fall back DOWN below home into any open seat; failing that, overflow.
         kids.slice().sort((a, b) => a.age - b.age).forEach(kid => {
             const home = Math.min(Math.max(kid.home || 0, 0), unitRooms.length - 1);
             let placed = false;
             for (let u = home; u < unitRooms.length; u++) {
-                if (canSeat(u, kid)) { placeInUnit(u, kid); placed = true; break; }
+                if (unitFits(u, kid)) { placeInUnit(u, kid); placed = true; break; }
             }
             if (!placed) {   // last resort: any unit below home with a free seat
                 for (let u = home - 1; u >= 0; u--) {
-                    if (canSeat(u, kid)) { placeInUnit(u, kid); placed = true; break; }
+                    if (unitFits(u, kid)) { placeInUnit(u, kid); placed = true; break; }
                 }
             }
             if (!placed) chargeOverflow(kid);
