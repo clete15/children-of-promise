@@ -3999,7 +3999,8 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
        unit and leaves its old standalone [7] position, so the children re-sort down the
        ladder as if that room were now for infants. Nothing is written; this only shapes
        this one projection response. */
-    if (scenario === 'convert7toInfant' && roomByNum[7] && roomByNum[1]) {
+    const infantScenario = (scenario === 'convert7toInfant' && roomByNum[7] && roomByNum[1]);
+    if (infantScenario) {
         roomByNum[7] = {
             roomNumber: 7,
             room: roomByNum[1].room + ' (converted)',
@@ -4007,11 +4008,14 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             type: roomByNum[1].type,             // PI
             maxMonths: roomByNum[1].maxMonths,   // 0–12 months
         };
-        // Fold room 7 into the youngest Infant unit and drop its old [7] unit.
+        // Room 7 is NOT part of the age ladder in this scenario — it is an OVERFLOW room that
+        // only absorbs infants who do not fit the real infant rooms (1, 2). So drop it from
+        // every ladder unit; a post-pass below relocates the lowest-enrolment infant overflow
+        // into it, whole-week. This keeps the normal projection unchanged and the converted
+        // room purely a release valve for over-capacity.
         ladderUnits = ladderUnits
             .map(u => u.filter(n => n !== 7))
             .filter(u => u.length);
-        if (ladderUnits[0] && ladderUnits[0].indexOf(7) === -1) ladderUnits[0].push(7);
     }
 
     /* Each ladder unit's AGE CEILING in months = the largest upper-bound across its rooms.
@@ -4162,6 +4166,12 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         // The tolerance for a unit: look up its room-set key, else the paired default, else none.
         const overCfg = uIdx => {
             if (!isPair(uIdx)) return { perDay: 0, maxDays: 0 };
+            // In the infant scenario the infant pair (1,2) gets NO over-tolerance: overfill must
+            // OVERFLOW (so the post-pass can relocate it into the converted room) rather than
+            // over-seat room 2. Identify that unit by its rooms including both 1 and 2.
+            if (infantScenario && unitRooms[uIdx].indexOf(1) !== -1 && unitRooms[uIdx].indexOf(2) !== -1) {
+                return { perDay: 0, maxDays: 0 };
+            }
             const key = unitRooms[uIdx].join('-');
             return PROJ_UNIT_OVER[key] || PROJ_PAIR_OVER_DEFAULT;
         };
@@ -4231,6 +4241,8 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         };
 
         // Charge an unseated child to the last unit's last room as overflow (whole week).
+        // Also record the child (and the room charged) so a later pass can relocate it — the
+        // infant scenario moves infant overflow into the converted room.
         const chargeOverflow = kid => {
             const lastRooms = unitRooms[unitRooms.length - 1] || [];
             const n = lastRooms[lastRooms.length - 1];
@@ -4238,16 +4250,19 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             const ro = roomsOut[n];
             const moved = lastRooms.indexOf(kid.actualRoom) === -1;
             for (let d = 0; d < 5; d++) if (kid.days[d]) ro.overflow[d]++;
-            addRoster(ro, kid, kid.days.map(x => x ? 1 : 0), true, moved);
+            const entry = addRoster(ro, kid, kid.days.map(x => x ? 1 : 0), true, moved);
+            overflowKids.push({ kid: kid, room: n, rosterEntry: entry });
         };
 
         // One roster entry per child per room, with the days the child occupies THAT room.
         // `moved` is true only for a genuine cross-UNIT move (not a within-pair shift), so
         // the client highlights only real promotions, not pair flex.
         const addRoster = (ro, kid, inRoomDays, overflow, moved) => {
-            ro.roster.push({ id: kid.id || 0, name: kid.name, birthDate: kid.birthDate || '',
+            const entry = { id: kid.id || 0, name: kid.name, birthDate: kid.birthDate || '',
                 ageDays: kid.age, source: kid.source || 'enrolled', pfaPi: !!kid.pfaPi,
-                program: kid.program || '', overflow: !!overflow, movedUnit: !!moved, days: inRoomDays });
+                program: kid.program || '', overflow: !!overflow, movedUnit: !!moved, days: inRoomDays };
+            ro.roster.push(entry);
+            return entry;
         };
 
         // Seat youngest-first. A child starts at their HOME unit (the youngest unit their
@@ -4339,9 +4354,52 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
     }
 
     const roomsOut = {};
+    // Children the ladder could not seat at all (whole-week overflow), recorded so the infant
+    // scenario's post-pass can relocate the infant-aged ones into the converted room.
+    const overflowKids = [];
     // Pass 2 — the age ladder seats everyone youngest-first by UNIT (whole-week placement,
     // paired rooms flex internally), using only the Pre-School seats the PFA pass left free.
     seatUnits(ladderUnits, ladderKids, pfaFilled, pfaFilledPfaPi);
+
+    /* INFANT SCENARIO post-pass — relocate infant overflow into the converted room (7).
+       The converted room is a release valve: it only takes infants the real infant rooms
+       (1, 2) could not seat. Among that overflow we move the LOWEST-ENROLMENT children first
+       (fewest total attending days), WHOLE-WEEK, up to room 7's daily capacity, and never a
+       PI child. Each relocated child is un-charged from the overflow room (its overflow count
+       and roster entry removed) and added to room 7's occupancy + roster. */
+    if (infantScenario && roomByNum[7]) {
+        if (!roomsOut[7]) roomsOut[7] = makeRoomOut(7);
+        const r7 = roomsOut[7];
+        const cap7 = roomByNum[7].capacity || 0;
+        const infantMax = roomByNum[1] ? roomByNum[1].maxMonths : Infinity;   // 0–12 months
+        const totalDays = kid => (kid.days || []).reduce((s, x) => s + (x ? 1 : 0), 0);
+        // Infant-aged, non-PI overflow children, lowest total days first (ties: youngest first).
+        const movers = overflowKids
+            .filter(o => o.kid.program !== 'PI' && (o.kid.age / 30.44) <= infantMax)
+            .sort((a, b) => (totalDays(a.kid) - totalDays(b.kid)) || (a.kid.age - b.kid.age));
+        for (const o of movers) {
+            const kid = o.kid;
+            // Room 7 must have a free seat on EVERY day this child attends (whole-week placement).
+            let fits = true;
+            for (let d = 0; d < 5; d++) if (kid.days[d] && r7.occupancy[d] >= cap7) { fits = false; break; }
+            if (!fits) continue;
+            // Un-charge from the overflow room: drop the overflow counts and the roster entry.
+            const src = roomsOut[o.room];
+            if (src) {
+                for (let d = 0; d < 5; d++) if (kid.days[d]) src.overflow[d] = Math.max(0, src.overflow[d] - 1);
+                const i = src.roster.indexOf(o.rosterEntry);
+                if (i !== -1) src.roster.splice(i, 1);
+            }
+            // Seat whole-week in room 7. "moved" since it is not the child's actual room.
+            const days = kid.days.map(x => x ? 1 : 0);
+            for (let d = 0; d < 5; d++) if (days[d]) { r7.occupancy[d]++; if (kid.pfaPi) r7.pfaPi[d]++; }
+            r7.roster.push({ id: kid.id || 0, name: kid.name, birthDate: kid.birthDate || '',
+                ageDays: kid.age, source: kid.source || 'enrolled', pfaPi: !!kid.pfaPi,
+                program: kid.program || '', overflow: false, movedUnit: true, days: days });
+        }
+        r7.roster.sort((a, b) => a.ageDays - b.ageDays);
+    }
+
     // Fold PFA overflow into Pre-School's overflow (both are "couldn't be seated in Pre-School"),
     // and add the PFA children to the Pre-School roster so it shows everyone it holds.
     if (roomsOut[PROJ_PRESCHOOL_ROOM]) {
