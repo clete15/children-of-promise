@@ -3889,10 +3889,13 @@ const PROJ_LADDER_UNITS = [[1, 2], [3], [4, 5], [7], [6]];
    Unlisted paired units fall back to the default below; singleton units get NO tolerance.
      • {1 Infant, 2 Infants/Toddlers}: the director confirmed (Oct 2026) this pair can run
        TWO over, every day — i.e. a second full-time child still fits in the projection.
-     • {4 Toddlers/2yr, 5 2 Year Olds}: the earlier +1-on-at-most-2-days rule (default). */
+     • {4 Toddlers/2yr, 5 2 Year Olds}: HARD CAPPED at 13 (no tolerance) — see PROJ_UNIT_OVER. */
 const PROJ_PAIR_OVER_DEFAULT = { perDay: 1, maxDays: 2 };
 const PROJ_UNIT_OVER = {
     '1-2': { perDay: 2, maxDays: 5 },
+    // {4 Toddlers/2yr, 5 2 Year Olds}: HARD CAP at combined capacity (13) — no over-tolerance,
+    // so this pair never seats more than 13 on a day; the 14th child overflows instead.
+    '4-5': { perDay: 0, maxDays: 0 },
 };
 
 /* The display order of rooms, youngest-first — the SAME age ladder as PROJ_LADDER_ROOMS
