@@ -4265,14 +4265,6 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             return entry;
         };
 
-        // The infant unit's index (the unit holding rooms 1 and 2), used only by the infant
-        // scenario's climb cap below. -1 when these units contain no infant unit.
-        const infantUnitIdx = (function () {
-            for (let u = 0; u < unitRooms.length; u++)
-                if (unitRooms[u].indexOf(1) !== -1 && unitRooms[u].indexOf(2) !== -1) return u;
-            return -1;
-        })();
-
         // Seat youngest-first. A child starts at their HOME unit (the youngest unit their
         // age still belongs in) and climbs UP the ladder to the first unit that fits every
         // day they attend — so an older child is never seated below their age band. PI children
@@ -4280,17 +4272,14 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         // the convert-to-infant scenario: PI children are kept out of the converted room, which
         // unitFits/placeInUnit enforce via eligibleRooms.) Only if NO unit from home upward has
         // room do we fall back DOWN below home into any open seat; failing that, overflow.
+        // NOTE on the infant scenario: an infant who cannot fit the infant rooms STILL climbs
+        // the ladder into any real room with space (Toddlers/2s, etc.). The converted room is
+        // the LAST resort — only infants that overflow the ENTIRE ladder are relocated into it
+        // by the post-pass. So the climb below is unchanged by the scenario.
         kids.slice().sort((a, b) => a.age - b.age).forEach(kid => {
             const home = Math.min(Math.max(kid.home || 0, 0), unitRooms.length - 1);
-            // INFANT SCENARIO climb cap: an infant-aged child (home at the infant unit) must NOT
-            // promote up the ladder when the infant rooms are full — they OVERFLOW instead, so
-            // the post-pass can place the lowest-enrolment ones in the converted room. Without
-            // this they would climb into Toddlers/2s/Pre-School and never reach the post-pass,
-            // leaving the converted room empty while everyone piled onto Pre-School.
-            const ceiling = (infantScenario && infantUnitIdx !== -1 && home === infantUnitIdx)
-                ? infantUnitIdx : (unitRooms.length - 1);
             let placed = false;
-            for (let u = home; u <= ceiling; u++) {
+            for (let u = home; u < unitRooms.length; u++) {
                 if (unitFits(u, kid)) { placeInUnit(u, kid); placed = true; break; }
             }
             if (!placed) {   // last resort: any unit below home with a free seat
