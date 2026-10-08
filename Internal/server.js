@@ -4281,7 +4281,10 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
        the room they are really in, no re-seating. The youngest-first unit logic below only
        runs once at least one waiting-list child is selected (then it may bump/promote). */
     const anyWaitlist = [].concat(ladderKids, pfaKids, standaloneKids).some(k => k.source === 'waitlist');
-    if (!anyWaitlist) {
+    // A what-if scenario reshapes the ladder, so it MUST re-seat even with the waitlist clear —
+    // re-sorting the children is the whole point. Only short-circuit in the normal (no-scenario)
+    // case when nothing from the waitlist is seated.
+    if (!anyWaitlist && !scenario) {
         const out = {};
         [].concat(ladderKids, pfaKids, standaloneKids).forEach(kid => {
             const n = parseInt(kid.actualRoom, 10);
