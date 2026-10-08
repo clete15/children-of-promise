@@ -850,16 +850,17 @@ function rosterPanel(roomNames) {
         : '';
 
     if (view === 'projected') {
-        const slots = alignedSlots(actualList, projList);
-        // Children in Actual but NOT in Projected — the projection dropped/didn't seat them.
-        // Their name is coloured red in the Actual card (opts.projKeys = who IS projected).
+        // The Actual card is FILTERED to only the children in Actual but NOT in Projected —
+        // the ones the projection dropped/couldn't seat (shown with a red name). The Projected
+        // card stays the full seated roster. No row-alignment: the two lists are independent.
         const projKeys = new Set(projList.map(childKey));
+        const droppedList = actualList.filter(c => !projKeys.has(childKey(c)));
         const aOpts = { sideByKey: actualSide, projKeys: projKeys };
         const pOpts = { markGreen: true, sideByKey: projSide };
-        const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-                                 'No children currently in this room.', aOpts, alignedBody(slots, 'a', aOpts));
+        const actualCard = card('Actual \u2014 not in projection', droppedList, null, !!actual,
+                                 'Every current child fits the projection.', aOpts);
         const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
-                              'No children seated here.', pOpts, alignedBody(slots, 'p', pOpts));
+                              'No children seated here.', pOpts);
         return `<div class="at-rosters-wrap"><div class="at-rosters">${actualCard}${projCard}</div>${sideLegend}</div>`;
     }
     const theCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
