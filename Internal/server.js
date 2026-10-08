@@ -4075,12 +4075,18 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             // The specific program ('PI' / 'PFA' / '') so the sidebar can label a room by
             // the children it holds — e.g. 3 PI children in an INCCRA room reads "3 PI".
             program: (prog === 'PI' || prog === 'PFA') ? prog : '',
-            // Youngest unit this child may be seated in. By age they belong no lower than
-            // their age-home; but an ENROLLED child is also never demoted below the unit
-            // they are ALREADY in — so a 19-month-old already in a 2-year-old room stays at
-            // that unit, not pulled back down into Infants/Toddlers. Take the higher of the
-            // two. (Rooms off the ladder give -1, which never raises the floor.)
-            home: Math.max(homeUnitIndex(ageInDays(e[3], e[4]) / 30.44), unitIndexOfRoom(roomNum)),
+            // Starting unit for seating. An ENROLLED child STAYS in the unit they are already
+            // in — the projection does not move an enrolled child out of their room by age; it
+            // only promotes them up the ladder if that unit is actually FULL (the seating loop
+            // climbs from `home` when the unit can't fit them). This keeps a child who has aged
+            // past their room's band (e.g. a 3y8m child kept with the 2 Year Olds, perhaps for
+            // a developmental reason) in that room while it still has space, rather than
+            // promoting them away. Only when the child's current room is NOT on the ladder
+            // (e.g. the 2 & 3 room removed in the infant scenario) do we fall back to the
+            // age-based home so they still land somewhere sensible.
+            home: (unitIndexOfRoom(roomNum) !== -1)
+                ? unitIndexOfRoom(roomNum)
+                : homeUnitIndex(ageInDays(e[3], e[4]) / 30.44),
         };
         if (PROJ_STANDALONE_ROOMS.indexOf(roomNum) !== -1) { standaloneKids.push(kid); return; }
         const isPFA = prog === 'PFA';
