@@ -336,6 +336,9 @@ const excludedIds = new Set();
 const ROOM_SETS = [
     ['Infant', 'Infants / Toddlers'],
     ['Toddlers / 2 Year Olds', '2 Year Olds'],
+    // View-only combine (not a server seating pair): the director can look at 2 & 3 Year Olds
+    // alongside Pre-School. Youngest-first order so the first room fills first in the split.
+    ['2 & 3 Year Olds', 'Pre-School'],
 ];
 // Normalise a room name for matching: lowercase, collapse runs of spaces/slashes to one space.
 function roomKey(name) {
@@ -370,9 +373,9 @@ function setIndices(idx) {
 
 /* Each room's age range in MONTHS, mirroring dimClassrooms.AgeRange (see
    Internal/setup_classrooms.sql / rename_rooms_2026.sql — the authoritative source). Keyed
-   by normalised room name. Year-based rooms (Pre-School, Before & After) carry a display
-   string instead of month bounds, since "3 - 5 yrs" shouldn't be shown as "36 - 60 M".
-   {lo,hi} are inclusive month bounds; `text` overrides with a literal label. */
+   by normalised room name. {lo,hi} are inclusive month bounds; the optional `text` is the
+   preferred label when the room is shown ON ITS OWN (so Pre-School reads "3 - 5 yrs" rather
+   than "36 - 60 M"). When rooms are COMBINED, the month bounds drive one spanning label. */
 const ROOM_AGE_RANGE = {
     [roomKey('Infant')]:                  { lo: 0,  hi: 12 },
     [roomKey('Infants / Toddlers')]:      { lo: 8,  hi: 20 },
@@ -380,27 +383,31 @@ const ROOM_AGE_RANGE = {
     [roomKey('Toddlers / 2 Year Olds')]:  { lo: 18, hi: 36 },
     [roomKey('2 Year Olds')]:             { lo: 24, hi: 36 },
     [roomKey('2 & 3 Year Olds')]:         { lo: 24, hi: 48 },
-    [roomKey('Pre-School')]:              { text: '3 - 5 yrs' },
-    [roomKey('Before and Afterschool')]:  { text: '5 - 12 yrs' },
+    [roomKey('Pre-School')]:              { lo: 36, hi: 60, text: '3 - 5 yrs' },
+    [roomKey('Before and Afterschool')]:  { lo: 60, hi: 144, text: '5 - 12 yrs' },
 };
-/* A display age range for one or more rooms. For month-bounded rooms it spans the lowest
-   low to the highest high across the given room names and reads "N - M M" (e.g. combining
-   Infant 0-12 + Infants/Toddlers 8-20 -> "0 - 20 M"). If every room shares one literal
-   `text`, that is shown; a mix of month-bounds and text rooms falls back to the month span
-   it can compute, else ''. */
+/* A display age range for one or more rooms.
+   - ONE room: its own preferred label (text when set, else "N - M M").
+   - COMBINED rooms: span the lowest low to the highest high across them. Expressed in YEARS
+     ("P - Q yrs") when the top of the span reaches 3 years (36 months) — e.g. 2 & 3 Year Olds
+     (24-48) + Pre-School (36-60) → "2 - 5 yrs" — otherwise in months ("N - M M"). */
 function ageRangeLabel(roomNames) {
     const defs = roomNames.map(nm => ROOM_AGE_RANGE[roomKey(nm)]).filter(Boolean);
     if (!defs.length) return '';
-    const texts = defs.filter(d => d.text);
+    // Single room: honour its own preferred label.
+    if (defs.length === 1) return defs[0].text || (defs[0].lo + ' - ' + defs[0].hi + ' M');
     const bounds = defs.filter(d => d.lo != null);
-    if (texts.length && !bounds.length) {
-        // All literal — show the single label if they agree, else join distinct ones.
-        const uniq = Array.from(new Set(texts.map(d => d.text)));
+    if (!bounds.length) {
+        const uniq = Array.from(new Set(defs.map(d => d.text).filter(Boolean)));
         return uniq.join(' / ');
     }
-    if (!bounds.length) return '';
     const lo = Math.min.apply(null, bounds.map(d => d.lo));
     const hi = Math.max.apply(null, bounds.map(d => d.hi));
+    // Reads better in years when the span is whole years and reaches 3 (e.g. 24-60 → "2 - 5
+    // yrs"); otherwise months (so 18-36 stays "18 - 36 M" rather than an awkward "1.5 - 3 yrs").
+    if (hi >= 36 && lo % 12 === 0 && hi % 12 === 0) {
+        return (lo / 12) + ' - ' + (hi / 12) + ' yrs';
+    }
     return lo + ' - ' + hi + ' M';
 }
 
