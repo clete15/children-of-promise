@@ -1035,6 +1035,13 @@ async function fetchProjected() {
     const res = await apiFetch(qs);
     const data = await res.json();
     cache.projected = projectedRows(data && data.projectedAttendance);
+    // In the infant scenario, surface the converted room at the TOP of the room list so the
+    // director sees the new infant room first. Detected by its "(converted)" name suffix.
+    if (scenario === 'convert7toInfant') {
+        const rows = cache.projected;
+        const idx = rows.findIndex(r => /\(converted\)/i.test(r.room || ''));
+        if (idx > 0) { const [conv] = rows.splice(idx, 1); rows.unshift(conv); }
+    }
     if (!waitlistAll && data && data.waitlistChildren) {
         waitlistAll = waitlistFromRows(data.waitlistChildren);
         // Default: every waiting-list child UNCHECKED (not seated). The director ticks the
