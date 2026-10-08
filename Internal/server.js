@@ -4168,9 +4168,20 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         const overUsed = unitRooms.map(() => [0, 0, 0, 0, 0]);
         const overDays = unitRooms.map(() => 0);
 
+        /* Per-ROOM eligibility (finer than the per-unit rule). In the "convert7toInfant"
+           scenario the converted room (7) is a PI-type infant room, but PI children are NOT
+           allowed in it — so a PI kid may sit in the OTHER rooms of its unit (1, 2) but never
+           in 7. Returns the rooms of a unit this child may actually take a seat in, in fill
+           order (so room 7, pushed last, is still filled LAST for the children who may use it). */
+        const roomAllowedForKid = (roomNum, kid) =>
+            !(scenario === 'convert7toInfant' && roomNum === 7 && kid.program === 'PI');
+        const eligibleRooms = (uIdx, kid) => unitRooms[uIdx].filter(n => roomAllowedForKid(n, kid));
+
         // Does unit u fit this child on EVERY day they attend (normal seat or an allowed over-slot)?
         const unitFits = (uIdx, kid) => {
             if (!unitRooms[uIdx].length) return false;
+            const rooms = eligibleRooms(uIdx, kid);
+            if (!rooms.length) return false;              // no room in this unit this kid may use
             const cfg = overCfg(uIdx);
             // Track, within THIS child's placement, the over-slots we'd tentatively spend so a
             // single child can't over-promise beyond the per-day or the whole-week budget.
@@ -4178,7 +4189,7 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
             const wouldUsed = overUsed[uIdx].slice();     // per-day over-count, mutated tentatively
             for (let d = 0; d < 5; d++) {
                 if (!kid.days[d]) continue;
-                let free = 0; unitRooms[uIdx].forEach(n => { free += freeByRoom[n][d]; });
+                let free = 0; rooms.forEach(n => { free += freeByRoom[n][d]; });
                 if (free > 0) continue;                      // normal seat
                 if (!cfg.perDay) return false;               // no tolerance (singleton) → no fit
                 if (wouldUsed[d] >= cfg.perDay) return false;    // this day already at its +perDay cap
@@ -4192,7 +4203,9 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
         // Place a seated child into the unit: each attending day takes a normal seat from the
         // first room with space, or (paired, within budget) a +1 over-seat in the fuller room.
         const placeInUnit = (uIdx, kid) => {
-            const rooms = unitRooms[uIdx];
+            // Only the rooms this child may use (per-room eligibility), in fill order — so the
+            // converted infant room (7), pushed last, fills LAST, and never for a PI child.
+            const rooms = eligibleRooms(uIdx, kid);
             // "Moved" = seated in a UNIT that does NOT contain the child's actual room. Shifting
             // between the two rooms of a paired unit is NOT a move (same unit), so it does not
             // flag. A waitlist child has no actualRoom, so they always read as moved (new).
