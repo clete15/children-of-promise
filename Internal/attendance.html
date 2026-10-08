@@ -742,8 +742,11 @@ function rosterPanel(roomNames) {
         opts = opts || {};
         // Green only for a genuine cross-UNIT move the server flagged — shifting between the
         // two rooms of a paired set is NOT a move and must not highlight. (opts.markGreen
-        // gates this to the projected card only.)
-        const movedIn = opts.markGreen && c.movedUnit;
+        // gates this to the projected card only.) In a COMBINED set a child who is ALREADY in
+        // the actual roster of that set is not "moved in" — a within-set shuffle shouldn't go
+        // green — so opts.actualKeys suppresses green for anyone already present in Actual.
+        const alreadyActual = opts.actualKeys && opts.actualKeys.has(childKey(c));
+        const movedIn = opts.markGreen && c.movedUnit && !alreadyActual;
         const cls = [];
         if (movedIn && !c.overflow) cls.push('at-moved-in');
         if (c.overflow) cls.push('at-overflow');
@@ -905,6 +908,9 @@ function rosterPanel(roomNames) {
         const projKeys = new Set(projList.map(childKey));
         const aOpts = { sideByKey: actualSide, projKeys: projKeys };
         const pOpts = { markGreen: true, sideByKey: projSide };
+        // In a COMBINED set, a child already in the set's Actual roster is not a real "move in"
+        // (it's a within-set shuffle), so suppress their green in the Projected card.
+        if (roomNames.length > 1) pOpts.actualKeys = new Set(actualList.map(childKey));
         const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
                                  'No children currently in this room.', aOpts);
         const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
