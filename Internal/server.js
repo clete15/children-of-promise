@@ -4164,14 +4164,12 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
              overDays[uIdx]    — how many distinct days have gone over at all (cap: maxDays). */
         const isPair = uIdx => unitRooms[uIdx].length > 1;
         // The tolerance for a unit: look up its room-set key, else the paired default, else none.
+        // This applies in the infant scenario too — the infant pair (1,2) keeps its normal +2
+        // over-tolerance, so it may run up to 2 over combined capacity (e.g. 10/8) BEFORE the
+        // converted room is used. The converted room is a separate, later release valve driven
+        // only by Pre-School pressure, not by removing the infant pair's tolerance.
         const overCfg = uIdx => {
             if (!isPair(uIdx)) return { perDay: 0, maxDays: 0 };
-            // In the infant scenario the infant pair (1,2) gets NO over-tolerance: overfill must
-            // OVERFLOW (so the post-pass can relocate it into the converted room) rather than
-            // over-seat room 2. Identify that unit by its rooms including both 1 and 2.
-            if (infantScenario && unitRooms[uIdx].indexOf(1) !== -1 && unitRooms[uIdx].indexOf(2) !== -1) {
-                return { perDay: 0, maxDays: 0 };
-            }
             const key = unitRooms[uIdx].join('-');
             return PROJ_UNIT_OVER[key] || PROJ_PAIR_OVER_DEFAULT;
         };
