@@ -4363,45 +4363,76 @@ function buildProjectedAttendance(roomRows, enrolledRows, waitlistRows, excludeI
     const overflowKids = [];
     // Pass 2 — the age ladder seats everyone youngest-first by UNIT (whole-week placement,
     // paired rooms flex internally), using only the Pre-School seats the PFA pass left free.
-    seatUnits(ladderUnits, ladderKids, pfaFilled, pfaFilledPfaPi);
+    if (!infantScenario) {
+        // Normal projection: seat the ladder exactly once (unchanged behaviour).
+        seatUnits(ladderUnits, ladderKids, pfaFilled, pfaFilledPfaPi);
+    } else {
+        /* INFANT SCENARIO relief loop — the converted "Infant (converted)" room (7, capacity 4,
+           no PI children) is a RELEASE VALVE that activates ONLY to keep Pre-School (room 6)
+           from exceeding a hard limit of 19 children on any single weekday.
 
-    /* INFANT SCENARIO post-pass — relocate infant overflow into the converted room (7).
-       The converted room is a release valve: it only takes infants the real infant rooms
-       (1, 2) could not seat. Among that overflow we move the LOWEST-ENROLMENT children first
-       (fewest total attending days), WHOLE-WEEK, up to room 7's daily capacity, and never a
-       PI child. Each relocated child is un-charged from the overflow room (its overflow count
-       and roster entry removed) and added to room 7's occupancy + roster. */
-    if (infantScenario && roomByNum[7]) {
-        if (!roomsOut[7]) roomsOut[7] = makeRoomOut(7);
-        const r7 = roomsOut[7];
-        const cap7 = roomByNum[7].capacity || 0;
-        const infantMax = roomByNum[1] ? roomByNum[1].maxMonths : Infinity;   // 0–12 months
-        const totalDays = kid => (kid.days || []).reduce((s, x) => s + (x ? 1 : 0), 0);
-        // Infant-aged, non-PI overflow children, lowest total days first (ties: youngest first).
-        const movers = overflowKids
-            .filter(o => o.kid.program !== 'PI' && (o.kid.age / 30.44) <= infantMax)
-            .sort((a, b) => (totalDays(a.kid) - totalDays(b.kid)) || (a.kid.age - b.kid.age));
-        for (const o of movers) {
-            const kid = o.kid;
-            // Room 7 must have a free seat on EVERY day this child attends (whole-week placement).
-            let fits = true;
-            for (let d = 0; d < 5; d++) if (kid.days[d] && r7.occupancy[d] >= cap7) { fits = false; break; }
-            if (!fits) continue;
-            // Un-charge from the overflow room: drop the overflow counts and the roster entry.
-            const src = roomsOut[o.room];
-            if (src) {
-                for (let d = 0; d < 5; d++) if (kid.days[d]) src.overflow[d] = Math.max(0, src.overflow[d] - 1);
-                const i = src.roster.indexOf(o.rosterEntry);
-                if (i !== -1) src.roster.splice(i, 1);
+           Room 7 is already off the ladder, so children who would have been in 2 & 3 climb into
+           Pre-School. If that pushes Pre-School's per-day demand (seated + overflow) over 19, we
+           pin the YOUNGEST non-PI ladder child whole-week into room 7 and RE-RUN the whole ladder
+           seating from scratch. Pinning a young child at the bottom opens a seat that cascades up
+           the ladder and lowers Pre-School's peak. We repeat until Pre-School peak demand ≤ 19,
+           the converted room is full (4), or no more eligible (non-PI) children remain to pin. */
+        const cap7 = roomByNum[7].capacity || 0;        // 4
+        const LIMIT = 19;                               // Pre-School hard per-day limit
+        const pinnedToConverted = new Set();            // ids of children held whole-week in room 7
+
+        // Seat the ladder once, with pinned children EXCLUDED from the ladder and placed
+        // whole-week directly into room 7. Resets the cumulative seating state first so the
+        // helper can be called repeatedly without double-counting. roomsOut/overflowKids are
+        // const; mutate their contents, never reassign.
+        const seatLadderWithPins = () => {
+            Object.keys(roomsOut).forEach(k => delete roomsOut[k]);
+            overflowKids.length = 0;
+            const laddered = ladderKids.filter(k => !pinnedToConverted.has(k.id));
+            seatUnits(ladderUnits, laddered, pfaFilled, pfaFilledPfaPi);
+            // Directly place each pinned child whole-week into room 7.
+            if (pinnedToConverted.size) {
+                if (!roomsOut[7]) roomsOut[7] = makeRoomOut(7);
+                const r7 = roomsOut[7];
+                ladderKids
+                    .filter(k => pinnedToConverted.has(k.id))
+                    .sort((a, b) => a.age - b.age)
+                    .forEach(kid => {
+                        const days = kid.days.map(x => x ? 1 : 0);
+                        for (let d = 0; d < 5; d++) if (days[d]) { r7.occupancy[d]++; if (kid.pfaPi) r7.pfaPi[d]++; }
+                        // "moved" since room 7 is not the child's actual room.
+                        r7.roster.push({ id: kid.id || 0, name: kid.name, birthDate: kid.birthDate || '',
+                            ageDays: kid.age, source: kid.source || 'enrolled', pfaPi: !!kid.pfaPi,
+                            program: kid.program || '', overflow: false, movedUnit: true, days: days });
+                    });
+                r7.roster.sort((a, b) => a.ageDays - b.ageDays);
             }
-            // Seat whole-week in room 7. "moved" since it is not the child's actual room.
-            const days = kid.days.map(x => x ? 1 : 0);
-            for (let d = 0; d < 5; d++) if (days[d]) { r7.occupancy[d]++; if (kid.pfaPi) r7.pfaPi[d]++; }
-            r7.roster.push({ id: kid.id || 0, name: kid.name, birthDate: kid.birthDate || '',
-                ageDays: kid.age, source: kid.source || 'enrolled', pfaPi: !!kid.pfaPi,
-                program: kid.program || '', overflow: false, movedUnit: true, days: days });
+        };
+
+        // Pre-School's peak per-day DEMAND = max over weekdays of (seated occupancy + overflow),
+        // because overflow children are ones Pre-School could not seat — they are still demand.
+        const preschoolPeak = () => {
+            const ps = roomsOut[PROJ_PRESCHOOL_ROOM];
+            if (!ps) return 0;
+            let peak = 0;
+            for (let d = 0; d < 5; d++) peak = Math.max(peak, (ps.occupancy[d] || 0) + (ps.overflow[d] || 0));
+            return peak;
+        };
+
+        // Initial seating (no pins), then relieve iteratively. Cap iterations at room 7's
+        // capacity so the loop can never run away.
+        seatLadderWithPins();
+        for (let iter = 0; iter < cap7; iter++) {
+            if (preschoolPeak() <= LIMIT) break;              // Pre-School within its limit
+            if (pinnedToConverted.size >= cap7) break;        // converted room full
+            // Youngest non-PI ladder child not already pinned.
+            const candidate = ladderKids
+                .filter(k => k.program !== 'PI' && !pinnedToConverted.has(k.id))
+                .sort((a, b) => a.age - b.age)[0];
+            if (!candidate) break;                            // no one left to pin
+            pinnedToConverted.add(candidate.id);
+            seatLadderWithPins();
         }
-        r7.roster.sort((a, b) => a.ageDays - b.ageDays);
     }
 
     // Fold PFA overflow into Pre-School's overflow (both are "couldn't be seated in Pre-School"),
