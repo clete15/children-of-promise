@@ -218,6 +218,19 @@
             min-width: 100px;
         }
         .status-select:focus { outline: none; border-color: var(--primary); }
+        /* Editable requested-start date in its column. */
+        .reqstart-input {
+            padding: 5px 6px;
+            border: 1px solid var(--sp-border-in);
+            border-radius: 4px;
+            font-size: 0.82rem;
+            font-family: inherit;
+            width: 100%;
+            min-width: 120px;
+            background: var(--sp-surface, #fff);
+            color: inherit;
+        }
+        .reqstart-input:focus { outline: none; border-color: var(--primary); }
         /* Program column: enough for the age-group labels ("2-Year Olds", "Before &
            After") without the old excess. */
         .col-program { min-width: 132px; }
@@ -529,9 +542,6 @@ function renderTable() {
         const scoreClass = score >= 50 ? 'score-high' : score >= 10 ? 'score-medium' : 'score-low';
         const flags = buildFlags(r);
         const date = r.SubmittedAt ? r.SubmittedAt.split(' ')[0] : '—';
-        // The family's requested start date from the pre-enrollment form (ChildStartDate).
-        const reqStart = (r.ChildStartDate && r.ChildStartDate !== 'NULL')
-            ? r.ChildStartDate.split(' ')[0] : '—';
         const status = (!r.WaitlistStatus || r.WaitlistStatus === 'NULL') ? 'Pending' : r.WaitlistStatus;
         const notes = (!r.Notes || r.Notes === 'NULL') ? '' : r.Notes;
         const isPending = status === 'Pending';
@@ -549,7 +559,7 @@ function renderTable() {
             <td><div class="flag-list"><span class="flag-score ${scoreClass}">${score} pts</span>${flags}</div></td>
             <td style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);font-weight:700;font-size:0.86rem;">${r.HouseholdIncome ? fmtMoney(r.HouseholdIncome) : '—'}</td>
             <td><span class="submitted-date">${date}</span></td>
-            <td><span class="submitted-date">${reqStart}</span></td>
+            <td><input type="date" class="reqstart-input" id="reqstart-${r.Id}" value="${(r.ChildStartDate && r.ChildStartDate !== 'NULL') ? r.ChildStartDate.split(' ')[0] : ''}" onchange="saveStartDate(${parseInt(r.Id)}, this)" title="Requested start date — editable; the projection sorts the waiting list by this date"></td>
             <td>
                 <select class="status-select" id="status-${r.Id}" onchange="handleStatusChange(${parseInt(r.Id)}, this)">
                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
@@ -683,6 +693,30 @@ async function saveNotes(id) {
             if (btn) { btn.textContent = 'Saved ✓'; setTimeout(() => btn.textContent = 'Save', 2000); }
         }
     } catch (e) { alert('Failed to save notes'); }
+}
+
+/* Save the edited requested start date (ChildStartDate). An empty value clears it.
+   The projection sorts the waiting list by this date, so changing it here reorders
+   who seats first. Brief green/red border flash confirms the save. */
+async function saveStartDate(id, el) {
+    const val = (el.value || '').trim();   // 'YYYY-MM-DD' or '' to clear
+    el.disabled = true;
+    try {
+        const res = await apiFetch(`/api/waitinglist/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ childStartDate: val })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || ('HTTP ' + res.status));
+        el.style.outline = '2px solid var(--sp-good-fg, #16a34a)';
+        setTimeout(() => { el.style.outline = ''; }, 1200);
+    } catch (e) {
+        el.style.outline = '2px solid var(--sp-bad-fg, #dc2626)';
+        setTimeout(() => { el.style.outline = ''; }, 2000);
+        alert('Failed to save requested start date: ' + (e && e.message ? e.message : e));
+    } finally {
+        el.disabled = false;
+    }
 }
 
 /* Hard-delete a pre-enrollment record — for test submissions and junk. A real family

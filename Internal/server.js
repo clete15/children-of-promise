@@ -9360,6 +9360,9 @@ ELSE
             if (d.status !== undefined) fields.push(`WaitlistStatus=${esc(d.status)}`);
             if (d.notes !== undefined) fields.push(`Notes=${esc(d.notes)}`);
             if (d.ageGroup !== undefined) fields.push(`AgeGroup=${esc(d.ageGroup)}`);
+            // The family's requested start date (editable in the waiting-list table). An
+            // empty string clears it (NULL); esc() maps '' to NULL, so this handles both.
+            if (d.childStartDate !== undefined) fields.push(`ChildStartDate=${esc(d.childStartDate)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
             /* This used to return {success:true} on r.ok alone - so a bad id, or a value
                too long for its column (sqlcmd exits 0, discards the write), reported
