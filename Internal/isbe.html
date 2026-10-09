@@ -1964,8 +1964,15 @@ async function renderChildFilesGrid(program) {
         return;
     }
 
+    // Columns per program. PI (birth-to-3) does NOT require vision/hearing screening
+    // (those are the school-age 77 Ill. Adm. Code 685/675 rules), so drop those two
+    // columns on the PI grid; PFA (preschool) keeps them.
+    var cols = (program === 'PI')
+        ? CHILD_DOCS.filter(function (d) { return d.key !== 'vision' && d.key !== 'hearing'; })
+        : CHILD_DOCS;
+
     var head = '<tr><th class="cf-name">Child</th><th class="cf-room">Room</th>'
-        + CHILD_DOCS.map(function (d) { return '<th class="cf-doc">' + escapeHtml(d.label) + '</th>'; }).join('')
+        + cols.map(function (d) { return '<th class="cf-doc">' + escapeHtml(d.label) + '</th>'; }).join('')
         + '</tr>';
 
     // Behavior and transition plans are "only required where applicable", so their
@@ -1973,7 +1980,7 @@ async function renderChildFilesGrid(program) {
     var OPTIONAL_DOCS = { behaviorplan: true, transitionplan: true };
 
     var rows = roster.map(function (s) {
-        var cells = CHILD_DOCS.map(function (doc) {
+        var cells = cols.map(function (doc) {
             var checked = !!(docChecklist[String(s.Id)] || {})[doc.key];
             // Proof of income is also tracked on the enrollment record; reflect that
             // legacy flag so a child marked there shows as on-file here without a
