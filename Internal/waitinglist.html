@@ -231,6 +231,10 @@
             color: inherit;
         }
         .reqstart-input:focus { outline: none; border-color: var(--primary); }
+        /* Clickable Requested Start header for sorting. */
+        th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+        th.sortable:hover { text-decoration: underline; }
+        .sort-arrow { font-size: 0.72rem; opacity: 0.85; }
         /* Program column: enough for the age-group labels ("2-Year Olds", "Before &
            After") without the old excess. */
         .col-program { min-width: 132px; }
@@ -372,7 +376,7 @@
                     <th>Score &amp; Risk Factors</th>
                     <th style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);">Income</th>
                     <th>Submitted</th>
-                    <th>Requested Start</th>
+                    <th id="reqStartHead" class="sortable" onclick="toggleStartSort()" title="Click to sort by requested start date">Requested Start <span id="reqStartArrow" class="sort-arrow"></span></th>
                     <th>Status</th>
                     <th>Notes</th>
                 </tr>
@@ -391,9 +395,18 @@
 // (allRows from /api/waitinglist), so it does not use app.js's students list.
 let allRows = [];
 let activeTab = 'infant';
+// Requested Start column sort. null = default (status, then score); 'asc'/'desc'
+// = sort by ChildStartDate. Rows with no requested start sort to the bottom either way.
+let startSort = null;
 // Every tab shown in the toolbar. 'other' catches unrecognized/missing programs
 // so a real submission can never be invisible to staff.
 const WL_TABS = ['infant', 'toddler', '2-3', '3-5', 'ba', 'other'];
+
+// Cycle the Requested Start sort: default → ascending → descending → default.
+function toggleStartSort() {
+    startSort = startSort === null ? 'asc' : startSort === 'asc' ? 'desc' : null;
+    renderTable();
+}
 
 // Sync top scrollbar width with table
 function syncScrollbar() {
@@ -529,13 +542,33 @@ function renderTable() {
         return;
     }
 
-    // Sort: Pending first, then Contacted, by score descending
-    rows.sort((a, b) => {
-        const getOrder = s => (!s || s === 'Pending' || s === 'NULL') ? 0 : 1;
-        const oa = getOrder(a.WaitlistStatus), ob = getOrder(b.WaitlistStatus);
-        if (oa !== ob) return oa - ob;
-        return (parseInt(b.Score)||0) - (parseInt(a.Score)||0);
-    });
+    if (startSort) {
+        // Sort by requested start date. Blank/unset dates always sink to the bottom,
+        // regardless of direction, so a missing date never jumps the queue.
+        const key = r => {
+            const v = (r.ChildStartDate && r.ChildStartDate !== 'NULL') ? r.ChildStartDate.split(' ')[0] : '';
+            return v || null;
+        };
+        rows.sort((a, b) => {
+            const ka = key(a), kb = key(b);
+            if (ka === null && kb === null) return 0;
+            if (ka === null) return 1;
+            if (kb === null) return -1;
+            return startSort === 'asc' ? ka.localeCompare(kb) : kb.localeCompare(ka);
+        });
+    } else {
+        // Default: Pending first, then Contacted, by score descending
+        rows.sort((a, b) => {
+            const getOrder = s => (!s || s === 'Pending' || s === 'NULL') ? 0 : 1;
+            const oa = getOrder(a.WaitlistStatus), ob = getOrder(b.WaitlistStatus);
+            if (oa !== ob) return oa - ob;
+            return (parseInt(b.Score)||0) - (parseInt(a.Score)||0);
+        });
+    }
+
+    // Reflect sort direction in the column header arrow.
+    const arrow = document.getElementById('reqStartArrow');
+    if (arrow) arrow.textContent = startSort === 'asc' ? '▲' : startSort === 'desc' ? '▼' : '';
 
     document.getElementById('wlBody').innerHTML = rows.map((r, i) => {
         const score = parseInt(r.Score) || 0;
