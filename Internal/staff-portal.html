@@ -345,6 +345,20 @@
     }
     .sp-pdr-link:hover { background: var(--sp-accent-soft); }
 
+    /* Styled file-picker for the PDR upload. A native <input type="file"> always
+       renders "Choose File / No file chosen" and that text cannot be changed, so the
+       real input is hidden and this label stands in for it — letting the control read
+       "click here to select your current PDR". It fills the row like the old field did,
+       and JS swaps in the filename once a file is chosen. */
+    .sp-filepick {
+        flex: 1 1 320px; min-width: 220px; display: inline-flex; align-items: center;
+        padding: 10px 14px; border-radius: 7px; cursor: pointer;
+        border: 1.5px dashed var(--sp-border); background: var(--sp-surface-2);
+        color: var(--sp-accent); font-size: 0.88rem; font-weight: 600;
+    }
+    .sp-filepick:hover { border-color: var(--sp-accent); background: var(--sp-accent-soft); }
+    .sp-filepick.has-file { color: var(--sp-text); font-weight: 600; border-style: solid; }
+
     /* ── Admin: Staff Attainments refresh ── */
     .sp-attn-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 6px; }
     .sp-attn-row input[type="file"] { font-size: 0.85rem; color: var(--sp-text-2); max-width: 100%; }
@@ -1886,9 +1900,13 @@ function credentialsSection(s) {
             + 'status and this year\u2019s PD training hours. You\u2019ll see exactly what changes '
             + 'before anything is saved.</div>'
             + '<div class="sp-attn-row">'
-            + '<input type="file" id="pdrFile" accept=".pdf">'
-            + '<button type="button" id="pdrUpload" class="sp-save">Read &amp; preview</button>'
-            /* Registry link sits right beside "Read & preview" so the two steps — go get
+            // Hidden native input + styled label, so the control can read "click here to
+            // select your current PDR" instead of the unchangeable "No file chosen".
+            + '<input type="file" id="pdrFile" accept=".pdf" style="display:none;">'
+            + '<label for="pdrFile" id="pdrFileLabel" class="sp-filepick">'
+            + 'Click here to select your current PDR (Professional Development Record)</label>'
+            + '<button type="button" id="pdrUpload" class="sp-save">Approve PDR Updates</button>'
+            /* Registry link sits right beside "Approve PDR Updates" so the two steps — go get
                the PDR, upload it — are together. Outline style so it reads as the
                secondary action. The old "Open most recent PDR" and "Open my Gateways
                page" buttons were removed as duplicates (of the tab-strip "\u2197 PDR"
@@ -2718,6 +2736,21 @@ function wirePdr() {
     const btn = $('pdrUpload');
     if (btn) btn.addEventListener('click', runPdrPreview);
 
+    // Reflect the chosen file in the styled label (the hidden input shows no filename).
+    const fileEl = $('pdrFile');
+    const label = $('pdrFileLabel');
+    if (fileEl && label) {
+        fileEl.addEventListener('change', () => {
+            if (fileEl.files && fileEl.files.length) {
+                label.textContent = fileEl.files[0].name;
+                label.classList.add('has-file');
+            } else {
+                label.textContent = 'Click here to select your current PDR (Professional Development Record)';
+                label.classList.remove('has-file');
+            }
+        });
+    }
+
     // The PDR button in the tab strip opens the panel (switching to the credentials
     // tab so the panel is visible); the × inside the panel closes it.
     const toggle = $('pdrToggle');
@@ -2780,7 +2813,7 @@ async function runPdrPreview() {
         if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Could not read it: ' + (e.message || e); }
         if (out) out.innerHTML = '';
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Read & preview'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Approve PDR Updates'; }
     }
 }
 
