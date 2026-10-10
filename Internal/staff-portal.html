@@ -1905,8 +1905,8 @@ function credentialsSection(s) {
             + '<input type="file" id="pdrFile" accept=".pdf" style="display:none;">'
             + '<label for="pdrFile" id="pdrFileLabel" class="sp-filepick">'
             + 'Click here to select your current PDR (Professional Development Record)</label>'
-            + '<button type="button" id="pdrUpload" class="sp-save">Approve PDR Updates</button>'
-            /* Registry link sits right beside "Approve PDR Updates" so the two steps — go get
+            + '<button type="button" id="pdrUpload" class="sp-save">Preview PDR</button>'
+            /* Registry link sits right beside "Preview PDR" so the two steps — go get
                the PDR, upload it — are together. Outline style so it reads as the
                secondary action. The old "Open most recent PDR" and "Open my Gateways
                page" buttons were removed as duplicates (of the tab-strip "\u2197 PDR"
@@ -2813,7 +2813,7 @@ async function runPdrPreview() {
         if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Could not read it: ' + (e.message || e); }
         if (out) out.innerHTML = '';
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Approve PDR Updates'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Preview PDR'; }
     }
 }
 
