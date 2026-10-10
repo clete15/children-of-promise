@@ -383,6 +383,51 @@
         font-size: 1rem; font-weight: 800; color: var(--sp-text); margin: 0 0 12px;
         text-align: center; padding-bottom: 10px; border-bottom: 1px solid var(--sp-border);
     }
+    /* "Apply for ECE 2" button beside the ladder heading. Solid accent so it reads as
+       the one action on the card. */
+    .sp-apply-btn {
+        appearance: none; -webkit-appearance: none; cursor: pointer;
+        font-family: inherit; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.03em;
+        color: #fff; background: var(--sp-accent); border: 1.5px solid var(--sp-accent);
+        border-radius: 8px; padding: 6px 13px; margin-left: 12px; white-space: nowrap;
+        vertical-align: middle; transition: filter 0.12s;
+    }
+    .sp-apply-btn:hover { filter: brightness(1.08); }
+    .sp-apply-btn:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+
+    /* ── Moveable "Apply for ECE 2" instructions window ──────────────────────
+       A free-floating panel (not a backdrop modal) the person can drag by its title
+       bar out of the way while they work in the Gateways Registry in another tab. */
+    .sp-win {
+        position: fixed; top: 90px; left: 50%; transform: translateX(-50%);
+        width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 120px);
+        display: flex; flex-direction: column; z-index: 1000;
+        background: var(--sp-surface); border: 1.5px solid var(--sp-border);
+        border-radius: 12px; box-shadow: 0 18px 50px rgba(0,0,0,0.35);
+    }
+    .sp-win-bar {
+        display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        padding: 11px 14px; cursor: move; user-select: none;
+        background: var(--sp-surface-2); border-bottom: 1.5px solid var(--sp-border);
+        border-radius: 12px 12px 0 0;
+    }
+    .sp-win-title { font-size: 0.95rem; font-weight: 800; color: var(--sp-text); }
+    .sp-win-close {
+        appearance: none; border: 0; background: transparent; cursor: pointer;
+        color: var(--sp-muted); font-size: 1.4rem; line-height: 1; padding: 2px 7px;
+        border-radius: 6px;
+    }
+    .sp-win-close:hover { color: var(--sp-text); background: var(--sp-border); }
+    .sp-win-body { padding: 6px 18px 18px; overflow-y: auto; }
+    .sp-win-body h3 {
+        font-size: 0.9rem; font-weight: 800; color: var(--sp-accent);
+        margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid var(--sp-border);
+    }
+    .sp-win-body h3:first-child { margin-top: 8px; padding-top: 0; border-top: 0; }
+    .sp-win-body ol, .sp-win-body ul { margin: 0 0 0 22px; padding: 0; }
+    .sp-win-body li { font-size: 0.88rem; color: var(--sp-text-2); line-height: 1.55; margin-bottom: 8px; }
+    .sp-win-body a { color: var(--sp-accent); }
+    .sp-win-body b { color: var(--sp-text); }
     .sp-need {
         display: grid; grid-template-columns: 92px 1fr; gap: 12px;
         padding: 10px 0; border-top: 1px solid var(--sp-border);
@@ -1658,7 +1703,13 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
     // bare "Level 2"), so it is clear which ladder this is when a person holds one and
     // is climbing the other.
     const credWord = kind === 'itc' ? 'Infant Toddler' : 'ECE';
-    body += '<div class="sp-need-head">Working toward <b>' + credWord + ' ' + esc(model.levelWord) + '</b></div>';
+    // "Apply for ECE 2" sits beside the heading only on the ECE ladder when the next
+    // level is 2 — it opens a moveable window with the step-by-step Gateways apply
+    // instructions. (openEceApplyWindow is defined once, below.)
+    const applyBtn = (kind === 'ece' && model.level === 2)
+        ? '<button type="button" class="sp-apply-btn" onclick="openEceApplyWindow()">Apply for ECE 2</button>'
+        : '';
+    body += '<div class="sp-need-head">Working toward <b>' + credWord + ' ' + esc(model.levelWord) + '</b>' + applyBtn + '</div>';
 
     /* Apply-now check (ITC only). When the held ECE has already unlocked a higher ITC
        level than the person holds, they can apply for the level they qualify for rather
@@ -2725,6 +2776,106 @@ async function applyAttainments(indexes, btn) {
         alert('Could not apply: ' + (e.message || e));
         if (btn) { btn.disabled = false; btn.textContent = 'Apply this'; }
     }
+}
+
+/* ── Apply for ECE 2: moveable instructions window ─────────────────────────
+   Opened by the "Apply for ECE 2" button beside the ECE ladder heading. A free-
+   floating panel (no backdrop) so the person can drag it aside and follow the steps
+   while the Gateways Registry is open in another tab. Singleton: a second click just
+   brings the existing one back rather than stacking copies. */
+function openEceApplyWindow() {
+    const existing = document.getElementById('eceApplyWin');
+    if (existing) { existing.remove(); }   // toggle: a second press closes it
+
+    const win = document.createElement('div');
+    win.id = 'eceApplyWin';
+    win.className = 'sp-win';
+    win.setAttribute('role', 'dialog');
+    win.setAttribute('aria-label', 'How to apply for ECE Level 2');
+    win.innerHTML =
+        '<div class="sp-win-bar" id="eceApplyBar">'
+        + '<span class="sp-win-title">Apply for ECE Level 2</span>'
+        + '<button type="button" class="sp-win-close" id="eceApplyClose" '
+        + 'title="Close" aria-label="Close">\u00d7</button>'
+        + '</div>'
+        + '<div class="sp-win-body">'
+        + '<h3>1. Update Your Gateways Profile</h3>'
+        + '<ol>'
+        + '<li>Log into your account on the '
+        + '<a href="https://registry.ilgateways.com" target="_blank" rel="noopener">Gateways Registry Dashboard</a>.</li>'
+        + '<li>Select <b>UPDATE</b> (the orange section on your dashboard) to verify that your '
+        + 'contact details, education profile, and current employment are accurate.</li>'
+        + '</ol>'
+        + '<h3>2. Submit the Online Application</h3>'
+        + '<ol>'
+        + '<li>Click <b>APPLY</b> (the orange suitcase icon) on the dashboard menu.</li>'
+        + '<li>Select <b>Gateways Credentials</b>.</li>'
+        + '<li>Click <b>Apply Now</b>.</li>'
+        + '<li>Choose <b>ECE Credential</b> from the list, select <b>Level 2</b>, and complete the '
+        + 'application prompts.</li>'
+        + '</ol>'
+        + '<h3>3. Review &amp; Processing</h3>'
+        + '<ul>'
+        + '<li>Once submitted, INCCRRA typically processes applications within <b>20 business days</b> '
+        + 'of receiving all required documentation (including official transcripts).</li>'
+        + '<li>You can check the status of your application at any time under the <b>APPLY</b> section '
+        + 'in your dashboard.</li>'
+        + '</ul>'
+        + '</div>';
+    document.body.appendChild(win);
+
+    document.getElementById('eceApplyClose').addEventListener('click', () => win.remove());
+    makeWindowDraggable(win, document.getElementById('eceApplyBar'));
+}
+
+/* Drag a floating window by a handle (its title bar). On the first drag we switch
+   from the centering transform to explicit left/top so the pointer math is simple
+   and the window stays where it is dropped. Kept generic in case other windows want
+   the same behaviour later. */
+function makeWindowDraggable(win, handle) {
+    let startX = 0, startY = 0, startLeft = 0, startTop = 0, dragging = false;
+
+    function onDown(e) {
+        // Ignore the close button so a click there doesn't start a drag.
+        if (e.target.closest('.sp-win-close')) return;
+        const pt = e.touches ? e.touches[0] : e;
+        const rect = win.getBoundingClientRect();
+        // Pin to pixel coordinates and drop the centering transform on first grab.
+        win.style.left = rect.left + 'px';
+        win.style.top = rect.top + 'px';
+        win.style.transform = 'none';
+        startX = pt.clientX; startY = pt.clientY;
+        startLeft = rect.left; startTop = rect.top;
+        dragging = true;
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onUp);
+        e.preventDefault();
+    }
+    function onMove(e) {
+        if (!dragging) return;
+        const pt = e.touches ? e.touches[0] : e;
+        let nx = startLeft + (pt.clientX - startX);
+        let ny = startTop + (pt.clientY - startY);
+        // Keep the title bar reachable: clamp so the window can't be lost off-screen.
+        const maxX = window.innerWidth - 60;
+        const maxY = window.innerHeight - 40;
+        nx = Math.max(60 - win.offsetWidth, Math.min(nx, maxX));
+        ny = Math.max(0, Math.min(ny, maxY));
+        win.style.left = nx + 'px';
+        win.style.top = ny + 'px';
+        if (e.cancelable) e.preventDefault();
+    }
+    function onUp() {
+        dragging = false;
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('touchend', onUp);
+    }
+    handle.addEventListener('mousedown', onDown);
+    handle.addEventListener('touchstart', onDown, { passive: false });
 }
 
 /* ── Update from PDR (one person, admin only) ──────────────────────────────
