@@ -441,6 +441,25 @@
         cfg = options || {};
         if (!cfg.key) throw new Error('PasForm.init needs a key');
 
+        /* ── Gate BEFORE anything paints ──
+           These are personal/staff-scoped forms; the server requires a credential and
+           the loader below bounces a 401 to /me. That bounce used to happen only after
+           the toolbar, the editable fields and (for staff forms) the /api/staff call —
+           so the form flashed on screen for a moment before the login replaced it. That
+           flash is the "opens briefly then heads to a password section" complaint.
+
+           A sign-in leaves a credential in sessionStorage synchronously, so we can check
+           for one here, before building any UI, and redirect straight to /me when there
+           is none. No flash. The server-side 401 handler further down stays as the
+           backstop for a token that is present but expired/rejected. 'list'-scope forms
+           are centre-wide and keep their own handling; this guards the per-person ones. */
+        if ((cfg.scope === 'staff' || cfg.scope === 'staff-year')
+            && window.CofpAuth && !CofpAuth.signedIn()) {
+            var back = encodeURIComponent(location.pathname + location.search);
+            location.replace('/me?next=' + back);
+            return;
+        }
+
         const style = document.createElement('style');
         style.textContent = TOOLBAR_CSS;
         document.head.appendChild(style);
