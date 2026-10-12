@@ -362,11 +362,16 @@
                 </a>
                 <!-- Room Roster moved into the Enrollment Management sub-nav (after Benefits
                      & Eligibility), reached via the Enrollment Management card above. -->
-                <a class="dash-item" href="/staff/foodreport.html">
-                    <div class="di-icon">🍽️</div>
+                <!-- Per-child files, for EVERY enrolled child (not just PI/PFA). One card
+                     with two subsets inside it: Administrative (the required-document
+                     checklist) and Teacher (classroom forms). Both are the editable
+                     source of truth; the ISBE Child Files grid shows a read-only PI/PFA
+                     subset. -->
+                <a class="dash-item" href="/staff/child-files.html">
+                    <div class="di-icon">🗂️</div>
                     <div class="di-content">
-                        <div class="di-title">Food Program</div>
-                        <div class="di-desc">Meal counts, roster, menus, and CACFP reporting</div>
+                        <div class="di-title">Child Files</div>
+                        <div class="di-desc">Every child's documents — Administrative records (birth cert, physical, income proof) and Teacher forms (permission slips, interviews, screenings)</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
@@ -379,25 +384,6 @@
              heading and data-role. Placed just below Daily Operations, above
              Administration, per the requested section order. -->
         <div class="dash-row">
-        <!-- Parents. The entry point for the parent/child portal: per-child access codes,
-             the forms a parent can fill out about their child, and video conferences with
-             a teacher. data-role="all" because teachers run conferences and hand out codes,
-             not just admins. Links to its own page rather than living inside the enrolled
-             students form, where the per-student Parent Code / Conference buttons started. -->
-        <div class="dash-section" data-role="all">
-            <div class="dash-section-title">Parents</div>
-            <div class="dash-group">
-                <a class="dash-item" href="/staff/parents.html">
-                    <div class="di-icon">👪</div>
-                    <div class="di-content">
-                        <div class="di-title">Parent Portal</div>
-                        <div class="di-desc">Set up a child portal for parents — access codes, forms, and video conferences with a teacher.</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
-            </div>
-        </div>
-
         <!-- Its own section rather than an entry under Administration. What a person
              holds, is owed and must do is a different question from administering
              everyone else, and it was previously reachable only by scrolling past two
@@ -420,27 +406,41 @@
                 </a>
             </div>
         </div>
+
+        <!-- Parents. The entry point for the parent/child portal: per-child access codes,
+             the forms a parent can fill out about their child, and video conferences with
+             a teacher. data-role="all" because teachers run conferences and hand out codes,
+             not just admins. Links to its own page rather than living inside the enrolled
+             students form, where the per-student Parent Code / Conference buttons started. -->
+        <div class="dash-section" data-role="all">
+            <div class="dash-section-title">Parents</div>
+            <div class="dash-group">
+                <a class="dash-item" href="/staff/parents.html">
+                    <div class="di-icon">👪</div>
+                    <div class="di-content">
+                        <div class="di-title">Parent Portal</div>
+                        <div class="di-desc">Set up a child portal for parents — access codes, forms, and video conferences with a teacher.</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+            </div>
+        </div>
         </div><!-- /.dash-row -->
 
         <div class="dash-section" data-role="admin">
             <div class="dash-section-title">Administration</div>
             <div class="dash-group">
-                <!-- Deciding whose each personnel document is. Deliberately not on My
-                     Page: that page is one person's own record, so the undecided pile
-                     and everybody else's paperwork have no business on it. -->
-                <!-- Per-child files, for EVERY enrolled child (not just PI/PFA). One card
-                     with two subsets inside it: Administrative (the required-document
-                     checklist) and Teacher (classroom forms). Both are the editable
-                     source of truth; the ISBE Child Files grid shows a read-only PI/PFA
-                     subset. First in Administration — it is the most-used card here. -->
-                <a class="dash-item" href="/staff/child-files.html">
-                    <div class="di-icon">🗂️</div>
+                <a class="dash-item" href="/staff/foodreport.html">
+                    <div class="di-icon">🍽️</div>
                     <div class="di-content">
-                        <div class="di-title">Child Files</div>
-                        <div class="di-desc">Every child's documents — Administrative records (birth cert, physical, income proof) and Teacher forms (permission slips, interviews, screenings)</div>
+                        <div class="di-title">Food Program</div>
+                        <div class="di-desc">Meal counts, roster, menus, and CACFP reporting</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
+                <!-- Deciding whose each personnel document is. Deliberately not on My
+                     Page: that page is one person's own record, so the undecided pile
+                     and everybody else's paperwork have no business on it. -->
                 <a class="dash-item" href="/staff/staff-files.html">
                     <div class="di-icon">🗂️</div>
                     <div class="di-content">
