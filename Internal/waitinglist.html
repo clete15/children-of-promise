@@ -127,19 +127,25 @@
         .wl-table tbody tr.row-pending:hover { background: var(--sp-warn-bg); filter: brightness(0.97); }
 
         /* ── NOTES ── */
-        .notes-cell { min-width: 150px; max-width: 180px; height: 100%; }
+        /* Widened considerably (was 150-180px) now that the Income column is gone —
+           notes are the most-read/most-edited field here, so they get the reclaimed
+           room. */
+        .notes-cell { min-width: 300px; max-width: 380px; height: 100%; }
         .notes-input {
             width: 100%;
             height: calc(100% - 24px);
-            padding: 5px 7px;
+            padding: 6px 8px;
             /* A visible recessed well with a clear border, so the box reads as an
                editable field against the row rather than blending into it. */
             border: 1px solid var(--sp-border-in);
             border-radius: 4px;
-            font-size: 0.82rem;
+            font-size: 0.84rem;
+            line-height: 1.35;
             font-family: inherit;
-            resize: none;
-            min-height: 60px;
+            /* Vertical resize allowed so a long note can be opened up without the
+               horizontal resize that would distort the column. */
+            resize: vertical;
+            min-height: 110px;
             color: var(--sp-text);
             background: var(--sp-field-bg);
         }
@@ -375,7 +381,6 @@
                     <th>Children</th>
                     <th class="col-program">Program</th>
                     <th>Score &amp; Risk Factors</th>
-                    <th style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);">Income</th>
                     <th>Submitted</th>
                     <th id="reqStartHead" class="sortable" onclick="toggleStartSort()" title="Click to sort by requested start date">Requested Start <span id="reqStartArrow" class="sort-arrow"></span></th>
                     <th>Status</th>
@@ -591,7 +596,6 @@ function renderTable() {
             <td style="font-size:0.82rem;max-width:140px;">${r.ChildrenInfo || '—'}</td>
             <td>${programSelect(r)}</td>
             <td><div class="flag-list"><span class="flag-score ${scoreClass}">${score} pts</span>${flags}</div></td>
-            <td style="background:var(--sp-warn-bg);color:var(--sp-warn-fg);font-weight:700;font-size:0.86rem;">${r.HouseholdIncome ? fmtMoney(r.HouseholdIncome) : '—'}</td>
             <td><span class="submitted-date">${date}</span></td>
             <td><input type="date" class="reqstart-input" id="reqstart-${r.Id}" value="${(r.ChildStartDate && r.ChildStartDate !== 'NULL') ? r.ChildStartDate.split(' ')[0] : ''}" onchange="saveStartDate(${parseInt(r.Id)}, this)" title="Requested start date — editable; the projection sorts the waiting list by this date"></td>
             <td>
