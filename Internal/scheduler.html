@@ -288,7 +288,11 @@ const HIDE_FROM_SCHEDULE = ['janell', 'janelle', 'sara', 'pamela', 'clete'];
    stored. Matched to staff by first name (case-insensitive); anyone not listed is left
    untouched, and a listed name with no matching staff row is simply skipped. */
 const PAPER_WEEK = '2026-10-12';
-const PAPER_NOSCHOOL = '0';   // Monday
+/* No no-school days: the "NO SCHOOL" header on the printed chart meant the grade
+   school was closed (so the afterschoolers were in all day) — OUR centre had school and
+   staff worked their normal Monday shifts. Marking Monday no-school here greyed out the
+   column and hid those shifts, which was wrong. Left blank so every day stays open. */
+const PAPER_NOSCHOOL = '';
 const PAPER = {
     tara:    { Mon: '6:15-4:15', Tue: '6:30-4:30', Wed: '6:15-4:30', Thu: 'OFF',       Fri: '6:15-4:30' },
     sue:     { Mon: 'OFF',       Tue: '6:15-5:30', Wed: '4:00-5:30', Thu: '6:15-5:30', Fri: '4:00-5:30' },
