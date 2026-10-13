@@ -1005,11 +1005,11 @@
                 </div>
             </div>
             <div class="pi-section">
-                <h4>Upload the ASQ / ASE</h4>
-                <div class="doc-note">Attach the completed ASQ-3 / ASQ:SE-2 (PDF or a clear photo). For a PI child the column turns <strong>green</strong> only when this is uploaded, the scores are entered, and the summary below is signed by both the parent and staff. If there are several pages, combine them into one PDF; re-uploading replaces the file on record.</div>
+                <h4>Upload the ASQ</h4>
+                <div class="doc-note">Attach the completed ASQ (PDF or a clear photo). For a PI child the column turns <strong>green</strong> only when this is uploaded, the scores are entered, and the summary below is signed by both the parent and staff. If there are several pages, combine them into one PDF; re-uploading replaces the file on record.</div>
                 <div class="cls-upload-row">
                     <input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">
-                    <button type="button" class="pi-btn pi-btn-primary" id="scrQuestBtn" onclick="uploadScreeningQuestionnaire()">Upload ASQ / ASE</button>
+                    <button type="button" class="pi-btn pi-btn-primary" id="scrQuestBtn" onclick="uploadScreeningQuestionnaire()">Upload ASQ</button>
                     <span id="scrQuestStatus" class="cls-upload-status"></span>
                 </div>
             </div>
@@ -2425,7 +2425,7 @@ function partialScreeningReason(student, field) {
     const scored = cf.hasForm && cf.hasForm(id, field);
     const parentSig = cf.hasSignature && cf.hasSignature(id, field, 'parent');
     const staffSig = cf.hasSignature && cf.hasSignature(id, field, 'staff');
-    (quest ? have : need).push('the ASQ / ASE upload');
+    (quest ? have : need).push('the ASQ upload');
     (scored ? have : need).push('the entered scores');
     (parentSig ? have : need).push('the parent signature');
     (staffSig ? have : need).push('the staff signature');
@@ -3421,7 +3421,7 @@ async function uploadScreeningQuestionnaire() {
     } catch (e) {
         if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Upload ASQ / ASE'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Upload ASQ'; }
     }
 }
 
@@ -3576,7 +3576,7 @@ async function openScreening(studentId, type, period) {
     var existingQ = ChildForms.fileFor(studentId, scrField, 'questionnaire');
     setUploadStatus('scrQuestStatus', existingQ
         ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
-        : null, 'No ASQ / ASE uploaded yet.');
+        : null, 'No ASQ uploaded yet.');
 
     // Load existing data
     try {

@@ -1117,14 +1117,14 @@
         var qHeading = document.getElementById('scrQuestHeading');
         var qNote = document.getElementById('scrQuestNote');
         if (qHeading) qHeading.textContent = questRequired
-            ? 'Upload the ASQ / ASE (required)'
-            : 'Upload the ASQ / ASE (optional)';
+            ? 'Upload the ASQ (required)'
+            : 'Upload the ASQ (optional)';
         if (qNote) qNote.textContent = questRequired
-            ? 'Upload the completed ASQ-3 / ASQ:SE-2 (PDF or a clear photo). For a PI child '
+            ? 'Upload the completed ASQ (PDF or a clear photo). For a PI child '
                 + 'this column turns green only when this is uploaded, the scores are entered '
                 + 'below, and the summary is signed by both the parent and staff.'
             : 'Optional. The scored summary below completes the screening on its own. You can '
-                + 'still attach the completed ASQ-3 / ASQ:SE-2 (PDF or image) to keep it in the '
+                + 'still attach the completed ASQ (PDF or image) to keep it in the '
                 + 'child\u2019s folder \u2014 but it is not required.';
         if (qSection) qSection.classList.toggle('scr-quest-required', questRequired);
         var qFile = document.getElementById('scrQuestFile');
@@ -1133,8 +1133,8 @@
         setUploadStatus('scrQuestStatus', existingQ
             ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
             : null, questRequired
-                ? '\u26a0 Required \u2014 no ASQ / ASE uploaded yet.'
-                : 'Optional \u2014 no ASQ / ASE uploaded yet.');
+                ? '\u26a0 Required \u2014 no ASQ uploaded yet.'
+                : 'Optional \u2014 no ASQ uploaded yet.');
 
         try {
             var res = await apiFetch(yearQS('/api/screening/' + studentId + '?type=' + encodeURIComponent(type) + '&period=' + encodeURIComponent(period)));
@@ -1316,7 +1316,7 @@
         } catch (e) {
             if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
         } finally {
-            if (btn) { btn.disabled = false; btn.textContent = 'Upload ASQ / ASE'; }
+            if (btn) { btn.disabled = false; btn.textContent = 'Upload ASQ'; }
         }
     }
 
@@ -1613,10 +1613,10 @@
         // comes before the student info and the scores. For a PI child it is REQUIRED
         // (openScreening relabels it and the .scr-quest-required class gives it a bright
         // amber callout); the heading/note here are the defaults it overrides.
-        '<div class="pi-section" id="scrQuestSection"><h4 id="scrQuestHeading">Upload the ASQ / ASE</h4>',
-        '<div class="doc-note" id="scrQuestNote">Upload the completed ASQ-3 / ASQ:SE-2 (PDF or a clear photo). For a PI child the column turns green only when this is uploaded, the scores are entered below, and the summary is signed by both the parent and staff.</div>',
+        '<div class="pi-section" id="scrQuestSection"><h4 id="scrQuestHeading">Upload the ASQ</h4>',
+        '<div class="doc-note" id="scrQuestNote">Upload the completed ASQ (PDF or a clear photo). For a PI child the column turns green only when this is uploaded, the scores are entered below, and the summary is signed by both the parent and staff.</div>',
         '<div class="cls-upload-row"><input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">',
-        '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload ASQ / ASE</button>',
+        '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload ASQ</button>',
         '<span id="scrQuestStatus" class="cls-upload-status"></span></div></div>',
         '<div class="pi-section"><h4>Student &amp; Screening Info</h4><div class="pi-grid three">',
         '<div class="pi-field"><label>Child Name</label><div class="pi-value" id="scrChildName"></div></div>',
