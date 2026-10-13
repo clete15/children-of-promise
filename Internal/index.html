@@ -340,7 +340,13 @@
     <p id="dashLead" style="max-width:680px;margin:0 auto 18px;color:var(--sp-muted);font-size:0.9rem;"></p>
 
     <div class="dashboard">
-        <div class="dash-section" data-role="admin">
+        <!-- Daily Operations now holds Enrollment Management, ISBE PFA/PI (next to it)
+             and Child Files (under it). The SECTION is data-role="all" so the ISBE card
+             — which teachers must see — is reachable here; the Enrollment Management and
+             Child Files cards carry their own data-role="admin" so teachers still don't
+             see those two. (A card cannot escape a hidden section, so the role gate has
+             to live on the cards, not the section, now that an all-card lives here.) -->
+        <div class="dash-section" data-role="all">
             <div class="dash-section-title" style="display:flex;align-items:center;gap:8px;">
                 Daily Operations
                 <a href="/staff/alerts.html" id="alertBadgePortal" style="display:none;background:#dc2626;color:white;font-size:0.65rem;font-weight:700;padding:2px 8px;border-radius:10px;text-decoration:none;cursor:pointer;animation:pulse-badge 2s infinite;" title="Click to view alerts">🔔 <span id="alertCountPortal"></span></a>
@@ -352,11 +358,21 @@
                      combined system and every view is reachable by its tab from there.
                      Opens on the Waiting List by default — the most-worked view — and the
                      other views are one click away on the shared sub-nav. -->
-                <a class="dash-item" id="emsCard" href="/staff/waitinglist.html">
+                <a class="dash-item" id="emsCard" href="/staff/waitinglist.html" data-role="admin">
                     <div class="di-icon">📋</div>
                     <div class="di-content">
                         <div class="di-title">Enrollment Management</div>
                         <div class="di-desc">Waiting list, enrolled student records, and benefits &amp; eligibility — one system, switch views with the tab bar</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+                <!-- ISBE PFA/PI sits beside Enrollment Management (moved up from Compliance
+                     & Programs). data-role="all": teachers reach their checklist from here. -->
+                <a class="dash-item" href="/staff/isbe.html" data-role="all">
+                    <div class="di-icon">🏛️</div>
+                    <div class="di-content">
+                        <div class="di-title">ISBE PFA / PI</div>
+                        <div class="di-desc">Program compliance, checklists, and ISBE documentation</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
@@ -366,8 +382,8 @@
                      with two subsets inside it: Administrative (the required-document
                      checklist) and Teacher (classroom forms). Both are the editable
                      source of truth; the ISBE Child Files grid shows a read-only PI/PFA
-                     subset. -->
-                <a class="dash-item" href="/staff/child-files.html">
+                     subset. Sits under Enrollment Management; admin-only. -->
+                <a class="dash-item" href="/staff/child-files.html" data-role="admin">
                     <div class="di-icon">🗂️</div>
                     <div class="di-content">
                         <div class="di-title">Child Files</div>
@@ -474,17 +490,13 @@
             </div>
         </div>
 
-        <div class="dash-section" data-role="all">
+        <!-- ISBE PFA/PI moved up to Daily Operations (next to Enrollment Management).
+             With it gone, every card left here is admin-only, so the SECTION is now
+             data-role="admin" — otherwise a teacher saw a "Compliance & Programs"
+             heading with no cards beneath it. -->
+        <div class="dash-section" data-role="admin">
             <div class="dash-section-title">Compliance &amp; Programs</div>
             <div class="dash-group">
-                <a class="dash-item" href="/staff/isbe.html" data-role="all">
-                    <div class="di-icon">🏛️</div>
-                    <div class="di-content">
-                        <div class="di-title">ISBE PFA / PI</div>
-                        <div class="di-desc">Program compliance, checklists, and ISBE documentation</div>
-                    </div>
-                    <div class="di-arrow">›</div>
-                </a>
                 <a class="dash-item" href="/staff/ccap.html" data-role="admin">
                     <div class="di-icon">🏦</div>
                     <div class="di-content">
