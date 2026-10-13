@@ -132,9 +132,10 @@ GO
      - Donna Nier: primary room 4 "Toddlers / 2 Year Olds" (Teacher 1 of 4),
        secondary room 5 "2 Year Olds" (Teacher 2 of 5). Her stored text may read
        "2 Years / Toddlers" (word order + plural), which the normalizer can't fold.
-     - "Infant/Toddler" (Paige Turner, Sue Engel) -> room 2 "Infants / Toddlers"
-       as primary (3a's normalized pass likely already handles this; kept as a
-       safety net).
+     - "Infant/Toddler" (Paige, Sue Engel) -> room 2 "Infants / Toddlers" as
+       primary (3a's normalized pass likely already handles this; kept as a safety
+       net). The person seeded as "Paige Turner" is now on the roster as "Paige
+       Holliday" after a name change, so BOTH names are listed to cover either.
 
    Each line is guarded by name AND by the link being NULL, so running 3b twice is
    a no-op and it never fights a value 3a already set. Adjust/extend to whatever
@@ -146,7 +147,7 @@ UPDATE Staff SET SecondaryRoomNumber = 5
  WHERE SecondaryRoomNumber IS NULL AND Name = 'Donna Nier';
 
 UPDATE Staff SET RoomNumber = 2
- WHERE RoomNumber IS NULL AND Name IN ('Paige Turner', 'Sue Engel');
+ WHERE RoomNumber IS NULL AND Name IN ('Paige Turner', 'Paige Holliday', 'Sue Engel');
 GO
 
 /* =============================================================================
