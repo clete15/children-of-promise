@@ -136,6 +136,9 @@ GO
        primary (3a's normalized pass likely already handles this; kept as a safety
        net). The person seeded as "Paige Turner" is now on the roster as "Paige
        Holliday" after a name change, so BOTH names are listed to cover either.
+     - Janell Poenitske: stored text "Pre-School 2" is a retired room name; she is
+       now Teacher 1 of room 7 "2 & 3 Year Olds" (the seed note confirms the room was
+       "formerly Pre-School 2"), so her primary is room 7.
 
    Each line is guarded by name AND by the link being NULL, so running 3b twice is
    a no-op and it never fights a value 3a already set. Adjust/extend to whatever
@@ -148,6 +151,18 @@ UPDATE Staff SET SecondaryRoomNumber = 5
 
 UPDATE Staff SET RoomNumber = 2
  WHERE RoomNumber IS NULL AND Name IN ('Paige Turner', 'Paige Holliday', 'Sue Engel');
+
+UPDATE Staff SET RoomNumber = 7
+ WHERE RoomNumber IS NULL AND Name = 'Janell Poenitske';
+
+/* 3c — explicit CLEARS (the only place this migration removes an assignment).
+   STEP 2 surfaced a stale secondary room; clear both the link and its text mirror
+   so it does not drift back. Named and separate from the add-only backfill above so
+   nothing is cleared implicitly.
+     - Keyona Hentz is Pre-School only (room 6); her secondary "Infants / Toddlers"
+       is stale, so drop the secondary entirely. */
+UPDATE Staff SET SecondaryRoomNumber = NULL, SecondaryClassroom = NULL
+ WHERE Name = 'Keyona Hentz';
 GO
 
 /* =============================================================================
