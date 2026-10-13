@@ -217,11 +217,11 @@
         { field: 'MidYearReport', teacher: true, label: 'Mid Year<br>Report Card' },
         { field: 'EndASQ', teacher: true, label: 'End ASQ' },
         { field: 'EndASE', teacher: true, label: 'End ASE' },
-        { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card' },
-        // Screening results shared with the parent (PICC PI10.H). A signed classroom
-        // form: captured when the teacher hands the report card / screening results to
-        // the family. Moved here from the ISBE roster's editable [form].
-        { field: 'ScreeningResultsShared', teacher: true, label: 'Results<br>Shared' }
+        { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card' }
+        // Screening results shared with the parent (PICC PI10.H) is NOT shown on the
+        // classroom card: that evidence is carried by the parent/teacher signatures on
+        // the screening cards above. The ScreeningResultsShared field, its modal and its
+        // compliance mapping still exist elsewhere; it just has no chip here.
     ];
     var SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
     // A column has a form behind it when opening it produces a modal. Mid/End year
