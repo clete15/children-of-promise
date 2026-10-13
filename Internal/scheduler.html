@@ -36,73 +36,77 @@
         .sch-btn-ghost:hover { background:var(--sp-surface-2);color:var(--sp-text); }
 
         /* ── The grid ──────────────────────────────────────────────────── */
-        .sch-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.84rem;min-width:900px; }
+        /* Tightened for readability: narrower day columns, slimmer time pickers and
+           less cell padding so a whole week reads at a glance without the eye travelling
+           across wide, airy cells. */
+        .sch-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.8rem;min-width:760px; }
         .sch-table thead th { position:sticky;top:0;z-index:3;background:var(--sp-surface); }
-        .sch-table th.name-col { text-align:left;min-width:190px;padding:10px 14px;
-            font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--sp-muted);
+        .sch-table th.name-col { text-align:left;width:150px;min-width:150px;padding:8px 10px;
+            font-size:0.64rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--sp-muted);
             border-bottom:2px solid var(--sp-border); }
+        /* Fixed, equal day columns so the five days line up tightly. */
+        .sch-table col.day-col { width:150px; }
 
-        /* Day header: weekday, date, and a clean NO-SCHOOL chip toggle. */
-        .day-th { padding:8px 10px 10px;border-bottom:2px solid var(--sp-border);text-align:center;vertical-align:top; }
-        .day-th .dow { font-size:0.82rem;font-weight:800;color:var(--sp-text); }
-        .day-th .date { font-size:0.72rem;color:var(--sp-muted);font-weight:600;margin-top:1px; }
-        .ns-chip { margin-top:6px;display:inline-flex;align-items:center;gap:5px;font-size:0.64rem;font-weight:700;
-            padding:3px 9px;border-radius:999px;cursor:pointer;border:1px solid var(--sp-border);
-            background:var(--sp-surface-2);color:var(--sp-muted);user-select:none;transition:all .12s; }
+        /* Day header: weekday, date, and a compact NO-SCHOOL chip toggle. */
+        .day-th { padding:6px 6px 7px;border-bottom:2px solid var(--sp-border);text-align:center;vertical-align:top; }
+        .day-th .dow { font-size:0.76rem;font-weight:800;color:var(--sp-text); }
+        .day-th .date { font-size:0.68rem;color:var(--sp-muted);font-weight:600;margin-top:1px; }
+        .ns-chip { margin-top:4px;display:inline-flex;align-items:center;gap:4px;font-size:0.6rem;font-weight:700;
+            padding:2px 7px;border-radius:999px;cursor:pointer;border:1px solid var(--sp-border);
+            background:var(--sp-surface-2);color:var(--sp-muted);user-select:none;transition:all .12s;white-space:nowrap; }
         .ns-chip:hover { border-color:#f59e0b;color:#b45309; }
         .ns-chip.on { background:#fff3cd;border-color:#f0b429;color:#8a5a00; }
-        .ns-chip .dot { width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.55; }
+        .ns-chip .dot { width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55; }
         .day-th.closed { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 7px,rgba(240,180,41,0.10) 7px,rgba(240,180,41,0.10) 14px); }
 
-        .sch-table td { padding:7px 8px;border-bottom:1px solid var(--sp-border);vertical-align:middle;text-align:center; }
+        .sch-table td { padding:4px 5px;border-bottom:1px solid var(--sp-border);vertical-align:middle;text-align:center; }
         .sch-table tbody tr:hover td { background:var(--sp-surface-2); }
 
         /* Classroom group header */
         .grouprow td { background:linear-gradient(var(--sp-surface-2),var(--sp-surface-2));
-            padding:9px 14px;text-align:left;border-bottom:1px solid var(--sp-border);border-top:1px solid var(--sp-border); }
-        .grouprow .g-name { font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
-        .grouprow .g-note { font-size:0.68rem;font-weight:600;color:var(--sp-muted);text-transform:none;letter-spacing:0;margin-left:8px; }
+            padding:6px 10px;text-align:left;border-bottom:1px solid var(--sp-border);border-top:1px solid var(--sp-border); }
+        .grouprow .g-name { font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--primary); }
+        .grouprow .g-note { font-size:0.64rem;font-weight:600;color:var(--sp-muted);text-transform:none;letter-spacing:0;margin-left:8px; }
 
         /* Name cell */
-        td.name-cell { text-align:left;padding-left:14px;white-space:nowrap; }
-        td.name-cell .nm { font-weight:700;color:var(--sp-text); }
-        td.name-cell .role { display:block;font-size:0.68rem;font-weight:500;color:var(--sp-muted);margin-top:1px; }
+        td.name-cell { text-align:left;padding-left:10px;white-space:nowrap; }
+        td.name-cell .nm { font-weight:700;color:var(--sp-text);font-size:0.8rem; }
+        td.name-cell .role { display:block;font-size:0.64rem;font-weight:500;color:var(--sp-muted);margin-top:0; }
 
         /* ── A shift cell: two time pickers + an OFF pill ──────────────── */
-        .shift { display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:nowrap; }
+        .shift { display:flex;align-items:center;justify-content:center;gap:2px;flex-wrap:nowrap; }
         .shift select {
             appearance:none;-webkit-appearance:none;
-            padding:6px 6px;border:1px solid var(--sp-border-in);border-radius:7px;
-            font-size:0.78rem;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text);
-            cursor:pointer;min-width:66px;text-align:center;text-align-last:center;transition:border-color .12s;
+            padding:4px 2px;border:1px solid var(--sp-border-in);border-radius:5px;
+            font-size:0.74rem;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text);
+            cursor:pointer;width:52px;min-width:0;text-align:center;text-align-last:center;transition:border-color .12s;
         }
         .shift select:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 2px rgba(37,99,235,0.15); }
-        .shift .dash { color:var(--sp-quiet);font-weight:700;font-size:0.8rem; }
+        .shift .dash { color:var(--sp-quiet);font-weight:700;font-size:0.72rem;margin:0 -1px; }
         .off-pill {
             border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-muted);
-            font-size:0.64rem;font-weight:800;letter-spacing:0.04em;padding:5px 9px;border-radius:7px;cursor:pointer;
+            font-size:0.58rem;font-weight:800;letter-spacing:0.02em;padding:4px 5px;border-radius:5px;cursor:pointer;
             transition:all .12s;flex-shrink:0;
         }
         .off-pill:hover { border-color:#e6cf3a;color:#8a7a00; }
 
         /* OFF state: a clean amber tile instead of two pickers. */
-        td.is-off .shift { }
         .off-tile {
-            display:inline-flex;align-items:center;justify-content:center;gap:7px;
-            background:#fde68a;color:#7a5c00;font-weight:800;font-size:0.78rem;letter-spacing:0.08em;
-            border:1px solid #f0b429;border-radius:8px;padding:7px 16px;cursor:pointer;min-width:118px;
+            display:inline-flex;align-items:center;justify-content:center;
+            background:#fde68a;color:#7a5c00;font-weight:800;font-size:0.72rem;letter-spacing:0.06em;
+            border:1px solid #f0b429;border-radius:6px;padding:5px 0;cursor:pointer;width:100%;max-width:132px;
         }
         .off-tile:hover { filter:brightness(0.98); }
 
         /* NO SCHOOL column cell */
         td.closed { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 7px,rgba(240,180,41,0.08) 7px,rgba(240,180,41,0.08) 14px); }
         td.closed .shift, td.closed .off-tile { opacity:0.28;pointer-events:none;filter:grayscale(0.3); }
-        .closed-tag { font-size:0.66rem;font-weight:700;color:#b45309;letter-spacing:0.03em; }
+        .closed-tag { font-size:0.62rem;font-weight:700;color:#b45309;letter-spacing:0.02em; }
 
         /* Row save */
-        .save-col { width:70px; }
-        .btn-row-save { padding:6px 12px;background:var(--sp-accent);color:#fff;border:none;border-radius:7px;
-            font-size:0.72rem;font-weight:700;cursor:pointer;opacity:0.35;transition:opacity .12s; }
+        .save-col { width:52px;min-width:52px; }
+        .btn-row-save { padding:4px 8px;background:var(--sp-accent);color:#fff;border:none;border-radius:6px;
+            font-size:0.68rem;font-weight:700;cursor:pointer;opacity:0.35;transition:opacity .12s; }
         .btn-row-save:not([disabled]) { opacity:1; }
         .btn-row-save.saved { background:#16a34a; }
 
@@ -191,6 +195,11 @@
                 <span class="wk-label" id="wkLabel">Loading…</span>
             </div>
             <table class="sch-table">
+                <colgroup>
+                    <col class="name-colg">
+                    <col class="day-col"><col class="day-col"><col class="day-col"><col class="day-col"><col class="day-col">
+                    <col class="save-colg">
+                </colgroup>
                 <thead><tr id="schHeadRow"></tr></thead>
                 <tbody id="schBody"><tr><td class="sch-empty" colspan="7">Loading…</td></tr></tbody>
             </table>
