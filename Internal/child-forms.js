@@ -190,6 +190,12 @@
         var rec = sigs[String(studentId)];
         return !!(rec && rec[field] && rec[field][String(role || '').toLowerCase()]);
     }
+    // Removes a signature from the local store, so a cell drops back out of 'form'
+    // the instant a signature is explicitly cleared — without waiting for a reload.
+    function unmarkSignature(studentId, field, role) {
+        var rec = sigs[String(studentId)];
+        if (rec && rec[field]) delete rec[field][String(role || '').toLowerCase()];
+    }
 
     /* The one question every view asks. `ticked` is the ISBETracking bit the
        caller already holds, passed in rather than fetched again here.
@@ -332,6 +338,7 @@
         mark: mark,
         markFile: markFile,
         markSignature: markSignature,
+        unmarkSignature: unmarkSignature,
         hasFile: hasFile,
         fileFor: fileFor,
         hasSignature: hasSignature,

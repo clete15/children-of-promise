@@ -66,6 +66,14 @@
         var ctx = canvas.getContext('2d');
 
         var drawn = false;          // has anything been drawn since the last clear
+        /* Set true when Clear is pressed on a pad that was showing an EXISTING on-file
+           signature — i.e. the user is deliberately removing a signature already on
+           record, not just wiping an in-progress scribble. The caller uses this to tell
+           the server "explicitly cleared, do not reuse the stored signature", which is
+           the only way an un-sign can actually stick (otherwise the server re-attaches
+           the stored signature on the next save). Reset by showExisting() and by drawing
+           a fresh stroke (a re-sign supersedes the clear). */
+        var cleared = false;
         var strokes = [];           // points in CSS pixels, so a resize can redraw
         var currentStroke = null;
         var ratio = 1;
@@ -161,6 +169,7 @@
             currentStroke = [pointFrom(e)];
             strokes.push(currentStroke);
             drawn = true;
+            cleared = false;   // a fresh signature supersedes an earlier Clear
             hint.style.display = 'none';
             setStatus('');
             /* Add ?sigdebug to the URL to see, on the tablet itself, whether touches
@@ -200,6 +209,10 @@
         canvas.addEventListener('pointercancel', endStroke);
 
         host.querySelector('.sig-clear').addEventListener('click', function () {
+            // If this pad was showing an on-file signature (or a just-drawn one),
+            // pressing Clear is a deliberate removal — remember that so the save can
+            // tell the server to drop the stored signature rather than reuse it.
+            if (existingImg || drawn) cleared = true;
             strokes = [];
             currentStroke = null;
             drawn = false;
@@ -255,6 +268,9 @@
 
         var api = {
             get drawn() { return drawn; },
+            // True when the user pressed Clear on a signature that was on file — a
+            // deliberate removal the save must forward so the server drops it.
+            get cleared() { return cleared; },
             toDataUrl: toDataUrl,
             clear: function () { host.querySelector('.sig-clear').click(); },
             refresh: fit,
@@ -264,6 +280,7 @@
             showExisting: function (url, onFail) {
                 strokes = [];
                 drawn = false;
+                cleared = false;   // showing an on-file signature is not a clear
                 hint.style.display = 'none';
                 var img = new Image();
                 img.onload = function () {

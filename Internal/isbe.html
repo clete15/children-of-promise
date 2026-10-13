@@ -1430,10 +1430,14 @@ function mountSigPad(hostId, studentId, field, role, opts) {
    the child's folder to upload to SharePoint. An unsigned PDF simply prints its
    signature lines blank, the same as a printed form awaiting ink. */
 async function fileSignedForm(studentId, field, content, fileEvenIfUnsigned) {
-    const drawn = Object.keys(sigPads)
-        .map(k => sigPads[k])
-        .filter(e => e.field === field && e.pad.drawn);
-    if (!drawn.length && !fileEvenIfUnsigned) return [];   // nothing signed, nothing to file
+    const padsForField = Object.keys(sigPads).map(k => sigPads[k]).filter(e => e.field === field);
+    const drawn = padsForField.filter(e => e.pad.drawn);
+    // Roles whose on-file signature was explicitly cleared (and not re-signed), so the
+    // server removes them rather than reusing the stored signature on the next save.
+    const clearedRoles = padsForField
+        .filter(e => e.pad.cleared && !e.pad.drawn)
+        .map(e => e.role);
+    if (!drawn.length && !clearedRoles.length && !fileEvenIfUnsigned) return [];   // nothing to do
 
     const student = students.find(s => String(s.Id) === String(studentId));
     /* allowUnsigned = file a blank-signature PDF for a form that has NEVER been signed.
@@ -1454,6 +1458,7 @@ async function fileSignedForm(studentId, field, content, fileEvenIfUnsigned) {
         blocks: content.blocks || [],
         capturedOn: navigator.userAgent.slice(0, 55),
         allowUnsigned: allowUnsigned,
+        clearedRoles: clearedRoles,
         signatures: []
     };
     drawn.forEach(e => {
@@ -1466,8 +1471,9 @@ async function fileSignedForm(studentId, field, content, fileEvenIfUnsigned) {
             dataUrl: url
         });
     });
-    // Only bail for want of a signature when the caller did not ask to file regardless.
-    if (!payload.signatures.length && !fileEvenIfUnsigned) return [];
+    // Only bail for want of a signature when nothing was cleared and the caller did
+    // not ask to file regardless.
+    if (!payload.signatures.length && !clearedRoles.length && !fileEvenIfUnsigned) return [];
 
     try {
         const res = await apiFetch('/api/child-signed-form', {
@@ -1502,13 +1508,24 @@ async function fileSignedForm(studentId, field, content, fileEvenIfUnsigned) {
                     ChildForms.markSignature(studentId, field, s.role);
                 }
             });
-        } else if (d.relPath) {
+        } else if (d.relPath && !clearedRoles.length) {
+            // Synthetic 'staff' marker for an unsigned FILED form (e.g. a blank Parent
+            // Interview) — but NOT when this was a clear-only save, or we would wrongly
+            // re-add a signature the user just removed.
             signatures[sigKey(studentId, field, 'staff')] = {
                 StudentId: String(studentId), FormField: field, Role: 'staff',
                 SignedName: '', RelPath: d.relPath,
                 SignedAt: new Date().toISOString().slice(0, 10)
             };
         }
+        // Drop any explicitly-cleared role from both signature stores so the cell
+        // reflects the removal immediately rather than reading as still-signed.
+        clearedRoles.forEach(role => {
+            delete signatures[sigKey(studentId, field, role)];
+            if (window.ChildForms && ChildForms.unmarkSignature) {
+                ChildForms.unmarkSignature(studentId, field, role);
+            }
+        });
         drawn.forEach(e => e.pad.setStatus('\u2713 Filed as ' + d.name, '#166534'));
         // The PDF is a new file in the child's folder, so the drawer's count is stale.
         docIndexState = 'idle';

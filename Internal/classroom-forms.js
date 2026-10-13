@@ -333,10 +333,17 @@
     }
 
     async function fileSignedForm(studentId, field, content, fileEvenIfUnsigned) {
-        var drawn = Object.keys(sigPads)
+        var padsForField = Object.keys(sigPads)
             .map(function (k) { return sigPads[k]; })
-            .filter(function (e) { return e.field === field && e.pad.drawn; });
-        if (!drawn.length && !fileEvenIfUnsigned) return [];
+            .filter(function (e) { return e.field === field; });
+        var drawn = padsForField.filter(function (e) { return e.pad.drawn; });
+        // Roles whose on-file signature the user explicitly CLEARED (and did not
+        // re-sign). Forwarded so the server removes them instead of reusing the stored
+        // signature — without this an un-sign silently comes back on the next save.
+        var clearedRoles = padsForField
+            .filter(function (e) { return e.pad.cleared && !e.pad.drawn; })
+            .map(function (e) { return e.role; });
+        if (!drawn.length && !clearedRoles.length && !fileEvenIfUnsigned) return [];
 
         var student = students().find(function (s) { return String(s.Id) === String(studentId); });
         var payload = {
@@ -352,6 +359,9 @@
             // Only the Parent Interview files a blank-signature PDF; a screening re-file
             // reuses the existing signature server-side (Option A) rather than filing blank.
             allowUnsigned: field === 'ParentInterview',
+            // Roles the user explicitly cleared, so the server drops them rather than
+            // reusing the stored signature.
+            clearedRoles: clearedRoles,
             signatures: []
         };
         drawn.forEach(function (e) {
@@ -394,6 +404,14 @@
                 // parent and staff signatures, which it reads from here.
                 if (ChildForms() && ChildForms().markSignature) {
                     ChildForms().markSignature(studentId, field, s.role);
+                }
+            });
+            // Drop any explicitly-cleared role from both signature stores so the cell
+            // reflects the removal immediately (and does not read as still-signed).
+            clearedRoles.forEach(function (role) {
+                delete sigs[sigKey(studentId, field, role)];
+                if (ChildForms() && ChildForms().unmarkSignature) {
+                    ChildForms().unmarkSignature(studentId, field, role);
                 }
             });
             if (ctx.setSignatures) ctx.setSignatures(sigs);
@@ -1675,24 +1693,24 @@
         '.pi-modal-header h3 { margin:0;font-size:1.1rem;font-weight:700;color:#1e3a8a; }',
         '.pi-modal-header .pi-close { background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;padding:4px 8px;border-radius:4px; }',
         '.pi-modal-header .pi-close:hover { background:#f3f4f6;color:#111; }',
-        '.pi-modal-body { padding:16px 24px; }',
-        '.pi-section { margin-bottom:14px; }',
-        '.pi-section h4 { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin:0 0 10px 0;padding-bottom:6px;border-bottom:1px solid #f3f4f6; }',
-        '.pi-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px 16px; }',
+        '.pi-modal-body { padding:12px 24px; }',
+        '.pi-section { margin-bottom:10px; }',
+        '.pi-section h4 { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin:0 0 6px 0;padding-bottom:4px;border-bottom:1px solid #f3f4f6; }',
+        '.pi-grid { display:grid;grid-template-columns:1fr 1fr;gap:7px 16px; }',
         '.pi-grid.three { grid-template-columns:1fr 1fr 1fr; }',
-        '.pi-field { display:flex;flex-direction:column;gap:3px; }',
+        '.pi-field { display:flex;flex-direction:column;gap:2px; }',
         '.pi-field label { font-size:0.7rem;font-weight:600;color:#6b7280; }',
-        '.pi-field .pi-value { font-size:0.82rem;font-weight:500;color:#111;padding:6px 10px;background:#f8fafc;border-radius:6px;min-height:28px;display:flex;align-items:center; }',
+        '.pi-field .pi-value { font-size:0.82rem;font-weight:500;color:#111;padding:5px 10px;background:#f8fafc;border-radius:6px;min-height:24px;display:flex;align-items:center; }',
         /* Explicit background AND text colour on every control. The modal is a white
            form, but it is injected into pages with different themes (the dark staff
            portal among them). Without an explicit colour the text inherits the host
            page's — light text on this white modal, which rendered the score-status
            dropdowns unreadable (white-on-white) on My Page. Pin both so the modal
            reads the same everywhere. */
-        '.pi-field textarea, .pi-field input[type=text], .pi-field input[type=date], .pi-field input[type=number] { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;resize:vertical;background:#fff;color:#111; }',
-        '.pi-field textarea { min-height:60px; }',
+        '.pi-field textarea, .pi-field input[type=text], .pi-field input[type=date], .pi-field input[type=number] { font-size:0.82rem;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;resize:vertical;background:#fff;color:#111; }',
+        '.pi-field textarea { min-height:48px; }',
         '.pi-field textarea:focus, .pi-field input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
-        '.pi-field select { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:#fff;color:#111; }',
+        '.pi-field select { font-size:0.82rem;padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:#fff;color:#111; }',
         '.pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }',
         '.pi-field select option { color:#111;background:#fff; }',
         /* The consent statement sits in its own soft panel so it reads as the formal

@@ -2360,14 +2360,26 @@ function fileChildSignedForm(d) {
        keyed by role, from the ChildSignatures rows for this (student, year, field).
        `reusedSignatures` is set so the ChildSignatures rows are RE-POINTED at the new
        PDF below (not inserted fresh), preserving SignedName/SignedAt. */
+    /* Roles the caller EXPLICITLY cleared (pressed Clear on an on-file signature and
+       did not re-sign). These must NOT be reused by Option A below, and their stored
+       ChildSignatures rows are deleted further down — otherwise an un-sign silently
+       comes back on the next save. Validated to the two known roles. */
+    const clearedRoles = (Array.isArray(d.clearedRoles) ? d.clearedRoles : [])
+        .map(r => (r === 'staff' ? 'staff' : r === 'parent' ? 'parent' : null))
+        .filter(Boolean);
+
     let reusedSignatures = false;
     if (!signatures.length) {
+        // Exclude cleared roles from the reuse set so a deliberate clear is honored.
+        const clearedFilter = clearedRoles.length
+            ? ` AND Role NOT IN (${clearedRoles.map(r => esc(r)).join(',')})`
+            : '';
         const existing = runSQLRows(
             `SELECT Role, ISNULL(SignedName,'') AS SignedName, ISNULL(SigImagePath,'') AS SigImagePath,
                     ISNULL(CONVERT(NVARCHAR(20),SignedAt,120),'') AS SignedAt
              FROM ChildSignatures
              WHERE StudentId=${studentId} AND SchoolYear=${esc(year)} AND FormField=${esc(d.field)}
-               AND ISNULL(SigImagePath,'') <> ''`,
+               AND ISNULL(SigImagePath,'') <> ''${clearedFilter}`,
             childSignatureEnsureSQL());
         if (existing.ok && existing.rows.length) {
             const DR0 = findDocRoot();
@@ -2393,7 +2405,11 @@ function fileChildSignedForm(d) {
        document for every completed interview, signed on a pad or not, so there is
        always evidence in the child's folder). With no signatures the PDF simply draws
        its signature lines blank and no ChildSignatures rows are written. */
-    if (!signatures.length && !d.allowUnsigned) {
+    /* Allow a clear-only save through: no signatures remain, but the caller explicitly
+       cleared one or more roles. We still regenerate the PDF (now unsigned) and delete
+       the cleared ChildSignatures rows below, which is how an un-sign actually sticks.
+       A plain unsigned save with nothing cleared and no allowUnsigned is still refused. */
+    if (!signatures.length && !d.allowUnsigned && !clearedRoles.length) {
         return { status: 400, body: { error: 'Nothing was signed, so there is nothing to file' } };
     }
 
@@ -2460,6 +2476,15 @@ ELSE
     INSERT INTO ChildSignatures (StudentId,SchoolYear,FormField,Role,SignedName,RelPath,SigImagePath,SignedAt,CapturedOn)
     VALUES (${studentId},${esc(year)},${esc(d.field)},${esc(s.role)},${esc(s.name)},${esc(rel)},${esc(img)},GETDATE(),${esc(d.capturedOn)});
 `;
+    });
+    /* Delete the stored signature rows for any role the caller explicitly cleared, so
+       the un-sign actually takes effect. Guarded against a role that was both cleared
+       and re-signed in the same save (can't happen from the pad, but belt-and-braces):
+       only delete roles NOT present in the signatures just written. */
+    const writtenRoles = signatures.map(s => s.role);
+    clearedRoles.filter(r => writtenRoles.indexOf(r) === -1).forEach(role => {
+        sql += `DELETE FROM ChildSignatures WHERE StudentId=${studentId} AND SchoolYear=${esc(year)} `
+            + `AND FormField=${esc(d.field)} AND Role=${esc(role)};\n`;
     });
     const r = runSQL(sql);
     if (!r.ok) {
