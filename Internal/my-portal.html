@@ -124,7 +124,7 @@
         <p class="mp-firsttime">
             <span class="mp-ft-label">First time signing in?</span>
             Your sign-in name and password are both your first name followed by the initial
-            of your surname — Molly Ellis would be <strong>MollyE</strong>. You will be asked
+            of your surname — Jane Doe would be <strong>JaneD</strong>. You will be asked
             to choose your own password.</p>
 
         <p class="mp-hint" style="margin-top:2px;">You will be asked to sign in each time
@@ -242,14 +242,20 @@ function hide(el) {
 /* Ask the browser to remember a just-verified credential so it can autofill it next
    time. Uses the Credential Management API where available (Chrome/Edge, which is what
    the centre uses); silently does nothing where it is not supported. Storing a credential
-   only enables autofill — it never signs the person in without the Sign In click. */
+   only enables autofill — it never signs the person in without the Sign In click.
+
+   Returns a promise that resolves once the store attempt has settled, so the caller can
+   AWAIT it before navigating away. That ordering matters: if we navigate first, the
+   store call is abandoned mid-flight and Chrome never records the password — which is
+   the "it won't save my password" symptom. */
 function rememberCredential(login, password) {
     try {
         if (window.PasswordCredential && navigator.credentials && navigator.credentials.store) {
             var cred = new PasswordCredential({ id: login, password: password, name: login });
-            navigator.credentials.store(cred).catch(function () { /* user declined / unsupported */ });
+            return navigator.credentials.store(cred).catch(function () { /* declined / unsupported */ });
         }
     } catch (e) { /* API not available in this browser */ }
+    return Promise.resolve();
 }
 
 $('mpSignIn').addEventListener('submit', async e => {
@@ -284,8 +290,14 @@ $('mpSignIn').addEventListener('submit', async e => {
         // the Credential Management API once the login has actually succeeded. This only
         // OFFERS to save/autofill; it does NOT sign anyone in automatically. The Sign In
         // button must still be clicked every visit, which is the point.
-        rememberCredential(login, password);
-        location.replace(await destAfterSignIn());
+        //
+        // AWAIT the store so it fully records before we leave the page — navigating
+        // first abandons it and nothing gets saved. Then use location.href (not
+        // location.replace): replace() discards this history entry, which suppresses
+        // Chrome's native "Save password?" offer; href keeps it so the prompt can show.
+        const dest = await destAfterSignIn();
+        await rememberCredential(login, password);
+        location.href = dest;
     } catch (ex) {
         show(err, 'err', ex.message || 'Could not sign in.');
         $('mpPassword').value = '';
