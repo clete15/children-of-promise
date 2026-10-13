@@ -1743,10 +1743,10 @@
         /* The parent-questionnaire section when it is REQUIRED (PI beginning screening):
            a bright amber callout box so a teacher cannot miss that an upload is needed
            before the screening is complete. Only applied when scr-quest-required is set. */
-        '#scrQuestSection.scr-quest-required { background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(245,158,11,0.25); }',
-        '#scrQuestSection.scr-quest-required h4 { color:#92400e;border-bottom-color:#fde68a; }',
+        '#scrQuestSection.scr-quest-required { background:#f3effc;border:2px solid #7c5fd3;border-radius:10px;padding:14px 16px;margin-bottom:16px;box-shadow:0 1px 3px rgba(75,46,131,0.18); }',
+        '#scrQuestSection.scr-quest-required h4 { color:#4b2e83;border-bottom-color:#d9cff2; }',
         '#scrQuestSection.scr-quest-required h4::before { content:"\\26A0 ";font-size:0.95rem; }',
-        '#scrQuestSection.scr-quest-required .doc-note { color:#92400e;font-weight:600; }',
+        '#scrQuestSection.scr-quest-required .doc-note { color:#4b2e83;font-weight:600; }',
         /* Weighted eligibility criteria table — grouped sections with subtotals and
            highlighted qualifying rows. Shipped here so the modal is styled on any page
            that injects the shared modals (isbe.html defines its own inline copy). */
