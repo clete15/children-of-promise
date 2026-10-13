@@ -651,6 +651,18 @@ function txDecode(v) {
 // Family Goal Plan must show annual updates).
 //
 // The year rolls over on July 1, matching getSchoolYear() in the browser and the
+// The Monday of the week a date falls in, as an ISO 'YYYY-MM-DD' string. Used as the
+// WeekStart key for the staff schedule so every day of a week resolves to one row-set.
+// Built from local date parts (not toISOString, which would shift across midnight UTC).
+function mondayOf(dateLike) {
+    const d = new Date(dateLike);
+    const dow = (d.getDay() + 6) % 7;         // 0=Mon .. 6=Sun
+    d.setDate(d.getDate() - dow);
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + m + '-' + day;
+}
+
 // USDA threshold boundary already used for F/R/P.
 function currentSchoolYear() {
     const now = new Date();
@@ -1595,6 +1607,38 @@ function staffTrainingEnsureSQL() {
         CreatedAt DATETIME DEFAULT GETDATE(),
         UpdatedAt DATETIME DEFAULT GETDATE()
     );
+`;
+}
+
+/* ── StaffSchedule schema ──
+   The weekly staff work schedule — one row per staff member per week, mirroring
+   the paper schedule chart (staff grouped by classroom, a Mon-Fri shift per person,
+   OFF cells, and days the centre is closed). Admins edit the whole chart on
+   scheduler.html; a staff member sees only their own week on their portal.
+
+   One row per (StaffId, WeekStart). WeekStart is the Monday of the week as an ISO
+   'YYYY-MM-DD' string (NVARCHAR, like every other date here, to dodge sqlcmd locale
+   issues — and ISO so it sorts lexically). Mon..Fri each hold a free-text shift
+   ('6:15-4:15'), the literal 'OFF', or '' (not scheduled). NoSchoolDays is a comma
+   list of day indices (0=Mon..4=Fri) the centre is closed that week — a per-WEEK
+   fact, so the write path mirrors the same value onto every row of the week. */
+function staffScheduleEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='StaffSchedule')
+    CREATE TABLE StaffSchedule (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        StaffId INT NOT NULL,
+        WeekStart NVARCHAR(10) NOT NULL,
+        SchoolYear NVARCHAR(20),
+        Mon NVARCHAR(40),
+        Tue NVARCHAR(40),
+        Wed NVARCHAR(40),
+        Thu NVARCHAR(40),
+        Fri NVARCHAR(40),
+        NoSchoolDays NVARCHAR(20),
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME DEFAULT GETDATE()
+    );
+GO
 `;
 }
 
@@ -8881,6 +8925,95 @@ ELSE
     UPDATE StaffTraining SET CompletedDate=${esc(date)},EvidenceLink=${esc(link)},Notes=${esc(notes)},UpdatedAt=GETDATE() WHERE ${where}
 ELSE
     INSERT INTO StaffTraining (StaffId,TrainingKey,CompletedDate,EvidenceLink,Notes) VALUES (${staffId},${esc(key)},${esc(date)},${esc(link)},${esc(notes)})`);
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            sendJSON(res, 200, { success: true, cleared: isEmpty });
+        });
+        return;
+    }
+
+    /* GET the weekly staff schedule for one week.
+         /api/staff-schedule?weekStart=YYYY-MM-DD[&staffId=N]
+       weekStart is the Monday of the week; an invalid/absent one falls back to the
+       current week's Monday so the admin grid and the portal always open on "now".
+       staffId narrows the result to one person — that is how a teacher's portal reads
+       only their own row. Guarded by checkClassroomAuth so any signed-in staff member
+       can READ (a teacher viewing their own schedule); editing is a separate POST
+       behind checkAuth. Uses runSQLRows because shift text is free-form. */
+    if (req.method === 'GET' && url.startsWith('/api/staff-schedule')) {
+        if (!checkClassroomAuth(req, res)) return;
+        const q = new URL(req.url, 'http://x').searchParams;
+        const weekStart = /^\d{4}-\d{2}-\d{2}$/.test(q.get('weekStart') || '')
+            ? q.get('weekStart') : mondayOf(new Date());
+        const staffIdRaw = q.get('staffId');
+        const staffId = staffIdRaw != null ? parseInt(staffIdRaw, 10) : NaN;
+        const scope = isNaN(staffId)
+            ? `WeekStart=${esc(weekStart)}`
+            : `WeekStart=${esc(weekStart)} AND StaffId=${staffId}`;
+        const r = runSQLRows(
+            `SELECT StaffId,ISNULL(Mon,'') AS Mon,ISNULL(Tue,'') AS Tue,ISNULL(Wed,'') AS Wed,
+                    ISNULL(Thu,'') AS Thu,ISNULL(Fri,'') AS Fri,ISNULL(NoSchoolDays,'') AS NoSchoolDays
+             FROM StaffSchedule WHERE ${scope}`,
+            staffScheduleEnsureSQL() + 'GO\n');
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        // NoSchoolDays is a per-week fact mirrored onto every row, so any row carries
+        // it; surface it once at the top level too for a week that has no rows yet.
+        const noSchool = (r.rows.find(x => String(x.NoSchoolDays || '').trim()) || {}).NoSchoolDays || '';
+        return sendJSON(res, 200, {
+            weekStart: weekStart,
+            schoolYear: currentSchoolYear(),
+            noSchoolDays: noSchool,
+            rows: r.rows
+        });
+    }
+
+    /* POST save one staff member's week (admin only), or broadcast the week's
+       NO-SCHOOL days across every row.
+         { weekStart, staffId, mon, tue, wed, thu, fri, noSchoolDays }  — upsert one row
+         { weekStart, noSchoolDays, broadcastNoSchool:true }            — set the
+             closed-days marker on every row of the week at once (the column toggle)
+       Upsert keyed on (StaffId, WeekStart). A row with every day blank and no
+       no-school marker is deleted, the same "empty means no record" rule the other
+       upserts follow. */
+    if (req.method === 'POST' && url === '/api/staff-schedule') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const weekStart = String(d.weekStart || '').trim();
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
+                return sendJSON(res, 400, { error: 'weekStart must be an ISO date (YYYY-MM-DD)' });
+            }
+            const year = resolveSchoolYear(d.schoolYear);
+            const noSchool = String(d.noSchoolDays || '').replace(/[^0-4,]/g, '').trim();
+
+            // Column toggle: set the week's closed-days on every existing row at once,
+            // so the whole chart shows the same NO SCHOOL columns.
+            if (d.broadcastNoSchool) {
+                const sql = staffScheduleEnsureSQL() + 'GO\n'
+                    + `UPDATE StaffSchedule SET NoSchoolDays=${esc(noSchool)},UpdatedAt=GETDATE() WHERE WeekStart=${esc(weekStart)}`;
+                const r = runSQL(sql);
+                if (!r.ok) return sendJSON(res, 500, { error: r.error });
+                return sendJSON(res, 200, { success: true });
+            }
+
+            const staffId = parseInt(d.staffId, 10);
+            if (!staffId) return sendJSON(res, 400, { error: 'staffId is required' });
+            // Each day: free text, capped to the column width; 'OFF' stays as-is.
+            const day = v => String(v == null ? '' : v).trim().slice(0, 40);
+            const mon = day(d.mon), tue = day(d.tue), wed = day(d.wed), thu = day(d.thu), fri = day(d.fri);
+            const anyDay = mon || tue || wed || thu || fri;
+
+            const where = `StaffId=${staffId} AND WeekStart=${esc(weekStart)}`;
+            // Nothing scheduled and no closed-days note → remove the row entirely.
+            const isEmpty = !anyDay && !noSchool;
+            const sql = staffScheduleEnsureSQL() + 'GO\n' + (isEmpty
+                ? `DELETE FROM StaffSchedule WHERE ${where}`
+                : `IF EXISTS (SELECT 1 FROM StaffSchedule WHERE ${where})
+    UPDATE StaffSchedule SET Mon=${esc(mon)},Tue=${esc(tue)},Wed=${esc(wed)},Thu=${esc(thu)},Fri=${esc(fri)},
+        NoSchoolDays=${esc(noSchool)},SchoolYear=${esc(year)},UpdatedAt=GETDATE() WHERE ${where}
+ELSE
+    INSERT INTO StaffSchedule (StaffId,WeekStart,SchoolYear,Mon,Tue,Wed,Thu,Fri,NoSchoolDays)
+    VALUES (${staffId},${esc(weekStart)},${esc(year)},${esc(mon)},${esc(tue)},${esc(wed)},${esc(thu)},${esc(fri)},${esc(noSchool)})`);
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true, cleared: isEmpty });

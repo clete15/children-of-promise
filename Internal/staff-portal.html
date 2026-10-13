@@ -1270,7 +1270,8 @@ function selfEditCard(s) {
    shown under the header rather than behind a tab. */
 const SP_TABS = [
     { key: 'credentials', label: 'Gateways Credentials' },
-    { key: 'classroom',   label: 'My Classroom' }
+    { key: 'classroom',   label: 'My Classroom' },
+    { key: 'schedule',    label: 'My Schedule' }
     /* "My files" and "Forms" are hidden for now — the portal is being rolled out one
        section at a time. The tab entries below are commented out so both the tab and
        its panel disappear; the sections themselves (filesCard, formsSection) and
@@ -1425,6 +1426,7 @@ function tabPanels(s, tabs) {
     const build = {
         classroom: classroomSection,
         credentials: credentialsSection,
+        schedule: scheduleSection,
         files: filesCard,
         forms: formsSection,
         admin: adminSection
@@ -3467,6 +3469,109 @@ function renderClassroomPanel() {
     wireClassroom();
 }
 
+/* ── My Schedule ──────────────────────────────────────────────────────────────
+   A read-only view of the signed-in person's own week on the staff work schedule
+   (the chart admins edit on scheduler.html). Mirrors the paper schedule: a Mon-Fri
+   shift, OFF cells shown yellow, and days the centre is closed shown as NO SCHOOL.
+   Loaded lazily like My Classroom: scheduleSection returns a loading state on first
+   paint and kicks off loadMySchedule, which re-renders just this panel. */
+let schState = 'idle';           // idle | loading | ready | error
+let schError = '';
+let schData = null;              // { weekStart, noSchoolDays, days:{Mon..Fri} }
+const SCH_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+const SCH_DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+function schMondayOf(d) {
+    const x = new Date(d);
+    const dow = (x.getDay() + 6) % 7;
+    x.setDate(x.getDate() - dow);
+    const m = String(x.getMonth() + 1).padStart(2, '0');
+    const day = String(x.getDate()).padStart(2, '0');
+    return x.getFullYear() + '-' + m + '-' + day;
+}
+function schDayLabel(weekStart, offset) {
+    const [y, m, d] = weekStart.split('-').map(Number);
+    const x = new Date(y, m - 1, d);
+    x.setDate(x.getDate() + offset);
+    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][x.getMonth()];
+    return x.getDate() + '-' + mon;
+}
+
+async function loadMySchedule() {
+    schState = 'loading';
+    const s = current;
+    try {
+        const week = schMondayOf(new Date());
+        const res = await myFetch('/api/staff-schedule?weekStart=' + encodeURIComponent(week)
+            + '&staffId=' + encodeURIComponent(s.Id));
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        const row = (data.rows || [])[0] || {};
+        const noSchool = new Set(String(data.noSchoolDays || '').split(',')
+            .map(n => parseInt(n, 10)).filter(n => !isNaN(n)));
+        schData = {
+            weekStart: data.weekStart || week,
+            noSchool: noSchool,
+            days: { Mon: row.Mon || '', Tue: row.Tue || '', Wed: row.Wed || '', Thu: row.Thu || '', Fri: row.Fri || '' }
+        };
+        schState = 'ready';
+    } catch (e) {
+        schError = e.message;
+        schState = 'error';
+    }
+    renderSchedulePanel();
+}
+
+function scheduleHtml() {
+    const ws = schData.weekStart;
+    const a = schDayLabel(ws, 0), b = schDayLabel(ws, 4);
+    let anyShift = false;
+    let cells = '';
+    for (let i = 0; i < 5; i++) {
+        const val = schData.days[SCH_DAYS[i]] || '';
+        const isOff = /^off$/i.test(val);
+        const closed = schData.noSchool.has(i);
+        if (val && !isOff) anyShift = true;
+        let display = closed ? 'NO SCHOOL' : (val || '—');
+        const style = isOff
+            ? 'background:#f7e463;color:#4a4a00;font-weight:700;'
+            : closed ? 'color:#b45309;font-weight:700;font-size:0.72rem;' : '';
+        cells += '<td style="text-align:center;padding:10px 6px;border:1px solid var(--sp-border);' + style + '">'
+            + esc(display) + '</td>';
+    }
+    let head = '';
+    for (let i = 0; i < 5; i++) {
+        head += '<th style="text-align:center;padding:8px 6px;border:1px solid var(--sp-border);'
+            + 'font-size:0.72rem;color:var(--sp-muted);">' + SCH_DAY_FULL[i] + '<br>' + schDayLabel(ws, i) + '</th>';
+    }
+    return '<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;font-size:0.86rem;margin-top:6px;">'
+        + '<thead><tr>' + head + '</tr></thead>'
+        + '<tbody><tr>' + cells + '</tr></tbody></table></div>'
+        + (anyShift ? '' : '<div class="sp-sub" style="margin-top:10px;">Nothing is scheduled for you this week yet.</div>');
+}
+
+function scheduleSection(s) {
+    if (schState === 'idle') { setTimeout(loadMySchedule, 0); }
+    let inner;
+    if (schState === 'loading' || schState === 'idle') {
+        inner = '<div class="sp-sub">Loading your schedule\u2026</div>';
+    } else if (schState === 'error') {
+        inner = '<div class="sp-sub sp-err">Could not load your schedule: ' + esc(schError) + '</div>';
+    } else {
+        inner = scheduleHtml();
+    }
+    return '<div class="sp-card"><h2>My Schedule</h2>'
+        + '<div class="sp-sub">Your work hours for this week, as set by the office. '
+        + 'OFF days are shaded; days the centre is closed show as NO SCHOOL.</div>'
+        + inner + '</div>';
+}
+
+function renderSchedulePanel() {
+    const panel = document.getElementById('sppanel_schedule');
+    if (!panel) { if (current) render(); return; }
+    panel.innerHTML = scheduleSection(current);
+}
+
 async function load() {
     try {
         // Identity first, and on its own: everything below is shaped by the answer.
@@ -3547,6 +3652,9 @@ async function load() {
             // re-defaults to this staff member's primary classroom instead of keeping
             // whatever room the previous person had selected.
             activeClsRoom = null;
+            // My Schedule is per-person (fetched by staffId), so force a reload for the
+            // newly chosen person rather than showing the previous one's week.
+            schState = 'idle';
             render();
             loadFiles(current.Id);
         });
