@@ -7,9 +7,12 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; margin: 0; }
-        .sch-layout { padding: 18px 24px 40px; }
+        /* Centre the card and cap it, so on a wide monitor the week doesn't stretch
+           edge-to-edge — the days stay close enough to read across. */
+        .sch-layout { padding: 18px 24px 40px; display:flex; justify-content:center; }
         .sch-card { background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:14px;
-            box-shadow:0 4px 24px rgba(0,0,0,0.10);overflow:hidden;display:flex;flex-direction:column; }
+            box-shadow:0 4px 24px rgba(0,0,0,0.10);overflow:hidden;display:flex;flex-direction:column;
+            width:100%;max-width:1080px; }
         .sch-head { padding:16px 22px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;
             justify-content:space-between;gap:14px;flex-wrap:wrap; }
         .sch-head h1 { font-size:1.15rem;font-weight:800;margin:0;letter-spacing:-0.01em; }
@@ -36,22 +39,23 @@
         .sch-btn-ghost:hover { background:var(--sp-surface-2);color:var(--sp-text); }
 
         /* ── The grid ──────────────────────────────────────────────────── */
-        /* Tightened for readability: narrower day columns, slimmer time pickers and
-           less cell padding so a whole week reads at a glance without the eye travelling
-           across wide, airy cells. */
-        .sch-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.8rem;min-width:760px; }
+        /* Content-sized, not stretched. width:auto lets the table be exactly as wide as
+           its columns need and no wider, so the five days sit shoulder-to-shoulder and
+           the eye tracks a person's week straight across — the dead gap on the right is
+           gone. A single compact "6:15a–4:15p" chip per day replaces the two wide
+           dropdowns, which is what let the columns shrink. */
+        .sch-table { width:auto;border-collapse:separate;border-spacing:0;font-size:0.8rem;margin:0 auto; }
         .sch-table thead th { position:sticky;top:0;z-index:3;background:var(--sp-surface); }
-        .sch-table th.name-col { text-align:left;width:150px;min-width:150px;padding:8px 10px;
+        .sch-table th.name-col { text-align:left;width:168px;min-width:168px;padding:8px 10px;
             font-size:0.64rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--sp-muted);
             border-bottom:2px solid var(--sp-border); }
-        /* Fixed, equal day columns so the five days line up tightly. */
-        .sch-table col.day-col { width:150px; }
+        .sch-table col.day-col { width:118px; }
 
         /* Day header: weekday, date, and a compact NO-SCHOOL chip toggle. */
-        .day-th { padding:6px 6px 7px;border-bottom:2px solid var(--sp-border);text-align:center;vertical-align:top; }
+        .day-th { padding:6px 8px 7px;border-bottom:2px solid var(--sp-border);text-align:center;vertical-align:top; }
         .day-th .dow { font-size:0.76rem;font-weight:800;color:var(--sp-text); }
         .day-th .date { font-size:0.68rem;color:var(--sp-muted);font-weight:600;margin-top:1px; }
-        .ns-chip { margin-top:4px;display:inline-flex;align-items:center;gap:4px;font-size:0.6rem;font-weight:700;
+        .ns-chip { margin-top:4px;display:inline-flex;align-items:center;gap:4px;font-size:0.58rem;font-weight:700;
             padding:2px 7px;border-radius:999px;cursor:pointer;border:1px solid var(--sp-border);
             background:var(--sp-surface-2);color:var(--sp-muted);user-select:none;transition:all .12s;white-space:nowrap; }
         .ns-chip:hover { border-color:#f59e0b;color:#b45309; }
@@ -59,8 +63,11 @@
         .ns-chip .dot { width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55; }
         .day-th.closed { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 7px,rgba(240,180,41,0.10) 7px,rgba(240,180,41,0.10) 14px); }
 
-        .sch-table td { padding:4px 5px;border-bottom:1px solid var(--sp-border);vertical-align:middle;text-align:center; }
+        .sch-table td { padding:4px 6px;border-bottom:1px solid var(--sp-border);vertical-align:middle;text-align:center; }
         .sch-table tbody tr:hover td { background:var(--sp-surface-2); }
+        /* A thin divider between the name column and the days, and after the last day,
+           so the week block reads as one unit. */
+        .sch-table td.name-cell, .sch-table th.name-col { border-right:1px solid var(--sp-border); }
 
         /* Classroom group header */
         .grouprow td { background:linear-gradient(var(--sp-surface-2),var(--sp-surface-2));
@@ -73,38 +80,51 @@
         td.name-cell .nm { font-weight:700;color:var(--sp-text);font-size:0.8rem; }
         td.name-cell .role { display:block;font-size:0.64rem;font-weight:500;color:var(--sp-muted);margin-top:0; }
 
-        /* ── A shift cell: two time pickers + an OFF pill ──────────────── */
+        /* ── A shift cell: ONE compact time chip that opens two pickers ──
+           A day shows as a single tidy "6:15a–4:15p" button filling its column. Click it
+           to edit: the two dropdowns + OFF appear in place. This keeps the resting grid
+           calm and scannable (the whole point), with editing one click away. */
+        .shift-chip {
+            display:inline-flex;align-items:center;justify-content:center;gap:3px;width:100%;
+            padding:5px 4px;border:1px solid var(--sp-border-in);border-radius:7px;
+            background:var(--sp-field-bg);color:var(--sp-text);font-size:0.76rem;font-weight:600;
+            cursor:pointer;transition:border-color .12s,background .12s;white-space:nowrap;
+        }
+        .shift-chip:hover { border-color:var(--sp-accent);background:var(--sp-surface-2); }
+        .shift-chip.empty { color:var(--sp-quiet);font-weight:500; }
+        .shift-chip .sep { color:var(--sp-quiet); }
+
         .shift { display:flex;align-items:center;justify-content:center;gap:2px;flex-wrap:nowrap; }
         .shift select {
             appearance:none;-webkit-appearance:none;
             padding:4px 2px;border:1px solid var(--sp-border-in);border-radius:5px;
             font-size:0.74rem;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text);
-            cursor:pointer;width:52px;min-width:0;text-align:center;text-align-last:center;transition:border-color .12s;
+            cursor:pointer;width:50px;min-width:0;text-align:center;text-align-last:center;transition:border-color .12s;
         }
         .shift select:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 2px rgba(37,99,235,0.15); }
         .shift .dash { color:var(--sp-quiet);font-weight:700;font-size:0.72rem;margin:0 -1px; }
         .off-pill {
             border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-muted);
-            font-size:0.58rem;font-weight:800;letter-spacing:0.02em;padding:4px 5px;border-radius:5px;cursor:pointer;
+            font-size:0.56rem;font-weight:800;letter-spacing:0.02em;padding:4px 5px;border-radius:5px;cursor:pointer;
             transition:all .12s;flex-shrink:0;
         }
         .off-pill:hover { border-color:#e6cf3a;color:#8a7a00; }
 
-        /* OFF state: a clean amber tile instead of two pickers. */
+        /* OFF state: a clean amber chip. */
         .off-tile {
             display:inline-flex;align-items:center;justify-content:center;
-            background:#fde68a;color:#7a5c00;font-weight:800;font-size:0.72rem;letter-spacing:0.06em;
-            border:1px solid #f0b429;border-radius:6px;padding:5px 0;cursor:pointer;width:100%;max-width:132px;
+            background:#fde68a;color:#7a5c00;font-weight:800;font-size:0.74rem;letter-spacing:0.06em;
+            border:1px solid #f0b429;border-radius:7px;padding:5px 0;cursor:pointer;width:100%;
         }
         .off-tile:hover { filter:brightness(0.98); }
 
         /* NO SCHOOL column cell */
         td.closed { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 7px,rgba(240,180,41,0.08) 7px,rgba(240,180,41,0.08) 14px); }
-        td.closed .shift, td.closed .off-tile { opacity:0.28;pointer-events:none;filter:grayscale(0.3); }
+        td.closed .shift, td.closed .off-tile, td.closed .shift-chip { opacity:0.28;pointer-events:none;filter:grayscale(0.3); }
         .closed-tag { font-size:0.62rem;font-weight:700;color:#b45309;letter-spacing:0.02em; }
 
         /* Row save */
-        .save-col { width:52px;min-width:52px; }
+        .save-col { width:48px;min-width:48px; }
         .btn-row-save { padding:4px 8px;background:var(--sp-accent);color:#fff;border:none;border-radius:6px;
             font-size:0.68rem;font-weight:700;cursor:pointer;opacity:0.35;transition:opacity .12s; }
         .btn-row-save:not([disabled]) { opacity:1; }
@@ -274,6 +294,10 @@ const PAPER = {
     sue:     { Mon: 'OFF',       Tue: '6:15-5:30', Wed: '4:00-5:30', Thu: '6:15-5:30', Fri: '4:00-5:30' },
     paige:   { Mon: '8:30-4:30', Tue: 'OFF',       Wed: '8:30-4:30', Thu: '8:30-4:30', Fri: 'OFF' },
     lindsey: { Mon: '8:30-4:30', Tue: '8:30-4:30', Wed: '8:30-4:30', Thu: '8:30-4:30', Fri: '8:30-4:30' },
+    // The paper's "Renee" row is our staff member Donna Nier — the printed chart used a
+    // different name. Keyed as `donna` so it matches the roster; `renee` kept as an alias
+    // in case the printed name is ever the one on file.
+    donna:   { Mon: '7:00-4:00', Tue: '7:00-5:00', Wed: '7:00-5:00', Thu: '7:00-5:00', Fri: '7:00-5:00' },
     renee:   { Mon: '7:00-4:00', Tue: '7:00-5:00', Wed: '7:00-5:00', Thu: '7:00-5:00', Fri: '7:00-5:00' },
     molly:   { Mon: '9:00-5:30', Tue: '9:00-5:30', Wed: '9:00-5:30', Thu: '9:00-5:30', Fri: '9:00-5:30' },
     keyona:  { Mon: '11:00-5:30', Tue: '9:00-5:30', Wed: '6:30-4:00', Thu: '9:00-5:30', Fri: '6:30-5:30' },
@@ -353,12 +377,19 @@ function minutesToCompact(mins) {
     let h12 = h % 12; if (h12 === 0) h12 = 12;
     return h12 + ':' + String(m).padStart(2, '0');
 }
-// Read a cell's current state back into the compact storage string.
+// Read a cell's current state back into the compact storage string. A cell at rest
+// (shown as a chip, no live pickers) keeps whatever is already stored for it — only an
+// EXPANDED cell reads from its dropdowns. Without this, saving a row would blank every
+// day that wasn't currently being edited.
 function cellToStored(id, dayIdx) {
     const td = document.getElementById('cell_' + id + '_' + dayIdx);
-    if (!td) return '';
+    if (!td) return (schedule[id] && schedule[id][DAYS[dayIdx]]) || '';
     if (td.dataset.off === '1') return 'OFF';
     const s = td.querySelector('.sel-start'), e = td.querySelector('.sel-end');
+    if (!s && !e) {
+        // Not in edit mode → trust the stored value (the chip is just a view of it).
+        return (schedule[id] && schedule[id][DAYS[dayIdx]]) || '';
+    }
     const sv = s && s.value, ev = e && e.value;
     if (!sv && !ev) return '';
     return (sv ? minutesToCompact(parseInt(sv, 10)) : '?') + '-' + (ev ? minutesToCompact(parseInt(ev, 10)) : '?');
@@ -508,30 +539,63 @@ function renderHead() {
     document.getElementById('schHeadRow').innerHTML = html;
 }
 
+/* Cells edited in place: a cell is a calm one-line chip at rest, and expands to the
+   two pickers + OFF only while it is being edited. editing holds "id_dayIdx" keys. */
+let editing = new Set();
+function cellKey(id, dayIdx) { return id + '_' + dayIdx; }
+
 function cellHtml(id, dayIdx) {
     const sc = schedule[id] || {};
     const parsed = parseShift(sc[DAYS[dayIdx]] || '');
     const closed = noSchoolDays.has(dayIdx);
+    const isEditing = editing.has(cellKey(id, dayIdx));
     let inner;
     if (closed) {
         inner = '<span class="closed-tag">— no school —</span>';
-    } else if (parsed.off) {
-        inner = '<button type="button" class="off-tile" title="Click to clear OFF" '
-            + 'onclick="setOff(\'' + id + '\',' + dayIdx + ',false)">OFF</button>';
-    } else {
+    } else if (isEditing) {
+        // Expanded editor for this one cell.
         inner = '<div class="shift">'
             + '<select class="sel-start" onchange="onEdit(\'' + id + '\')" aria-label="start">' + timeOptionsHtml(parsed.start) + '</select>'
             + '<span class="dash">–</span>'
             + '<select class="sel-end" onchange="onEdit(\'' + id + '\')" aria-label="end">' + timeOptionsHtml(parsed.end) + '</select>'
             + '<button type="button" class="off-pill" title="Mark day off" onclick="setOff(\'' + id + '\',' + dayIdx + ',true)">OFF</button>'
             + '</div>';
+    } else if (parsed.off) {
+        inner = '<button type="button" class="off-tile" title="Click to edit" '
+            + 'onclick="editCell(\'' + id + '\',' + dayIdx + ')">OFF</button>';
+    } else if (parsed.start != null || parsed.end != null) {
+        // Resting chip: the shift on one line.
+        inner = '<button type="button" class="shift-chip" title="Click to edit" '
+            + 'onclick="editCell(\'' + id + '\',' + dayIdx + ')">'
+            + (parsed.start != null ? timeLabel(parsed.start) : '?')
+            + '<span class="sep">–</span>'
+            + (parsed.end != null ? timeLabel(parsed.end) : '?')
+            + '</button>';
+    } else {
+        // Empty day: a quiet "add" affordance.
+        inner = '<button type="button" class="shift-chip empty" title="Click to set hours" '
+            + 'onclick="editCell(\'' + id + '\',' + dayIdx + ')">+ add</button>';
     }
     return '<td id="cell_' + id + '_' + dayIdx + '"' + (parsed.off ? ' data-off="1"' : '')
         + ' class="' + (closed ? 'closed' : '') + '">' + inner + '</td>';
 }
 
+/* Expand a single cell into its editor and focus the start picker. Other cells stay
+   as calm chips, so the grid is only ever "busy" where you are actually working. */
+function editCell(id, dayIdx) {
+    if (noSchoolDays.has(dayIdx)) return;
+    editing.add(cellKey(id, dayIdx));
+    const td = document.getElementById('cell_' + id + '_' + dayIdx);
+    if (td) {
+        td.outerHTML = cellHtml(id, dayIdx);
+        const sel = document.querySelector('#cell_' + id + '_' + dayIdx + ' .sel-start');
+        if (sel) sel.focus();
+    }
+}
+
 function renderBody() {
     dirty = new Set();
+    editing = new Set();   // a full re-render collapses every cell back to its chip
     const all = document.getElementById('schSaveAll'); if (all) all.disabled = true;
     const groups = groupedStaff();
     const tbody = document.getElementById('schBody');
@@ -576,6 +640,9 @@ function setOff(id, dayIdx, on) {
     schedule[id] = schedule[id] || {};
     // Preserve what was typed so clearing OFF restores an empty pair (not stale times).
     schedule[id][DAYS[dayIdx]] = on ? 'OFF' : '';
+    // Marking OFF collapses the cell out of the editor; clearing OFF reopens the editor
+    // so the person can pick times straight away.
+    if (on) editing.delete(cellKey(id, dayIdx)); else editing.add(cellKey(id, dayIdx));
     const td = document.getElementById('cell_' + id + '_' + dayIdx);
     if (td) td.outerHTML = cellHtml(id, dayIdx);
     markDirty(id);
@@ -615,6 +682,12 @@ async function putRow(id) {
         if (data.success) {
             schedule[id] = { Mon: body.mon, Tue: body.tue, Wed: body.wed, Thu: body.thu, Fri: body.fri };
             dirty.delete(String(id));
+            // Collapse this row's cells back to calm chips now that they're saved.
+            for (let i = 0; i < 5; i++) {
+                editing.delete(cellKey(id, i));
+                const td = document.getElementById('cell_' + id + '_' + i);
+                if (td) td.outerHTML = cellHtml(id, i);
+            }
             const btn = document.getElementById('save_' + id);
             if (btn) { btn.disabled = true; btn.classList.add('saved'); btn.textContent = 'Saved ✓'; }
             return true;
