@@ -7,67 +7,125 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; margin: 0; }
-        /* A touch less left inset than the other Enrollment pages (15%) because the
-           week grid is wide; it still opens in line with the sub-nav. */
-        .sch-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px 20px 20px 4%; }
-        .sch-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.12);max-height:calc(100vh - 130px); }
-        .sch-head { padding:14px 20px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap; }
-        .sch-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
-        .sch-body { overflow:auto;flex:1;padding:16px 20px; }
+        .sch-layout { padding: 18px 24px 40px; }
+        .sch-card { background:var(--sp-surface);border:1px solid var(--sp-border);border-radius:14px;
+            box-shadow:0 4px 24px rgba(0,0,0,0.10);overflow:hidden;display:flex;flex-direction:column; }
+        .sch-head { padding:16px 22px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;
+            justify-content:space-between;gap:14px;flex-wrap:wrap; }
+        .sch-head h1 { font-size:1.15rem;font-weight:800;margin:0;letter-spacing:-0.01em; }
+        .sch-head .sub { font-size:0.78rem;color:var(--sp-muted);margin-top:2px; }
+        .sch-body { padding:18px 22px 26px; overflow-x:auto; }
 
-        /* Week navigation strip */
-        .sch-weeknav { display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap; }
-        .sch-weeknav .wk-label { font-size:1rem;font-weight:700;color:var(--sp-text); min-width:230px; }
-        .wk-btn { padding:6px 12px;background:var(--sp-surface-2);color:var(--sp-text-2);border:1px solid var(--sp-border);border-radius:6px;font-size:0.8rem;font-weight:700;cursor:pointer; }
-        .wk-btn:hover { filter:brightness(1.05);color:var(--sp-text); }
+        /* ── Week navigation ───────────────────────────────────────────── */
+        .sch-weeknav { display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap; }
+        .wk-group { display:inline-flex;border:1px solid var(--sp-border);border-radius:9px;overflow:hidden; }
+        .wk-group .wk-btn { border:none;border-radius:0;border-right:1px solid var(--sp-border); }
+        .wk-group .wk-btn:last-child { border-right:none; }
+        .wk-btn { padding:8px 14px;background:var(--sp-surface);color:var(--sp-text-2);border:1px solid var(--sp-border);
+            border-radius:8px;font-size:0.82rem;font-weight:700;cursor:pointer;transition:background .12s,color .12s; }
+        .wk-btn:hover { background:var(--sp-surface-2);color:var(--sp-text); }
+        .wk-label { font-size:1.05rem;font-weight:800;color:var(--sp-text);margin-left:4px; }
+        .wk-sub { font-size:0.76rem;color:var(--sp-muted);font-weight:600; }
+        .sch-actions { margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
 
-        .sch-table { width:100%;border-collapse:collapse;font-size:0.82rem; }
-        .sch-table thead th { position:sticky;top:0;z-index:2;background:var(--sp-surface-2);border-bottom:2px solid var(--sp-border);padding:7px 6px;text-align:center;font-size:0.72rem;font-weight:700;color:var(--sp-muted); }
-        .sch-table th.name-col { text-align:left;min-width:150px;padding-left:12px; }
-        .sch-table td { padding:4px 5px;border-bottom:1px solid var(--sp-border);vertical-align:middle;text-align:center; }
-        .sch-table td.name-cell { text-align:left;padding-left:12px;font-weight:600;color:var(--sp-text); white-space:nowrap; }
-        .sch-table td.name-cell .role { display:block;font-size:0.68rem;font-weight:400;color:var(--sp-muted); }
-
-        /* Classroom group header rows (Infants, Toddler, 2s, …) */
-        .sch-grouprow td { background:var(--sp-surface-2);font-weight:700;text-transform:uppercase;letter-spacing:0.05em;
-            font-size:0.68rem;color:var(--primary);padding:6px 12px;text-align:left;border-bottom:1px solid var(--sp-border); }
-
-        /* A shift cell: the time input plus an OFF toggle sitting under it. */
-        .cell-wrap { display:flex;flex-direction:column;align-items:stretch;gap:2px; }
-        .sch-table input.time {
-            width:100%;box-sizing:border-box;padding:5px 4px;border:1px solid var(--sp-border-in);border-radius:5px;
-            font-size:0.8rem;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text);text-align:center;
-        }
-        .sch-table input.time:focus { outline:none;border-color:var(--sp-accent); }
-        /* OFF cells carry the same yellow the paper schedule uses. */
-        td.is-off input.time { background:#f7e463;color:#4a4a00;font-weight:700;border-color:#e6cf3a; }
-        .off-toggle { font-size:0.6rem;color:var(--sp-muted);cursor:pointer;user-select:none; display:flex;align-items:center;justify-content:center;gap:3px; }
-        .off-toggle input { margin:0; }
-
-        /* A NO SCHOOL column: greyed, with the toggle living in the header. */
-        .noschool-toggle { display:block;font-size:0.6rem;font-weight:700;margin-top:3px;cursor:pointer;color:var(--sp-muted);user-select:none; }
-        th.noschool, td.noschool { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 6px,rgba(0,0,0,0.04) 6px,rgba(0,0,0,0.04) 12px); }
-        td.noschool input.time { opacity:0.5; }
-        .noschool-flag { font-size:0.6rem;font-weight:700;color:#b45309;letter-spacing:0.04em; }
-
-        .sch-btn { padding:6px 14px;background:var(--sp-accent);color:#fff;border:none;border-radius:6px;font-size:0.76rem;font-weight:700;cursor:pointer; }
-        .sch-btn:hover { filter:brightness(1.05); }
+        .sch-btn { padding:9px 16px;background:var(--sp-accent);color:#fff;border:none;border-radius:8px;
+            font-size:0.82rem;font-weight:700;cursor:pointer;transition:filter .12s; }
+        .sch-btn:hover { filter:brightness(1.06); }
         .sch-btn[disabled] { opacity:0.4;cursor:default; }
-        .sch-btn-plain { background:var(--sp-surface-2);color:var(--sp-text-2);border:1px solid var(--sp-border); }
-        .btn-row-save { padding:4px 9px;background:var(--sp-accent);color:#fff;border:none;border-radius:5px;font-size:0.7rem;font-weight:700;cursor:pointer;opacity:0.4; }
-        .btn-row-save:not([disabled]) { opacity:1; }
-        .sch-empty { padding:24px;color:var(--sp-muted);font-size:0.88rem;text-align:center; }
+        .sch-btn-ghost { background:transparent;color:var(--sp-text-2);border:1px solid var(--sp-border); }
+        .sch-btn-ghost:hover { background:var(--sp-surface-2);color:var(--sp-text); }
 
-        /* Print: just the chart, landscape, no chrome. */
+        /* ── The grid ──────────────────────────────────────────────────── */
+        .sch-table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.84rem;min-width:900px; }
+        .sch-table thead th { position:sticky;top:0;z-index:3;background:var(--sp-surface); }
+        .sch-table th.name-col { text-align:left;min-width:190px;padding:10px 14px;
+            font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--sp-muted);
+            border-bottom:2px solid var(--sp-border); }
+
+        /* Day header: weekday, date, and a clean NO-SCHOOL chip toggle. */
+        .day-th { padding:8px 10px 10px;border-bottom:2px solid var(--sp-border);text-align:center;vertical-align:top; }
+        .day-th .dow { font-size:0.82rem;font-weight:800;color:var(--sp-text); }
+        .day-th .date { font-size:0.72rem;color:var(--sp-muted);font-weight:600;margin-top:1px; }
+        .ns-chip { margin-top:6px;display:inline-flex;align-items:center;gap:5px;font-size:0.64rem;font-weight:700;
+            padding:3px 9px;border-radius:999px;cursor:pointer;border:1px solid var(--sp-border);
+            background:var(--sp-surface-2);color:var(--sp-muted);user-select:none;transition:all .12s; }
+        .ns-chip:hover { border-color:#f59e0b;color:#b45309; }
+        .ns-chip.on { background:#fff3cd;border-color:#f0b429;color:#8a5a00; }
+        .ns-chip .dot { width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.55; }
+        .day-th.closed { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 7px,rgba(240,180,41,0.10) 7px,rgba(240,180,41,0.10) 14px); }
+
+        .sch-table td { padding:7px 8px;border-bottom:1px solid var(--sp-border);vertical-align:middle;text-align:center; }
+        .sch-table tbody tr:hover td { background:var(--sp-surface-2); }
+
+        /* Classroom group header */
+        .grouprow td { background:linear-gradient(var(--sp-surface-2),var(--sp-surface-2));
+            padding:9px 14px;text-align:left;border-bottom:1px solid var(--sp-border);border-top:1px solid var(--sp-border); }
+        .grouprow .g-name { font-size:0.72rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
+        .grouprow .g-note { font-size:0.68rem;font-weight:600;color:var(--sp-muted);text-transform:none;letter-spacing:0;margin-left:8px; }
+
+        /* Name cell */
+        td.name-cell { text-align:left;padding-left:14px;white-space:nowrap; }
+        td.name-cell .nm { font-weight:700;color:var(--sp-text); }
+        td.name-cell .role { display:block;font-size:0.68rem;font-weight:500;color:var(--sp-muted);margin-top:1px; }
+
+        /* ── A shift cell: two time pickers + an OFF pill ──────────────── */
+        .shift { display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:nowrap; }
+        .shift select {
+            appearance:none;-webkit-appearance:none;
+            padding:6px 6px;border:1px solid var(--sp-border-in);border-radius:7px;
+            font-size:0.78rem;font-family:inherit;background:var(--sp-field-bg);color:var(--sp-text);
+            cursor:pointer;min-width:66px;text-align:center;text-align-last:center;transition:border-color .12s;
+        }
+        .shift select:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 2px rgba(37,99,235,0.15); }
+        .shift .dash { color:var(--sp-quiet);font-weight:700;font-size:0.8rem; }
+        .off-pill {
+            border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-muted);
+            font-size:0.64rem;font-weight:800;letter-spacing:0.04em;padding:5px 9px;border-radius:7px;cursor:pointer;
+            transition:all .12s;flex-shrink:0;
+        }
+        .off-pill:hover { border-color:#e6cf3a;color:#8a7a00; }
+
+        /* OFF state: a clean amber tile instead of two pickers. */
+        td.is-off .shift { }
+        .off-tile {
+            display:inline-flex;align-items:center;justify-content:center;gap:7px;
+            background:#fde68a;color:#7a5c00;font-weight:800;font-size:0.78rem;letter-spacing:0.08em;
+            border:1px solid #f0b429;border-radius:8px;padding:7px 16px;cursor:pointer;min-width:118px;
+        }
+        .off-tile:hover { filter:brightness(0.98); }
+
+        /* NO SCHOOL column cell */
+        td.closed { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 7px,rgba(240,180,41,0.08) 7px,rgba(240,180,41,0.08) 14px); }
+        td.closed .shift, td.closed .off-tile { opacity:0.28;pointer-events:none;filter:grayscale(0.3); }
+        .closed-tag { font-size:0.66rem;font-weight:700;color:#b45309;letter-spacing:0.03em; }
+
+        /* Row save */
+        .save-col { width:70px; }
+        .btn-row-save { padding:6px 12px;background:var(--sp-accent);color:#fff;border:none;border-radius:7px;
+            font-size:0.72rem;font-weight:700;cursor:pointer;opacity:0.35;transition:opacity .12s; }
+        .btn-row-save:not([disabled]) { opacity:1; }
+        .btn-row-save.saved { background:#16a34a; }
+
+        .sch-empty { padding:30px;color:var(--sp-muted);font-size:0.9rem;text-align:center; }
+
+        /* Legend */
+        .sch-legend { display:flex;gap:16px;align-items:center;margin-top:16px;font-size:0.72rem;color:var(--sp-muted);flex-wrap:wrap; }
+        .sch-legend .sw { display:inline-block;width:13px;height:13px;border-radius:3px;vertical-align:-2px;margin-right:5px; }
+
+        /* Print: clean chart, no chrome. */
         @media print {
+            @page { size: landscape; margin: 10mm; }
             body { background:#fff;color:#000; }
-            .site-header, .em-subnav-wrap, .sch-head, .wk-btn, .off-toggle, .noschool-toggle, .btn-row-save { display:none !important; }
+            .site-header, .em-subnav-wrap, .sch-head, .sch-weeknav, .sch-actions, .off-pill, .ns-chip, .btn-row-save, .save-col, .sch-legend { display:none !important; }
             .sch-layout { padding:0; }
-            .sch-card { border:none;box-shadow:none;max-height:none; }
+            .sch-card { border:none;box-shadow:none; }
             .sch-body { overflow:visible;padding:0; }
-            .sch-table input.time { border:none;background:transparent;color:#000; }
-            td.is-off input.time { background:#f7e463 !important;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
-            .wk-label { color:#000; }
+            .sch-table { min-width:0; }
+            .shift select { border:none;background:transparent;-webkit-appearance:none;appearance:none;padding:2px; }
+            .off-tile { background:#fde68a !important;-webkit-print-color-adjust:exact;print-color-adjust:exact; }
+            td.closed, .day-th.closed { -webkit-print-color-adjust:exact;print-color-adjust:exact; }
+            /* A printed title, since the on-screen header is hidden. */
+            .sch-body::before { content:"Children of Promise — Staff Schedule, " attr(data-weeklabel); display:block;font-weight:800;font-size:14pt;margin-bottom:8px; }
         }
     </style>
 </head>
@@ -87,7 +145,6 @@
     </div>
 </header>
 
-<!-- Shared Enrollment Management sub-nav (see ems.html for the note). -->
 <style>
     .em-subnav { display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:1400px;margin:0;padding:10px 20px 0 15%; }
     .em-subnav a {
@@ -114,23 +171,34 @@
 <div class="sch-layout">
     <div class="sch-card">
         <div class="sch-head">
-            <div class="sch-title">Staff Scheduler</div>
-            <div style="display:flex;gap:8px;">
-                <button class="sch-btn" id="schSaveAll" onclick="saveAll()" disabled>Save All Changes</button>
-                <button class="sch-btn sch-btn-plain" onclick="window.print()">&#x1F5A8;&#xFE0F; Print</button>
+            <div>
+                <h1>Staff Scheduler</h1>
+                <div class="sub">Weekly shifts by classroom. Pick a start and end time, or mark a day OFF.</div>
+            </div>
+            <div class="sch-actions">
+                <button class="sch-btn sch-btn-ghost" id="applyPaper" onclick="applyPaperSchedule()">Fill from paper schedule</button>
+                <button class="sch-btn sch-btn-ghost" onclick="window.print()">&#x1F5A8;&#xFE0F; Print</button>
+                <button class="sch-btn" id="schSaveAll" onclick="saveAll()" disabled>Save all changes</button>
             </div>
         </div>
-        <div class="sch-body">
+        <div class="sch-body" id="schBodyWrap">
             <div class="sch-weeknav">
-                <button class="wk-btn" onclick="shiftWeek(-1)">&lsaquo; Previous</button>
-                <button class="wk-btn" onclick="goThisWeek()">This week</button>
-                <button class="wk-btn" onclick="shiftWeek(1)">Next &rsaquo;</button>
+                <div class="wk-group">
+                    <button class="wk-btn" onclick="shiftWeek(-1)">&lsaquo; Prev</button>
+                    <button class="wk-btn" onclick="goThisWeek()">This week</button>
+                    <button class="wk-btn" onclick="shiftWeek(1)">Next &rsaquo;</button>
+                </div>
                 <span class="wk-label" id="wkLabel">Loading…</span>
             </div>
             <table class="sch-table">
                 <thead><tr id="schHeadRow"></tr></thead>
-                <tbody id="schBody"><tr><td class="sch-empty" colspan="6">Loading…</td></tr></tbody>
+                <tbody id="schBody"><tr><td class="sch-empty" colspan="7">Loading…</td></tr></tbody>
             </table>
+            <div class="sch-legend">
+                <span><span class="sw" style="background:#fde68a;border:1px solid #f0b429;"></span>OFF — scheduled day off</span>
+                <span><span class="sw" style="background:repeating-linear-gradient(45deg,#eee,#eee 4px,rgba(240,180,41,0.25) 4px,rgba(240,180,41,0.25) 8px);"></span>No school — centre closed</span>
+                <span>Leave both times blank for an unscheduled day.</span>
+            </div>
         </div>
     </div>
 </div>
@@ -138,19 +206,23 @@
 <script src="app.js"></script>
 <script src="/staff/auth.js"></script>
 <script>
-/* Staff Scheduler — the weekly work schedule chart, admin-edited. Mirrors the paper
-   schedule: staff grouped by classroom, a Mon-Fri shift per person, OFF cells, and
-   days the centre is closed (NO SCHOOL). Saves per person per week through
-   /api/staff-schedule. A staff member sees only their own week, read-only, from their
-   portal — this page is the editor for the whole chart. */
+/* Staff Scheduler — the weekly work-schedule chart, admin-edited. Staff grouped by
+   classroom; each person gets a start/end time per weekday, an OFF day, or a blank
+   (unscheduled). Days the centre is closed are marked NO SCHOOL per column. Saves per
+   person per week through /api/staff-schedule; a staff member sees only their own week,
+   read-only, from their portal.
+
+   Storage format is unchanged from the first version so the server and the portal view
+   keep working: each day is the compact text "6:15-4:15", the literal "OFF", or "".
+   This page just parses that into two time pickers and writes it back the same way. */
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const DAY_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-/* The classroom buckets on the paper schedule, and which room numbers fall in each.
-   Rooms are grouped youngest-first to match every other room-ordered view. Anyone
-   whose primary room is not one of these (or who has none) lands in "Unassigned" so
-   nobody is dropped from the chart. */
+/* Classroom buckets and the rooms in each (youngest-first, matching every other view).
+   GROUP_OVERRIDE folds one bucket's people into another temporarily WITHOUT touching
+   their room records — used while the 2s room is closed and those staff are covering in
+   Preschool during Janelle's injury leave. Remove the '2s' entry to restore it. */
 const BUCKETS = [
     { label: 'Infants',     rooms: [1, 2] },
     { label: 'Toddler',     rooms: [3, 4] },
@@ -158,46 +230,128 @@ const BUCKETS = [
     { label: 'Preschool',   rooms: [6] },
     { label: 'Afterschool', rooms: [8] },
 ];
+const GROUP_OVERRIDE = {
+    // bucket -> { into: targetBucket, note: shown beside the group header }
+    '2s': { into: 'Preschool', note: '2s room folded into Preschool while Janelle is on leave' }
+};
 
-let staff = [];              // active staff rows from /api/staff
-let weekStart = null;        // ISO 'YYYY-MM-DD', the Monday on screen
-let noSchoolDays = new Set();// day indices (0..4) the centre is closed this week
-let schedule = {};           // StaffId -> { Mon,Tue,Wed,Thu,Fri }
-let dirty = new Set();       // StaffIds with unsaved edits
+/* The paper schedule, by lowercase first name, for the "Fill from paper schedule"
+   button. Monday was NO SCHOOL that week, so Monday shifts are omitted where the paper
+   left them blank. OFF is the literal word. Times are compact "start-end" exactly as
+   stored. Matched to staff by first name (case-insensitive); anyone not listed is left
+   untouched, and a listed name with no matching staff row is simply skipped. */
+const PAPER_WEEK = '2026-10-12';
+const PAPER_NOSCHOOL = '0';   // Monday
+const PAPER = {
+    tara:    { Mon: '6:15-4:15', Tue: '6:30-4:30', Wed: '6:15-4:30', Thu: 'OFF',       Fri: '6:15-4:30' },
+    sue:     { Mon: 'OFF',       Tue: '6:15-5:30', Wed: '4:00-5:30', Thu: '6:15-5:30', Fri: '4:00-5:30' },
+    paige:   { Mon: '8:30-4:30', Tue: 'OFF',       Wed: '8:30-4:30', Thu: '8:30-4:30', Fri: 'OFF' },
+    lindsey: { Mon: '8:30-4:30', Tue: '8:30-4:30', Wed: '8:30-4:30', Thu: '8:30-4:30', Fri: '8:30-4:30' },
+    renee:   { Mon: '7:00-4:00', Tue: '7:00-5:00', Wed: '7:00-5:00', Thu: '7:00-5:00', Fri: '7:00-5:00' },
+    molly:   { Mon: '9:00-5:30', Tue: '9:00-5:30', Wed: '9:00-5:30', Thu: '9:00-5:30', Fri: '9:00-5:30' },
+    keyona:  { Mon: '11:00-5:30', Tue: '9:00-5:30', Wed: '6:30-4:00', Thu: '9:00-5:30', Fri: '6:30-5:30' },
+    maddie:  { Mon: '8:00-4:00', Tue: '8:00-4:30', Wed: '8:00-4:00', Thu: '8:00-4:00', Fri: '8:00-4:00' },
+    madeline:{ Mon: '8:00-4:00', Tue: '8:00-4:30', Wed: '8:00-4:00', Thu: '8:00-4:00', Fri: '8:00-4:00' },
+    megan:   { Mon: '6:30-5:30', Tue: '9:00-4:00', Wed: '10:30-5:30', Thu: '6:30-4:30', Fri: '9:00-4:00' },
+    jeremy:  { Mon: '10:00-5:00', Tue: '10:00-5:00', Wed: '10:00-5:00', Thu: '10:00-5:00', Fri: '10:00-5:00' },
+};
+
+let staff = [];
+let weekStart = null;
+let noSchoolDays = new Set();
+let schedule = {};           // StaffId -> { Mon..Fri }  (compact text per day)
+let dirty = new Set();
 
 function esc(v) {
     return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-// ── Week math ───────────────────────────────────────────────────────────────
+/* ── Time options ──────────────────────────────────────────────────────────────
+   Every 15 minutes from 6:00 AM to 7:00 PM. Each option's VALUE is minutes-since-
+   midnight (stable, easy to compare); its LABEL is a tidy 12-hour time ("6:15a",
+   "4:15p"). A daycare day lives inside this window, so it keeps the lists short. */
+const TIME_MIN = 6 * 60;      // 6:00 AM
+const TIME_MAX = 19 * 60;     // 7:00 PM
+const TIME_STEP = 15;
+function timeLabel(mins) {
+    let h = Math.floor(mins / 60), m = mins % 60;
+    const ap = h >= 12 ? 'p' : 'a';
+    let h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + String(m).padStart(2, '0') + ap;
+}
+function timeOptionsHtml(selectedMins) {
+    let out = '<option value="">—</option>';
+    for (let t = TIME_MIN; t <= TIME_MAX; t += TIME_STEP) {
+        out += '<option value="' + t + '"' + (t === selectedMins ? ' selected' : '') + '>' + timeLabel(t) + '</option>';
+    }
+    return out;
+}
+
+/* ── Parse / format the compact "start-end" shift text ───────────────────────────
+   The paper writes 12-hour times without am/pm, relying on daycare convention: a
+   start is in the morning, an end is in the afternoon/evening. So a bare hour 1..6 on
+   the END is PM (4:15 -> 16:15), and 7..11 is AM-ish only if it is before the start —
+   in practice ends are always PM here. Starts: 6..11 are AM, 12 is noon, 1..5 would be
+   PM (rare). We convert each side to minutes-since-midnight for the pickers. */
+function toMinutes(part, isEnd) {
+    const m = String(part || '').trim().match(/^(\d{1,2}):(\d{2})\s*(a|p|am|pm)?$/i);
+    if (!m) return null;
+    let h = parseInt(m[1], 10); const min = parseInt(m[2], 10);
+    const ap = (m[3] || '').toLowerCase()[0];
+    if (ap === 'p') { if (h !== 12) h += 12; }
+    else if (ap === 'a') { if (h === 12) h = 0; }
+    else {
+        // No am/pm: infer. End times of 1..6 are afternoon; a start of 1..5 is too, but
+        // starts here are 6:00+ in the morning, so only bump the END into the afternoon.
+        if (isEnd && h >= 1 && h <= 6) h += 12;
+    }
+    return h * 60 + min;
+}
+function parseShift(text) {
+    const t = String(text || '').trim();
+    if (!t) return { off: false, start: null, end: null };
+    if (/^off$/i.test(t)) return { off: true, start: null, end: null };
+    const parts = t.split('-');
+    return { off: false, start: toMinutes(parts[0], false), end: toMinutes(parts[1], true) };
+}
+// Minutes -> compact "H:MM" with no am/pm, matching the paper's written form.
+function minutesToCompact(mins) {
+    let h = Math.floor(mins / 60), m = mins % 60;
+    let h12 = h % 12; if (h12 === 0) h12 = 12;
+    return h12 + ':' + String(m).padStart(2, '0');
+}
+// Read a cell's current state back into the compact storage string.
+function cellToStored(id, dayIdx) {
+    const td = document.getElementById('cell_' + id + '_' + dayIdx);
+    if (!td) return '';
+    if (td.dataset.off === '1') return 'OFF';
+    const s = td.querySelector('.sel-start'), e = td.querySelector('.sel-end');
+    const sv = s && s.value, ev = e && e.value;
+    if (!sv && !ev) return '';
+    return (sv ? minutesToCompact(parseInt(sv, 10)) : '?') + '-' + (ev ? minutesToCompact(parseInt(ev, 10)) : '?');
+}
+
+// ── Week math ───────────────────────────────────────────────────────────────────
 function mondayOf(d) {
-    const x = new Date(d);
-    const dow = (x.getDay() + 6) % 7;   // 0=Mon..6=Sun
-    x.setDate(x.getDate() - dow);
-    return isoDate(x);
+    const x = new Date(d); const dow = (x.getDay() + 6) % 7; x.setDate(x.getDate() - dow); return isoDate(x);
 }
 function isoDate(x) {
-    const m = String(x.getMonth() + 1).padStart(2, '0');
-    const day = String(x.getDate()).padStart(2, '0');
-    return x.getFullYear() + '-' + m + '-' + day;
+    return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
 }
-// A date for a given day offset (0=Mon) within the current week.
 function dayDate(offset) {
     const [y, m, d] = weekStart.split('-').map(Number);
-    const x = new Date(y, m - 1, d);
-    x.setDate(x.getDate() + offset);
-    return x;
+    const x = new Date(y, m - 1, d); x.setDate(x.getDate() + offset); return x;
 }
 function fmtDay(x) {
     const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][x.getMonth()];
-    return x.getDate() + '-' + mon;   // e.g. "13-Oct", matching the paper chart
+    return x.getDate() + '-' + mon;
 }
 function weekLabel() {
     const a = dayDate(0), b = dayDate(4);
     return 'Week of ' + fmtDay(a) + ' – ' + fmtDay(b) + ', ' + a.getFullYear();
 }
 
-// ── Load ─────────────────────────────────────────────────────────────────────
+// ── Load ──────────────────────────────────────────────────────────────────────────
 async function loadStaff() {
     try {
         const res = await apiFetch('/api/staff');
@@ -209,10 +363,8 @@ async function loadStaff() {
         }
     } catch (e) { staff = []; }
 }
-
 async function loadWeek() {
-    schedule = {};
-    noSchoolDays = new Set();
+    schedule = {}; noSchoolDays = new Set();
     try {
         const res = await apiFetch('/api/staff-schedule?weekStart=' + encodeURIComponent(weekStart));
         if (res.ok) {
@@ -221,85 +373,93 @@ async function loadWeek() {
                 schedule[String(r.StaffId)] = { Mon: r.Mon, Tue: r.Tue, Wed: r.Wed, Thu: r.Thu, Fri: r.Fri };
             });
             String(data.noSchoolDays || '').split(',').forEach(n => {
-                const i = parseInt(n, 10);
-                if (!isNaN(i)) noSchoolDays.add(i);
+                const i = parseInt(n, 10); if (!isNaN(i)) noSchoolDays.add(i);
             });
         }
-    } catch (e) { /* a blank week renders empty, which is correct */ }
+    } catch (e) { /* blank week renders empty, which is correct */ }
 }
 
-// ── Grouping ──────────────────────────────────────────────────────────────────
-function bucketOf(s) {
+// ── Grouping ────────────────────────────────────────────────────────────────────
+function rawBucketOf(s) {
     const rn = parseInt(s.RoomNumber, 10);
     const b = BUCKETS.find(x => x.rooms.indexOf(rn) !== -1);
     return b ? b.label : 'Unassigned';
 }
-// Staff grouped into bucket order, each group's people sorted by name.
 function groupedStaff() {
     const order = BUCKETS.map(b => b.label).concat(['Unassigned']);
+    const notes = {};
     const groups = {};
     staff.forEach(s => {
-        const b = bucketOf(s);
+        let b = rawBucketOf(s);
+        const ov = GROUP_OVERRIDE[b];
+        if (ov) { notes[ov.into] = ov.note; b = ov.into; }
         (groups[b] = groups[b] || []).push(s);
     });
     return order
+        .filter(label => !GROUP_OVERRIDE[label])          // the folded-away bucket disappears
         .filter(label => groups[label] && groups[label].length)
         .map(label => ({
             label: label,
+            note: notes[label] || '',
             people: groups[label].sort((a, b) => String(a.Name).localeCompare(String(b.Name)))
         }));
 }
 
-// ── Render ─────────────────────────────────────────────────────────────────────
+// ── Render ──────────────────────────────────────────────────────────────────────
 function renderHead() {
-    const row = document.getElementById('schHeadRow');
-    let html = '<th class="name-col">Name</th>';
+    let html = '<th class="name-col">Staff</th>';
     for (let i = 0; i < 5; i++) {
         const closed = noSchoolDays.has(i);
-        html += '<th class="' + (closed ? 'noschool' : '') + '">'
-            + DAY_FULL[i] + '<br>' + fmtDay(dayDate(i))
-            + '<label class="noschool-toggle"><input type="checkbox" ' + (closed ? 'checked' : '')
-            + ' onchange="toggleNoSchool(' + i + ', this.checked)"> no school</label>'
+        html += '<th class="day-th' + (closed ? ' closed' : '') + '">'
+            + '<div class="dow">' + DAY_FULL[i] + '</div>'
+            + '<div class="date">' + fmtDay(dayDate(i)) + '</div>'
+            + '<span class="ns-chip' + (closed ? ' on' : '') + '" onclick="toggleNoSchool(' + i + ')">'
+            + '<span class="dot"></span>' + (closed ? 'No school' : 'Mark no school') + '</span>'
             + '</th>';
     }
-    html += '<th style="width:56px;">Save</th>';
-    row.innerHTML = html;
+    html += '<th class="name-col save-col" style="text-align:center;">Save</th>';
+    document.getElementById('schHeadRow').innerHTML = html;
+}
+
+function cellHtml(id, dayIdx) {
+    const sc = schedule[id] || {};
+    const parsed = parseShift(sc[DAYS[dayIdx]] || '');
+    const closed = noSchoolDays.has(dayIdx);
+    let inner;
+    if (closed) {
+        inner = '<span class="closed-tag">— no school —</span>';
+    } else if (parsed.off) {
+        inner = '<button type="button" class="off-tile" title="Click to clear OFF" '
+            + 'onclick="setOff(\'' + id + '\',' + dayIdx + ',false)">OFF</button>';
+    } else {
+        inner = '<div class="shift">'
+            + '<select class="sel-start" onchange="onEdit(\'' + id + '\')" aria-label="start">' + timeOptionsHtml(parsed.start) + '</select>'
+            + '<span class="dash">–</span>'
+            + '<select class="sel-end" onchange="onEdit(\'' + id + '\')" aria-label="end">' + timeOptionsHtml(parsed.end) + '</select>'
+            + '<button type="button" class="off-pill" title="Mark day off" onclick="setOff(\'' + id + '\',' + dayIdx + ',true)">OFF</button>'
+            + '</div>';
+    }
+    return '<td id="cell_' + id + '_' + dayIdx + '"' + (parsed.off ? ' data-off="1"' : '')
+        + ' class="' + (closed ? 'closed' : '') + '">' + inner + '</td>';
 }
 
 function renderBody() {
     dirty = new Set();
-    const all = document.getElementById('schSaveAll');
-    if (all) all.disabled = true;
-
-    const tbody = document.getElementById('schBody');
+    const all = document.getElementById('schSaveAll'); if (all) all.disabled = true;
     const groups = groupedStaff();
-    if (!groups.length) {
-        tbody.innerHTML = '<tr><td class="sch-empty" colspan="6">No staff to schedule.</td></tr>';
-        return;
-    }
+    const tbody = document.getElementById('schBody');
+    if (!groups.length) { tbody.innerHTML = '<tr><td class="sch-empty" colspan="7">No staff to schedule.</td></tr>'; return; }
     let html = '';
     groups.forEach(g => {
-        html += '<tr class="sch-grouprow"><td colspan="6">' + esc(g.label) + '</td></tr>';
+        html += '<tr class="grouprow"><td colspan="7"><span class="g-name">' + esc(g.label) + '</span>'
+            + (g.note ? '<span class="g-note">· ' + esc(g.note) + '</span>' : '') + '</td></tr>';
         g.people.forEach(s => {
             const id = String(s.Id);
-            const sc = schedule[id] || {};
             html += '<tr data-staff="' + id + '">';
-            html += '<td class="name-cell">' + esc(s.Name)
+            html += '<td class="name-cell"><span class="nm">' + esc(s.Name) + '</span>'
                 + (s.Role ? '<span class="role">' + esc(s.Role) + '</span>' : '') + '</td>';
-            for (let i = 0; i < 5; i++) {
-                const val = sc[DAYS[i]] || '';
-                const isOff = /^off$/i.test(val);
-                const closed = noSchoolDays.has(i);
-                html += '<td class="' + (isOff ? 'is-off ' : '') + (closed ? 'noschool' : '') + '">'
-                    + '<div class="cell-wrap">'
-                    + '<input class="time" type="text" value="' + esc(val) + '" '
-                    + 'placeholder="' + (closed ? '—' : '6:15-4:15') + '" '
-                    + 'id="c_' + id + '_' + i + '" oninput="onEdit(\'' + id + '\')">'
-                    + '<label class="off-toggle"><input type="checkbox" ' + (isOff ? 'checked' : '')
-                    + ' onchange="toggleOff(\'' + id + '\',' + i + ',this.checked)">OFF</label>'
-                    + '</div></td>';
-            }
-            html += '<td><button class="btn-row-save" id="save_' + id + '" onclick="saveRow(\'' + id + '\')" disabled>Save</button></td>';
+            for (let i = 0; i < 5; i++) html += cellHtml(id, i);
+            html += '<td class="save-col" style="text-align:center;"><button class="btn-row-save" id="save_' + id + '" onclick="saveRow(\'' + id + '\')" disabled>Save</button></td>';
             html += '</tr>';
         });
     });
@@ -308,69 +468,60 @@ function renderBody() {
 
 function render() {
     document.getElementById('wkLabel').textContent = weekLabel();
+    const wrap = document.getElementById('schBodyWrap');
+    if (wrap) wrap.setAttribute('data-weeklabel', weekLabel());
     renderHead();
     renderBody();
 }
 
-// ── Edit tracking ───────────────────────────────────────────────────────────────
+// ── Edit tracking ─────────────────────────────────────────────────────────────────
 function markDirty(id) {
     dirty.add(String(id));
     const btn = document.getElementById('save_' + id);
-    if (btn) btn.disabled = false;
-    const all = document.getElementById('schSaveAll');
-    if (all) all.disabled = false;
+    if (btn) { btn.disabled = false; btn.classList.remove('saved'); btn.textContent = 'Save'; }
+    const all = document.getElementById('schSaveAll'); if (all) all.disabled = false;
 }
-function onEdit(id) {
-    // A cell typed into is no longer "OFF" unless it literally says OFF; keep the
-    // yellow in sync with the text so the two never disagree.
-    for (let i = 0; i < 5; i++) {
-        const input = document.getElementById('c_' + id + '_' + i);
-        if (!input) continue;
-        const td = input.closest('td');
-        if (td) td.classList.toggle('is-off', /^off$/i.test(input.value.trim()));
-    }
-    markDirty(id);
-}
-function toggleOff(id, dayIdx, on) {
-    const input = document.getElementById('c_' + id + '_' + dayIdx);
-    if (!input) return;
-    input.value = on ? 'OFF' : '';
-    const td = input.closest('td');
-    if (td) td.classList.toggle('is-off', on);
+function onEdit(id) { markDirty(id); }
+
+/* OFF is a state on the cell, not a checkbox: flipping it rewrites just that cell so
+   the pickers give way to the amber OFF tile (and back). */
+function setOff(id, dayIdx, on) {
+    schedule[id] = schedule[id] || {};
+    // Preserve what was typed so clearing OFF restores an empty pair (not stale times).
+    schedule[id][DAYS[dayIdx]] = on ? 'OFF' : '';
+    const td = document.getElementById('cell_' + id + '_' + dayIdx);
+    if (td) td.outerHTML = cellHtml(id, dayIdx);
     markDirty(id);
 }
 
-/* NO SCHOOL is a per-week fact, not per-person, so toggling a column broadcasts the
-   new closed-days list to every row of the week in one call, then re-renders. */
-async function toggleNoSchool(dayIdx, on) {
+/* NO SCHOOL is a per-week fact: toggling a column broadcasts it to every row of the
+   week, then re-renders so the whole column greys at once. */
+async function toggleNoSchool(dayIdx) {
+    const on = !noSchoolDays.has(dayIdx);
     if (on) noSchoolDays.add(dayIdx); else noSchoolDays.delete(dayIdx);
-    const list = Array.from(noSchoolDays).sort().join(',');
+    const list = Array.from(noSchoolDays).sort((a, b) => a - b).join(',');
     try {
         const res = await apiFetch('/api/staff-schedule', {
             method: 'POST',
             body: JSON.stringify({ weekStart: weekStart, noSchoolDays: list, broadcastNoSchool: true })
         });
         const data = await res.json();
-        if (!data.success) { showNotification('Could not update no-school days: ' + (data.error || ''), 'error'); }
+        if (!data.success) showNotification('Could not update no-school days: ' + (data.error || ''), 'error');
     } catch (e) { showNotification('Network error', 'error'); }
     render();
 }
 
-// ── Save ───────────────────────────────────────────────────────────────────────
-function readRow(id) {
-    const out = {};
-    for (let i = 0; i < 5; i++) {
-        const input = document.getElementById('c_' + id + '_' + i);
-        out[DAYS[i].toLowerCase()] = input ? input.value.trim() : '';
-    }
-    return out;
+// ── Save ────────────────────────────────────────────────────────────────────────
+function collectRow(id) {
+    const body = {
+        weekStart: weekStart, staffId: parseInt(id, 10),
+        noSchoolDays: Array.from(noSchoolDays).sort((a, b) => a - b).join(',')
+    };
+    for (let i = 0; i < 5; i++) body[DAYS[i].toLowerCase()] = cellToStored(id, i);
+    return body;
 }
 async function putRow(id) {
-    const body = Object.assign({
-        weekStart: weekStart,
-        staffId: parseInt(id, 10),
-        noSchoolDays: Array.from(noSchoolDays).sort().join(',')
-    }, readRow(id));
+    const body = collectRow(id);
     try {
         const res = await apiFetch('/api/staff-schedule', { method: 'POST', body: JSON.stringify(body) });
         const data = await res.json();
@@ -378,7 +529,7 @@ async function putRow(id) {
             schedule[id] = { Mon: body.mon, Tue: body.tue, Wed: body.wed, Thu: body.thu, Fri: body.fri };
             dirty.delete(String(id));
             const btn = document.getElementById('save_' + id);
-            if (btn) btn.disabled = true;
+            if (btn) { btn.disabled = true; btn.classList.add('saved'); btn.textContent = 'Saved ✓'; }
             return true;
         }
         showNotification('Save failed: ' + (data.error || ''), 'error');
@@ -402,24 +553,57 @@ async function saveAll() {
     if (!dirty.size) { const all = document.getElementById('schSaveAll'); if (all) all.disabled = true; }
 }
 
-// ── Week navigation ──────────────────────────────────────────────────────────────
-function warnIfDirty() {
-    return !dirty.size || confirm('You have unsaved changes that will be lost. Continue?');
+/* "Fill from paper schedule" — populate the Oct 12 week from the printed chart. It
+   jumps to that week if needed, writes the paper's shifts into each matching person's
+   row (by first name), marks Monday no school, and leaves everything DIRTY so the admin
+   reviews it and clicks Save. It never writes to the server on its own. */
+async function applyPaperSchedule() {
+    if (weekStart !== PAPER_WEEK) {
+        if (dirty.size && !confirm('Jump to the week of ' + PAPER_WEEK + ' and fill it from the paper schedule? Unsaved edits on this week will be lost.')) return;
+        weekStart = PAPER_WEEK;
+        await loadWeek();
+    }
+    // Monday no school, per the paper.
+    noSchoolDays = new Set(PAPER_NOSCHOOL.split(',').map(Number));
+    try {
+        await apiFetch('/api/staff-schedule', {
+            method: 'POST',
+            body: JSON.stringify({ weekStart: weekStart, noSchoolDays: PAPER_NOSCHOOL, broadcastNoSchool: true })
+        });
+    } catch (e) { /* non-fatal; the column still shows locally */ }
+
+    let matched = 0;
+    staff.forEach(s => {
+        const first = String(s.Name || '').trim().split(/\s+/)[0].toLowerCase();
+        const row = PAPER[first];
+        if (!row) return;
+        schedule[String(s.Id)] = {
+            Mon: row.Mon || '', Tue: row.Tue || '', Wed: row.Wed || '', Thu: row.Thu || '', Fri: row.Fri || ''
+        };
+        matched++;
+    });
+    render();
+    // Mark every matched person dirty so Save all lights up.
+    staff.forEach(s => {
+        const first = String(s.Name || '').trim().split(/\s+/)[0].toLowerCase();
+        if (PAPER[first]) markDirty(String(s.Id));
+    });
+    showNotification('Filled ' + matched + ' staff from the paper schedule — review and Save all.', matched ? 'success' : 'error');
 }
+
+// ── Week navigation ────────────────────────────────────────────────────────────────
+function warnIfDirty() { return !dirty.size || confirm('You have unsaved changes that will be lost. Continue?'); }
 async function shiftWeek(delta) {
     if (!warnIfDirty()) return;
     const [y, m, d] = weekStart.split('-').map(Number);
-    const x = new Date(y, m - 1, d);
-    x.setDate(x.getDate() + delta * 7);
+    const x = new Date(y, m - 1, d); x.setDate(x.getDate() + delta * 7);
     weekStart = isoDate(x);
-    await loadWeek();
-    render();
+    await loadWeek(); render();
 }
 async function goThisWeek() {
     if (!warnIfDirty()) return;
     weekStart = mondayOf(new Date());
-    await loadWeek();
-    render();
+    await loadWeek(); render();
 }
 
 async function init() {
@@ -428,7 +612,6 @@ async function init() {
     await loadWeek();
     render();
 }
-
 init();
 </script>
 </body>
