@@ -156,13 +156,16 @@ UPDATE Staff SET RoomNumber = 7
  WHERE RoomNumber IS NULL AND Name = 'Janell Poenitske';
 
 /* 3c — explicit CLEARS (the only place this migration removes an assignment).
-   STEP 2 surfaced a stale secondary room; clear both the link and its text mirror
-   so it does not drift back. Named and separate from the add-only backfill above so
+   STEP 2 surfaced stale secondary rooms; clear both the link and its text mirror so
+   they do not drift back. Named and separate from the add-only backfill above so
    nothing is cleared implicitly.
      - Keyona Hentz is Pre-School only (room 6); her secondary "Infants / Toddlers"
-       is stale, so drop the secondary entirely. */
+       is stale, so drop the secondary entirely.
+     - Megan Nooney is Director with no classroom (primary already blank); her stray
+       secondary "2 Year Olds / Toddlers" is leftover data, so drop it too. Keeps her
+       off the teaching-staff worksheets, which is intentional. */
 UPDATE Staff SET SecondaryRoomNumber = NULL, SecondaryClassroom = NULL
- WHERE Name = 'Keyona Hentz';
+ WHERE Name IN ('Keyona Hentz', 'Megan Nooney');
 GO
 
 /* =============================================================================
