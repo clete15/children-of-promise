@@ -754,9 +754,10 @@
     a.cls-chip-done:hover { background:var(--sp-good-bg);border-color:var(--sp-good-br);color:var(--sp-good-fg); }
     .cls-dl { font-size:0.62rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px; }
     .cls-paper { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--sp-warn-bg);color:var(--sp-warn-fg);cursor:help; }
-    /* A screening with only one of its two required items on file (scored summary OR
-       original test sheets, not both): real progress, not done. Bright yellow, matching
-       the admin ISBE roster's partial pill, so teacher and director see the same thing. */
+    /* A screening that is started but not fully complete: some but not all of the four
+       parts are in (ASQ/ASE uploaded, scores entered, parent signature, staff signature).
+       Real progress, not done. Bright yellow, matching the admin ISBE roster's partial
+       pill, so teacher and director see the same thing. */
     .cls-chip-partial { background:#fef3c7;border-color:#f59e0b;color:#92400e; }
     a.cls-chip-partial:hover { background:#fde68a;border-color:#f59e0b;color:#92400e; }
     .cls-partial { font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:8px;margin-left:2px;background:var(--sp-warn-bg);color:var(--sp-warn-fg);cursor:help; }
@@ -1553,8 +1554,18 @@ async function wireDocButtons(s) {
    once records are maintained from the PDR upload. selfEditCard/setDetailsOpen remain
    in the code but are no longer surfaced. */
 function identityHeader(s) {
-    const rooms = [s.Classroom, s.SecondaryClassroom]
-        .map(v => String(v || '').trim()).filter(Boolean).join(' and ');
+    /* Prefer the live room name resolved from the id link, so a rename shows here
+       immediately; fall back to the stored text mirror if the id isn't in the room
+       list (deleted room) or isn't set. */
+    const roomNameFor = (num, mirror) => {
+        const n = String(num || '').trim();
+        const room = n ? (ROOMS || []).find(r => String(r.RoomNumber) === n) : null;
+        return room ? String(room.Room || '').trim() : String(mirror || '').trim();
+    };
+    const rooms = [
+        roomNameFor(s.RoomNumber, s.Classroom),
+        roomNameFor(s.SecondaryRoomNumber, s.SecondaryClassroom)
+    ].filter(Boolean).join(' and ');
 
     return '<div class="sp-card sp-who">'
         + '<div class="sp-who-row">'
@@ -2065,13 +2076,27 @@ function myClassrooms(s) {
             .map(r => ({ name: String(r.Room || '').trim() || ('Room ' + r.RoomNumber),
                          roomNumber: String(r.RoomNumber), secondary: false }));
     }
-    return [s.Classroom, s.SecondaryClassroom]
-        .map(v => String(v || '').trim()).filter(Boolean)
-        .map(name => {
-            const room = ROOMS.find(r => String(r.Room || '').trim() === name);
-            return { name: name, roomNumber: room ? String(room.RoomNumber) : null,
-                     secondary: name === String(s.SecondaryClassroom || '').trim() };
-        });
+    /* Resolve by RoomNumber, not by name. The staff record links to a room by id
+       (RoomNumber primary, SecondaryRoomNumber part-time), so a room rename never
+       breaks this and a near-miss in a name mirror can't orphan the checklist. The
+       display name comes from the matched room record, so it always reads the room's
+       current name. Falls back to the stored text mirror only if an id doesn't match
+       a current room (e.g. a room was deleted), so nothing silently disappears. */
+    const links = [
+        { num: s.RoomNumber,          text: s.Classroom,          secondary: false },
+        { num: s.SecondaryRoomNumber, text: s.SecondaryClassroom, secondary: true  }
+    ];
+    return links
+        .filter(l => String(l.num || '').trim() || String(l.text || '').trim())
+        .map(l => {
+            const num = String(l.num || '').trim();
+            const room = num ? ROOMS.find(r => String(r.RoomNumber) === num) : null;
+            const name = room ? String(room.Room || '').trim() : String(l.text || '').trim();
+            return { name: name,
+                     roomNumber: room ? String(room.RoomNumber) : null,
+                     secondary: l.secondary };
+        })
+        .filter(l => l.name || l.roomNumber);
 }
 
 /* ── My Classroom ──────────────────────────────────────────────────────────
@@ -3360,6 +3385,9 @@ async function loadClassroomData() {
             // Uploaded evidence (parent ASQ/ASE questionnaires, report-card scans), so a
             // screening's two halves and a filed report card show from the first render.
             (window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(CLS_YEAR, myFetch).catch(() => null) : Promise.resolve(),
+            // Signatures into ChildForms too: its screening-completion rule now needs
+            // the parent + staff signatures, not just the scored summary.
+            (window.ChildForms && ChildForms.loadSignatures) ? ChildForms.loadSignatures(CLS_YEAR, myFetch).catch(() => null) : Promise.resolve(),
             (window.CofpForms) ? CofpForms.loadSignatures(CLS_YEAR).then(s => { CLS_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve(),
             // Which children have a weighted-eligibility form on disk, so the pill can
             // highlight when it exists and open it. Optional; absent = no pills lit.

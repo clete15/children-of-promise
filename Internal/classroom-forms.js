@@ -389,6 +389,12 @@
                     SigImagePath: sigImages[s.role] || '',
                     SignedAt: new Date().toISOString().slice(0, 10)
                 };
+                // Mirror into ChildForms' own signature store so a screening cell can
+                // flip to green immediately — its completion rule now needs both the
+                // parent and staff signatures, which it reads from here.
+                if (ChildForms() && ChildForms().markSignature) {
+                    ChildForms().markSignature(studentId, field, s.role);
+                }
             });
             if (ctx.setSignatures) ctx.setSignatures(sigs);
             drawn.forEach(function (e) { e.pad.setStatus('\u2713 Filed as ' + d.name, '#166534'); });
@@ -1081,25 +1087,27 @@
         mountSigPad('scrStaffSigPad', studentId, scrField, 'staff',
             { label: 'Staff signature', printedName: 'scrStaffSig', dateField: 'scrDate' });
 
-        // Reset and reflect the parent-questionnaire upload slot. For a PI child on the
-        // beginning screenings the questionnaire is REQUIRED, so the slot is relabelled
-        // and its empty-state reads "Required", not "Optional".
+        // Reset and reflect the ASQ/ASE upload slot. For a PI child the upload is
+        // REQUIRED on every screening: the column turns green only when the ASQ/ASE is
+        // uploaded, the scores are entered, and the summary is signed by both parent and
+        // staff. For non-PI children the scored summary alone completes it, so the upload
+        // is optional. (The old separate "test sheets" upload was retired — this ASQ/ASE
+        // IS the single required upload.)
         var childIsPI = String(student.PFA_PI_na || '').trim().toUpperCase() === 'PI';
-        var questRequired = childIsPI && (scrField === 'BegASQ' || scrField === 'BegASE');
+        var questRequired = childIsPI;
         var qSection = document.getElementById('scrQuestSection');
         var qHeading = document.getElementById('scrQuestHeading');
         var qNote = document.getElementById('scrQuestNote');
         if (qHeading) qHeading.textContent = questRequired
-            ? 'Parent\u2019s Completed Questionnaire (required)'
-            : 'Parent\u2019s Completed Questionnaire (optional)';
+            ? 'Upload the ASQ / ASE (required)'
+            : 'Upload the ASQ / ASE (optional)';
         if (qNote) qNote.textContent = questRequired
-            ? 'Required for PI children: upload the parent\u2019s completed Ages & Stages '
-                + 'questionnaire (PDF or a clear photo). The scored summary alone does not '
-                + 'complete this screening until the questionnaire is on file.'
-            : 'Optional. The scored summary below completes the screening on its own. If a '
-                + 'parent completed an Ages & Stages questionnaire, you can attach the scan or a '
-                + 'clear photo (PDF or image) to keep it in the child\u2019s folder \u2014 but it '
-                + 'is not required.';
+            ? 'Upload the completed ASQ-3 / ASQ:SE-2 (PDF or a clear photo). For a PI child '
+                + 'this column turns green only when this is uploaded, the scores are entered '
+                + 'below, and the summary is signed by both the parent and staff.'
+            : 'Optional. The scored summary below completes the screening on its own. You can '
+                + 'still attach the completed ASQ-3 / ASQ:SE-2 (PDF or image) to keep it in the '
+                + 'child\u2019s folder \u2014 but it is not required.';
         if (qSection) qSection.classList.toggle('scr-quest-required', questRequired);
         var qFile = document.getElementById('scrQuestFile');
         if (qFile) qFile.value = '';
@@ -1107,8 +1115,8 @@
         setUploadStatus('scrQuestStatus', existingQ
             ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
             : null, questRequired
-                ? '\u26a0 Required \u2014 no questionnaire on file yet.'
-                : 'Optional \u2014 no questionnaire on file.');
+                ? '\u26a0 Required \u2014 no ASQ / ASE uploaded yet.'
+                : 'Optional \u2014 no ASQ / ASE uploaded yet.');
 
         try {
             var res = await apiFetch(yearQS('/api/screening/' + studentId + '?type=' + encodeURIComponent(type) + '&period=' + encodeURIComponent(period)));
@@ -1290,7 +1298,7 @@
         } catch (e) {
             if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
         } finally {
-            if (btn) { btn.disabled = false; btn.textContent = 'Upload questionnaire'; }
+            if (btn) { btn.disabled = false; btn.textContent = 'Upload ASQ / ASE'; }
         }
     }
 
@@ -1582,21 +1590,22 @@
         '<div class="pi-modal-header"><h3 id="scrModalTitle">Screening Score Entry</h3>',
         '<button class="pi-close" onclick="CofpForms.closeScreening()" aria-label="Close">&times;</button></div>',
         '<div class="pi-modal-body">',
+        // The parent-completed questionnaire is the FIRST thing in the modal — the first
+        // thing a teacher should see — so the required upload is impossible to miss and
+        // comes before the student info and the scores. For a PI child it is REQUIRED
+        // (openScreening relabels it and the .scr-quest-required class gives it a bright
+        // amber callout); the heading/note here are the defaults it overrides.
+        '<div class="pi-section" id="scrQuestSection"><h4 id="scrQuestHeading">Upload the ASQ / ASE</h4>',
+        '<div class="doc-note" id="scrQuestNote">Upload the completed ASQ-3 / ASQ:SE-2 (PDF or a clear photo). For a PI child the column turns green only when this is uploaded, the scores are entered below, and the summary is signed by both the parent and staff.</div>',
+        '<div class="cls-upload-row"><input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">',
+        '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload ASQ / ASE</button>',
+        '<span id="scrQuestStatus" class="cls-upload-status"></span></div></div>',
         '<div class="pi-section"><h4>Student &amp; Screening Info</h4><div class="pi-grid three">',
         '<div class="pi-field"><label>Child Name</label><div class="pi-value" id="scrChildName"></div></div>',
         '<div class="pi-field"><label>Date of Birth</label><div class="pi-value" id="scrDOB"></div></div>',
         '<div class="pi-field"><label>Age at Screening</label><div class="pi-value" id="scrAge"></div></div></div>',
         '<div class="pi-grid" style="margin-top:10px;"><div class="pi-field"><label>Screening Type</label><div class="pi-value" id="scrType"></div></div>',
         '<div class="pi-field"><label>Period</label><div class="pi-value" id="scrPeriod"></div></div></div></div>',
-        // The parent-completed questionnaire sits ABOVE the score so a teacher sees the
-        // required upload before entering scores, not buried at the bottom. For a PI
-        // beginning screening it is REQUIRED, and the .scr-quest-required class gives it
-        // a bright amber callout so it is impossible to miss.
-        '<div class="pi-section" id="scrQuestSection"><h4 id="scrQuestHeading">Parent\u2019s Completed Questionnaire (optional)</h4>',
-        '<div class="doc-note" id="scrQuestNote">Optional. The scored summary below completes the screening on its own. If a parent completed an Ages &amp; Stages questionnaire, you can attach the scan or a clear photo (PDF or image) to keep it in the child\u2019s folder &mdash; but it is not required.</div>',
-        '<div class="cls-upload-row"><input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">',
-        '<button type="button" class="pi-btn pi-btn-secondary" id="scrQuestBtn" onclick="CofpForms.uploadScreeningQuestionnaire()">Upload questionnaire</button>',
-        '<span id="scrQuestStatus" class="cls-upload-status"></span></div></div>',
         '<div class="pi-section" id="scrASQDomains"><h4>ASQ-3 Domain Scores</h4>',
         '<p style="font-size:0.72rem;color:#6b7280;margin-bottom:10px;">Enter the score for each domain (0-60). Mark cutoff status based on the scoring guide for the child\'s age interval.</p>',
         '<div class="pi-grid">',

@@ -53,10 +53,11 @@
         'FamilyCenteredAssessment', 'FamilyGoalPlan', 'TransitionPlan', 'Referral'
     ];
 
-    /* The four screening columns need TWO artefacts to be complete: the parent's
-       filled-in questionnaire (uploaded scan) AND the teacher's scored, signed
-       summary (an in-app form). One without the other is not a file a monitor would
-       pass, so both are required here. */
+    /* The four screening columns. For a PI child a column is complete only when the
+       ASQ/ASE questionnaire is uploaded, the form is scored (filed as the summary PDF),
+       AND that summary is signed by both the parent and the staff member — see the PI
+       branch in state(). One upload (the ASQ/ASE) plus the signed scored summary; there
+       is no separate "test sheets" artefact. */
     var SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
     // The two report-card columns are complete on an uploaded scan alone.
     var REPORT_FIELDS = ['MidYearReport', 'EndYearReport'];
@@ -71,28 +72,6 @@
     }
     function isScreening(field) { return SCREENING_FIELDS.indexOf(field) !== -1; }
     function isReport(field) { return REPORT_FIELDS.indexOf(field) !== -1; }
-
-    /* The beginning-of-year screenings, where a PI child must have the parent's
-       uploaded questionnaire on file (not just a teacher-scored summary) for the column
-       to count. Program policy above the compliance floor; PFA/non-PI keep the scored
-       summary as sufficient. Kept as its own list so it is one line to change if the
-       end-of-year screenings are ever brought under the same rule. */
-    var QUESTIONNAIRE_REQUIRED_FIELDS = ['BegASQ', 'BegASE'];
-    function requiresQuestionnaire(field, isPI) {
-        return !!isPI && QUESTIONNAIRE_REQUIRED_FIELDS.indexOf(field) !== -1;
-    }
-
-    /* Original scored test sheets (the raw ASQ-3 / ASQ:SE-2 scoring sheets the summary
-       was built from). PI families must have these on file for ALL four screening
-       columns — beginning AND end — not just the scored summary. A summary with no test
-       sheets behind it is real progress but not done ('partial', shown yellow): the
-       monitor wants to see the original scores, not only our typed-up summary. PFA and
-       non-PI rooms keep the streamlined rule (summary alone completes it). One list so
-       the policy is one line to change. */
-    var TESTSHEET_REQUIRED_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
-    function requiresTestSheets(field, isPI) {
-        return !!isPI && TESTSHEET_REQUIRED_FIELDS.indexOf(field) !== -1;
-    }
 
     /* Reads the year's form records. The caller supplies its own fetch wrapper so
        this file carries no opinion about authentication. Failure is recorded, not
@@ -178,6 +157,40 @@
         return !!fileFor(studentId, field, kind);
     }
 
+    /* Captured signatures, keyed studentId -> field -> role ('parent'|'staff').
+       Loaded from /api/child-signatures (same year as forms/files). The screening
+       completion rule requires BOTH roles signed, so state() reads these. Failure is
+       swallowed like the others: a signature index that will not load must not blank
+       the roster — state() falls back to not-signed, which reads as not-yet-done
+       rather than falsely complete. */
+    var sigs = {};   // { studentId: { Field: { role: true } } }
+    function loadSignatures(year, fetcher) {
+        return fetcher('/api/child-signatures?year=' + encodeURIComponent(year))
+            .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function (d) {
+                sigs = {};
+                (d && d.signatures || []).forEach(function (s) {
+                    var id = String(s.StudentId);
+                    if (!sigs[id]) sigs[id] = {};
+                    if (!sigs[id][s.FormField]) sigs[id][s.FormField] = {};
+                    sigs[id][s.FormField][String(s.Role || '').toLowerCase()] = true;
+                });
+                return sigs;
+            })
+            .catch(function () { sigs = {}; return null; });
+    }
+    // Records a signature that just happened, so a cell updates without a reload.
+    function markSignature(studentId, field, role) {
+        var id = String(studentId);
+        if (!sigs[id]) sigs[id] = {};
+        if (!sigs[id][field]) sigs[id][field] = {};
+        sigs[id][field][String(role || '').toLowerCase()] = true;
+    }
+    function hasSignature(studentId, field, role) {
+        var rec = sigs[String(studentId)];
+        return !!(rec && rec[field] && rec[field][String(role || '').toLowerCase()]);
+    }
+
     /* The one question every view asks. `ticked` is the ISBETracking bit the
        caller already holds, passed in rather than fetched again here.
 
@@ -209,34 +222,31 @@
         if (loadState !== 'ready') return ticked ? 'unknown' : 'none';
 
         if (isScreening(field)) {
-            var scored = hasForm(studentId, field);
-            var quest = hasFile(studentId, field, 'questionnaire');
-            var sheets = hasFile(studentId, field, 'testsheet');
-            // Whatever the program's "summary" artefact is for this child: the typed-up
-            // scored summary, or (where a questionnaire is required) the questionnaire.
-            var summaryOnFile = requiresQuestionnaire(field, isPI) ? quest : (scored || quest);
+            var scored = hasForm(studentId, field);           // scores filed as the signed summary PDF
+            var quest = hasFile(studentId, field, 'questionnaire');  // the uploaded ASQ/ASE
+            var parentSig = hasSignature(studentId, field, 'parent');
+            var staffSig = hasSignature(studentId, field, 'staff');
 
-            /* PI children must ALSO have the original scored test sheets on file for the
-               screening columns — the raw ASQ-3 / ASQ:SE-2 sheets with the original
-               scores the summary was built from. A summary with no test sheets behind it
-               is 'partial' (yellow): progress, but a monitor still has nothing original
-               to check. Both present completes the column. */
-            if (requiresTestSheets(field, isPI)) {
-                if (summaryOnFile && sheets) return 'form';
-                if (summaryOnFile || scored) return 'partial';   // summary up, test sheets still needed
-                return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
+            /* PI rule (program policy, confirmed with the director): a screening column
+               is COMPLETE (green) only when all three are true —
+                 1. the ASQ/ASE questionnaire is uploaded,
+                 2. the form is scored, filed as the summary PDF (hasForm), and
+                 3. that summary is signed by BOTH the parent and the staff member.
+               The uploaded ASQ/ASE is the only upload; it IS the questionnaire, and the
+               signed scored form IS the summary — there is no separate "test sheets"
+               artefact any more. Anything with some-but-not-all of the three is 'partial'
+               (yellow): real progress, not yet a file a monitor would pass. */
+            if (isPI) {
+                if (quest && scored && parentSig && staffSig) return 'form';
+                if (quest || scored || parentSig || staffSig) return 'partial';
+                return ticked ? 'tick-only' : 'none';
             }
 
-            /* PI beginning screenings (where no test sheets rule applies, e.g. legacy)
-               still require the parent's completed questionnaire. Kept for completeness;
-               with test sheets required above this branch is reached only for non-PI. */
-            if (requiresQuestionnaire(field, isPI)) {
-                if (quest) return 'form';
-                if (scored) return 'partial';   // scored but questionnaire still needed
-                return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
-            }
+            /* PFA / non-PI rooms keep the streamlined rule: the scored summary (or an
+               uploaded questionnaire) completes it, and a bare tick counts as done since
+               a monitor reviews the physical folder, not the app, for these children. */
             if (scored || quest) return 'form';
-            return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
+            return ticked ? 'tick' : 'none';
         }
         if (isReport(field)) {
             if (hasFile(studentId, field, 'report')) return 'form';
@@ -310,6 +320,7 @@
     window.ChildForms = {
         load: load,
         loadFiles: loadFiles,
+        loadSignatures: loadSignatures,
         BACKED_FIELDS: BACKED_FIELDS,
         SCREENING_FIELDS: SCREENING_FIELDS,
         REPORT_FIELDS: REPORT_FIELDS,
@@ -320,8 +331,10 @@
         formDate: formDate,
         mark: mark,
         markFile: markFile,
+        markSignature: markSignature,
         hasFile: hasFile,
         fileFor: fileFor,
+        hasSignature: hasSignature,
         state: state,
         isDone: isDone,
         rollup: rollup,
@@ -332,6 +345,8 @@
         get all() { return forms; },
         _set: function (f, st) { forms = f || {}; loadState = st || 'ready'; },
         // Tests set the upload index directly, same as _set does for forms.
-        _setFiles: function (f) { files = f || {}; }
+        _setFiles: function (f) { files = f || {}; },
+        // Tests set the signature index directly, same shape loadSignatures builds.
+        _setSignatures: function (s) { sigs = s || {}; }
     };
 })();
