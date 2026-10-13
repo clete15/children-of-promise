@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ASQ-3 &amp; ASQ:SE-2 — Updated Scoring &amp; Signature Process</title>
+<style>
+    :root { --ink:#2b1e3d; --muted:#5b5570; --line:#d9d4e4; --accent:#4b2e83; --accent-soft:#efeafb; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+        font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+        color: var(--ink); line-height: 1.5; background: #f3f1f7;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .sheet {
+        max-width: 780px; margin: 24px auto; background: #fff; padding: 40px 48px 48px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.10); border-radius: 10px;
+    }
+    header { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid var(--accent); padding-bottom: 16px; }
+    header img { width: 86px; height: auto; flex-shrink: 0; }
+    header .ht h1 { margin: 0; font-size: 1.5rem; color: var(--accent); letter-spacing: -0.01em; }
+    header .ht .sub { margin: 3px 0 0; font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+    header .ht .center { margin: 2px 0 0; font-size: 0.82rem; color: var(--muted); }
+
+    .callout {
+        margin: 22px 0; padding: 14px 18px; background: var(--accent-soft); border: 1px solid #cbbdf0;
+        border-left: 5px solid var(--accent); border-radius: 6px; color: var(--ink); font-size: 0.95rem;
+    }
+    .callout strong { color: var(--accent); }
+
+    /* Steps, image-forward: each step is a numbered heading + its screenshot. */
+    .step { margin: 24px 0 6px; page-break-inside: avoid; }
+    .step-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .step-num {
+        width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: #fff;
+        font-weight: 800; font-size: 1.05rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .step-title { font-weight: 700; font-size: 1.02rem; }
+    .step-title .who { display:inline-block;font-size:0.64rem;font-weight:800;text-transform:uppercase;
+        letter-spacing:0.05em;padding:2px 8px;border-radius:999px;margin-left:8px;vertical-align:middle; }
+    .who.parent { background:#e7f0ff;color:#1d4ed8; }
+    .who.teacher { background:#e8f6ec;color:#15803d; }
+    .step figure { margin: 0; }
+    .step img {
+        display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+    }
+    .step figcaption { font-size: 0.84rem; color: var(--muted); margin-top: 6px; }
+    .no-img { font-size:0.82rem;color:var(--muted);background:#f6f4fa;border:1px dashed var(--line);border-radius:6px;
+        padding:10px 12px; } /* shows only if an image file is missing */
+
+    footer { margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--muted); }
+    .noprint { text-align: center; margin: 18px; }
+    .noprint button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
+        padding: 10px 22px; border-radius: 8px; cursor: pointer; }
+
+    @media print {
+        body { background: #fff; }
+        .sheet { box-shadow: none; margin: 0; max-width: none; border-radius: 0; padding: 0 8mm; }
+        .noprint { display: none; }
+        @page { margin: 12mm; }
+    }
+</style>
+</head>
+<body>
+
+<div class="noprint"><button onclick="window.print()">🖨 Print this sheet</button></div>
+
+<div class="sheet">
+    <header>
+        <img src="../Internal/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool">
+        <div class="ht">
+            <h1>ASQ-3 &amp; ASQ:SE-2 — Updated Process</h1>
+            <p class="sub">Scoring &amp; signatures for Prevention Initiative (PI) children</p>
+            <p class="center">Children of Promise Christian Dayschool · Millstadt, IL</p>
+        </div>
+    </header>
+
+    <div class="callout">
+        <strong>What's changing:</strong> Parents still fill out the ASQ-3 / ASQ:SE-2 <strong>questionnaire</strong>.
+        Going forward, <strong>do not send the summary page home for the parent to score</strong> — the
+        <strong>teacher</strong> enters the summary scoring in our system. We also need signatures on
+        <strong>every PI child's</strong> forms on the Lenovo IdeaTab, even if the family already signed.
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step">
+        <div class="step-head">
+            <div class="step-num">1</div>
+            <div class="step-title">Parent completes the questionnaire <span class="who parent">Parent</span></div>
+        </div>
+        <p style="margin:0 0 4px;color:var(--muted);font-size:0.9rem;">The family fills out the age-appropriate ASQ-3 / ASQ:SE-2 questionnaire — the same as always.</p>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+        <div class="step-head">
+            <div class="step-num">2</div>
+            <div class="step-title">Teacher uploads the parent's form <span class="who teacher">Teacher</span></div>
+        </div>
+        <figure>
+            <img src="../Internal/pictures/asq-step-upload.png" alt="Upload the ASQ / ASE — Choose File, then Upload ASQ / ASE"
+                 onerror="this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the UPLOAD screenshot as Internal/pictures/asq-step-upload.png ]&lt;/div&gt;'">
+            <figcaption>In the child's card, use <b>Beg ASQ / Beg ASE</b>, then <b>Upload ASQ / ASE</b> (PDF or clear photo). Required for a PI child.</figcaption>
+        </figure>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step">
+        <div class="step-head">
+            <div class="step-num">3</div>
+            <div class="step-title">Teacher scores the summary in the system <span class="who teacher">Teacher</span></div>
+        </div>
+        <figure>
+            <img src="../Internal/pictures/asq-step-scoring.png" alt="ASQ-3 Score Entry — area scores and statuses"
+                 onerror="this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the SCORING screenshot as Internal/pictures/asq-step-scoring.png ]&lt;/div&gt;'">
+            <figcaption>Enter each area score and status, the date, interval, and any notes/referral. <b>The teacher scores the summary — not the parent.</b></figcaption>
+        </figure>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step">
+        <div class="step-head">
+            <div class="step-num">4</div>
+            <div class="step-title">Teacher collects the parent's signature on the IdeaTab <span class="who teacher">Teacher</span></div>
+        </div>
+        <figure>
+            <img src="../Internal/pictures/asq-step-signatures.png" alt="Signatures — Parent/Guardian and Staff signature pads"
+                 onerror="this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the SIGNATURES screenshot as Internal/pictures/asq-step-signatures.png ]&lt;/div&gt;'">
+            <figcaption>Hand the Lenovo IdeaTab to the parent to sign the scored summary, then add the staff signature. Do this for <b>every PI child</b>, even if they already signed the paper document.</figcaption>
+        </figure>
+    </div>
+
+    <footer>
+        A PI child's ASQ / ASE is complete (green) only when the questionnaire is uploaded, the scores are entered,
+        and the summary is signed by both parent and staff. A teacher-administered summary is compliant for
+        PICC/monitoring (PI10). If any older ASQ handout still says the parent scores the summary, update or retire it
+        so our materials match this process.
+    </footer>
+</div>
+
+</body>
+</html>
