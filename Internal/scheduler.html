@@ -230,10 +230,19 @@ const BUCKETS = [
     { label: 'Preschool',   rooms: [6] },
     { label: 'Afterschool', rooms: [8] },
 ];
+// A standalone group for people who run the centre rather than a room. Appended after
+// the classroom buckets. Director has no room, so staff land here by DIRECTOR_NAMES
+// (first name) rather than by RoomNumber.
+const DIRECTOR_LABEL = 'Director';
+const DIRECTOR_NAMES = ['megan'];
 const GROUP_OVERRIDE = {
     // bucket -> { into: targetBucket, note: shown beside the group header }
     '2s': { into: 'Preschool', note: '2s room folded into Preschool while Janelle is on leave' }
 };
+/* Staff hidden from the scheduler ONLY (their records are untouched) — matched by first
+   name, case-insensitive. Janelle is out on injury leave; Sara and Pamela are not on
+   the weekly chart right now. Remove a name here to bring that person back. */
+const HIDE_FROM_SCHEDULE = ['janell', 'janelle', 'sara', 'pamela'];
 
 /* The paper schedule, by lowercase first name, for the "Fill from paper schedule"
    button. Monday was NO SCHOOL that week, so Monday shifts are omitted where the paper
@@ -267,11 +276,14 @@ function esc(v) {
 }
 
 /* ── Time options ──────────────────────────────────────────────────────────────
-   Every 15 minutes from 6:00 AM to 7:00 PM. Each option's VALUE is minutes-since-
+   Every 15 minutes from 5:30 AM to 8:00 PM. Each option's VALUE is minutes-since-
    midnight (stable, easy to compare); its LABEL is a tidy 12-hour time ("6:15a",
-   "4:15p"). A daycare day lives inside this window, so it keeps the lists short. */
-const TIME_MIN = 6 * 60;      // 6:00 AM
-const TIME_MAX = 19 * 60;     // 7:00 PM
+   "4:15p"). A daycare day lives inside this window; the floor is 5:30a and the cap
+   8:00p so an early open or a late-afternoon start (e.g. a 4:00p shift) still has a
+   matching option — a selected time outside the list rendered as a blank picker,
+   which is the bug that dropped Sue's 4:00p Friday start. */
+const TIME_MIN = 5 * 60 + 30;  // 5:30 AM
+const TIME_MAX = 20 * 60;      // 8:00 PM
 const TIME_STEP = 15;
 function timeLabel(mins) {
     let h = Math.floor(mins / 60), m = mins % 60;
@@ -288,11 +300,13 @@ function timeOptionsHtml(selectedMins) {
 }
 
 /* ── Parse / format the compact "start-end" shift text ───────────────────────────
-   The paper writes 12-hour times without am/pm, relying on daycare convention: a
-   start is in the morning, an end is in the afternoon/evening. So a bare hour 1..6 on
-   the END is PM (4:15 -> 16:15), and 7..11 is AM-ish only if it is before the start —
-   in practice ends are always PM here. Starts: 6..11 are AM, 12 is noon, 1..5 would be
-   PM (rare). We convert each side to minutes-since-midnight for the pickers. */
+   The paper writes 12-hour times without am/pm, relying on daycare convention. We
+   convert each side to minutes-since-midnight for the pickers:
+     END   — hours 1..6 are afternoon (4:30 -> 16:30); 7..11 stay AM.
+     START — hours 6..11 are morning, 12 is noon, and 1..5 are AFTERNOON (a late
+             start like Sue's 4:00p close shift). Previously a bare start of 1..5 was
+             left as AM, which put 4:00 at 4:00 AM — outside the picker window, so it
+             rendered blank. Treating a low start as PM fixes that. */
 function toMinutes(part, isEnd) {
     const m = String(part || '').trim().match(/^(\d{1,2}):(\d{2})\s*(a|p|am|pm)?$/i);
     if (!m) return null;
@@ -301,9 +315,10 @@ function toMinutes(part, isEnd) {
     if (ap === 'p') { if (h !== 12) h += 12; }
     else if (ap === 'a') { if (h === 12) h = 0; }
     else {
-        // No am/pm: infer. End times of 1..6 are afternoon; a start of 1..5 is too, but
-        // starts here are 6:00+ in the morning, so only bump the END into the afternoon.
-        if (isEnd && h >= 1 && h <= 6) h += 12;
+        // No am/pm: infer from daycare convention. Both a start of 1..5 and an end of
+        // 1..6 are in the afternoon; a start/end of 6+ is already morning/as-written.
+        if (isEnd) { if (h >= 1 && h <= 6) h += 12; }
+        else { if (h >= 1 && h <= 5) h += 12; }
     }
     return h * 60 + min;
 }
@@ -363,6 +378,32 @@ async function loadStaff() {
         }
     } catch (e) { staff = []; }
 }
+// The real room names from the database, keyed by RoomNumber, so each classroom
+// section is headed by its actual name (e.g. "Pre-School", "Infants / Toddlers")
+// rather than an invented label.
+let roomName = {};   // RoomNumber(int) -> Room (string)
+async function loadRooms() {
+    try {
+        const res = await apiFetch('/api/classrooms');
+        if (res.ok) {
+            const data = await res.json();
+            (Array.isArray(data) ? data : []).forEach(r => {
+                const n = parseInt(r.RoomNumber, 10);
+                if (!isNaN(n)) roomName[n] = String(r.Room || '').trim();
+            });
+        }
+    } catch (e) { /* fall back to the bucket label if room names didn't load */ }
+}
+/* The heading for a bucket, built from the DB room names it contains. Infants ->
+   "Infant · Infants / Toddlers". Falls back to the bucket's own label if the room
+   names didn't load. */
+function bucketLabel(bucket) {
+    const names = (bucket.rooms || [])
+        .map(n => roomName[n])
+        .filter(Boolean);
+    return names.length ? names.join(' · ') : bucket.label;
+}
+function bucketByLabel(label) { return BUCKETS.find(b => b.label === label); }
 async function loadWeek() {
     schedule = {}; noSchoolDays = new Set();
     try {
@@ -380,16 +421,24 @@ async function loadWeek() {
 }
 
 // ── Grouping ────────────────────────────────────────────────────────────────────
+function firstName(s) { return String(s.Name || '').trim().split(/\s+/)[0].toLowerCase(); }
+function isHidden(s) { return HIDE_FROM_SCHEDULE.indexOf(firstName(s)) !== -1; }
 function rawBucketOf(s) {
+    // Directors run the centre, not a room, so they go to the Director group by name
+    // regardless of (missing) RoomNumber.
+    if (DIRECTOR_NAMES.indexOf(firstName(s)) !== -1) return DIRECTOR_LABEL;
     const rn = parseInt(s.RoomNumber, 10);
     const b = BUCKETS.find(x => x.rooms.indexOf(rn) !== -1);
     return b ? b.label : 'Unassigned';
 }
 function groupedStaff() {
-    const order = BUCKETS.map(b => b.label).concat(['Unassigned']);
+    // Director sits after the classrooms; Unassigned (anyone with no room and not a
+    // director) sits last.
+    const order = BUCKETS.map(b => b.label).concat([DIRECTOR_LABEL, 'Unassigned']);
     const notes = {};
     const groups = {};
     staff.forEach(s => {
+        if (isHidden(s)) return;                           // scheduler-only hide (record untouched)
         let b = rawBucketOf(s);
         const ov = GROUP_OVERRIDE[b];
         if (ov) { notes[ov.into] = ov.note; b = ov.into; }
@@ -400,9 +449,29 @@ function groupedStaff() {
         .filter(label => groups[label] && groups[label].length)
         .map(label => ({
             label: label,
+            display: sectionDisplayName(label),
             note: notes[label] || '',
             people: groups[label].sort((a, b) => String(a.Name).localeCompare(String(b.Name)))
         }));
+}
+
+/* The heading text shown for a section. Classroom buckets use their real DB room
+   name(s); the Director and Unassigned groups keep their plain labels. When a bucket
+   has been folded into another (2s -> Preschool), the target section's heading lists
+   both its own and the folded-in rooms' real names, so it reads as the real rooms it
+   now covers. */
+function sectionDisplayName(label) {
+    if (label === DIRECTOR_LABEL || label === 'Unassigned') return label;
+    const own = bucketByLabel(label);
+    let names = own ? [bucketLabel(own)] : [label];
+    // Append the real names of any bucket folded INTO this one.
+    Object.keys(GROUP_OVERRIDE).forEach(src => {
+        if (GROUP_OVERRIDE[src].into === label) {
+            const srcB = bucketByLabel(src);
+            if (srcB) names.push(bucketLabel(srcB));
+        }
+    });
+    return names.join(' · ');
 }
 
 // ── Render ──────────────────────────────────────────────────────────────────────
@@ -451,7 +520,7 @@ function renderBody() {
     if (!groups.length) { tbody.innerHTML = '<tr><td class="sch-empty" colspan="7">No staff to schedule.</td></tr>'; return; }
     let html = '';
     groups.forEach(g => {
-        html += '<tr class="grouprow"><td colspan="7"><span class="g-name">' + esc(g.label) + '</span>'
+        html += '<tr class="grouprow"><td colspan="7"><span class="g-name">' + esc(g.display || g.label) + '</span>'
             + (g.note ? '<span class="g-note">· ' + esc(g.note) + '</span>' : '') + '</td></tr>';
         g.people.forEach(s => {
             const id = String(s.Id);
@@ -608,7 +677,7 @@ async function goThisWeek() {
 
 async function init() {
     weekStart = mondayOf(new Date());
-    await loadStaff();
+    await Promise.all([loadStaff(), loadRooms()]);
     await loadWeek();
     render();
 }
