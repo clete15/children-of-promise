@@ -1160,6 +1160,23 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff'
 GO
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='LastLoginDate')
     ALTER TABLE Staff ADD LastLoginDate NVARCHAR(30);
+GO
+/* The ID-based link to the person's PRIMARY classroom: Staff.RoomNumber ->
+   dimClassrooms.RoomNumber. This REPLACES matching on the Classroom NAME, so a
+   room can be renamed in one place (dimClassrooms.Room) and every page follows.
+   Classroom (text) is kept as a human-readable mirror the server refreshes from
+   dimClassrooms whenever the link or the room name changes — it is no longer the
+   source of truth, just a label. Nullable: a Director with no room is NULL.
+   Existing rows are backfilled once by Internal/migrate_staff_roomnumber.sql
+   (reviewed against production); this ALTER only guarantees the column exists. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='RoomNumber')
+    ALTER TABLE Staff ADD RoomNumber INT NULL;
+GO
+/* The SECONDARY (part-time) room link, mirror of SecondaryClassroom, same design as
+   RoomNumber above. Teacher 2 of a room in the staffing chart is that room as a
+   person's secondary. */
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='SecondaryRoomNumber')
+    ALTER TABLE Staff ADD SecondaryRoomNumber INT NULL;
 `;
 }
 
@@ -1174,8 +1191,43 @@ const STAFF_COLUMNS = [
     ['SemesterHoursTotal', 'semesterHoursTotal'], ['SemesterHoursEce', 'semesterHoursEce'],
     ['TranscriptOnFile', 'transcriptOnFile'], ['PdHoursYtd', 'pdHoursYtd'],
     ['PdHoursYear', 'pdHoursYear'], ['PdContentAreas', 'pdContentAreas'],
-    ['PdCourses', 'pdCourses']
+    ['PdCourses', 'pdCourses'],
+    /* The ID-based primary-room link. It is an INT, not text, so the shared value
+       builder (which quotes everything via esc) is NOT used for it — the staff
+       INSERT/UPDATE handlers emit it as a bare integer (or NULL) and DERIVE the
+       Classroom name mirror from dimClassrooms, so Classroom is never authored by a
+       client and can never drift from the room's real name. It is listed here only
+       so GET /api/staff returns it to the pages. */
+    ['RoomNumber', 'roomNumber'],
+    /* The SECONDARY (part-time) room link, same ID-based design as the primary:
+       SecondaryRoomNumber is the link, SecondaryClassroom its derived text mirror. In
+       the Classrooms & Staffing chart, Teacher 1 of a room = that person's primary
+       (RoomNumber), Teacher 2 = their secondary (SecondaryRoomNumber). */
+    ['SecondaryRoomNumber', 'secondaryRoomNumber']
 ];
+
+/* The two room links and the text column each mirrors, so the staff INSERT/UPDATE
+   can treat primary and secondary identically. payloadKey is what the client sends. */
+const STAFF_ROOM_LINKS = [
+    { payloadKey: 'roomNumber',          linkCol: 'RoomNumber',          mirrorCol: 'Classroom' },
+    { payloadKey: 'secondaryRoomNumber', linkCol: 'SecondaryRoomNumber', mirrorCol: 'SecondaryClassroom' }
+];
+// The text mirror columns, which the generic esc() value builder must NOT author.
+const STAFF_ROOM_MIRROR_KEYS = new Set(['classroom', 'secondaryClassroom']);
+const STAFF_ROOM_LINK_KEYS = new Set(STAFF_ROOM_LINKS.map(l => l.payloadKey));
+
+/* SQL `col=...` fragments that set a room link and its text mirror together, so the
+   mirror always equals the room's current name and can never be authored by a client.
+   Empty/!number clears both (a person with no room in that slot). Interpolated with a
+   parsed int, so nothing a client sends reaches SQL unescaped. */
+function staffRoomSetSql(roomNumberRaw, link) {
+    const rn = parseInt(roomNumberRaw, 10);
+    if (isNaN(rn)) return [`${link.linkCol}=NULL`, `${link.mirrorCol}=NULL`];
+    return [
+        `${link.linkCol}=${rn}`,
+        `${link.mirrorCol}=(SELECT Room FROM dimClassrooms WHERE RoomNumber=${rn})`
+    ];
+}
 
 /* What a staff member may change on their OWN record. Everything else on the card
    stays with the director.
@@ -1462,40 +1514,60 @@ function staffFileLinkFor(links, rel) {
 
    Safe to delete this constant once the table is populated in production. */
 const STAFF_SEED = [
-    { name: 'Keyona Hentz', role: 'Teacher', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: "Bachelor's", eceCredentials: 'ECE Level 5, IT Level 4, Director Level I', gateways: 'ECE Credential - Level 5', experienceYears: '9.5', registryId: 'N285894', notes: "Holds a Director Level I credential and serves as PFA Director for the grant, but her role here is Teacher. Bachelor's ECE (Univ of Arizona Global, 2020). Associate's ECE (SWIC, 2016). Prior: Toddle Town Inc IT (5/2015-5/2018, 6,240 hrs) + Preschool (3/2020-5/2022, 4,160 hrs), Belleville PS Dist 118 IT (08/22-08/24, 2,340 hrs). Current: CofP since 2/2024 - PFA Teacher + Director (teaching 520 hrs + admin 2,050 hrs thru 03/2025, continuing). Total ~9.5 yrs as of 08/2026." },
-    { name: 'Madeline Muir', role: 'Assistant Teacher', program: 'PFA', classroom: 'Pre-School', fte: '1.0', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '3.5', registryId: 'N559187', notes: 'HS Diploma (Waterloo HS, 2012). ECE Level 1 (2/20/2025). Prior: Together We Grow - Asst Teacher Infant room (01/2023-05/2023, 4,160 hrs). Current: CofP since 01/2024.' },
-    { name: 'Lindsey Runyon', role: 'Teacher', program: 'INCCRA', classroom: 'Toddlers', fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '14', registryId: 'N171961', notes: "Associate's ECC (SWIC, 2011). At CofP since 4/2/2012. Moved from Pre-School 2 to the Toddler room for 2026-2027. 40hrs/wk. Pending: ECE & IT (Missing Documents)." },
-    { name: 'Tara Goldsmith', role: 'Teacher', program: 'PI', classroom: 'Infant', fte: '1.0', education: 'High School/GED', eceCredentials: 'ECE Level 1, CDA', gateways: 'ECE Credential - Level 1', experienceYears: '14', registryId: 'N230823', notes: 'HS Diploma (Belleville West, 2004). At CofP since 10/15/2012. 40hrs/wk x 12+ yrs = 24,900+ hrs. Now the Infant Room Teacher (no longer floating). Holds a CDA. Pending: Director, ECE, IT.' },
-    { name: 'Paige Turner', role: 'Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: 'High School/GED', eceCredentials: '', gateways: '', experienceYears: '10', registryId: 'N452129', notes: 'HS Diploma (Litchfield Senior HS, 2013). At CofP since 1/2016 as Infant/Toddler Teacher. 32hrs/wk x 8+ yrs = 13,312+ hrs. Verified by Megan Nooney 12/16/2024. No Gateways credential yet.' },
-    { name: 'Janell Poenitske', role: 'Teacher', program: 'PI', classroom: '2 & 3 Year Olds', fte: '1.0', education: 'Some College', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '12', registryId: 'N147146', notes: "Teacher in the 2 & 3 Year Olds room (formerly Pre-School 2) for 2026-2027. Pursuing a Director credential, but her role here is Teacher. HS Diploma (Providence HS, 1994). Coursework: Bachelor's Music (SIUE). Prior: Together We Grow (9/2023, 1,040 hrs), Magic Building Blocks (9/09-12/2010, 4,640 hrs), First Baptist/Early Years (10/2015-2/2023, 15,184 hrs). Current: CofP since 6/3/2024. Pending: Director, IT, ECE." },
-    { name: 'Sue Engel', role: 'Teacher', program: 'PI', classroom: 'Infant/Toddler', fte: '.75', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '37', registryId: 'N278509', notes: 'HS Diploma (Belleville West, 1982). At CofP since 5/1988. 30hrs/wk x 36+ yrs = 56,160+ total hrs. Preschool/Toddler - care, feed, daily activities. Pending: ECE & IT.' },
-    { name: 'Renee Nier', role: 'Assistant Teacher', program: 'PI', classroom: 'Toddlers / 2 Year Olds', fte: '1.0', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Sole staff member in the Toddlers / 2 Year Olds room as of 2026-2027. Not in Gateways report as of 2/24/2025 — qualifications still need gathering.' },
-    /* Classroom is deliberately blank: Megan is Director only as of 2026-2027,
-       with no assigned room. That keeps her off the teaching staff worksheets —
-       her qualifications belong on the Administrator Qualifications worksheet. */
-    { name: 'Megan Nooney', role: 'Director', program: 'PI', classroom: '', fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1, Gold IT2, Autism 101', gateways: 'ECE Credential - Level 1', experienceYears: '17.5', registryId: 'N179660', notes: "Director only as of 2026-2027, no assigned classroom. Associate's ECE (SWIC, 2012). At CofP since 01/2009. Prior teaching: 40hrs/wk x 15+ yrs = 31,200+ hrs - lead teacher preschool, curriculum, schedules. Admin: Director since 01/2009 - staff, files, admin, filling classrooms. Pending: IT, ECE, Director (Awaiting Work Exp). Gold IT2 (1/2024)." },
+    { name: 'Keyona Hentz', role: 'Teacher', program: 'PFA', roomNumber: 6, fte: '1.0', education: "Bachelor's", eceCredentials: 'ECE Level 5, IT Level 4, Director Level I', gateways: 'ECE Credential - Level 5', experienceYears: '9.5', registryId: 'N285894', notes: "Holds a Director Level I credential and serves as PFA Director for the grant, but her role here is Teacher. Bachelor's ECE (Univ of Arizona Global, 2020). Associate's ECE (SWIC, 2016). Prior: Toddle Town Inc IT (5/2015-5/2018, 6,240 hrs) + Preschool (3/2020-5/2022, 4,160 hrs), Belleville PS Dist 118 IT (08/22-08/24, 2,340 hrs). Current: CofP since 2/2024 - PFA Teacher + Director (teaching 520 hrs + admin 2,050 hrs thru 03/2025, continuing). Total ~9.5 yrs as of 08/2026." },
+    { name: 'Madeline Muir', role: 'Assistant Teacher', program: 'PFA', roomNumber: 6, fte: '1.0', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '3.5', registryId: 'N559187', notes: 'HS Diploma (Waterloo HS, 2012). ECE Level 1 (2/20/2025). Prior: Together We Grow - Asst Teacher Infant room (01/2023-05/2023, 4,160 hrs). Current: CofP since 01/2024.' },
+    { name: 'Lindsey Runyon', role: 'Teacher', program: 'INCCRA', roomNumber: 3, fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '14', registryId: 'N171961', notes: "Associate's ECC (SWIC, 2011). At CofP since 4/2/2012. Moved from Pre-School 2 to the Toddler room for 2026-2027. 40hrs/wk. Pending: ECE & IT (Missing Documents)." },
+    { name: 'Tara Goldsmith', role: 'Teacher', program: 'PI', roomNumber: 1, fte: '1.0', education: 'High School/GED', eceCredentials: 'ECE Level 1, CDA', gateways: 'ECE Credential - Level 1', experienceYears: '14', registryId: 'N230823', notes: 'HS Diploma (Belleville West, 2004). At CofP since 10/15/2012. 40hrs/wk x 12+ yrs = 24,900+ hrs. Now the Infant Room Teacher (no longer floating). Holds a CDA. Pending: Director, ECE, IT.' },
+    { name: 'Paige Turner', role: 'Teacher', program: 'PI', roomNumber: 2, fte: '.75', education: 'High School/GED', eceCredentials: '', gateways: '', experienceYears: '10', registryId: 'N452129', notes: 'HS Diploma (Litchfield Senior HS, 2013). At CofP since 1/2016 as Infant/Toddler Teacher. 32hrs/wk x 8+ yrs = 13,312+ hrs. Verified by Megan Nooney 12/16/2024. No Gateways credential yet.' },
+    { name: 'Janell Poenitske', role: 'Teacher', program: 'PI', roomNumber: 7, fte: '1.0', education: 'Some College', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '12', registryId: 'N147146', notes: "Teacher in the 2 & 3 Year Olds room (formerly Pre-School 2) for 2026-2027. Pursuing a Director credential, but her role here is Teacher. HS Diploma (Providence HS, 1994). Coursework: Bachelor's Music (SIUE). Prior: Together We Grow (9/2023, 1,040 hrs), Magic Building Blocks (9/09-12/2010, 4,640 hrs), First Baptist/Early Years (10/2015-2/2023, 15,184 hrs). Current: CofP since 6/3/2024. Pending: Director, IT, ECE." },
+    { name: 'Sue Engel', role: 'Teacher', program: 'PI', roomNumber: 2, fte: '.75', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '37', registryId: 'N278509', notes: 'HS Diploma (Belleville West, 1982). At CofP since 5/1988. 30hrs/wk x 36+ yrs = 56,160+ total hrs. Preschool/Toddler - care, feed, daily activities. Pending: ECE & IT.' },
+    { name: 'Renee Nier', role: 'Assistant Teacher', program: 'PI', roomNumber: 4, fte: '1.0', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Sole staff member in the Toddlers / 2 Year Olds room as of 2026-2027. Not in Gateways report as of 2/24/2025 — qualifications still need gathering.' },
+    /* No roomNumber on purpose: Megan is Director only as of 2026-2027, with no
+       assigned room, so both RoomNumber and the Classroom mirror seed as NULL. That
+       keeps her off the teaching staff worksheets — her qualifications belong on the
+       Administrator Qualifications worksheet. */
+    { name: 'Megan Nooney', role: 'Director', program: 'PI', fte: '1.0', education: "Associate's", eceCredentials: 'ECE Level 1, Gold IT2, Autism 101', gateways: 'ECE Credential - Level 1', experienceYears: '17.5', registryId: 'N179660', notes: "Director only as of 2026-2027, no assigned classroom. Associate's ECE (SWIC, 2012). At CofP since 01/2009. Prior teaching: 40hrs/wk x 15+ yrs = 31,200+ hrs - lead teacher preschool, curriculum, schedules. Admin: Director since 01/2009 - staff, files, admin, filling classrooms. Pending: IT, ECE, Director (Awaiting Work Exp). Gold IT2 (1/2024)." },
     /* eceCredentials is the bare token 'CDA' on purpose. The card editor matches
        /^CDA$/ to tick its checkbox, so "CDA (Infant/Toddler)" would fall through to
        the free-text "other credentials" box and the checkbox would read as unticked.
        The setting is recorded in the notes instead, which is where the other
        credential detail lives. Gateways stays blank: the CDA is not a Gateways
        credential and hers has not come through yet. */
-    { name: 'Molly Ellis', role: 'Teacher', program: 'PI', classroom: '2 Year Olds', fte: '', education: '', eceCredentials: 'CDA', gateways: '', experienceYears: '', registryId: '', notes: 'New teacher for 2026-2027, took over the 2 Year Olds room from Janell Poenitske. Holds an Infant/Toddler CDA — the setting covers birth to 36 months, which includes the 2 Year Olds room she is in. Gateways submission still pending, so no ECE or IT level yet. Still needed: education level, semester hours, prior experience, Registry ID and start date.' },
+    { name: 'Molly Ellis', role: 'Teacher', program: 'PI', roomNumber: 5, fte: '', education: '', eceCredentials: 'CDA', gateways: '', experienceYears: '', registryId: '', notes: 'New teacher for 2026-2027, took over the 2 Year Olds room from Janell Poenitske. Holds an Infant/Toddler CDA — the setting covers birth to 36 months, which includes the 2 Year Olds room she is in. Gateways submission still pending, so no ECE or IT level yet. Still needed: education level, semester hours, prior experience, Registry ID and start date.' },
     /* Ownership group. Taken from the Gateways Staff Education and Credentials
        report of 9/6/2026, which is the source of truth for names, degrees and
        credential levels. Grouped separately from classroom staff because the
        ExceleRate credential thresholds are proportions of teaching staff. */
-    { name: 'Pamela Holliday', role: 'Director', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: "Master's", eceCredentials: 'ECE Level 5', gateways: 'ECE Credential - Level 5', experienceYears: '21', registryId: 'N52689', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Director/Early Childhood Teacher, position code 16 Director/Administrator (multi site), serves School-Age, at CofP since 1/3/2005. HS (Collinsville 1967), Bachelor\u2019s Special Education (SIU Carbondale 1971), Master\u2019s Special Education (SIUE 1976). ECE Level 1 (9/13/2017), ECE Level 5 (3/25/2025). Pending: Illinois Director Credential (Awaiting Work Experience).' },
-    { name: 'Clete Holliday', role: 'Administrator', program: 'n/a', classroom: '', fte: '', education: "Bachelor's", eceCredentials: '', gateways: '', experienceYears: '', registryId: 'N297190', staffGroup: 'Ownership', notes: 'Ownership group, no classroom assignment. Gateways 9/6/2026: Manager LLC, position code 1 Director/Administrator (one site), age served Not Applicable, since 1/1/2025. Associate\u2019s and Bachelor\u2019s Electrical Engineering. No Gateways credentials. REGISTRY MEMBERSHIP EXPIRED \u2014 needs renewal.' },
-    { name: 'Jeremy Holliday', role: 'Assistant Teacher', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '11', registryId: 'N279427', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Assistant Child Care Worker, position code 5 Assistant Teacher, serves Preschool, at CofP since 1/5/2015. HS (Belleville West 2001). ECE Level 1 (10/13/2017).' },
-    { name: 'Sara Holliday', role: 'Teacher', program: 'n/a', classroom: 'Before and Afterschool', fte: '', education: 'Some College', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '26', registryId: 'N236163', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Early Childhood Teacher, position code 4 Teacher, serves Infants and Preschool, at CofP since 5/1/2000 (position since 5/1/2008). HS (Belleville West 2000), coursework toward Associate\u2019s and Bachelor\u2019s (no degree awarded). ECE Level 1 (12/4/2017). Pending: ECE Credential and Infant Toddler Credential (both Awaiting Additional Coursework).' },
-    { name: 'New Teacher', role: 'TBD', program: 'n/a', classroom: 'TBD', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Placeholder for new hire' }
+    { name: 'Pamela Holliday', role: 'Director', program: 'n/a', roomNumber: 8, fte: '', education: "Master's", eceCredentials: 'ECE Level 5', gateways: 'ECE Credential - Level 5', experienceYears: '21', registryId: 'N52689', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Director/Early Childhood Teacher, position code 16 Director/Administrator (multi site), serves School-Age, at CofP since 1/3/2005. HS (Collinsville 1967), Bachelor\u2019s Special Education (SIU Carbondale 1971), Master\u2019s Special Education (SIUE 1976). ECE Level 1 (9/13/2017), ECE Level 5 (3/25/2025). Pending: Illinois Director Credential (Awaiting Work Experience).' },
+    { name: 'Clete Holliday', role: 'Administrator', program: 'n/a', fte: '', education: "Bachelor's", eceCredentials: '', gateways: '', experienceYears: '', registryId: 'N297190', staffGroup: 'Ownership', notes: 'Ownership group, no classroom assignment. Gateways 9/6/2026: Manager LLC, position code 1 Director/Administrator (one site), age served Not Applicable, since 1/1/2025. Associate\u2019s and Bachelor\u2019s Electrical Engineering. No Gateways credentials. REGISTRY MEMBERSHIP EXPIRED \u2014 needs renewal.' },
+    { name: 'Jeremy Holliday', role: 'Assistant Teacher', program: 'n/a', roomNumber: 8, fte: '', education: 'High School/GED', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '11', registryId: 'N279427', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Assistant Child Care Worker, position code 5 Assistant Teacher, serves Preschool, at CofP since 1/5/2015. HS (Belleville West 2001). ECE Level 1 (10/13/2017).' },
+    { name: 'Sara Holliday', role: 'Teacher', program: 'n/a', roomNumber: 8, fte: '', education: 'Some College', eceCredentials: 'ECE Level 1', gateways: 'ECE Credential - Level 1', experienceYears: '26', registryId: 'N236163', staffGroup: 'Ownership', notes: 'Ownership group. Gateways 9/6/2026: Early Childhood Teacher, position code 4 Teacher, serves Infants and Preschool, at CofP since 5/1/2000 (position since 5/1/2008). HS (Belleville West 2000), coursework toward Associate\u2019s and Bachelor\u2019s (no degree awarded). ECE Level 1 (12/4/2017). Pending: ECE Credential and Infant Toddler Credential (both Awaiting Additional Coursework).' },
+    { name: 'New Teacher', role: 'TBD', program: 'n/a', fte: '', education: '', eceCredentials: '', gateways: '', experienceYears: '', registryId: '', notes: 'Placeholder for new hire' }
 ];
 
 function staffSeedSQL() {
-    const cols = STAFF_COLUMNS.map(([c]) => c).join(',');
-    const rows = STAFF_SEED.map(s =>
-        '(' + STAFF_COLUMNS.map(([, key]) => esc(s[key])).join(',') + ')').join(',\n        ');
+    /* The seed links each teacher to a room by ID (roomNumber), never by name — the
+       same rule the live editors follow. RoomNumber is emitted as a bare int, and
+       Classroom (the text mirror) is DERIVED per row from dimClassrooms so a fresh
+       database is ID-based and self-consistent from the first row. A seed entry with
+       no roomNumber (a Director with no room, or the "New Teacher" placeholder) gets
+       NULL for both. All other columns go through the quoted esc() builder. */
+    const colList = STAFF_COLUMNS
+        .filter(([, key]) => !STAFF_ROOM_LINK_KEYS.has(key) && !STAFF_ROOM_MIRROR_KEYS.has(key));
+    const roomCols = STAFF_ROOM_LINKS.flatMap(l => [l.linkCol, l.mirrorCol]);
+    const cols = colList.map(([c]) => c).concat(roomCols).join(',');
+    const rows = STAFF_SEED.map(s => {
+        const vals = colList.map(([, key]) => esc(s[key]));
+        STAFF_ROOM_LINKS.forEach(link => {
+            const rn = parseInt(s[link.payloadKey], 10);
+            if (isNaN(rn)) {
+                vals.push('NULL', 'NULL');
+            } else {
+                vals.push(String(rn), `(SELECT Room FROM dimClassrooms WHERE RoomNumber=${rn})`);
+            }
+        });
+        return '(' + vals.join(',') + ')';
+    }).join(',\n        ');
     // Guarded on the table being empty, so this is a migration and not a reset.
     return `IF NOT EXISTS (SELECT 1 FROM Staff)
     INSERT INTO Staff (${cols}) VALUES
@@ -4850,7 +4922,46 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
             const rn = parseInt(roomNumber);
             const whereClause = isNaN(rn) ? `RoomNumber=${esc(roomNumber)}` : `RoomNumber=${rn}`;
-            const sql = `UPDATE dimClassrooms SET ${fields.join(',')} WHERE ${whereClause}`;
+            let sql = `UPDATE dimClassrooms SET ${fields.join(',')} WHERE ${whereClause}`;
+            /* Cascade a RENAME into the Staff name mirror. Staff link to a room by
+               RoomNumber (the id), and Classroom is only a readable label; when the
+               room's name changes here, refresh that label on every staff row linked
+               to this room so the two can never disagree. Keyed on the numeric id, so
+               it only runs for a real room number (not the legacy string-id path). */
+            if (d.room !== undefined && !isNaN(rn)) {
+                /* Both mirrors: a primary-linked person's Classroom and a secondary-
+                   linked person's SecondaryClassroom both reflect this room's name. */
+                sql += `;UPDATE Staff SET Classroom=${esc(d.room)} WHERE RoomNumber=${rn}`;
+                sql += `;UPDATE Staff SET SecondaryClassroom=${esc(d.room)} WHERE SecondaryRoomNumber=${rn}`;
+            }
+
+            /* Two-way sync (ADD-only, never auto-clear). The room editor sends the two
+               teacher slots as staff IDs: teacher1Id = this room is that person's
+               PRIMARY (RoomNumber), teacher2Id = this room is their SECONDARY
+               (SecondaryRoomNumber) — matching the Teacher 1 / Teacher 2 columns. Point
+               each person's link at this room, deriving the name mirror so it can't
+               drift.
+
+               Deliberately NOT the mirror image: clearing a slot does not wipe anyone's
+               link. Any number of staff may point at a room but a room shows only two,
+               so auto-clearing on removal could silently unassign someone a dropdown
+               swap didn't mean to touch. Clearing/moving a person's room stays an
+               explicit act on the staff card. IDs parsed to ints, so nothing a client
+               sends reaches SQL unescaped. */
+            if (!isNaN(rn)) {
+                const t1 = parseInt(d.teacher1Id, 10);
+                const t2 = parseInt(d.teacher2Id, 10);
+                if (!isNaN(t1)) {
+                    sql += `;UPDATE Staff SET RoomNumber=${rn},`
+                        + `Classroom=(SELECT Room FROM dimClassrooms WHERE RoomNumber=${rn}),`
+                        + `UpdatedAt=GETDATE() WHERE Id=${t1}`;
+                }
+                if (!isNaN(t2)) {
+                    sql += `;UPDATE Staff SET SecondaryRoomNumber=${rn},`
+                        + `SecondaryClassroom=(SELECT Room FROM dimClassrooms WHERE RoomNumber=${rn}),`
+                        + `UpdatedAt=GETDATE() WHERE Id=${t2}`;
+                }
+            }
             console.log('[PUT CLASSROOM]', sql);
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
@@ -7816,10 +7927,24 @@ ELSE
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             if (!String(d.name || '').trim()) return sendJSON(res, 400, { error: 'Name is required' });
-            const cols = STAFF_COLUMNS.map(([c]) => c).join(',');
-            const vals = STAFF_COLUMNS.map(([, key]) => esc(d[key])).join(',');
+            /* RoomNumber (int link) and Classroom (its derived text mirror) are set
+               together from a parsed room id, not from client text — same rule as the
+               UPDATE path — so the label can never drift from the room's real name.
+               Everything else goes through the quoted esc() builder. */
+            const colList = STAFF_COLUMNS
+                .filter(([, key]) => !STAFF_ROOM_LINK_KEYS.has(key) && !STAFF_ROOM_MIRROR_KEYS.has(key));
+            const cols = colList.map(([c]) => c);
+            const vals = colList.map(([, key]) => esc(d[key]));
+            // Each supplied room link adds its int column + derived name mirror.
+            STAFF_ROOM_LINKS.forEach(link => {
+                const rn = parseInt(d[link.payloadKey], 10);
+                if (!isNaN(rn)) {
+                    cols.push(link.linkCol, link.mirrorCol);
+                    vals.push(String(rn), `(SELECT Room FROM dimClassrooms WHERE RoomNumber=${rn})`);
+                }
+            });
             const sql = staffEnsureSQL() + 'GO\n'
-                + `INSERT INTO Staff (${cols}) VALUES (${vals});SELECT SCOPE_IDENTITY() AS Id`;
+                + `INSERT INTO Staff (${cols.join(',')}) VALUES (${vals.join(',')});SELECT SCOPE_IDENTITY() AS Id`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
@@ -7857,7 +7982,22 @@ ELSE
                 }
             }
 
-            const sets = supplied.map(([c, key]) => `${c}=${esc(d[key])}`);
+            /* Build the SET list. RoomNumber (the room link) and Classroom (its text
+               mirror) are handled together and specially: whenever a roomNumber is
+               supplied, the server DERIVES Classroom from dimClassrooms so the label
+               can never drift from the room's real name, and a client-sent classroom
+               string is ignored. Everything else goes through the quoted esc() path. */
+            const sets = supplied
+                .filter(([, key]) => !STAFF_ROOM_LINK_KEYS.has(key) && !STAFF_ROOM_MIRROR_KEYS.has(key))
+                .map(([c, key]) => `${c}=${esc(d[key])}`);
+            // Each room link (primary + secondary) sets its own link col and derived mirror.
+            let roomChanged = false;
+            STAFF_ROOM_LINKS.forEach(link => {
+                if (d[link.payloadKey] !== undefined) {
+                    staffRoomSetSql(d[link.payloadKey], link).forEach(frag => sets.push(frag));
+                    roomChanged = true;
+                }
+            });
             if (!sets.length) return sendJSON(res, 400, { error: 'Nothing to update' });
 
             /* A staff member editing their own qualifications puts the record back
@@ -7873,8 +8013,46 @@ ELSE
                 sets.push('ReviewedBy=NULL', 'ReviewedDate=NULL');
             }
 
-            const sql = staffEnsureSQL() + 'GO\n'
+            let sql = staffEnsureSQL() + 'GO\n'
                 + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
+
+            /* Two-way sync, the staff-card -> room direction. When this save changes
+               the person's room, rebuild every room's TeacherDescription caption from
+               the staff actually linked to it, so the Classrooms & Staffing chart shows
+               who is really assigned — including dropping this person from the room they
+               just left and adding them to the one they joined. Rebuilt for ALL rooms
+               (there are a handful) rather than tracking the old room number, so no
+               caption can be left stale. Active teaching staff only; names joined with
+               ' / ', matching the caption format the room editor reads. A room with no
+               linked staff is left as-is rather than blanked, so a hand-typed caption
+               for an unstaffed room is not destroyed. This runs in the same batch as the
+               staff UPDATE above, so it sees the new assignment. */
+            if (roomChanged) {
+                /* FOR XML PATH concatenation rather than STRING_AGG: STRING_AGG needs
+                   SQL Server 2017+, and this runs on SQL Server Express of unknown
+                   version. A silent failure here would take the whole staff save with
+                   it, so the portable form is the safe choice. STUFF() trims the leading
+                   ' / '.
+
+                   A person belongs to a room's caption if EITHER link points at it:
+                   their primary (RoomNumber) OR their secondary (SecondaryRoomNumber).
+                   Primary teachers are listed first (slot 0) so the caption reads in
+                   Teacher 1 / Teacher 2 order, matching the staffing chart's columns. */
+                sql += `;UPDATE c SET TeacherDescription = x.Names
+                         FROM dimClassrooms c
+                         CROSS APPLY (
+                             SELECT STUFF((
+                                 SELECT ' / ' + s.Name
+                                 FROM Staff s
+                                 WHERE (s.RoomNumber = c.RoomNumber OR s.SecondaryRoomNumber = c.RoomNumber)
+                                   AND ISNULL(s.Active,1)=1
+                                 ORDER BY CASE WHEN s.RoomNumber = c.RoomNumber THEN 0 ELSE 1 END, s.Id
+                                 FOR XML PATH(''), TYPE
+                             ).value('.', 'NVARCHAR(MAX)'), 1, 3, '') AS Names
+                         ) x
+                         WHERE x.Names IS NOT NULL AND x.Names <> ''`;
+            }
+
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             /* A rejected value takes the whole UPDATE with it, so reporting success here

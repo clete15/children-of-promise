@@ -154,19 +154,42 @@ function splitTeachers(desc) {
     return [parts[0] || '', parts[1] || ''];
 }
 
-/* A dropdown of staff names, `selected` pre-chosen. Falls back to a text input if the
-   staff list didn't load. An unknown legacy name is added as its own option so it stays
-   selected rather than vanishing. */
-function teacherSelect(id, selected, i) {
+/* A dropdown of staff, pre-selected to the person named in the room caption.
+
+   The option VALUE is the staff Id, not the name — that is what makes the two-way
+   sync possible: on save we send those Ids and the server points each person's
+   Staff.RoomNumber at this room (an ID link that survives a room rename). The label
+   stays the name. `selectedName` comes from splitting the stored TeacherDescription
+   caption, so we resolve it back to an Id to pre-select the right row.
+
+   A legacy name that matches no current staff is kept as its own option valued
+   "name:<the name>" so it stays selected and is not lost; readRoomRow understands
+   that prefix. Falls back to a plain text field if the staff list didn't load. */
+function teacherSelect(id, selectedName, i) {
     if (!roomsStaff.length) {
-        return `<input type="text" id="${id}" value="${attr(selected)}" placeholder="Teacher name" oninput="markSettingsChanged(${i})">`;
+        return `<input type="text" id="${id}" value="${attr(selectedName)}" placeholder="Teacher name" oninput="markSettingsChanged(${i})">`;
     }
-    const names = roomsStaff.map(s => s.Name);
-    if (selected && !names.includes(selected)) names.unshift(selected);
-    const opts = ['<option value="">— none —</option>'].concat(
-        names.map(n => `<option value="${attr(n)}"${n === selected ? ' selected' : ''}>${attr(n)}</option>`)
+    const match = roomsStaff.find(s => String(s.Name).trim() === String(selectedName || '').trim());
+    const selectedVal = match ? String(match.Id) : (selectedName ? 'name:' + selectedName : '');
+    let opts = '<option value="">— none —</option>';
+    // Preserve an unrecognized legacy name as its own option so it stays selected.
+    if (selectedName && !match) {
+        opts += `<option value="name:${attr(selectedName)}" selected>${attr(selectedName)} (not in staff list)</option>`;
+    }
+    opts += roomsStaff.map(s =>
+        `<option value="${attr(s.Id)}"${String(s.Id) === selectedVal ? ' selected' : ''}>${attr(s.Name)}</option>`
     ).join('');
     return `<select id="${id}" onchange="markSettingsChanged(${i})">${opts}</select>`;
+}
+
+/* Resolve a teacher-select's value back to a display NAME for the caption string.
+   An Id maps to the staff name; a "name:<x>" legacy value yields <x>; '' yields ''. */
+function teacherValueToName(val) {
+    const v = String(val || '');
+    if (!v) return '';
+    if (v.indexOf('name:') === 0) return v.slice(5);
+    const s = roomsStaff.find(x => String(x.Id) === v);
+    return s ? s.Name : '';
 }
 
 function renderSettings() {
@@ -230,13 +253,23 @@ async function addNewRoom() {
 }
 
 function readRoomRow(i) {
-    const t1 = (document.getElementById(`setTeacher1_${i}`).value || '').trim();
-    const t2 = (document.getElementById(`setTeacher2_${i}`).value || '').trim();
+    // The two teacher selects carry staff Ids (or a "name:" legacy value), not plain
+    // names. Build the display caption from the resolved names, and send each slot's
+    // staff Id separately: Teacher 1 -> teacher1Id (that room becomes the person's
+    // PRIMARY), Teacher 2 -> teacher2Id (their SECONDARY). The server points the
+    // matching link column at this room.
+    const v1 = (document.getElementById(`setTeacher1_${i}`).value || '').trim();
+    const v2 = (document.getElementById(`setTeacher2_${i}`).value || '').trim();
+    const names = [teacherValueToName(v1), teacherValueToName(v2)].filter(Boolean);
+    const id1 = parseInt(v1, 10);   // 'name:...' / '' -> NaN
+    const id2 = parseInt(v2, 10);
     return {
-        room:     document.getElementById(`setRoom${i}`).value.trim(),
-        teacher:  [t1, t2].filter(Boolean).join(' / '),
-        capacity: document.getElementById(`setCap${i}`).value,
-        ageRange: document.getElementById(`setAge${i}`).value.trim()
+        room:       document.getElementById(`setRoom${i}`).value.trim(),
+        teacher:    names.join(' / '),
+        teacher1Id: isNaN(id1) ? null : id1,
+        teacher2Id: isNaN(id2) ? null : id2,
+        capacity:   document.getElementById(`setCap${i}`).value,
+        ageRange:   document.getElementById(`setAge${i}`).value.trim()
     };
 }
 

@@ -546,8 +546,6 @@ function cardHtml(s) {
     const isVacant = name === 'New Teacher' || name.toLowerCase().includes('tbd');
     const reviewed = !!(s.ReviewedBy || '').trim();
     const creds = parseCredentials(s.EceCredentials || s.Gateways || '');
-    const rooms = window.CLASSROOM_LIST || [];
-
     // data-f carries the API field name, so saving is a straight read of the card.
     const txt = (f, val, ph, extra) => `<input type="text" class="cf-input" data-f="${f}"`
         + ` value="${escAttr(val)}" placeholder="${escAttr(ph || '')}"${extra || ''}>`;
@@ -558,16 +556,7 @@ function cardHtml(s) {
         }).join('') + '</select>';
     const row = (label, control) => `<div class="card-field"><span class="cf-label">${label}</span>${control}</div>`;
     const stack = (label, control) => `<div class="cf-stack"><span class="cf-label">${label}</span>${control}</div>`;
-    // A room already on file that is not in the list is kept and marked, so
-    // opening a card can never quietly discard it.
-    const roomOpts = extra => [['', extra]].concat(rooms.map(r => [r, r]))
-        .concat(![''].concat(rooms).includes(s[extra === '— none —' ? 'SecondaryClassroom' : 'Classroom'] || '')
-            ? [] : []);
-    const roomList = current => {
-        const base = rooms.slice();
-        if (current && !base.includes(current)) base.push(current);
-        return base;
-    };
+    // Classroom dropdowns are built by roomOptionsHtml (RoomNumber-valued), not here.
 
     return `
     <div class="staff-card ${reviewed ? '' : 'needs-review'}" data-id="${s.Id}">
@@ -593,11 +582,10 @@ function cardHtml(s) {
                 ? `<span class="review-chip reviewed" title="Confirmed by ${escAttr(s.ReviewedBy)}${s.ReviewedDate ? ' on ' + escAttr(s.ReviewedDate) : ''}">✓ Reviewed</span>`
                 : '<span class="review-chip unreviewed" title="Extracted from Gateways reports; not yet confirmed by the director">Needs review</span>')}
             ${row('Group', sel('staffGroup', s.StaffGroup, [['', 'Teaching staff'], ['Ownership', 'Ownership group']]))}
-            ${stack('Classroom', sel('classroom', s.Classroom,
-                [['', '— none (no assigned room) —']].concat(roomList(s.Classroom).map(r => [r, r]))))}
-            ${stack('Second classroom <span style="font-weight:400;color:#94a3b8;">(part time)</span>',
-                sel('secondaryClassroom', s.SecondaryClassroom,
-                [['', '— none —']].concat(roomList(s.SecondaryClassroom).map(r => [r, r]))))}
+            ${stack('Classroom <span style="font-weight:400;color:#94a3b8;">(Teacher 1)</span>',
+                `<select class="cf-input" data-f="roomNumber">${roomOptionsHtml(s.RoomNumber, '— none (no assigned room) —')}</select>`)}
+            ${stack('Second classroom <span style="font-weight:400;color:#94a3b8;">(part time · Teacher 2)</span>',
+                `<select class="cf-input" data-f="secondaryRoomNumber">${roomOptionsHtml(s.SecondaryRoomNumber, '— none —')}</select>`)}
             ${row('Education', sel('education', s.Education,
                 [['', '—'], 'High School/GED', 'Some College', "Associate's", "Bachelor's", "Master's", 'Doctorate']))}
             <div class="cf-stack">
@@ -696,8 +684,11 @@ async function saveCard(id) {
     if (!body.name) { alert('A name is required.'); return; }
 
     const COL = {
-        name: 'Name', role: 'Role', program: 'Program', classroom: 'Classroom',
-        secondaryClassroom: 'SecondaryClassroom', fte: 'Fte', education: 'Education',
+        name: 'Name', role: 'Role', program: 'Program',
+        // Rooms are the ID links now; the Classroom/SecondaryClassroom text columns
+        // are server-derived mirrors and are not sent from here.
+        roomNumber: 'RoomNumber', secondaryRoomNumber: 'SecondaryRoomNumber',
+        fte: 'Fte', education: 'Education',
         eceCredentials: 'EceCredentials', gateways: 'Gateways', experienceYears: 'ExperienceYears',
         registryId: 'RegistryId', notes: 'Notes', reviewedBy: 'ReviewedBy',
         reviewedDate: 'ReviewedDate', staffGroup: 'StaffGroup',
@@ -753,9 +744,8 @@ function openEdit(id) {
     // Role and classroom are dropdowns now. Keep a value already on file that is
     // not in the list, rather than snapping it to the first option and losing it.
     setSelectPreserving('editRole', s.Role || '');
-    populateClassroomOptions();
-    setSelectPreserving('editClassroom', s.Classroom || '', true);
-    setSelectPreserving('editSecondaryClassroom', s.SecondaryClassroom || '', true);
+    // Classroom dropdowns are RoomNumber-valued and preselected from the record.
+    populateClassroomOptions(s);
     document.getElementById('editShTotal').value = s.SemesterHoursTotal || '';
     document.getElementById('editShEce').value = s.SemesterHoursEce || '';
     document.getElementById('editTranscript').value = s.TranscriptOnFile || '';
@@ -795,27 +785,51 @@ function setSelectPreserving(selectId, value, flagUnknown) {
     sel.value = value;
 }
 
-// Room lists come from the classroom table, so they stay right when rooms change.
-function populateClassroomOptions() {
-    [['editClassroom', '— none (no assigned room) —'], ['editSecondaryClassroom', '— none —']]
-        .forEach(([id, blank]) => {
-            const sel = document.getElementById(id);
-            const current = sel.value;
-            sel.innerHTML = `<option value="">${blank}</option>`
-                + (window.CLASSROOM_LIST || []).map(c => `<option value="${c}">${c}</option>`).join('');
-            sel.value = current;
-        });
+/* Fill the modal's two classroom dropdowns with RoomNumber-valued options, each
+   preselected to the staff record's primary / secondary link. Keyed by RoomNumber
+   (not name), so a room rename never breaks the link. `s` is the staff record being
+   edited (or {} for a new one). */
+function populateClassroomOptions(s) {
+    s = s || {};
+    document.getElementById('editClassroom').innerHTML =
+        roomOptionsHtml(s.RoomNumber, '— none (no assigned room) —');
+    document.getElementById('editSecondaryClassroom').innerHTML =
+        roomOptionsHtml(s.SecondaryRoomNumber, '— none —');
 }
 
 async function loadClassroomList() {
     try {
         const res = await apiFetch('/api/classrooms');
         const rooms = await res.json();
-        window.CLASSROOM_LIST = rooms.map(r => r.Room).filter(Boolean);
+        // Full {RoomNumber, Room} objects: both classroom dropdowns are keyed by
+        // RoomNumber now, so renaming a room never breaks a staff link. CLASSROOM_LIST
+        // (names) is kept too for any legacy reader.
+        window.ROOM_OBJS = Array.isArray(rooms)
+            ? rooms.filter(r => r.Room).map(r => ({ num: String(r.RoomNumber), name: r.Room }))
+            : [];
+        window.CLASSROOM_LIST = window.ROOM_OBJS.map(r => r.name);
     } catch (e) {
         console.warn('Could not load classrooms; the room dropdown will be empty.', e);
+        window.ROOM_OBJS = [];
         window.CLASSROOM_LIST = [];
     }
+}
+
+/* The option list for a classroom dropdown: value = RoomNumber, label = room name.
+   `selectedNum` is the staff row's stored RoomNumber/SecondaryRoomNumber. A stored
+   id that is not in the current room list is kept as its own option so opening a
+   card never silently discards an assignment. */
+function roomOptionsHtml(selectedNum, blankLabel) {
+    const rooms = window.ROOM_OBJS || [];
+    const sel = String(selectedNum == null ? '' : selectedNum);
+    let html = `<option value="">${blankLabel}</option>`;
+    if (sel && !rooms.some(r => r.num === sel)) {
+        html += `<option value="${escAttr(sel)}" selected>Room ${escAttr(sel)} (not in current list)</option>`;
+    }
+    html += rooms.map(r =>
+        `<option value="${escAttr(r.num)}"${r.num === sel ? ' selected' : ''}>${escHtml(r.name)}</option>`
+    ).join('');
+    return html;
 }
 
 /* Pull levels out of the stored credential text. Handles both the "ECE Level 5"
@@ -869,11 +883,11 @@ async function saveStaff() {
         role: document.getElementById('editRole').value.trim(),
         program: document.getElementById('editProgram').value,
         staffGroup: document.getElementById('editStaffGroup').value,
-        secondaryClassroom: document.getElementById('editSecondaryClassroom').value,
+        secondaryRoomNumber: document.getElementById('editSecondaryClassroom').value,
         semesterHoursTotal: document.getElementById('editShTotal').value.trim(),
         semesterHoursEce: document.getElementById('editShEce').value.trim(),
         transcriptOnFile: document.getElementById('editTranscript').value,
-        classroom: document.getElementById('editClassroom').value.trim(),
+        roomNumber: document.getElementById('editClassroom').value.trim(),
         fte: document.getElementById('editFTE').value.trim(),
         education: document.getElementById('editEducation').value,
         eceCredentials: composeCredentials(),
