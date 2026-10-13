@@ -66,6 +66,10 @@
         .page-break { break-before: page; page-break-before: always; }
         .step img { max-height: 2.9in; width: auto; max-width: 100%; margin: 0 auto; }
         .step { margin: 10px 0 8px; break-inside: avoid; page-break-inside: avoid; }
+        /* Per-step sizing on page 2: the scoring screenshot (step 3) a little larger,
+           the signatures screenshot (step 4) a little smaller. */
+        .step3 img { max-height: 3.4in; }
+        .step4 img { max-height: 2.4in; }
         .callout { margin: 12px 0; }
         header { padding-bottom: 10px; }
     }
@@ -116,7 +120,7 @@
     </div>
 
     <!-- STEP 3 (starts page 2 in print) -->
-    <div class="step page-break">
+    <div class="step step3 page-break">
         <div class="step-head">
             <div class="step-num">3</div>
             <div class="step-title">Teacher scores the summary in their staff portal <span class="who teacher">Teacher</span></div>
@@ -129,7 +133,7 @@
     </div>
 
     <!-- STEP 4 -->
-    <div class="step">
+    <div class="step step4">
         <div class="step-head">
             <div class="step-num">4</div>
             <div class="step-title">Teacher collects the parent's signature on the IdeaTab <span class="who teacher">Teacher</span></div>
