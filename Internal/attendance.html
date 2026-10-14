@@ -7,9 +7,11 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
-        /* Left-aligned, but inset 15% from the left to match the sub-nav links above. */
+        /* Left-aligned with only a small left inset, so the whole three-part layout
+           (rooms, Actual/Projected, waiting list) fits on smaller screens without being
+           pushed off the right edge. */
         /* Card on the left, the waiting-list filter (projected view only) to its right. */
-        .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;gap:18px;padding:20px 20px 20px 15%;flex-wrap:wrap; }
+        .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;gap:18px;padding:20px 20px 20px 2%;flex-wrap:wrap; }
         .at-wrapper { display:flex;max-height:calc(100vh - 130px);flex:1 1 auto;min-width:0;max-width:1320px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
         /* The filter container beside the card; empty (and hidden) outside the projected view. */
         #atFilter:empty { display:none; }
@@ -80,6 +82,24 @@
         .at-split-chart { flex:0 0 300px;min-width:280px; }
         .at-rosters-wrap { flex:1 1 480px;min-width:340px;display:flex;flex-direction:column;gap:10px;min-width:0; }
         .at-rosters { display:flex;gap:14px;flex-wrap:nowrap;min-width:0; }
+        /* Collapse the "Actual — now" card to a thin rail so Projected (and, beside the
+           card, the waiting list) get the room on a small screen. When collapsed the
+           Actual card shows only a slim vertical bar with a rotated label and an expand
+           arrow; clicking it restores the full card. Projected flexes to fill the gap. */
+        .at-rosters.actual-collapsed .at-rcard.at-rcard-actual { flex:0 0 34px;min-width:34px;cursor:pointer; }
+        .at-rosters.actual-collapsed .at-rcard.at-rcard-actual .at-rcard-head { flex-direction:column;gap:6px;padding:10px 4px;height:100%;justify-content:flex-start;border-bottom:none; }
+        .at-rosters.actual-collapsed .at-rcard.at-rcard-actual .at-rcard-headtext { writing-mode:vertical-rl;transform:rotate(180deg);white-space:nowrap; }
+        .at-rosters.actual-collapsed .at-rcard.at-rcard-actual .at-rcard-sub,
+        .at-rosters.actual-collapsed .at-rcard.at-rcard-actual .at-cap-chip,
+        .at-rosters.actual-collapsed .at-rcard.at-rcard-actual .at-rscroll { display:none; }
+        .at-rosters.actual-collapsed .at-rcard.at-rcard-actual .at-collapse-btn { transform:none; }
+        /* The collapse/expand control in the Actual card header. */
+        .at-collapse-btn {
+            flex-shrink:0;appearance:none;border:1px solid var(--sp-border);background:var(--sp-surface);
+            color:var(--sp-text-2);width:22px;height:22px;border-radius:6px;cursor:pointer;font-size:0.8rem;
+            line-height:1;display:inline-flex;align-items:center;justify-content:center;transition:background .12s;
+        }
+        .at-collapse-btn:hover { background:var(--sp-surface-2);color:var(--sp-text); }
         /* Key for the pink second-room mark on a combined pair. */
         .at-side-legend { font-size:0.74rem;color:var(--sp-muted);display:flex;align-items:center;gap:7px;padding:2px 2px 0; }
         .at-side-legend strong { color:var(--sp-text-2);font-weight:700; }
@@ -254,9 +274,9 @@
 <style>
     .em-subnav {
         display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
-        /* Inset from the left by 15% of the page so the links (and the content below,
-           which uses the same 15% inset) don't hug the left edge. */
-        max-width: 1400px; margin: 0; padding: 10px 20px 0 15%;
+        /* Small left inset, matching the content below, so the page uses the full width
+           on smaller screens. */
+        max-width: 1400px; margin: 0; padding: 10px 20px 0 2%;
     }
     .em-subnav .em-subnav-label {
         font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
@@ -331,6 +351,11 @@ const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
 const CHART_H = 220;
 
 let view = 'actual';                 // 'actual' | 'projected'
+// Projected view only: when true the "Actual — now" column is collapsed to a thin rail
+// so Projected (and the waiting list beside the card) have more room on a small screen.
+// Persisted so it stays how the user left it.
+let actualCollapsed = false;
+try { actualCollapsed = localStorage.getItem('atActualCollapsed') === '1'; } catch (e) {}
 let activeRoom = 0;
 // When the active room is in a paired set, whether to COMBINE the pair into one view. The
 // director can see one room alone or both merged, toggled per selection. Off by default:
@@ -577,6 +602,14 @@ function showRoom(idx, keepCombined) {
     const html = roomBlock(group);
     if (!html) return;
     document.getElementById('atBody').innerHTML = html;
+    // If the Actual column is persisted collapsed, wire its rail click + arrow now that
+    // the markup is in the DOM (the class itself was applied in the template).
+    if (actualCollapsed) {
+        const actualCard = document.querySelector('.at-rosters .at-rcard-actual');
+        if (actualCard) actualCard.onclick = function (e) { toggleActualCollapsed(e); };
+        const btn = document.querySelector('.at-rcard-actual .at-collapse-btn');
+        if (btn) btn.textContent = '\u00bb';
+    }
 }
 
 /* Flip the combine toggle for the active paired set and re-render. */
@@ -820,9 +853,9 @@ function rosterPanel(roomNames) {
     const alignedBody = (slots, side, opts) =>
         slots.map(s => s[side] ? rowHtml(s[side], opts) : blankRow()).join('');
 
-    const card = (title, list, cap, present, missingMsg, opts, bodyOverride) => {
-        if (!present) return cardShell(title, '', '<div class="at-roster-empty">Loading…</div>');
-        if (!list.length) return cardShell(title, '', '<div class="at-roster-empty">' + missingMsg + '</div>');
+    const card = (title, list, cap, present, missingMsg, opts, bodyOverride, shellOpts) => {
+        if (!present) return cardShell(title, '', '<div class="at-roster-empty">Loading…</div>', '', shellOpts);
+        if (!list.length) return cardShell(title, '', '<div class="at-roster-empty">' + missingMsg + '</div>', '', shellOpts);
         const td = perDay(list);
         const peak = Math.max(0, ...td);
         const capNum = (typeof cap === 'number' && !isNaN(cap)) ? cap : null;
@@ -839,17 +872,26 @@ function rosterPanel(roomNames) {
             <tbody>${body}</tbody>
             <tfoot><tr><td class="at-tc-name">Per day \u00b7 ${list.length} total</td>${dayTotals}</tr></tfoot>
         </table></div>`;
-        return cardShell(title, chip, table, sub);
+        return cardShell(title, chip, table, sub, shellOpts);
     };
 
-    const cardShell = (title, chip, inner, sub) => `
-        <div class="at-rcard">
+    /* shellOpts (optional): { cls, collapsible }. `cls` adds a class to the card (used to
+       mark the Actual card so it can collapse); `collapsible` adds the collapse/expand
+       control in the header. The header text is wrapped so it can rotate when collapsed. */
+    const cardShell = (title, chip, inner, sub, shellOpts) => {
+        shellOpts = shellOpts || {};
+        const btn = shellOpts.collapsible
+            ? `<button type="button" class="at-collapse-btn" onclick="toggleActualCollapsed(event)" title="Collapse / expand the Actual column" aria-label="Collapse or expand the Actual column">\u00ab</button>`
+            : '';
+        return `
+        <div class="at-rcard${shellOpts.cls ? ' ' + shellOpts.cls : ''}">
             <div class="at-rcard-head">
-                <div><div class="at-rcard-title">${title}</div>${sub ? '<div class="at-rcard-sub">' + sub + '</div>' : ''}</div>
-                ${chip || ''}
+                <div class="at-rcard-headtext"><div class="at-rcard-title">${title}</div>${sub ? '<div class="at-rcard-sub">' + sub + '</div>' : ''}</div>
+                ${chip || ''}${btn}
             </div>
             ${inner}
         </div>`;
+    };
 
     /* ── Which side of a COMBINED pair each child falls in, per day ──
        Only for a combined set (two rooms). For each weekday, split that day's children
@@ -913,14 +955,37 @@ function rosterPanel(roomNames) {
         // (it's a within-set shuffle), so suppress their green in the Projected card.
         if (roomNames.length > 1) pOpts.actualKeys = new Set(actualList.map(childKey));
         const actualCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
-                                 'No children currently in this room.', aOpts);
+                                 'No children currently in this room.', aOpts, null,
+                                 { cls: 'at-rcard-actual', collapsible: true });
         const projCard = card('Projected \u2014 youngest-first', projList, projected && projected.capacity, !!projected,
                               'No children seated here.', pOpts);
-        return `<div class="at-rosters-wrap"><div class="at-rosters">${actualCard}${projCard}</div>${sideLegend}</div>`;
+        const collapsedCls = actualCollapsed ? ' actual-collapsed' : '';
+        return `<div class="at-rosters-wrap"><div class="at-rosters${collapsedCls}">${actualCard}${projCard}</div>${sideLegend}</div>`;
     }
     const theCard = card('Actual \u2014 now', actualList, actual && actual.capacity, !!actual,
                          'No children currently in this room.', { sideByKey: actualSide });
     return `<div class="at-rosters-wrap"><div class="at-rosters">${theCard}</div>${sideLegend}</div>`;
+}
+
+/* Collapse / expand the "Actual — now" column (Projected view). Flips the class on the
+   live .at-rosters node so Projected widens immediately, and persists the choice. Clicking
+   the collapsed rail anywhere expands it again. */
+function toggleActualCollapsed(ev) {
+    if (ev) ev.stopPropagation();
+    actualCollapsed = !actualCollapsed;
+    try { localStorage.setItem('atActualCollapsed', actualCollapsed ? '1' : '0'); } catch (e) {}
+    const rosters = document.querySelector('.at-rosters');
+    if (rosters) {
+        rosters.classList.toggle('actual-collapsed', actualCollapsed);
+        // When collapsed, a click anywhere on the thin Actual rail expands it.
+        const actualCard = rosters.querySelector('.at-rcard-actual');
+        if (actualCard) {
+            actualCard.onclick = actualCollapsed ? function (e) { toggleActualCollapsed(e); } : null;
+        }
+    }
+    // Swap the arrow glyph on the button.
+    const btn = document.querySelector('.at-rcard-actual .at-collapse-btn');
+    if (btn) btn.textContent = actualCollapsed ? '\u00bb' : '\u00ab';
 }
 
 /* The waiting-list roster filter, rendered OUTSIDE the attendance card into #atFilter.
