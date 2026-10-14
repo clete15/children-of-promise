@@ -51,17 +51,21 @@
             border-bottom:2px solid var(--sp-border); }
         .sch-table col.day-col { width:118px; }
 
-        /* Day header: weekday, date, and a compact NO-SCHOOL chip toggle. */
+        /* Day header: weekday, date, and a compact "MCS Closed" chip toggle. This marks
+           a day Millstadt Community Schools is closed (so the before/after-school kids
+           are in all day) — it is INFORMATIONAL ONLY and does NOT change our staffing;
+           the shift cells stay fully editable underneath. */
         .day-th { padding:6px 8px 7px;border-bottom:2px solid var(--sp-border);text-align:center;vertical-align:top; }
         .day-th .dow { font-size:0.76rem;font-weight:800;color:var(--sp-text); }
         .day-th .date { font-size:0.68rem;color:var(--sp-muted);font-weight:600;margin-top:1px; }
         .ns-chip { margin-top:4px;display:inline-flex;align-items:center;gap:4px;font-size:0.58rem;font-weight:700;
             padding:2px 7px;border-radius:999px;cursor:pointer;border:1px solid var(--sp-border);
             background:var(--sp-surface-2);color:var(--sp-muted);user-select:none;transition:all .12s;white-space:nowrap; }
-        .ns-chip:hover { border-color:#f59e0b;color:#b45309; }
-        .ns-chip.on { background:#fff3cd;border-color:#f0b429;color:#8a5a00; }
+        .ns-chip:hover { border-color:#2563eb;color:#1d4ed8; }
+        .ns-chip.on { background:#e7f0ff;border-color:#93b4f0;color:#1d4ed8; }
         .ns-chip .dot { width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.55; }
-        .day-th.closed { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 7px,rgba(240,180,41,0.10) 7px,rgba(240,180,41,0.10) 14px); }
+        /* A subtle header tint when MCS is closed — a marker, not a block. */
+        .day-th.closed { background:rgba(37,99,235,0.06); }
 
         .sch-table td { padding:4px 6px;border-bottom:1px solid var(--sp-border);vertical-align:middle;text-align:center; }
         .sch-table tbody tr:hover td { background:var(--sp-surface-2); }
@@ -94,6 +98,16 @@
         .shift-chip.empty { color:var(--sp-quiet);font-weight:500; }
         .shift-chip .sep { color:var(--sp-quiet); }
 
+        /* Float coverage: a "covering: <room>" picker under the editor, and a small
+           arrow tag under the resting chip showing which room this shift covers. */
+        .cover-row { margin-top:3px; }
+        .cover-sel { width:100%;appearance:none;-webkit-appearance:none;padding:3px 4px;
+            border:1px solid var(--sp-border-in);border-radius:5px;font-size:0.66rem;font-family:inherit;
+            background:var(--sp-field-bg);color:var(--sp-text-2);cursor:pointer;text-align:center;text-align-last:center; }
+        .cover-sel:focus { outline:none;border-color:var(--sp-accent); }
+        .cover-tag { margin-top:2px;font-size:0.6rem;font-weight:700;color:#1d4ed8;white-space:nowrap;
+            overflow:hidden;text-overflow:ellipsis; }
+
         .shift { display:flex;align-items:center;justify-content:center;gap:2px;flex-wrap:nowrap; }
         .shift select {
             appearance:none;-webkit-appearance:none;
@@ -118,10 +132,9 @@
         }
         .off-tile:hover { filter:brightness(0.98); }
 
-        /* NO SCHOOL column cell */
-        td.closed { background:repeating-linear-gradient(45deg,var(--sp-surface-2),var(--sp-surface-2) 7px,rgba(240,180,41,0.08) 7px,rgba(240,180,41,0.08) 14px); }
-        td.closed .shift, td.closed .off-tile, td.closed .shift-chip { opacity:0.28;pointer-events:none;filter:grayscale(0.3); }
-        .closed-tag { font-size:0.62rem;font-weight:700;color:#b45309;letter-spacing:0.02em; }
+        /* MCS-closed column: a faint tint only, so the day reads as "grade school closed"
+           WITHOUT disabling our shifts (we are open — the cells stay fully editable). */
+        td.closed { background:rgba(37,99,235,0.04); }
 
         /* Row save */
         .save-col { width:48px;min-width:48px; }
@@ -225,7 +238,7 @@
             </table>
             <div class="sch-legend">
                 <span><span class="sw" style="background:#fde68a;border:1px solid #f0b429;"></span>OFF — scheduled day off</span>
-                <span><span class="sw" style="background:repeating-linear-gradient(45deg,#eee,#eee 4px,rgba(240,180,41,0.25) 4px,rgba(240,180,41,0.25) 8px);"></span>No school — centre closed</span>
+                <span><span class="sw" style="background:rgba(37,99,235,0.12);border:1px solid #93b4f0;"></span>MCS Closed — Millstadt schools closed (we stay open)</span>
                 <span>Leave both times blank for an unscheduled day.</span>
             </div>
         </div>
@@ -268,11 +281,17 @@ const BUCKETS = [
     { label: 'Preschool',     rooms: [6] },
     { label: 'Afterschool',   rooms: [8] },
 ];
-// A standalone group for people who run the centre rather than a room. Appended after
-// the classroom buckets. Director has no room, so staff land here by DIRECTOR_NAMES
-// (first name) rather than by RoomNumber.
-const DIRECTOR_LABEL = 'Director';
-const DIRECTOR_NAMES = ['megan'];
+/* Floats / Coverage — staff who are not tied to one room's regular line-up: the
+   director and anyone who flexes to cover an absence. They sit in their own group at
+   the bottom, and each of their shifts can be tagged with the room it is covering
+   that day (a "covering: <room>" picker on the cell). Membership is by first name,
+   since a float has no fixed RoomNumber. */
+const FLOAT_LABEL = 'Floats / Coverage';
+const FLOAT_NAMES = ['megan'];
+// The rooms a float can be tagged as covering, shown in the per-cell "covering:" picker.
+// Built from the classroom bucket labels; the display name resolves to the real room
+// name(s) at render time via sectionDisplayName.
+function coverChoices() { return BUCKETS.map(b => b.label); }
 // No bucket is folded into another right now (Preschool is just room 6 until Janelle
 // returns). Kept as an empty map so the folding machinery stays available.
 const GROUP_OVERRIDE = {};
@@ -368,8 +387,17 @@ function toMinutes(part, isEnd) {
     }
     return h * 60 + min;
 }
-function parseShift(text) {
+/* A Float's shift may carry a coverage tag as an "@<room>" suffix, e.g.
+   "9:00-4:00 @Infants". parseShift strips it off and returns it as `cover` so the time
+   pickers see only the time; cellToStored re-appends it on save. */
+function splitCover(text) {
     const t = String(text || '').trim();
+    const at = t.indexOf('@');
+    if (at === -1) return { time: t, cover: '' };
+    return { time: t.slice(0, at).trim(), cover: t.slice(at + 1).trim() };
+}
+function parseShift(text) {
+    const t = splitCover(text).time;
     if (!t) return { off: false, start: null, end: null };
     if (/^off$/i.test(t)) return { off: true, start: null, end: null };
     const parts = t.split('-');
@@ -396,7 +424,11 @@ function cellToStored(id, dayIdx) {
     }
     const sv = s && s.value, ev = e && e.value;
     if (!sv && !ev) return '';
-    return (sv ? minutesToCompact(parseInt(sv, 10)) : '?') + '-' + (ev ? minutesToCompact(parseInt(ev, 10)) : '?');
+    let out = (sv ? minutesToCompact(parseInt(sv, 10)) : '?') + '-' + (ev ? minutesToCompact(parseInt(ev, 10)) : '?');
+    // A float's coverage tag, if one is chosen on this cell, is stored as "@<room>".
+    const cov = td.querySelector('.cover-sel');
+    if (cov && cov.value) out += ' @' + cov.value;
+    return out;
 }
 
 // ── Week math ───────────────────────────────────────────────────────────────────
@@ -476,18 +508,19 @@ async function loadWeek() {
 // ── Grouping ────────────────────────────────────────────────────────────────────
 function firstName(s) { return String(s.Name || '').trim().split(/\s+/)[0].toLowerCase(); }
 function isHidden(s) { return HIDE_FROM_SCHEDULE.indexOf(firstName(s)) !== -1; }
+function isFloat(s) { return FLOAT_NAMES.indexOf(firstName(s)) !== -1; }
 function rawBucketOf(s) {
-    // Directors run the centre, not a room, so they go to the Director group by name
-    // regardless of (missing) RoomNumber.
-    if (DIRECTOR_NAMES.indexOf(firstName(s)) !== -1) return DIRECTOR_LABEL;
+    // Floats (director + anyone who flexes) run between rooms, so they go to the
+    // Floats / Coverage group by name regardless of (missing) RoomNumber.
+    if (isFloat(s)) return FLOAT_LABEL;
     const rn = parseInt(s.RoomNumber, 10);
     const b = BUCKETS.find(x => x.rooms.indexOf(rn) !== -1);
     return b ? b.label : 'Unassigned';
 }
 function groupedStaff() {
-    // Director sits after the classrooms; Unassigned (anyone with no room and not a
-    // director) sits last.
-    const order = BUCKETS.map(b => b.label).concat([DIRECTOR_LABEL, 'Unassigned']);
+    // Floats / Coverage sits after the classrooms; Unassigned (no room, not a float)
+    // sits last.
+    const order = BUCKETS.map(b => b.label).concat([FLOAT_LABEL, 'Unassigned']);
     const notes = {};
     const groups = {};
     staff.forEach(s => {
@@ -514,7 +547,7 @@ function groupedStaff() {
    both its own and the folded-in rooms' real names, so it reads as the real rooms it
    now covers. */
 function sectionDisplayName(label) {
-    if (label === DIRECTOR_LABEL || label === 'Unassigned') return label;
+    if (label === FLOAT_LABEL || label === 'Unassigned') return label;
     const own = bucketByLabel(label);
     let names = own ? [bucketLabel(own)] : [label];
     // Append the real names of any bucket folded INTO this one.
@@ -536,7 +569,7 @@ function renderHead() {
             + '<div class="dow">' + DAY_FULL[i] + '</div>'
             + '<div class="date">' + fmtDay(dayDate(i)) + '</div>'
             + '<span class="ns-chip' + (closed ? ' on' : '') + '" onclick="toggleNoSchool(' + i + ')">'
-            + '<span class="dot"></span>' + (closed ? 'No school' : 'Mark no school') + '</span>'
+            + '<span class="dot"></span>' + (closed ? 'MCS Closed' : 'Mark MCS closed') + '</span>'
             + '</th>';
     }
     html += '<th class="name-col save-col" style="text-align:center;">Save</th>';
@@ -547,34 +580,50 @@ function renderHead() {
    two pickers + OFF only while it is being edited. editing holds "id_dayIdx" keys. */
 let editing = new Set();
 function cellKey(id, dayIdx) { return id + '_' + dayIdx; }
+// StaffIds in the Floats / Coverage group — their cells get a "covering:" picker.
+let floatIds = new Set();
+
+// The "covering: <room>" picker for a float's cell, pre-selected to the stored cover.
+function coverSelectHtml(id, selected) {
+    let opts = '<option value="">covering…</option>';
+    coverChoices().forEach(label => {
+        const name = sectionDisplayName(label);
+        opts += '<option value="' + esc(label) + '"' + (label === selected ? ' selected' : '') + '>'
+            + esc(name) + '</option>';
+    });
+    return '<select class="cover-sel" onchange="onEdit(\'' + id + '\')" aria-label="covering">' + opts + '</select>';
+}
 
 function cellHtml(id, dayIdx) {
     const sc = schedule[id] || {};
-    const parsed = parseShift(sc[DAYS[dayIdx]] || '');
+    const raw = sc[DAYS[dayIdx]] || '';
+    const parsed = parseShift(raw);
+    const cover = splitCover(raw).cover;
     const closed = noSchoolDays.has(dayIdx);
     const isEditing = editing.has(cellKey(id, dayIdx));
+    const isFloatRow = floatIds.has(String(id));
     let inner;
-    if (closed) {
-        inner = '<span class="closed-tag">— no school —</span>';
-    } else if (isEditing) {
-        // Expanded editor for this one cell.
+    if (isEditing) {
+        // Expanded editor for this one cell. A float also gets the covering picker.
         inner = '<div class="shift">'
             + '<select class="sel-start" onchange="onEdit(\'' + id + '\')" aria-label="start">' + timeOptionsHtml(parsed.start) + '</select>'
             + '<span class="dash">–</span>'
             + '<select class="sel-end" onchange="onEdit(\'' + id + '\')" aria-label="end">' + timeOptionsHtml(parsed.end) + '</select>'
             + '<button type="button" class="off-pill" title="Mark day off" onclick="setOff(\'' + id + '\',' + dayIdx + ',true)">OFF</button>'
-            + '</div>';
+            + '</div>'
+            + (isFloatRow ? '<div class="cover-row">' + coverSelectHtml(id, cover) + '</div>' : '');
     } else if (parsed.off) {
         inner = '<button type="button" class="off-tile" title="Click to edit" '
             + 'onclick="editCell(\'' + id + '\',' + dayIdx + ')">OFF</button>';
     } else if (parsed.start != null || parsed.end != null) {
-        // Resting chip: the shift on one line.
+        // Resting chip: the shift on one line, plus a coverage tag for a float.
         inner = '<button type="button" class="shift-chip" title="Click to edit" '
             + 'onclick="editCell(\'' + id + '\',' + dayIdx + ')">'
             + (parsed.start != null ? timeLabel(parsed.start) : '?')
             + '<span class="sep">–</span>'
             + (parsed.end != null ? timeLabel(parsed.end) : '?')
-            + '</button>';
+            + '</button>'
+            + (isFloatRow && cover ? '<div class="cover-tag" title="Covering">\u2192 ' + esc(sectionDisplayName(cover)) + '</div>' : '');
     } else {
         // Empty day: a quiet "add" affordance.
         inner = '<button type="button" class="shift-chip empty" title="Click to set hours" '
@@ -587,7 +636,6 @@ function cellHtml(id, dayIdx) {
 /* Expand a single cell into its editor and focus the start picker. Other cells stay
    as calm chips, so the grid is only ever "busy" where you are actually working. */
 function editCell(id, dayIdx) {
-    if (noSchoolDays.has(dayIdx)) return;
     editing.add(cellKey(id, dayIdx));
     const td = document.getElementById('cell_' + id + '_' + dayIdx);
     if (td) {
@@ -602,6 +650,8 @@ function renderBody() {
     editing = new Set();   // a full re-render collapses every cell back to its chip
     const all = document.getElementById('schSaveAll'); if (all) all.disabled = true;
     const groups = groupedStaff();
+    // Which rows are floats — their cells get the "covering:" picker.
+    floatIds = new Set(staff.filter(isFloat).map(s => String(s.Id)));
     const tbody = document.getElementById('schBody');
     if (!groups.length) { tbody.innerHTML = '<tr><td class="sch-empty" colspan="7">No staff to schedule.</td></tr>'; return; }
     let html = '';
