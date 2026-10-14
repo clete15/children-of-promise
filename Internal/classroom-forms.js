@@ -270,6 +270,14 @@
                             label: opts.label || '', printedName: opts.printedName || '',
                             dateField: opts.dateField || '' };
         var existing = signatureFor(studentId, field, role);
+        /* Repopulate the printed-name box from the stored SignedName for THIS child, so
+           reopening a signed form shows the name that was entered (it was being saved but
+           never read back — the "Daniel Beyer's box is blank" symptom). openScreening
+           cleared it first, so a child with no signature on file correctly shows blank. */
+        if (opts.printedName) {
+            var pnEl = document.getElementById(opts.printedName);
+            if (pnEl) pnEl.value = (existing && existing.SignedName) ? existing.SignedName : '';
+        }
         /* The standalone signature IMAGE (SigImagePath) is the only thing the pad can
            redraw — RelPath is the whole signed form as a PDF, which an <img> cannot
            render. We no longer fall back to RelPath for display: a PDF never loads, so
@@ -1094,6 +1102,12 @@
         document.getElementById('scrReferral').value = 'No';
         document.getElementById('scrNotes').value = '';
         document.getElementById('scrSavedBadge').style.display = 'none';
+        // Clear the printed-name boxes for THIS child. Without this they kept whatever
+        // the previous child's modal left in the DOM, so one child's printed name showed
+        // up on another's record. mountSigPad below repopulates them from the saved
+        // SignedName when this child actually has a signature on file.
+        var scrParentSigEl = document.getElementById('scrParentSig'); if (scrParentSigEl) scrParentSigEl.value = '';
+        var scrStaffSigEl = document.getElementById('scrStaffSig'); if (scrStaffSigEl) scrStaffSigEl.value = '';
 
         // The checklist column this screening belongs to (BegASQ / EndASE / …).
         var scrField = screeningField(type, period);

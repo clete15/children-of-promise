@@ -101,8 +101,10 @@
         .ck-chip:active { transform:scale(0.97); }
         .ck-chip-done { background:transparent; border-color:#1e3a2f; color:#4ade80; cursor:default;
             font-weight:600; padding:9px 11px; }
-        .ck-chip-partial { background:#b45309; color:#fff; }
-        .ck-chip-partial:hover { background:#92400e; }
+        /* Partial (some-but-not-all of upload / scores / both signatures): the warm
+           amber used across the staff portal, not the old brown. */
+        .ck-chip-partial { background:#fde68a; color:#7a5c00; border-color:#f0b429; }
+        .ck-chip-partial:hover { background:#fcd34d; }
 
         .ck-empty { padding:48px; text-align:center; color:#94a3b8; font-size:0.95rem;
             background:#1e293b; border:1px solid #334155; border-radius:12px; }
@@ -426,6 +428,14 @@ async function loadEnhancements() {
             settle(ckFetch(yq('/api/screening-summary'))),
             settle((window.ChildForms && ChildForms.load) ? ChildForms.load(CK_YEAR, ckFetch) : null),
             settle((window.ChildForms && ChildForms.loadFiles) ? ChildForms.loadFiles(CK_YEAR, ckFetch) : null),
+            // The pill color rule (ChildForms.state) reads signatures from ChildForms'
+            // OWN store, so it must be loaded here — without it a fully-signed PI
+            // screening never sees its signatures and stays stuck 'partial' (orange)
+            // instead of going green. (This was the bug: only CofpForms.loadSignatures,
+            // which fills the sign-PAD store, was called — the pads could redraw but the
+            // pills could not turn green.)
+            settle((window.ChildForms && ChildForms.loadSignatures) ? ChildForms.loadSignatures(CK_YEAR, ckFetch) : null),
+            // Also fills the pad store, so reopening a signed form can redraw the ink.
             settle((window.CofpForms && CofpForms.loadSignatures)
                 ? CofpForms.loadSignatures(CK_YEAR).then(s => { CK_SIGNATURES = s || {}; }) : null)
         ]);

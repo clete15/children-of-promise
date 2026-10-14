@@ -1373,6 +1373,13 @@ function mountSigPad(hostId, studentId, field, role, opts) {
                         dateField: opts.dateField || '' };
 
     const existing = signatureFor(studentId, field, role);
+    /* Repopulate the printed-name box from the stored SignedName for THIS child, so a
+       reopened signed form shows the entered name (it was saved but never read back).
+       openScreening cleared it first, so a child with no signature stays blank. */
+    if (opts.printedName) {
+        const pnEl = document.getElementById(opts.printedName);
+        if (pnEl) pnEl.value = (existing && existing.SignedName) ? existing.SignedName : '';
+    }
     /* Prefer the standalone signature image; RelPath is the whole signed form as a PDF,
        which cannot be drawn on the pad's canvas. And fetch WITH credentials, handing the
        pad a blob URL — a bare <img src="/api/doc-file?..."> is an unauthenticated GET
@@ -3563,6 +3570,10 @@ async function openScreening(studentId, type, period) {
     document.getElementById('scrReferral').value = 'No';
     document.getElementById('scrNotes').value = '';
     document.getElementById('scrSavedBadge').style.display = 'none';
+    // Clear the printed-name boxes for THIS child so a previous child's name can't
+    // linger in the DOM (mountSigPad repopulates from the saved SignedName below).
+    var scrParentSigEl = document.getElementById('scrParentSig'); if (scrParentSigEl) scrParentSigEl.value = '';
+    var scrStaffSigEl = document.getElementById('scrStaffSig'); if (scrStaffSigEl) scrStaffSigEl.value = '';
 
     // Signature pads for the scored summary, and the parent-questionnaire slot.
     var scrField = screeningField(type, period);
