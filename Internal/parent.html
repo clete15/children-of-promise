@@ -217,6 +217,35 @@
     </div>
 </div>
 
+<!-- EXIT INTERVIEW MODAL (PFA, end of year) -->
+<div class="p-overlay" id="pExitOverlay">
+    <div class="p-modal">
+        <div class="p-modal-header">
+            <h3>Exit Interview</h3>
+            <button class="p-modal-close" onclick="closeModal('pExitOverlay')">&times;</button>
+        </div>
+        <div class="p-modal-body">
+            <div class="p-section" style="text-align:center;">
+                <strong style="font-size:1rem;color:#1e3a8a;">Children of Promise PFA</strong><br>
+                <span style="font-size:0.9rem;font-weight:600;">Exit Interview Form</span>
+            </div>
+            <div class="consent-text" id="peExitText">
+                <!-- filled by prefillExit() with the child's school year -->
+            </div>
+            <div class="sig-box">
+                <div style="font-size:0.8rem;font-weight:600;color:#374151;margin-bottom:8px;">Sign below with your finger or a stylus:</div>
+                <div id="peSigPad"></div>
+                <div class="sig-label">Parent/Guardian Signature</div>
+            </div>
+            <div class="p-field" style="margin-top:10px;"><label>Date</label><input type="date" id="pe_signDate"></div>
+        </div>
+        <div class="p-modal-footer">
+            <button class="p-btn p-btn-secondary" onclick="closeModal('pExitOverlay')">Cancel</button>
+            <button class="p-btn p-btn-primary" id="peSubmitBtn" onclick="submitExit()">Sign &amp; Submit</button>
+        </div>
+    </div>
+</div>
+
 <!-- PARENT INTERVIEW MODAL -->
 <div class="p-overlay" id="pInterviewOverlay">
     <div class="p-modal" style="max-width:720px;">
@@ -330,6 +359,15 @@ function renderFormList() {
             action: "openModal('pInterviewOverlay');prefillInterview()"
         }
     ];
+    // The PFA Exit Interview is an end-of-year form for Preschool for All children only.
+    if (String((parentStudent && parentStudent.PFA_PI_na) || '').trim().toUpperCase() === 'PFA') {
+        forms.push({
+            key: 'ExitInterview',
+            title: 'Exit Interview',
+            desc: 'Confirm you received your child\u2019s screening results and final report card for the year, then sign.',
+            action: "openModal('pExitOverlay');prefillExit()"
+        });
+    }
 
     const list = document.getElementById('formList');
     var html = '';
@@ -437,6 +475,55 @@ async function submitPermissionSlip() {
             trackingStatus.PermissionSlip = true;
             renderFormList();
             closeModal('pPermSlipOverlay');
+        } else { alert('Error: ' + (data.error || 'Unknown error')); }
+    } catch (e) { alert('Error: ' + e.message); }
+    finally { btn.disabled = false; btn.textContent = 'Sign & Submit'; }
+}
+
+// ── Exit Interview (PFA, end of year) ──
+function currentSchoolYearLabel() {
+    var now = new Date();
+    var y = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+    return y + '-' + (y + 1);
+}
+
+function prefillExit() {
+    var sy = currentSchoolYearLabel();
+    document.getElementById('peExitText').innerHTML =
+        'I confirm that Children of Promise has shared my child\u2019s <strong>ASQ-3 and ASQ:SE-2</strong> '
+        + 'developmental screening results for the <strong>' + sy + '</strong> school year, and that I have '
+        + 'received a final <strong>Teaching Strategies Gold</strong> report card for that school year.';
+    document.getElementById('pe_signDate').value = new Date().toISOString().split('T')[0];
+    resetParentSigPad('peSigPad');
+}
+
+async function submitExit() {
+    var pad = parentSigPad('peSigPad');
+    var sig = pad ? pad.toDataUrl() : null;
+    if (!sig) { alert('Please sign in the box before submitting.'); return; }
+
+    var btn = document.getElementById('peSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Submitting...';
+    try {
+        var res = await fetch('/api/parent-portal/sign', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code: parentCode,
+                formType: 'ExitInterview',
+                data: {
+                    schoolYear: currentSchoolYearLabel(),
+                    signedDate: document.getElementById('pe_signDate').value,
+                    parentSignature: sig
+                }
+            })
+        });
+        var data = await res.json();
+        if (data.success) {
+            trackingStatus.ExitInterview = true;
+            renderFormList();
+            closeModal('pExitOverlay');
+            alert('Thank you! Your Exit Interview has been submitted.');
         } else { alert('Error: ' + (data.error || 'Unknown error')); }
     } catch (e) { alert('Error: ' + e.message); }
     finally { btn.disabled = false; btn.textContent = 'Sign & Submit'; }
