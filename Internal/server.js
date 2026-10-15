@@ -8947,23 +8947,29 @@ ELSE
             ? q.get('weekStart') : mondayOf(new Date());
         const staffIdRaw = q.get('staffId');
         const staffId = staffIdRaw != null ? parseInt(staffIdRaw, 10) : NaN;
+        // StaffId=0 is the sentinel "week settings" row that holds NoSchoolDays even
+        // when no staff are scheduled; include it in the read but strip it from the
+        // returned staff rows below. A per-person read (staffId given) also pulls the
+        // sentinel so the portal view still learns the week's closed days.
         const scope = isNaN(staffId)
             ? `WeekStart=${esc(weekStart)}`
-            : `WeekStart=${esc(weekStart)} AND StaffId=${staffId}`;
+            : `WeekStart=${esc(weekStart)} AND StaffId IN (0,${staffId})`;
         const r = runSQLRows(
             `SELECT StaffId,ISNULL(Mon,'') AS Mon,ISNULL(Tue,'') AS Tue,ISNULL(Wed,'') AS Wed,
                     ISNULL(Thu,'') AS Thu,ISNULL(Fri,'') AS Fri,ISNULL(NoSchoolDays,'') AS NoSchoolDays
              FROM StaffSchedule WHERE ${scope}`,
             staffScheduleEnsureSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        // NoSchoolDays is a per-week fact mirrored onto every row, so any row carries
-        // it; surface it once at the top level too for a week that has no rows yet.
-        const noSchool = (r.rows.find(x => String(x.NoSchoolDays || '').trim()) || {}).NoSchoolDays || '';
+        // The week's closed days: prefer the sentinel row, else any row that carries it.
+        const noSchool = (r.rows.find(x => String(x.StaffId) === '0' && String(x.NoSchoolDays || '').trim())
+            || r.rows.find(x => String(x.NoSchoolDays || '').trim()) || {}).NoSchoolDays || '';
+        // Never surface the sentinel as a schedulable person.
+        const rows = r.rows.filter(x => String(x.StaffId) !== '0');
         return sendJSON(res, 200, {
             weekStart: weekStart,
             schoolYear: currentSchoolYear(),
             noSchoolDays: noSchool,
-            rows: r.rows
+            rows: rows
         });
     }
 
@@ -8986,11 +8992,20 @@ ELSE
             const year = resolveSchoolYear(d.schoolYear);
             const noSchool = String(d.noSchoolDays || '').replace(/[^0-4,]/g, '').trim();
 
-            // Column toggle: set the week's closed-days on every existing row at once,
-            // so the whole chart shows the same NO SCHOOL columns.
+            // Column toggle: record the week's closed-days. This MUST survive even when
+            // the week has no staff rows yet, so it is stored on a sentinel StaffId=0
+            // "week settings" row (upserted) rather than only mirrored onto existing
+            // staff rows. Mirroring onto the real rows too keeps a per-staff read simple.
+            // (The earlier version only UPDATEd existing rows, so toggling no-school on a
+            // week with no saved shifts silently persisted nothing and vanished on reload.)
             if (d.broadcastNoSchool) {
+                const wk = esc(weekStart);
                 const sql = staffScheduleEnsureSQL() + 'GO\n'
-                    + `UPDATE StaffSchedule SET NoSchoolDays=${esc(noSchool)},UpdatedAt=GETDATE() WHERE WeekStart=${esc(weekStart)}`;
+                    + `UPDATE StaffSchedule SET NoSchoolDays=${esc(noSchool)},UpdatedAt=GETDATE() WHERE WeekStart=${wk};\n`
+                    + `IF EXISTS (SELECT 1 FROM StaffSchedule WHERE StaffId=0 AND WeekStart=${wk})\n`
+                    + `    UPDATE StaffSchedule SET NoSchoolDays=${esc(noSchool)},UpdatedAt=GETDATE() WHERE StaffId=0 AND WeekStart=${wk};\n`
+                    + `ELSE\n`
+                    + `    INSERT INTO StaffSchedule (StaffId,WeekStart,SchoolYear,NoSchoolDays) VALUES (0,${wk},${esc(year)},${esc(noSchool)});`;
                 const r = runSQL(sql);
                 if (!r.ok) return sendJSON(res, 500, { error: r.error });
                 return sendJSON(res, 200, { success: true });
