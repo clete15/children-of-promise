@@ -342,10 +342,11 @@
     <div class="dashboard">
         <!-- Daily Operations now holds Enrollment Management, ISBE PFA/PI (next to it)
              and Child Files (under it). The SECTION is data-role="all" so the ISBE card
-             — which teachers must see — is reachable here; the Enrollment Management and
-             Child Files cards carry their own data-role="admin" so teachers still don't
-             see those two. (A card cannot escape a hidden section, so the role gate has
-             to live on the cards, not the section, now that an all-card lives here.) -->
+             — which every teacher must see — is reachable here; the Enrollment Management
+             and Child Files cards carry data-role="ops" so they show for the Operations
+             tier (Keyona/Paige/Tara + admins) but stay hidden from plain teachers. (A
+             card cannot escape a hidden section, so the role gate has to live on the
+             cards, not the section, now that an all-card lives here.) -->
         <div class="dash-section" data-role="all">
             <div class="dash-section-title" style="display:flex;align-items:center;gap:8px;">
                 Daily Operations
@@ -358,7 +359,7 @@
                      combined system and every view is reachable by its tab from there.
                      Opens on the Waiting List by default — the most-worked view — and the
                      other views are one click away on the shared sub-nav. -->
-                <a class="dash-item" id="emsCard" href="/staff/waitinglist.html" data-role="admin">
+                <a class="dash-item" id="emsCard" href="/staff/waitinglist.html" data-role="ops">
                     <div class="di-icon">📋</div>
                     <div class="di-content">
                         <div class="di-title">Enrollment Management</div>
@@ -383,7 +384,7 @@
                      checklist) and Teacher (classroom forms). Both are the editable
                      source of truth; the ISBE Child Files grid shows a read-only PI/PFA
                      subset. Sits under Enrollment Management; admin-only. -->
-                <a class="dash-item" href="/staff/child-files.html" data-role="admin">
+                <a class="dash-item" href="/staff/child-files.html" data-role="ops">
                     <div class="di-icon">🗂️</div>
                     <div class="di-content">
                         <div class="di-title">Child Files</div>
@@ -591,17 +592,33 @@ function showPortal() {
     const mc = document.getElementById('mainContent');
     mc.style.display = 'flex';
 
-    /* Role-shape the dashboard. Admin sees everything; a teacher sees only the
-       sections/cards marked data-role="all". Sections and individual cards carry
-       data-role="admin" (hidden from a teacher) or data-role="all" (everyone). */
+    /* Role-shape the dashboard. Three tiers:
+         admin  — sees everything.
+         ops    — Keyona/Paige/Tara: the data-role="all" cards PLUS data-role="ops"
+                  cards (the Daily Operations set: Enrollment Management, Child Files;
+                  ISBE is already "all"). No Administration/Compliance, no IT.
+         teacher— only the data-role="all" cards (Staff Portal, ISBE, Parents).
+       Admin is a superset of ops, so an admin also satisfies the ops gate. */
     const isAdmin = !!(window.WHO && window.WHO.admin);
+    const isOps = isAdmin || !!(window.WHO && window.WHO.ops);
     document.body.classList.toggle('role-admin', isAdmin);
-    document.body.classList.toggle('role-staff', !isAdmin);
+    document.body.classList.toggle('role-ops', isOps && !isAdmin);
+    document.body.classList.toggle('role-staff', !isAdmin && !isOps);
+
+    // Hide admin-only nodes from anyone who is not a centre admin.
     if (!isAdmin) {
         document.querySelectorAll('[data-role="admin"]').forEach(function (el) {
             el.style.display = 'none';
         });
-        // A friendly heading for the trimmed staff view.
+    }
+    // Hide ops-only nodes from anyone below the ops tier (plain teachers).
+    if (!isOps) {
+        document.querySelectorAll('[data-role="ops"]').forEach(function (el) {
+            el.style.display = 'none';
+        });
+    }
+    if (!isAdmin) {
+        // A friendly heading for the trimmed (ops or teacher) view.
         var t = document.getElementById('dashLead');
         if (t) t.textContent = 'Welcome' + (window.WHO && window.WHO.name ? ', ' + window.WHO.name.split(' ')[0] : '')
             + ' — here is what you have access to.';

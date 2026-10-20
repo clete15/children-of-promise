@@ -341,6 +341,14 @@ function readSession(token) {
 const STAFF_ADMIN_LOGINS = ['CleteH', 'MeganN', 'SaraH'];
 const IT_ADMIN_LOGINS = ['CleteH'];
 
+/* OPERATIONS tier — a third, narrower tier between teacher and centre admin. An ops
+   staff member sees the Daily Operations cards (Enrollment Management, ISBE PFA/PI,
+   Child Files) but NOT the centre-wide Administration / Compliance sections and NOT
+   the IT controls. These are lead/float teachers trusted to work the roster and the
+   compliance checklists day to day. Every centre admin is implicitly ops too.
+   LoginName is the stored login (first name + last initial by convention). */
+const OPS_LOGINS = ['KeyonaH', 'PaigeH', 'TaraG'];
+
 function isAdminLogin(loginName) {
     const l = String(loginName || '').trim().toLowerCase();
     if (!l) return false;
@@ -351,6 +359,15 @@ function isITAdminLogin(loginName) {
     const l = String(loginName || '').trim().toLowerCase();
     if (!l) return false;
     return IT_ADMIN_LOGINS.some(a => a.toLowerCase() === l);
+}
+
+/* Ops if explicitly listed, or if already a centre admin (admins see everything,
+   so they are a superset of ops). */
+function isOpsLogin(loginName) {
+    const l = String(loginName || '').trim().toLowerCase();
+    if (!l) return false;
+    if (isAdminLogin(l)) return true;
+    return OPS_LOGINS.some(a => a.toLowerCase() === l);
 }
 
 /* Is this staff id one of the administrators? Read from the row rather than passed in,
@@ -370,6 +387,15 @@ function staffIdIsITAdmin(staffId) {
     const r = runSQLRows(`SELECT ISNULL(LoginName,'') AS LoginName FROM Staff WHERE Id=${id}`);
     if (!r.ok || !r.rows[0]) return false;
     return isITAdminLogin(r.rows[0].LoginName);
+}
+
+// As above, but for the Operations tier (Daily Operations cards).
+function staffIdIsOps(staffId) {
+    const id = parseInt(staffId, 10);
+    if (!id) return false;
+    const r = runSQLRows(`SELECT ISNULL(LoginName,'') AS LoginName FROM Staff WHERE Id=${id}`);
+    if (!r.ok || !r.rows[0]) return false;
+    return isOpsLogin(r.rows[0].LoginName);
 }
 
 /* Who is asking? Either the director by shared password, or one specific staff
@@ -7789,6 +7815,12 @@ ELSE
                from admin so Megan and Sara get the whole-centre view without the power
                to ship code. */
             itAdmin: isITAdminLogin(row.LoginName),
+            /* The Operations tier: Keyona, Paige, Tara (plus every admin, who is a
+               superset). Reveals the Daily Operations cards without the centre-wide
+               Administration/Compliance sections. Card visibility only — DATA access
+               for roster/ISBE already rides on checkClassroomAuth for any signed-in
+               staff, so this grants no new endpoints. */
+            ops: isOpsLogin(row.LoginName),
             staffId: String(row.Id),
             name: String(row.Name || ''),
             loginName: String(row.LoginName || ''),
