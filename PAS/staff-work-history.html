@@ -52,9 +52,30 @@
             padding: 8px 10px; font-size: 9pt; color: #92400e; margin-bottom: 12px;
         }
         @media print {
-            body { padding: 0; }
-            @page { margin: 0.45in 0.5in; size: letter; }
+            /* Compress the whole form onto ONE Letter sheet. The content is fixed (a
+               Gateways verification form — all four position blocks and both legal
+               paragraphs must stay), so fitting a page is done purely by tightening the
+               print type and spacing; the on-screen form is unchanged. */
+            @page { margin: 0.35in 0.5in; size: letter; }
+            body { padding: 0; font-size: 9pt; line-height: 1.2; }
             .no-print, .note-screen { display: none !important; }
+            .gw-head { margin-bottom: 4px; }
+            .gw-head .big { font-size: 15pt; }
+            .gw-head .bar { font-size: 10.5pt; padding: 2px 5px; }
+            .gw-head .bar span { font-size: 8.5pt; }
+            .intro { font-size: 8pt; margin: 4px 0 6px; line-height: 1.25; }
+            .sec-title { font-size: 10.5pt; margin: 7px 0 3px; }
+            .grp-title { font-size: 9pt; margin-top: 5px; }
+            .row { gap: 5px; margin-top: 3px; }
+            .fill { min-height: 1.1em; }
+            .sig-label { font-size: 9pt; margin-top: 6px; }
+            .sig-row { margin-top: 2px; }
+            /* Keep the signature area short in print so a pad doesn't eat vertical
+               space, but scale the drawn ink to fit rather than cropping it. */
+            .pf-sign { max-height: 0.5in; overflow: hidden; }
+            .pf-sign img, .pf-sign canvas { max-height: 0.5in; width: auto; }
+            .legal { font-size: 6.6pt; line-height: 1.22; margin-top: 3px; text-align: justify; }
+            .footer { margin-top: 8px; padding-top: 4px; font-size: 7pt; }
         }
     </style>
 </head>
