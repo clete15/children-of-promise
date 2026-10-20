@@ -131,25 +131,42 @@
            notes are the most-read/most-edited field here, so they get the reclaimed
            room. */
         .notes-cell { min-width: 300px; max-width: 380px; height: 100%; }
+        /* The log of past note sections — each a distinct dated block, scrollable so a
+           long history never pushes the row tall. The textarea below is only the NEW
+           note being written. */
+        .notes-log {
+            max-height: 150px; overflow-y: auto; margin-bottom: 5px;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .note-section {
+            font-size: 0.8rem; line-height: 1.3; color: var(--sp-text);
+            background: var(--sp-surface-2, #f1f5f9); border: 1px solid var(--sp-border, #e2e8f0);
+            border-left: 3px solid var(--primary); border-radius: 4px; padding: 5px 8px;
+            white-space: pre-wrap; word-break: break-word;
+        }
+        .notes-empty { font-size: 0.78rem; color: var(--text-muted, #94a3b8); font-style: italic; padding: 2px 0; }
         .notes-input {
             width: 100%;
-            height: calc(100% - 24px);
             padding: 6px 8px;
-            /* A visible recessed well with a clear border, so the box reads as an
-               editable field against the row rather than blending into it. */
             border: 1px solid var(--sp-border-in);
             border-radius: 4px;
             font-size: 0.84rem;
             line-height: 1.35;
             font-family: inherit;
-            /* Vertical resize allowed so a long note can be opened up without the
-               horizontal resize that would distort the column. */
             resize: vertical;
-            min-height: 110px;
+            min-height: 54px;
             color: var(--sp-text);
             background: var(--sp-field-bg);
         }
         .notes-input:focus { outline: none; border-color: var(--primary); }
+        .notes-actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+        .btn-new-note {
+            margin-top: 3px; padding: 3px 10px;
+            background: var(--sp-surface-2, #e2e8f0); color: var(--sp-text-2, #334155);
+            border: 1px solid var(--sp-border, #cbd5e0); border-radius: 4px;
+            font-size: 0.68rem; font-weight: 700; cursor: pointer; transition: background 0.15s;
+        }
+        .btn-new-note:hover { background: var(--sp-surface, #cbd5e0); }
         .btn-save-notes {
             margin-top: 3px;
             padding: 3px 10px;
@@ -603,14 +620,19 @@ function renderTable() {
                     <option value="Pending" ${status==='Pending'?'selected':''}>Pending</option>
                     <option value="Contacted" ${status==='Contacted'?'selected':''}>Contacted</option>
                     <option value="Visited" ${status==='Visited'?'selected':''}>Visited</option>
+                    <option value="Ready to Start" ${status==='Ready to Start'?'selected':''}>Ready to Start</option>
                     <option value="Enroll">Enroll →</option>
                     <option value="Declined">Declined</option>
                 </select>
             </td>
             <td class="notes-cell">
-                <textarea class="notes-input" id="notes-${r.Id}" placeholder="Add notes…">${notes}</textarea>
-                <button class="btn-save-notes" onclick="saveNotes(${r.Id})">Save</button>
-                <button class="btn-delete-wl" onclick="deleteRecord(${parseInt(r.Id)}, '${(r.LastName + ', ' + r.FirstName).replace(/'/g, "\\'")}')" title="Delete this pre-enrollment record (for test/junk entries — real families are marked Declined instead)">Remove</button>
+                <div class="notes-log" id="noteslog-${r.Id}">${renderNoteSections(notes)}</div>
+                <textarea class="notes-input" id="notes-${r.Id}" placeholder="Add a note…"></textarea>
+                <div class="notes-actions">
+                    <button class="btn-save-notes" onclick="saveNotes(${r.Id})" title="Save this note">Save</button>
+                    <button class="btn-new-note" onclick="newNote(${r.Id})" title="Finish this note and start a new one">+ New note</button>
+                    <button class="btn-delete-wl" onclick="deleteRecord(${parseInt(r.Id)}, '${(r.LastName + ', ' + r.FirstName).replace(/'/g, "\\'")}')" title="Delete this pre-enrollment record (for test/junk entries — real families are marked Declined instead)">Remove</button>
+                </div>
             </td>
         </tr>`;
     }).join('');
@@ -692,6 +714,25 @@ function handleStatusChange(id, selectEl) {
         const row = allRows.find(r => r.Id == id);
         if (row) row.WaitlistStatus = val;
     });
+
+    /* A status change starts a new note section. If something is already typed in the
+       textarea, it is committed as its own section first; then a status-marker section
+       records the change (tagged with the new status), so the notes log reads as a
+       dated timeline of where this family stands. */
+    startStatusNote(id, val);
+}
+
+/* Commit any typed note, then add a "[Status] changed" marker section, both stamped. */
+async function startStatusNote(id, status) {
+    try {
+        let full = currentNotes(id);
+        const typed = buildSection(id);          // whatever is in the textarea now
+        if (typed) full = full ? full + SECTION_SEP + typed : typed;
+        const marker = '[' + status + ']  \u2014 ' + nowStamp();
+        full = full ? full + SECTION_SEP + marker : marker;
+        await persistNotes(id, full);
+        const el = document.getElementById('notes-' + id); if (el) el.value = '';
+    } catch (e) { /* status already saved; a note-log hiccup is non-fatal */ }
 }
 
 async function updateStatusAPI(id, status) {
@@ -703,35 +744,91 @@ async function updateStatusAPI(id, status) {
     } catch (e) { alert('Failed to update status'); }
 }
 
-async function saveNotes(id) {
-    const el = document.getElementById(`notes-${id}`);
-    // Notes must stay single-line: the API returns rows as pipe-delimited text split
-    // on newlines, so an embedded newline would break that record into bogus rows.
-    let notes = el.value.replace(/[\r\n]+/g, '  ').trim();
-    // Append a timestamp when there's content to stamp. Skip if it already ends
-    // with one, so re-saving unchanged text doesn't stack duplicates.
-    if (notes) {
-        const stampRe = /—\s*\d{1,2}\/\d{1,2}\/\d{4},?\s+\d{1,2}:\d{2}\s*(?:AM|PM)\s*$/i;
-        if (!stampRe.test(notes)) {
-            const now = new Date().toLocaleString('en-US', {
-                month: 'numeric', day: 'numeric', year: 'numeric',
-                hour: 'numeric', minute: '2-digit'
-            });
-            notes = notes + '  — ' + now;
-        }
+/* ── Sectioned notes ──────────────────────────────────────────────────────────
+   Notes are stored as ONE single-line string (the API transport splits rows on
+   newlines, so a note can never contain a real newline). To keep a log of distinct,
+   dated entries in that one line, sections are joined by SECTION_SEP. Each section is
+   its own dated note (optionally prefixed with a [Status] tag when the status changed).
+   The cell shows past sections as read-only stacked blocks; the textarea is only ever
+   the NEW note being written. */
+const SECTION_SEP = ' \u2016 ';   // ‖ — safe on one line, never typed by a user
+
+function noteSections(str) {
+    return String(str || '')
+        .split(/\s*\u2016\s*/)
+        .map(s => s.trim())
+        .filter(Boolean);
+}
+function renderNoteSections(str) {
+    const secs = noteSections(str);
+    if (!secs.length) return '<div class="notes-empty">No notes yet.</div>';
+    return secs.map(s => '<div class="note-section">' + escapeHtml(s) + '</div>').join('');
+}
+function escapeHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function nowStamp() {
+    return new Date().toLocaleString('en-US', {
+        month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
+    });
+}
+/* Turn whatever is in the textarea into a finished, stamped section string, or '' if
+   it is empty. `tag` optionally prefixes it, e.g. "Ready to Start" for a status change. */
+function buildSection(id, tag) {
+    const el = document.getElementById('notes-' + id);
+    if (!el) return '';
+    const text = el.value.replace(/[\r\n]+/g, '  ').trim();
+    if (!text) return '';
+    const prefix = tag ? '[' + tag + '] ' : '';
+    return prefix + text + '  \u2014 ' + nowStamp();
+}
+/* The current full stored notes string for a row (from the loaded record). */
+function currentNotes(id) {
+    const row = allRows.find(r => String(r.Id) === String(id));
+    const n = row && row.Notes;
+    return (!n || n === 'NULL') ? '' : String(n);
+}
+/* Persist a full notes string and refresh the row's log + record. */
+async function persistNotes(id, full) {
+    const res = await apiFetch(`/api/waitinglist/${id}`, {
+        method: 'PUT', body: JSON.stringify({ notes: full })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) throw new Error((data && data.error) || 'save failed');
+    const row = allRows.find(r => String(r.Id) === String(id));
+    if (row) row.Notes = full;
+    const log = document.getElementById('noteslog-' + id);
+    if (log) log.innerHTML = renderNoteSections(full);
+    return true;
+}
+
+/* Save: append the textarea's text as a NEW dated section (never rewrites old ones),
+   then clear the textarea so the next note starts clean. */
+async function saveNotes(id, tag) {
+    const sec = buildSection(id, tag);
+    if (!sec) {   // nothing typed — a no-op save, just acknowledge
+        const b = document.querySelector('#notes-' + id + ' ~ .notes-actions .btn-save-notes');
+        if (b) { b.textContent = 'Empty'; setTimeout(() => b.textContent = 'Save', 1200); }
+        return;
     }
-    el.value = notes;
+    const existing = currentNotes(id);
+    const full = existing ? existing + SECTION_SEP + sec : sec;
     try {
-        const res = await apiFetch(`/api/waitinglist/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ notes })
-        });
-        const data = await res.json();
-        if (data.success) {
-            const btn = document.querySelector(`#notes-${id} + button`);
-            if (btn) { btn.textContent = 'Saved ✓'; setTimeout(() => btn.textContent = 'Save', 2000); }
-        }
+        await persistNotes(id, full);
+        const el = document.getElementById('notes-' + id); if (el) el.value = '';
+        const b = document.querySelector('#notes-' + id + ' ~ .notes-actions .btn-save-notes');
+        if (b) { b.textContent = 'Saved ✓'; setTimeout(() => b.textContent = 'Save', 2000); }
     } catch (e) { alert('Failed to save notes'); }
+}
+
+/* "+ New note": commit the current textarea as a section (if any), clearing it so the
+   next note is visibly its own section. Same as Save, named for the user's intent. */
+async function newNote(id) {
+    const el = document.getElementById('notes-' + id);
+    if (el && !el.value.trim()) { el.focus(); return; }   // nothing to section off yet
+    await saveNotes(id);
+    const e2 = document.getElementById('notes-' + id); if (e2) e2.focus();
 }
 
 /* Save the edited requested start date (ChildStartDate). An empty value clears it.
