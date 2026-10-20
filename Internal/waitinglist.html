@@ -160,13 +160,6 @@
         }
         .notes-input:focus { outline: none; border-color: var(--primary); }
         .notes-actions { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
-        .btn-new-note {
-            margin-top: 3px; padding: 3px 10px;
-            background: var(--sp-surface-2, #e2e8f0); color: var(--sp-text-2, #334155);
-            border: 1px solid var(--sp-border, #cbd5e0); border-radius: 4px;
-            font-size: 0.68rem; font-weight: 700; cursor: pointer; transition: background 0.15s;
-        }
-        .btn-new-note:hover { background: var(--sp-surface, #cbd5e0); }
         .btn-save-notes {
             margin-top: 3px;
             padding: 3px 10px;
@@ -629,8 +622,7 @@ function renderTable() {
                 <div class="notes-log" id="noteslog-${r.Id}">${renderNoteSections(notes)}</div>
                 <textarea class="notes-input" id="notes-${r.Id}" placeholder="Add a note…"></textarea>
                 <div class="notes-actions">
-                    <button class="btn-save-notes" onclick="saveNotes(${r.Id})" title="Save this note">Save</button>
-                    <button class="btn-new-note" onclick="newNote(${r.Id})" title="Finish this note and start a new one">+ New note</button>
+                    <button class="btn-save-notes" onclick="saveNotes(${r.Id})" title="Save this note — it moves into the log above, stamped with the current status and date">Save</button>
                     <button class="btn-delete-wl" onclick="deleteRecord(${parseInt(r.Id)}, '${(r.LastName + ', ' + r.FirstName).replace(/'/g, "\\'")}')" title="Delete this pre-enrollment record (for test/junk entries — real families are marked Declined instead)">Remove</button>
                 </div>
             </td>
@@ -773,14 +765,17 @@ function nowStamp() {
         month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit'
     });
 }
-/* Turn whatever is in the textarea into a finished, stamped section string, or '' if
-   it is empty. `tag` optionally prefixes it, e.g. "Ready to Start" for a status change. */
+/* Turn whatever is in the textarea into a finished section string, or '' if it is
+   empty. Every saved note is stamped: the current status at the FRONT and the date at
+   the BACK, e.g. "[Contacted] left a voicemail  — 10/20/2026, 3:14 PM". Pass `tag` to
+   override the status label (used by the status-change marker). */
 function buildSection(id, tag) {
     const el = document.getElementById('notes-' + id);
     if (!el) return '';
     const text = el.value.replace(/[\r\n]+/g, '  ').trim();
     if (!text) return '';
-    const prefix = tag ? '[' + tag + '] ' : '';
+    const label = tag || currentStatus(id);
+    const prefix = label ? '[' + label + '] ' : '';
     return prefix + text + '  \u2014 ' + nowStamp();
 }
 /* The current full stored notes string for a row (from the loaded record). */
@@ -788,6 +783,12 @@ function currentNotes(id) {
     const row = allRows.find(r => String(r.Id) === String(id));
     const n = row && row.Notes;
     return (!n || n === 'NULL') ? '' : String(n);
+}
+/* The row's current waitlist status label (defaults to Pending). */
+function currentStatus(id) {
+    const row = allRows.find(r => String(r.Id) === String(id));
+    const s = row && row.WaitlistStatus;
+    return (!s || s === 'NULL') ? 'Pending' : String(s);
 }
 /* Persist a full notes string and refresh the row's log + record. */
 async function persistNotes(id, full) {
@@ -820,15 +821,6 @@ async function saveNotes(id, tag) {
         const b = document.querySelector('#notes-' + id + ' ~ .notes-actions .btn-save-notes');
         if (b) { b.textContent = 'Saved ✓'; setTimeout(() => b.textContent = 'Save', 2000); }
     } catch (e) { alert('Failed to save notes'); }
-}
-
-/* "+ New note": commit the current textarea as a section (if any), clearing it so the
-   next note is visibly its own section. Same as Save, named for the user's intent. */
-async function newNote(id) {
-    const el = document.getElementById('notes-' + id);
-    if (el && !el.value.trim()) { el.focus(); return; }   // nothing to section off yet
-    await saveNotes(id);
-    const e2 = document.getElementById('notes-' + id); if (e2) e2.focus();
 }
 
 /* Save the edited requested start date (ChildStartDate). An empty value clears it.
