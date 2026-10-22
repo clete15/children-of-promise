@@ -83,6 +83,7 @@
         .cfg-cell { min-width:74px; }
         .cfg-cell.filed { background:var(--sp-good-bg) !important; }
         .cfg-cell.paper { background:var(--sp-warn-bg) !important; }
+        .cfg-cell.cfg-na { color:var(--sp-muted);font-size:0.7rem;font-style:italic; }
         .cfg-check input { width:16px;height:16px;accent-color:#16a34a;cursor:pointer;vertical-align:middle; }
         .cfg-attach, .cfg-attached { display:inline-block;margin-left:6px;cursor:pointer;text-decoration:none;font-size:0.9rem; }
         .cfg-attach:hover { opacity:0.7; }
@@ -417,6 +418,9 @@ function roomNeedsDocs(s) {
     // True if this child is missing any Administrative document. Mirrors the checkbox /
     // file logic in renderAdmin so the sidebar count matches the grid exactly.
     return CHILD_DOCS.some(function (doc) {
+        // Vision/hearing don't apply to a PI child, so a missing one is not "needs docs"
+        // (keeps the sidebar count in step with the n/a cells in the grid).
+        if ((doc.key === 'vision' || doc.key === 'hearing') && s.PFA_PI_na === 'PI') return false;
         var file = childDocFile(s.Id, doc.key);
         if (file) return false;                       // a scan is on file
         if (doc.key === 'behaviorplan' || doc.key === 'transitionplan') return true; // upload-only, no file = missing
@@ -680,6 +684,14 @@ function renderAdmin() {
         + '</tr>';
     var rows = roster.map(function (s) {
         var cells = CHILD_DOCS.map(function (doc) {
+            /* Vision and hearing screening are school-age rules (77 Ill. Adm. Code
+               685/675). A PI child (birth-to-3) is not subject to them, so those two
+               columns do not apply — show an explicit n/a rather than an empty box a
+               teacher might feel obliged to tick. PFA (preschool) children in the same
+               room still get the real checkbox, so the column stays for them. */
+            if ((doc.key === 'vision' || doc.key === 'hearing') && s.PFA_PI_na === 'PI') {
+                return '<td class="cfg-cell cfg-na" title="Not required for PI (birth-to-3) children">n/a</td>';
+            }
             var file = childDocFile(s.Id, doc.key);
             /* Behavior Plan and Transition Plan are UPLOAD-ONLY pills: no "on paper"
                checkbox, because they are documents a monitor opens, not a box to tick.
