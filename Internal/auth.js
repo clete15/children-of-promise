@@ -72,6 +72,36 @@
        no-op on a clean browser and self-heals the ones that still carry old state.
        sessionStorage is untouched, so a sign-in done this session still works until
        the browser is closed. */
+    /* ── One-time token HANDOFF for a new tab ──
+       A link with target="_blank" no longer carries the opener's sessionStorage:
+       modern browsers treat target="_blank" as implicitly rel="noopener", so the new
+       tab opens with an EMPTY sessionStorage and a personal page (a PAS form) bounces
+       straight to /me — the "it keeps kicking me to the login" bug, which dropping
+       rel="noopener" no longer fixes because the browser applies it anyway.
+
+       So the opener hands the token across explicitly: just before opening the tab it
+       writes the token to this one localStorage key, and here — the instant the new
+       tab's auth.js runs — we lift it into THIS tab's sessionStorage and delete it
+       again. It exists in localStorage only for the blink between click and load, is
+       consumed exactly once, and never persists a session across a browser restart
+       (the purge below still runs), so the "a session must be re-made each visit"
+       guarantee holds. Only fills an empty sessionStorage, so it can never override a
+       real sign-in already in this tab. */
+    try {
+        var HANDOFF_KEY = 'copTokenHandoff';
+        var HANDOFF_NAME = 'copTokenHandoffName';
+        var ho = localStorage.getItem(HANDOFF_KEY);
+        if (ho) {
+            if (!sessionStorage.getItem(TOKEN_KEY)) {
+                sessionStorage.setItem(TOKEN_KEY, ho);
+                var hn = localStorage.getItem(HANDOFF_NAME);
+                if (hn) sessionStorage.setItem(TOKEN_NAME_KEY, hn);
+            }
+            localStorage.removeItem(HANDOFF_KEY);
+            localStorage.removeItem(HANDOFF_NAME);
+        }
+    } catch (e) { /* storage disabled — fall through to the normal gate */ }
+
     try {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(TOKEN_NAME_KEY);
@@ -318,6 +348,45 @@
         staffChangePassword: staffChangePassword, whoAmI: whoAmI,
         // True when this browser holds either kind of credential.
         signedIn: function () { return !!stored() || !!token(); },
-        isStaffSession: function () { return !stored() && !!token(); }
+        isStaffSession: function () { return !stored() && !!token(); },
+        /* Stage this tab's token for a new tab about to be opened (target="_blank").
+           The new tab's auth.js lifts it into its own sessionStorage and deletes it.
+           Call this in the click handler, immediately before the tab opens. No-op when
+           there is no personal token (a shared-password director has no token to pass —
+           the opened page's own 401→/me handling covers that case). */
+        handoffToken: function () {
+            try {
+                var t = token();
+                if (!t) return;
+                localStorage.setItem('copTokenHandoff', t);
+                var n = tokenName();
+                if (n) localStorage.setItem('copTokenHandoffName', n);
+            } catch (e) { /* storage disabled — nothing to hand off */ }
+        }
     };
+
+    /* ── Carry the sign-in into every new tab, automatically ──
+       Any link that opens a same-origin /pas/ page in a new tab (target="_blank")
+       would otherwise land there with an empty sessionStorage and bounce to /me (see
+       the handoff note above). Rather than tag each link, we stage the token here for
+       ANY such click — current and future PAS links alike. Capture phase so it runs
+       before the browser follows the link; only same-origin /pas/ new-tab links, so it
+       never leaks the token to an external site or a middle-click to elsewhere. */
+    try {
+        document.addEventListener('click', function (ev) {
+            // Ignore modified clicks the browser may handle oddly? No — a ctrl/middle
+            // click that opens a background tab needs the handoff too, so we don't skip
+            // those. We only require that it is an anchor to our own /pas/ in a new tab.
+            var a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+            if (!a) return;
+            if ((a.getAttribute('target') || '') !== '_blank') return;
+            var href = a.getAttribute('href') || '';
+            // Resolve relative hrefs against this page, then require same origin + /pas/.
+            var u;
+            try { u = new URL(href, location.href); } catch (e) { return; }
+            if (u.origin !== location.origin) return;
+            if (!/^\/pas\//i.test(u.pathname)) return;   // absolute path; URL() resolved it
+            window.CofpAuth.handoffToken();
+        }, true);
+    } catch (e) { /* no document (shouldn't happen for a page script) — skip */ }
 })();

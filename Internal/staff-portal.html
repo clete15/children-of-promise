@@ -1385,12 +1385,15 @@ function tabBar(s, tabs) {
               + 'title="Open ' + esc(s.Name || 'this person') + '\u2019s most recent Gateways PDR (view only)">'
               + '\u2197 PDR</button>'
               /* Same-origin PAS page: it reads identity from sessionStorage (copStaffToken).
-                 rel="noopener" gives the new tab a FRESH, EMPTY sessionStorage, so the token
-                 does not carry over and the PAS page's /api/staff 401s straight to /me — the
-                 "it kicks me back to the password screen" bug. Dropping noopener lets the new
-                 tab inherit the opener's sessionStorage snapshot, which carries the sign-in.
-                 Safe here because the target is our own origin (reverse-tabnabbing is only a
-                 cross-origin concern). */
+                 A new tab (target="_blank") no longer inherits the opener's sessionStorage —
+                 modern browsers treat target="_blank" as implicitly rel="noopener", so the
+                 new tab opens EMPTY and the PAS page 401s straight to /me ("it kicks me back
+                 to the password screen"). Dropping rel="noopener" does NOT fix it anymore.
+                 auth.js now stages the token across the open via a global click handler on
+                 any same-origin /pas/ target="_blank" link (CofpAuth.handoffToken), which
+                 the new tab's auth.js lifts into its own sessionStorage and deletes on load,
+                 so this link (and every other PAS link) carries the sign-in with no per-link
+                 markup. */
               + '<a class="sp-histbtn" href="/pas/staff-work-history.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank" '
               + 'title="Everywhere ' + esc(s.Name || 'this person') + ' has worked with children (Gateways form '
               + 'PD75a) \u2014 used to verify experience toward a credential level">Work History</a>'
