@@ -150,6 +150,12 @@
            not done enough to pass a monitor. */
         .cf-pill-partial { color:#92400e;background:#fef3c7;border-color:#f59e0b; }
         a.cf-pill-partial:hover { filter:brightness(1.03); }
+        /* The "not started" state — a CLEAR pill (no fill), dashed muted outline, so an
+           item nobody has begun reads as an open slot rather than an empty cell. Quieter
+           than missing-red (which is for required admin docs that are genuinely overdue):
+           this is simply "not done yet". Clickable for a screening (opens the form). */
+        .cf-pill-clear { color:var(--text-muted);background:transparent;border:1px dashed var(--sp-border); }
+        a.cf-pill-clear:hover { color:var(--sp-accent);border-color:var(--sp-accent); }
         td { padding:8px 12px;border-bottom:1px solid var(--sp-border);text-align:center;white-space:nowrap; }
         td.left { text-align:left;padding-left:16px; }
         /* Uniform row height: a cell with a screening pill + its date/flag line is two
@@ -2417,7 +2423,18 @@ function teacherPill(student, field, extra) {
             + ' onclick="event.preventDefault();' + screeningOpenCall(student, field) + '">\u25B2 finish</a>'
             + (extra || '');
     }
-    return '';   // nothing on file yet — empty cell
+    /* Nothing on file yet. Rather than an empty cell, show a CLEAR "not started" pill so
+       an item nobody has begun reads as an open slot at a glance. A screening pill is
+       clickable (opens the screening form, like the yellow "finish" pill); the other
+       teacher items are read-only on the roster, so theirs is a plain, non-clickable
+       pill — they are completed in the classroom card. */
+    const openCall = screeningOpenCall(student, field);
+    if (openCall && openCall !== 'void 0') {
+        return '<a class="cf-pill cf-pill-clear" href="#" title="Not started yet \u2014 click to open the screening and begin."'
+            + ' onclick="event.preventDefault();' + openCall + '">not started</a>'
+            + (extra || '');
+    }
+    return '<span class="cf-pill cf-pill-clear" title="Not started yet. Completed by the teacher in the classroom card.">not started</span>';
 }
 
 /* Why a screening cell is yellow, in words, for the pill's hover tooltip. A PI
