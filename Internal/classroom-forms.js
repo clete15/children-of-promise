@@ -129,18 +129,55 @@
         return beg ? 'BegASE' : 'EndASE';   // ASQ:SE-2
     }
 
-    /* Draw the state of an upload slot: a green "on file" line with a view link, or
+    /* Open uploaded child evidence WITH the current page's credentials. A normal href
+       cannot attach X-Staff-Token, so navigating straight to /api/doc-file returns
+       Unauthorized even though the person is signed in. Open a blank tab during the
+       click (so popup blockers allow it), fetch the protected bytes through apiFetch,
+       then point that tab at a temporary blob URL. */
+    function openUploadedFile(rel, name) {
+        if (!rel) return;
+        var tab = null;
+        try {
+            tab = window.open('about:blank', '_blank');
+            if (tab) tab.opener = null;
+        } catch (e) { tab = null; }
+        apiFetch('/api/doc-file?path=' + encodeURIComponent(rel))
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.status === 401 ? 'Your sign-in was not accepted' : ('HTTP ' + res.status));
+                return res.blob();
+            })
+            .then(function (blob) {
+                var u = URL.createObjectURL(blob);
+                if (tab && !tab.closed) tab.location.replace(u);
+                else {
+                    var a = document.createElement('a');
+                    a.href = u; a.target = '_blank'; a.rel = 'noopener';
+                    document.body.appendChild(a); a.click(); a.remove();
+                }
+                setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+            })
+            .catch(function (e) {
+                if (tab && !tab.closed) tab.close();
+                alert('Could not open "' + (name || 'uploaded file') + '": ' + e.message);
+            });
+    }
+
+    /* Draw the state of an upload slot: a green "on file" line with a View action, or
        a grey prompt when nothing is filed yet. rec is { on, name, relPath } or null. */
     function setUploadStatus(elId, rec, emptyText) {
         var el = document.getElementById(elId);
         if (!el) return;
         if (rec && rec.on) {
             var link = rec.relPath
-                ? ' \u2014 <a href="/api/doc-file?path=' + encodeURIComponent(rec.relPath)
-                  + '" target="_blank" rel="noopener">view</a>'
+                ? ' \u2014 <a href="#" class="cls-upload-view">view</a>'
                 : '';
             el.innerHTML = '\u2713 On file: ' + escapeHtml(rec.name || 'uploaded') + link;
             el.style.color = '#166534';
+            var view = el.querySelector('.cls-upload-view');
+            if (view) view.addEventListener('click', function (e) {
+                e.preventDefault();
+                openUploadedFile(rec.relPath, rec.name);
+            });
         } else {
             el.textContent = emptyText || 'Nothing uploaded yet.';
             el.style.color = '#64748b';
