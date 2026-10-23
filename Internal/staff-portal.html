@@ -768,52 +768,6 @@
     .cls-days-label { font-size:0.66rem;font-weight:700;color:var(--sp-quiet);margin-right:4px;text-transform:uppercase;letter-spacing:0.03em; }
     .cls-day { display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;padding:0 6px;border-radius:6px;border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-quiet);font-size:0.72rem;font-weight:700; }
     .cls-day-on { background:var(--sp-accent-soft);border-color:var(--sp-accent);color:var(--sp-accent); }
-
-    /* ── My Work ─────────────────────────────────────────────────────────────
-       A role-focused landing surface: today's shift, the employee's assigned room(s),
-       and the next classroom actions derived from the same forms/checklist data as
-       My Classroom. No second task store — when the evidence changes, this view does. */
-    .mw-hero { padding:18px 20px; }
-    .mw-hero-row { display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap; }
-    .mw-eyebrow { font-size:0.7rem;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--sp-muted); }
-    .mw-today { font-size:1.25rem;font-weight:800;color:var(--sp-text);margin-top:3px; }
-    .mw-context { color:var(--sp-text-2);font-size:0.9rem;margin-top:5px;line-height:1.45; }
-    .mw-counts { display:flex;gap:8px;flex-wrap:wrap; }
-    .mw-count { min-width:78px;padding:8px 11px;border:1px solid var(--sp-border);border-radius:9px;background:var(--sp-surface-2);text-align:center; }
-    .mw-count strong { display:block;font-size:1.05rem;color:var(--sp-text); }
-    .mw-count span { display:block;font-size:0.68rem;color:var(--sp-muted);margin-top:1px; }
-    .mw-count.ready strong { color:var(--sp-accent); }
-    .mw-count.waiting strong { color:var(--sp-warn-fg); }
-    .mw-next { width:100%;margin-top:14px;padding:11px 16px;border:0;border-radius:8px;background:var(--sp-accent);color:#fff;font:800 0.9rem/1.2 inherit;cursor:pointer; }
-    .mw-next:hover { filter:brightness(1.07); }
-    .mw-next:focus-visible { outline:2px solid var(--sp-accent);outline-offset:3px; }
-    .mw-next:disabled { background:var(--sp-border);color:var(--sp-muted);cursor:default;filter:none; }
-    .mw-section { margin-bottom:16px; }
-    .mw-section-head { display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:8px;padding:0 2px; }
-    .mw-section-head h2 { font-size:0.93rem;text-align:left;margin:0;color:var(--sp-text); }
-    .mw-section-note { font-size:0.72rem;color:var(--sp-muted); }
-    .mw-list { display:flex;flex-direction:column;gap:8px; }
-    .mw-task { width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:11px 13px;border:1.5px solid var(--sp-border);border-radius:9px;background:var(--sp-surface);color:var(--sp-text);font-family:inherit; }
-    button.mw-task { cursor:pointer; }
-    button.mw-task:hover { border-color:var(--sp-accent);background:var(--sp-accent-soft); }
-    button.mw-task:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
-    .mw-task-mark { width:28px;height:28px;flex:0 0 28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:0.76rem;font-weight:900;background:var(--sp-accent-soft);color:var(--sp-accent); }
-    .mw-task.due .mw-task-mark { background:var(--sp-warn-bg);color:var(--sp-warn-fg); }
-    .mw-task.wait .mw-task-mark { background:var(--sp-surface-2);color:var(--sp-muted); }
-    .mw-task.done .mw-task-mark { background:var(--sp-good-bg);color:var(--sp-good-fg); }
-    .mw-task-main { flex:1 1 auto;min-width:0; }
-    .mw-task-title { font-size:0.88rem;font-weight:800;color:var(--sp-text); }
-    .mw-task-meta { font-size:0.75rem;color:var(--sp-muted);margin-top:2px;line-height:1.4; }
-    .mw-task-go { flex:0 0 auto;color:var(--sp-accent);font-size:0.76rem;font-weight:800;white-space:nowrap; }
-    .mw-empty { padding:14px;border:1px dashed var(--sp-border);border-radius:9px;color:var(--sp-muted);font-size:0.82rem;text-align:center;background:var(--sp-surface-2); }
-    .mw-all-done { padding:18px;border:1px solid var(--sp-good-br);border-radius:10px;background:var(--sp-good-bg);color:var(--sp-good-fg);font-size:0.9rem;font-weight:700;text-align:center; }
-    .mw-columns { display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start; }
-    @media (max-width:700px) {
-        .mw-columns { grid-template-columns:1fr;gap:0; }
-        .mw-task { padding:12px; }
-        .mw-task-go { display:none; }
-        .mw-count { flex:1 1 78px; }
-    }
 </style>
 </head>
 <body>
@@ -1295,16 +1249,12 @@ function selfEditCard(s) {
    Grouped by the job somebody came here to do rather than by where the data
    happens to live:
 
-     My Work     today's shift and the next actions for assigned rooms
-     Credentials the ECE route, the ITC route, and my training completions
-     My Classroom the full room checklist, one card per child
-     My Schedule the current work week
+     Credentials  the ECE route, the ITC route, and my training completions
+     My Classroom my room's checklist, one card per child
      My files     what is on file, and handing in what is not
      Forms        goal plan, self-appraisal, reviews, observations
 
-   A normal employee lands on My Work because classroom work is the frequent job.
-   Administrators keep Credentials as their default because they commonly open this
-   page to review another employee. An explicit tab in the URL always wins.
+   Credentials leads because it is what most people open this page to check.
    "Where you stand" (the old Overview) is no longer a tab — it is a summary of
    the person, so it sits under the name card, always visible, rather than being
    somewhere to navigate to. Training sits under Credentials rather than alone,
@@ -1319,7 +1269,6 @@ function selfEditCard(s) {
    card they are already looking at. The self-edit card still exists; it is just
    shown under the header rather than behind a tab. */
 const SP_TABS = [
-    { key: 'work',        label: 'My Work' },
     { key: 'credentials', label: 'Gateways Credentials' },
     { key: 'classroom',   label: 'My Classroom' },
     { key: 'schedule',    label: 'My Schedule' }
@@ -1333,9 +1282,8 @@ const SP_TABS = [
     */
 ];
 
-/* Start neutral on Credentials while identity loads. Once WHO is known, a normal
-   employee defaults to My Work; administrators keep Credentials. An explicit ?tab=
-   or hash always wins, so existing direct links still land where requested. */
+/* "Where you stand" (the old Overview) is no longer a tab — it sits under the name
+   card, always visible. So the default tab is the first remaining one. */
 let activeTab = 'credentials';
 
 /* Which credential the Gateways Credentials tab is showing — 'ece' or 'itc'. The two
@@ -1361,11 +1309,6 @@ let transcriptOpen = false;
    count that cannot be worked out is simply not shown. */
 function tabCount(key, s) {
     try {
-        if (key === 'work') {
-            if (clsState !== 'ready') return 0;
-            const m = workModel(s);
-            return m.doNow.length + m.dueSoon.length;
-        }
         if (key === 'files') {
             /* FILES is null until the fetch returns, and the first render deliberately
                happens before then so the page appears immediately rather than blank.
@@ -1403,11 +1346,7 @@ function adminHere(s) {
 }
 
 function visibleTabs(s) {
-    // For a teacher this is literally "My Work". An administrator may be viewing
-    // somebody else, so name the same panel "Staff Work" to keep the context honest.
-    const tabs = SP_TABS.map(t => (t.key === 'work' && isAdmin())
-        ? { key: t.key, label: 'Staff Work' }
-        : t);
+    const tabs = SP_TABS.slice();
     if (adminHere(s)) tabs.push({ key: 'admin', label: 'Admin' });
     return tabs;
 }
@@ -1488,7 +1427,6 @@ function tabBar(s, tabs) {
 
 function tabPanels(s, tabs) {
     const build = {
-        work: myWorkSection,
         classroom: classroomSection,
         credentials: credentialsSection,
         schedule: scheduleSection,
@@ -1518,16 +1456,6 @@ function wireTabs(s, tabs) {
             const p = $('sppanel_' + t.key);
             if (p) p.hidden = t.key !== key;
         });
-        // Panels are built while hidden, but their heavier data loads wait until the
-        // user opens a tab. My Work needs both classroom evidence and today's schedule.
-        if (key === 'work') {
-            if (clsState === 'idle') loadClassroomData();
-            if (schState === 'idle') loadMySchedule();
-        } else if (key === 'classroom' && clsState === 'idle') {
-            loadClassroomData();
-        } else if (key === 'schedule' && schState === 'idle') {
-            loadMySchedule();
-        }
     };
     btns.forEach((b, i) => {
         b.addEventListener('click', () => show(b.getAttribute('data-tab')));
@@ -1563,8 +1491,6 @@ function render() {
     // the elements they belong to each time.
     wireCardActions();
     wireDetailsToggle();
-    // My Work rows use the same CofpForms entry points as the classroom chips.
-    wireMyWork();
     // The classroom panel carries its own controls (room picker, chips, print all).
     if (clsState === 'ready') wireClassroom();
     // The admin tab (Clete/Megan only) carries the attainments uploader.
@@ -2122,363 +2048,6 @@ function credentialsSection(s) {
     return html;
 }
 
-/* ── My Work ────────────────────────────────────────────────────────────────
-   A thin workflow layer over data that already exists. It does NOT keep its own
-   completion flags: classroom forms/files remain the evidence, tracking remains the
-   checklist, and the weekly schedule remains the schedule. This view only answers
-   "what should this employee do next?" for their assigned primary/secondary rooms. */
-function assignedWorkRooms(s) {
-    if (!s) return [];
-    const links = [
-        { num: s.RoomNumber,          text: s.Classroom,          secondary: false },
-        { num: s.SecondaryRoomNumber, text: s.SecondaryClassroom, secondary: true  }
-    ];
-    const seen = new Set();
-    return links.map(link => {
-        const num = String(link.num || '').trim();
-        if (!num || seen.has(num)) return null;
-        seen.add(num);
-        const room = (ROOMS || []).find(r => String(r.RoomNumber) === num);
-        return {
-            roomNumber: num,
-            name: room ? (String(room.Room || '').trim() || ('Room ' + num))
-                : (String(link.text || '').trim() || ('Room ' + num)),
-            secondary: link.secondary
-        };
-    }).filter(Boolean);
-}
-
-function workChildren(s) {
-    const roomIds = new Set(assignedWorkRooms(s).map(r => String(r.roomNumber)));
-    if (!roomIds.size) return [];
-    return CLS_STUDENTS.filter(child =>
-        (child.Active === 'Yes' || child.Active === 'YES')
-        && roomIds.has(String(child.RoomNumber))
-        // Before/after-school cards show attending days rather than this checklist.
-        && String(child.Type || '').trim().toLowerCase() !== 'n/a'
-    ).sort(CofpForms.sortByName);
-}
-
-function workFieldLabel(field) {
-    const labels = {
-        PermissionSlip: 'Permission Slip', BegASQ: 'Beginning ASQ-3',
-        BegASE: 'Beginning ASQ:SE-2', MidYearReport: 'Mid-Year Report Card',
-        EndASQ: 'End ASQ-3', EndASE: 'End ASQ:SE-2',
-        EndYearReport: 'End-Year Report Card',
-        ExitInterview: 'PFA Exit Interview',
-        ScreeningResultsShared: 'Screening Results Shared',
-        ParentInterview: 'Parent Interview'
-    };
-    return labels[field] || field;
-}
-
-function workAction(field, studentId) {
-    if (field === 'PermissionSlip') return 'permission|' + studentId;
-    if (field === 'BegASQ') return 'screening|' + studentId + '|ASQ-3|Beginning';
-    if (field === 'EndASQ') return 'screening|' + studentId + '|ASQ-3|End';
-    if (field === 'BegASE') return 'screening|' + studentId + '|ASQ:SE-2|Beginning';
-    if (field === 'EndASE') return 'screening|' + studentId + '|ASQ:SE-2|End';
-    if (field === 'MidYearReport' || field === 'EndYearReport') return 'upload|' + studentId + '|' + field;
-    if (field === 'ExitInterview') return 'exit|' + studentId;
-    if (field === 'ScreeningResultsShared') return 'results|' + studentId;
-    return '';
-}
-
-function workEvidenceDate(studentId, field) {
-    let date = ChildForms.formDate(studentId, field) || '';
-    if (!date && (field === 'MidYearReport' || field === 'EndYearReport')) {
-        const f = ChildForms.fileFor(studentId, field, 'report');
-        date = f && f.date ? f.date : '';
-    }
-    return String(date || '').slice(0, 10);
-}
-
-function shortWorkDate(iso) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(iso || ''))) return '';
-    const p = String(iso).split('-');
-    return Number(p[1]) + '/' + Number(p[2]) + '/' + String(p[0]).slice(2);
-}
-
-/* Build the four user-facing buckets. Seasonal fields stay out of sight until staff
-   can reasonably act on them: mid-year report cards Jan-Mar; end screenings/reports
-   Apr-Jun. Beginning screenings remain visible until finished, including late starts. */
-function workModel(s) {
-    const out = { doNow: [], dueSoon: [], waiting: [], done: [] };
-    if (clsState !== 'ready' || !window.ChildForms || !window.CofpForms) return out;
-    const month = new Date().getMonth();       // 0=Jan
-    const midSeason = month >= 0 && month <= 2;
-    const endSeason = month >= 3 && month <= 5;
-    const children = workChildren(s);
-    const roomName = id => {
-        const r = (ROOMS || []).find(x => String(x.RoomNumber) === String(id));
-        return r ? String(r.Room || '') : ('Room ' + id);
-    };
-    const addTask = (bucket, child, field, state, detail, priority) => {
-        bucket.push({
-            childId: String(child.Id), field: field,
-            title: workFieldLabel(field),
-            child: String(child.First_Name || '') + ' ' + String(child.Last_Name || ''),
-            room: roomName(child.RoomNumber), detail: detail || '',
-            state: state, priority: priority == null ? 5 : priority,
-            action: workAction(field, child.Id)
-        });
-    };
-
-    children.forEach(child => {
-        const track = CLS_TRACKING[child.Id] || {};
-        const isPI = String(child.PFA_PI_na || '').trim().toUpperCase() === 'PI';
-        const screeningFields = ['BegASQ','BegASE','EndASQ','EndASE'];
-        const stateOf = field => {
-            const base = ChildForms.state(child.Id, field, !!track[field], isPI);
-            /* My Work follows the settled compliance rule: the TEACHER-SCORED summary
-               completes a screening. The parent questionnaire is optional supporting
-               evidence and cannot leave the task in Do now. ChildForms' older PI state
-               still asks for questionnaire + both signatures; override only the work
-               queue until that shared state is corrected as its own reviewed change. */
-            if (isPI && screeningFields.indexOf(field) !== -1) {
-                if (ChildForms.hasForm(child.Id, field)) return 'form';
-                const someProgress = ChildForms.hasFile(child.Id, field, 'questionnaire')
-                    || ChildForms.hasSignature(child.Id, field, 'parent')
-                    || ChildForms.hasSignature(child.Id, field, 'staff');
-                if (someProgress) return 'partial';
-            }
-            return base;
-        };
-        const doneState = st => st === 'form' || st === 'tick' || st === 'unknown';
-
-        // Permission is actionable throughout the year until complete.
-        const ps = stateOf('PermissionSlip');
-        if (!doneState(ps)) {
-            addTask(out.doNow, child, 'PermissionSlip', ps,
-                ps === 'partial' || ps === 'tick-only' ? 'Started — finish and file it' : 'Ready for parent signature', 0);
-        }
-
-        // Beginning screenings stay in the queue until finished. Partial and overdue
-        // work belongs in Do now; unstarted work with time remaining belongs Due soon.
-        ['BegASQ', 'BegASE'].forEach(field => {
-            const st = stateOf(field);
-            if (doneState(st)) return;
-            const type = field === 'BegASQ' ? 'ASQ-3' : 'ASQ:SE-2';
-            const rec = (CLS_SCREENING[child.Id] || {})[type + '|Beginning'];
-            const dl = CofpForms.screeningDeadline(child, rec && rec.ScreeningDate, CLS_YEAR);
-            const dlText = dl ? dl.text : 'Beginning-of-year screening';
-            if (st === 'partial' || st === 'tick-only' || (dl && dl.state === 'overdue')) {
-                addTask(out.doNow, child, field, st,
-                    (st === 'partial' || st === 'tick-only' ? 'Started — finish the remaining pieces' : dlText),
-                    dl && dl.state === 'overdue' ? 0 : 1);
-            } else {
-                addTask(out.dueSoon, child, field, st, dlText,
-                    dl && dl.state === 'due' ? 1 : 2);
-            }
-        });
-
-        if (midSeason) {
-            const st = stateOf('MidYearReport');
-            if (!doneState(st)) addTask(out.doNow, child, 'MidYearReport', st,
-                st === 'tick-only' ? 'Marked done — upload the copy' : 'Upload the report card', 2);
-        }
-        if (endSeason) {
-            ['EndASQ', 'EndASE', 'EndYearReport'].forEach(field => {
-                const st = stateOf(field);
-                if (!doneState(st)) addTask(out.doNow, child, field, st,
-                    st === 'partial' || st === 'tick-only' ? 'Started — finish the remaining pieces'
-                        : (field === 'EndYearReport' ? 'Upload the report card' : 'Ready to complete'), 2);
-            });
-            // PFA children also have a signed end-of-year Exit Interview.
-            if (String(child.PFA_PI_na || '').trim().toUpperCase() === 'PFA') {
-                const exitState = stateOf('ExitInterview');
-                if (!doneState(exitState)) addTask(out.doNow, child, 'ExitInterview', exitState,
-                    exitState === 'tick-only' ? 'Marked done — finish the signed form' : 'Ready for the parent and teacher', 3);
-            }
-        }
-
-        /* Once both beginning screenings exist for a PI child, results sharing is the
-           next teacher action unless its own seven-component record is already on file. */
-        if (isPI && doneState(stateOf('BegASQ')) && doneState(stateOf('BegASE'))) {
-            const rs = stateOf('ScreeningResultsShared');
-            if (!doneState(rs)) addTask(out.doNow, child, 'ScreeningResultsShared', rs,
-                'Record who received the results, when, and how', 1);
-        }
-
-        /* Parent Interview is office-owned. Teachers see it only as a dependency in
-           Waiting, so they know why the child's beginning packet is not complete without
-           being asked to perform an admin task. */
-        if (child.PFA_PI_na === 'PI' || child.PFA_PI_na === 'PFA') {
-            const pi = stateOf('ParentInterview');
-            if (!doneState(pi)) addTask(out.waiting, child, 'ParentInterview', pi,
-                'Office task — waiting for enrollment/admin completion', 5);
-        }
-
-        // Show dated evidence only; an undated paper tick is not useful as "recent".
-        ['PermissionSlip','BegASQ','BegASE','MidYearReport','EndASQ','EndASE','EndYearReport','ExitInterview','ScreeningResultsShared']
-            .forEach(field => {
-                const st = stateOf(field);
-                const date = doneState(st) ? workEvidenceDate(child.Id, field) : '';
-                if (!date) return;
-                out.done.push({
-                    childId: String(child.Id), field: field,
-                    title: workFieldLabel(field),
-                    child: String(child.First_Name || '') + ' ' + String(child.Last_Name || ''),
-                    room: roomName(child.RoomNumber), detail: 'Completed ' + shortWorkDate(date),
-                    date: date, state: 'done', priority: 9, action: workAction(field, child.Id)
-                });
-            });
-    });
-
-    const taskSort = (a, b) => a.priority - b.priority
-        || a.child.localeCompare(b.child, undefined, { sensitivity: 'base' })
-        || a.title.localeCompare(b.title);
-    out.doNow.sort(taskSort);
-    out.dueSoon.sort(taskSort);
-    out.waiting.sort(taskSort);
-    out.done.sort((a, b) => b.date.localeCompare(a.date)).splice(5);
-    return out;
-}
-
-function workTodayContext(s) {
-    const rooms = assignedWorkRooms(s);
-    const roomText = rooms.length
-        ? rooms.map(r => r.name + (r.secondary ? ' (part time)' : '')).join(' · ')
-        : 'No classroom assigned';
-    const now = new Date();
-    const day = now.getDay();
-    let shift = 'Weekend';
-    if (schState === 'loading' || schState === 'idle') shift = 'Loading today\u2019s shift…';
-    else if (schState === 'error') shift = 'Schedule unavailable';
-    else if (schState === 'ready' && day >= 1 && day <= 5) {
-        const idx = day - 1;
-        const val = (schData.days[SCH_DAYS[idx]] || '').trim();
-        shift = schData.noSchool.has(idx) ? 'MCS Closed'
-            : /^off$/i.test(val) ? 'OFF'
-            : val || 'No shift listed';
-    }
-    return { rooms: roomText, shift: shift };
-}
-
-function workTaskHtml(task, kind) {
-    const actionable = !!task.action;
-    const tag = actionable ? 'button' : 'div';
-    const attr = actionable
-        ? ' type="button" data-work-act="' + esc(task.action) + '"'
-        : '';
-    const symbol = kind === 'done' ? '\u2713' : kind === 'waiting' ? '\u2026' : kind === 'due' ? '!' : '\u2192';
-    return '<' + tag + ' class="mw-task ' + (kind === 'waiting' ? 'wait' : kind) + '"' + attr + '>'
-        + '<span class="mw-task-mark">' + symbol + '</span>'
-        + '<span class="mw-task-main"><span class="mw-task-title">' + esc(task.child) + ' \u00b7 ' + esc(task.title) + '</span>'
-        + '<span class="mw-task-meta">' + esc(task.room) + (task.detail ? ' \u00b7 ' + esc(task.detail) : '') + '</span></span>'
-        + (actionable && kind !== 'done' ? '<span class="mw-task-go">Open \u203a</span>' : '')
-        + '</' + tag + '>';
-}
-
-function workSectionHtml(title, note, list, kind, empty) {
-    return '<section class="mw-section"><div class="mw-section-head"><h2>' + esc(title) + '</h2>'
-        + (note ? '<span class="mw-section-note">' + esc(note) + '</span>' : '') + '</div>'
-        + (list.length
-            ? '<div class="mw-list">' + list.map(t => workTaskHtml(t, kind)).join('') + '</div>'
-            : '<div class="mw-empty">' + esc(empty) + '</div>')
-        + '</section>';
-}
-
-function myWorkSection(s) {
-    // Both datasets feed the header/queue. Start them only when this tab is actually
-    // selected; tabPanels builds hidden panels too, and hidden work must not fetch.
-    if (activeTab === 'work' && clsState === 'idle') setTimeout(loadClassroomData, 0);
-    if (activeTab === 'work' && schState === 'idle') setTimeout(loadMySchedule, 0);
-
-    const today = new Date().toLocaleDateString('en-US', {
-        weekday: 'long', month: 'long', day: 'numeric'
-    });
-    const workHeading = isAdmin() ? 'Staff Work' : 'My Work';
-    const ctx = workTodayContext(s);
-
-    if (clsState === 'idle' || clsState === 'loading') {
-        return '<div class="sp-card mw-hero"><div class="mw-eyebrow">' + workHeading + '</div>'
-            + '<div class="mw-today">' + esc(today) + '</div>'
-            + '<div class="mw-context">' + esc(ctx.rooms) + ' \u00b7 ' + esc(ctx.shift) + '</div>'
-            + '<div class="sp-sub" style="margin:18px 0 0;">Building your work list…</div></div>';
-    }
-    if (clsState === 'error') {
-        return '<div class="sp-card mw-hero"><div class="mw-eyebrow">' + workHeading + '</div>'
-            + '<div class="mw-today">' + esc(today) + '</div>'
-            + '<div class="mw-context">' + esc(ctx.rooms) + ' \u00b7 ' + esc(ctx.shift) + '</div>'
-            + '<div class="sp-sub sp-err" style="margin:18px 0 0;">Could not build your work list: '
-            + esc(clsError) + '</div></div>';
-    }
-
-    const m = workModel(s);
-    const next = m.doNow.find(t => t.action) || m.dueSoon.find(t => t.action) || null;
-    const hero = '<div class="sp-card mw-hero"><div class="mw-hero-row"><div>'
-        + '<div class="mw-eyebrow">' + workHeading + '</div><div class="mw-today">' + esc(today) + '</div>'
-        + '<div class="mw-context">' + esc(ctx.rooms) + ' \u00b7 Today: ' + esc(ctx.shift) + '</div></div>'
-        + '<div class="mw-counts">'
-        + '<div class="mw-count ready"><strong>' + m.doNow.length + '</strong><span>do now</span></div>'
-        + '<div class="mw-count"><strong>' + m.dueSoon.length + '</strong><span>due soon</span></div>'
-        + '<div class="mw-count waiting"><strong>' + m.waiting.length + '</strong><span>waiting</span></div>'
-        + '</div></div>'
-        + '<button type="button" class="mw-next" id="mwContinue"'
-        + (next ? ' data-work-act="' + esc(next.action) + '">Continue: ' + esc(next.title) + ' for ' + esc(next.child)
-                : ' disabled>Nothing ready to do')
-        + '</button></div>';
-
-    if (!assignedWorkRooms(s).length) {
-        return hero + '<div class="mw-empty">No classroom is assigned to this staff record, so there is no personal work queue yet. Assign a primary or secondary room to build it.</div>';
-    }
-    if (!m.doNow.length && !m.dueSoon.length && !m.waiting.length) {
-        return hero + '<div class="mw-all-done">\u2713 You are caught up. Nothing is waiting in your assigned classroom checklist.</div>'
-            + (m.done.length ? '<div style="margin-top:16px;">'
-                + workSectionHtml('Done recently', 'Latest 5', m.done, 'done', 'Nothing completed yet.') + '</div>' : '');
-    }
-
-    return hero
-        + '<div class="mw-columns"><div>'
-        + workSectionHtml('Do now', 'Ready to complete', m.doNow, 'ready', 'Nothing needs immediate attention.')
-        + workSectionHtml('Due soon', 'Upcoming classroom work', m.dueSoon, 'due', 'Nothing due soon.')
-        + '</div><div>'
-        + workSectionHtml('Waiting', 'Someone else has the next step', m.waiting, 'waiting', 'Nothing is waiting on someone else.')
-        + workSectionHtml('Done recently', 'Latest 5', m.done, 'done', 'No dated completions yet.')
-        + '</div></div>';
-}
-
-function runWorkAction(action) {
-    const p = String(action || '').split('|');
-    const id = parseInt(p[1], 10);
-    if (!id || !window.CofpForms) return;
-    if (p[0] === 'permission') CofpForms.openPermissionSlip(id);
-    else if (p[0] === 'screening') CofpForms.openScreening(id, p[2], p[3]);
-    else if (p[0] === 'upload') CofpForms.openReportUpload(id, p[2]);
-    else if (p[0] === 'exit') CofpForms.openExitInterview(id);
-    else if (p[0] === 'results') CofpForms.openResultsShared(id);
-}
-
-function wireMyWork() {
-    document.querySelectorAll('#sppanel_work [data-work-act]').forEach(el => {
-        el.addEventListener('click', () => runWorkAction(el.getAttribute('data-work-act')));
-    });
-}
-
-function renderWorkPanel() {
-    const panel = document.getElementById('sppanel_work');
-    if (!panel || !current) return;
-    panel.innerHTML = myWorkSection(current);
-    wireMyWork();
-    // Keep the tab badge in step without a full render (which could disturb an open form).
-    const tab = document.getElementById('sptab_work');
-    if (tab && clsState === 'ready') {
-        const m = workModel(current);
-        const n = m.doNow.length + m.dueSoon.length;
-        let badge = tab.querySelector('.sp-count');
-        if (n && !badge) {
-            badge = document.createElement('span');
-            badge.className = 'sp-count';
-            tab.appendChild(badge);
-        }
-        if (badge) {
-            if (n) { badge.textContent = n; badge.setAttribute('aria-label', n + ' needing attention'); }
-            else badge.remove();
-        }
-    }
-}
-
 /* ── Their classroom ──
    The compliance work for a child is done on the roster, and until now there was
    no route from a staff member to their own room: they had to open the ISBE page
@@ -2548,10 +2117,11 @@ function myClassrooms(s) {
 }
 
 /* ── My Classroom ──────────────────────────────────────────────────────────
-   The full room checklist, native to My Page: a room picker, the batch of what is
-   outstanding for the room, then one card per child with a chip for each TEACHER task.
-   Parent Interview is intentionally not here: it is an office/admin enrollment task,
-   and My Work shows its status under Waiting so the teacher knows who owns it.
+   The full room checklist, native to My Page: a room picker (limited to the
+   rooms this person is assigned to), the batch of what is outstanding for the
+   room, then one card per child with a chip for each teacher task. The chips
+   open the very same Parent Interview / Permission Slip / Screening forms the
+   ISBE roster opens, because both pages share classroom-forms.js.
 
    The data is loaded lazily — this returns a loading state on first paint and
    kicks off loadClassroomData(), which re-renders this panel when it lands. */
@@ -2565,10 +2135,8 @@ function classroomSection(s) {
             + 'your record.</div></div>';
     }
 
-    // Hidden tab panels are built too; fetch only when Classroom or My Work needs it.
-    if (clsState === 'idle' && (activeTab === 'classroom' || activeTab === 'work')) {
-        setTimeout(loadClassroomData, 0);
-    }
+    // Kick off the fetch the first time the tab is rendered.
+    if (clsState === 'idle') { setTimeout(loadClassroomData, 0); }
 
     let inner;
     if (clsState === 'loading' || clsState === 'idle') {
@@ -2581,8 +2149,9 @@ function classroomSection(s) {
     }
 
     return '<div class="sp-card"><h2>My Classroom</h2>'
-        + '<div class="sp-sub">Your children\u2019s screening permissions, ASQ/ASE summaries and '
-        + 'report cards. Everything opens and saves here; Parent Interviews are completed by the office.</div>'
+        + '<div class="sp-sub">Your children\u2019s screenings, permission slips and parent '
+        + 'interviews. Everything opens and saves here, and a signed paper copy can be checked '
+        + 'in against the child.</div>'
         + inner + '</div>';
 }
 
@@ -3802,12 +3371,9 @@ function initClassroomForms() {
         getYear: () => CLS_YEAR || currentSchoolYear(),
         apiFetch: (url, opts) => myFetch(url, opts),
         ChildForms: window.ChildForms,
-        // After a save, refresh both working surfaces from the same in-memory evidence:
-        // the detailed classroom cards and the role-focused My Work queue.
-        refreshActiveView: () => {
-            renderClassroomPanel();
-            renderWorkPanel();
-        },
+        // After a save the module calls this so the open room re-renders with the
+        // new tick, exactly as isbe.html's refreshActiveView does for its views.
+        refreshActiveView: () => renderClassroomPanel(),
         // Print All in the classroom is scoped to the room on screen.
         classroomRoster: () => classroomRoster(activeClsRoom)
     });
@@ -3876,7 +3442,6 @@ async function loadClassroomData() {
         clsError = e.message;
     }
     renderClassroomPanel();
-    renderWorkPanel();
 }
 
 /* Every active child in a room, sorted by name.
@@ -3948,9 +3513,6 @@ function schDayLabel(weekStart, offset) {
 }
 
 async function loadMySchedule() {
-    // My Work and My Schedule both depend on this. Both panels are built during the
-    // page render, so guard the shared loader to prevent two identical requests.
-    if (schState === 'loading' || schState === 'ready') return;
     schState = 'loading';
     const s = current;
     try {
@@ -3973,7 +3535,6 @@ async function loadMySchedule() {
         schState = 'error';
     }
     renderSchedulePanel();
-    renderWorkPanel();
 }
 
 function scheduleHtml() {
@@ -4005,10 +3566,7 @@ function scheduleHtml() {
 }
 
 function scheduleSection(s) {
-    // Hidden tab panels are built too; fetch only when Schedule or My Work needs it.
-    if (schState === 'idle' && (activeTab === 'schedule' || activeTab === 'work')) {
-        setTimeout(loadMySchedule, 0);
-    }
+    if (schState === 'idle') { setTimeout(loadMySchedule, 0); }
     let inner;
     if (schState === 'loading' || schState === 'idle') {
         inner = '<div class="sp-sub">Loading your schedule\u2026</div>';
@@ -4085,7 +3643,6 @@ async function load() {
         const askedTab = (new URLSearchParams(location.search).get('tab')
             || location.hash.replace(/^#/, '')).toLowerCase();
         if (SP_TABS.some(t => t.key === askedTab)) activeTab = askedTab;
-        else activeTab = isAdmin() ? 'credentials' : 'work';
 
         const sel = $('spStaff');
         if (!STAFF.length) {
