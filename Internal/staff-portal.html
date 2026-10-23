@@ -2069,15 +2069,10 @@ function myClassrooms(s) {
        Primacy is positional — Classroom is primary — so listing it first also makes
        the picker default to it.
 
-       Viewing your OWN record, the picker offers EVERY room (anyone can look in on
-       another classroom's checklist), but your own rooms are listed FIRST so the
-       default selection stays your primary classroom. A SELECTED ADMINISTRATOR record
-       also offers every room, even when another administrator is viewing it: Megan,
-       Clete and Sara work across the centre and must have the same classroom view.
-       When an admin selects a non-admin teacher, the picker still shows that teacher's
-       assigned rooms only, so the record remains about their assignment. */
-    const viewingOwn = !!(WHO && current && String(WHO.staffId) === String(current.Id));
-    const selectedIsAdmin = String(s.IsAdmin || '') === '1' || s.IsAdmin === true;
+       EVERY selected staff record offers every classroom. The selected person's own
+       primary classroom appears first and therefore remains the default; a secondary
+       room follows, then all other rooms in room-number order. Staff with no assigned
+       room (such as centre-wide administrators) start with the first classroom. */
 
     /* Resolve by RoomNumber, not by name. The staff record links to a room by id
        (RoomNumber primary, SecondaryRoomNumber part-time), so a room rename never
@@ -2101,10 +2096,9 @@ function myClassrooms(s) {
         })
         .filter(l => l.name || l.roomNumber);
 
-    // On your own page OR any selected administrator record, append every other room.
-    // A teacher keeps their own primary room first; an administrator with no assigned
-    // room (Megan/Clete) gets the full room list in room-number order.
-    if ((viewingOwn || selectedIsAdmin) && Array.isArray(ROOMS) && ROOMS.length) {
+    // Append every OTHER room after this person's own room(s). Since the primary
+    // assignment is first in `mine`, it remains the default selected classroom.
+    if (Array.isArray(ROOMS) && ROOMS.length) {
         const have = new Set(mine.map(l => String(l.roomNumber)));
         const others = ROOMS
             .slice()
@@ -2112,9 +2106,8 @@ function myClassrooms(s) {
             .filter(r => !have.has(String(r.RoomNumber)))
             .map(r => ({ name: String(r.Room || '').trim() || ('Room ' + r.RoomNumber),
                          roomNumber: String(r.RoomNumber), secondary: false }));
-        /* An admin with no room on their own record (Megan/Clete) would otherwise get
-           an empty picker; falling through to the full list keeps their every-room view.
-           A teacher keeps their own room(s) first, then the rest. */
+        /* A person with no assigned room gets the full list in room-number order.
+           Anyone with assignments keeps primary/secondary first, then the rest. */
         return mine.concat(others);
     }
     return mine;

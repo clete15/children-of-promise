@@ -7886,21 +7886,16 @@ ELSE
             ? 'ISNULL(Active,1)=1'
             : `Id=${parseInt(actor.staffId, 10)}`;
         const r = runSQLRows(
-            `SELECT ${select.join(',')},ISNULL(CAST(Active AS INT),1) AS Active,
-                    ISNULL(LoginName,'') AS _LoginName
+            `SELECT ${select.join(',')},ISNULL(CAST(Active AS INT),1) AS Active
              FROM Staff WHERE ${scope} ORDER BY Name`,
             staffEnsureSQL() + 'GO\n' + staffSeedSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         // Strings throughout, as the pages expect; null becomes '' rather than "null".
-        // IsAdmin is derived from the same central LoginName list used by authorization.
-        // The login itself stays server-side; clients only need to know that a selected
-        // administrator's cross-centre classroom view applies.
         const rows = r.rows.map(row => {
             const o = {};
             select.concat(['Active']).forEach(k => {
                 o[k] = row[k] === null || row[k] === undefined ? '' : String(row[k]);
             });
-            o.IsAdmin = isAdminLogin(row._LoginName) ? '1' : '0';
             return o;
         });
         return sendJSON(res, 200, rows);
