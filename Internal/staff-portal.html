@@ -2071,10 +2071,13 @@ function myClassrooms(s) {
 
        Viewing your OWN record, the picker offers EVERY room (anyone can look in on
        another classroom's checklist), but your own rooms are listed FIRST so the
-       default selection stays your primary classroom — the change adds reach without
-       moving the default. When you are an admin looking at SOMEONE ELSE's record, the
-       picker still shows that teacher's rooms, so you can see where they are assigned. */
+       default selection stays your primary classroom. A SELECTED ADMINISTRATOR record
+       also offers every room, even when another administrator is viewing it: Megan,
+       Clete and Sara work across the centre and must have the same classroom view.
+       When an admin selects a non-admin teacher, the picker still shows that teacher's
+       assigned rooms only, so the record remains about their assignment. */
     const viewingOwn = !!(WHO && current && String(WHO.staffId) === String(current.Id));
+    const selectedIsAdmin = String(s.IsAdmin || '') === '1' || s.IsAdmin === true;
 
     /* Resolve by RoomNumber, not by name. The staff record links to a room by id
        (RoomNumber primary, SecondaryRoomNumber part-time), so a room rename never
@@ -2098,9 +2101,10 @@ function myClassrooms(s) {
         })
         .filter(l => l.name || l.roomNumber);
 
-    // On your own page, append every OTHER room after your own, so the default (your
-    // primary, listed first) is unchanged but any classroom is reachable.
-    if (viewingOwn && Array.isArray(ROOMS) && ROOMS.length) {
+    // On your own page OR any selected administrator record, append every other room.
+    // A teacher keeps their own primary room first; an administrator with no assigned
+    // room (Megan/Clete) gets the full room list in room-number order.
+    if ((viewingOwn || selectedIsAdmin) && Array.isArray(ROOMS) && ROOMS.length) {
         const have = new Set(mine.map(l => String(l.roomNumber)));
         const others = ROOMS
             .slice()
