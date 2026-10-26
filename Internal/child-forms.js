@@ -263,12 +263,11 @@
             return ticked ? 'tick-only' : 'none';
         }
         if (field === 'FamilyCenteredAssessment' || field === 'FamilyGoalPlan') {
-            /* PI6 reuses the already-filed beginning questionnaire instead of asking
-               staff to upload a duplicate under a second name. A legacy family-form row
-               or a bare tracking tick is not enough for these new pills: the source file
-               itself must exist so it can be opened now and exported later. */
-            var sourceField = field === 'FamilyCenteredAssessment' ? 'BegASQ' : 'BegASE';
-            if (hasFile(studentId, sourceField, 'questionnaire')) return 'form';
+            /* These are the child's explicitly identified initial-ever assessments.
+               Never infer them from BegASQ/BegASE, which describe the selected school
+               year and may be a later administration for an established child. */
+            var initialKind = field === 'FamilyCenteredAssessment' ? 'initialasq' : 'initialase';
+            if (hasFile(studentId, field, initialKind)) return 'form';
             return ticked ? 'tick-only' : 'none';
         }
         if (isReport(field)) {

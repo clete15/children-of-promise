@@ -6002,17 +6002,16 @@ DROP TABLE #cf;`;
        POST /api/child-file-upload?studentId=&field=&kind=
 
        For the artefacts that are scanned or photographed rather than signed in the
-       app: the parent's completed ASQ/ASE questionnaire (kind 'questionnaire'), and
-       the mid-year and end-year report cards (kind 'report'). The file lands in the
-       child's folder next to any signed PDFs, and a ChildFiles row points at it so
-       the roster counts it as real evidence.
+       app: school-year ASQ/ASE questionnaires (kind 'questionnaire'), each child's
+       initial-ever ASQ/ASE evidence (kinds 'initialasq'/'initialase'), and report cards
+       (kind 'report'). The file lands in the child's permanent folder and a ChildFiles
+       row identifies its purpose so the roster and future export do not infer meaning
+       from the filename.
 
-       Report cards are the whole requirement, so an upload ticks their checklist
-       column. An ASQ/ASE questionnaire is only half of the requirement — the other
-       half is the teacher's scored, signed summary — so it does NOT tick the column
-       on its own; /api/child-forms reports the two halves and the roster requires
-       both. Modelled on the staff-file-upload multipart handling, kept deliberately
-       consistent with it rather than introducing a second way. */
+       Report cards and dedicated initial assessments are the whole requirement for
+       their respective pill, so those uploads tick that checklist column. A school-year
+       screening questionnaire is only one part of Beg/End ASQ/ASE completion and never
+       implies that it is the child's initial-ever assessment. */
     if (req.method === 'POST' && url.startsWith('/api/child-file-upload')) {
         if (!checkClassroomAuth(req, res)) return;
         const qs = new URLSearchParams(req.url.split('?')[1] || '');
@@ -6030,12 +6029,19 @@ DROP TABLE #cf;`;
             if (!ISBE_TRACKING_COLUMNS.includes(field)) {
                 return sendJSON(res, 400, { error: 'Unknown form: ' + field });
             }
-            // A questionnaire belongs to a screening column; a report to a report column;
-            // a scanned interview form to the ParentInterview column.
+            // A school-year questionnaire belongs to a screening column. Initial-ever
+            // ASQ/ASE evidence uses distinct field/kind pairs so it cannot be inferred
+            // from whichever questionnaire happens to be this year's beginning upload.
             const SCREENING = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
             const REPORTS = ['MidYearReport', 'EndYearReport'];
             if (kind === 'questionnaire' && SCREENING.indexOf(field) === -1) {
                 return sendJSON(res, 400, { error: 'A questionnaire attaches to an ASQ or ASE column.' });
+            }
+            if (kind === 'initialasq' && field !== 'FamilyCenteredAssessment') {
+                return sendJSON(res, 400, { error: 'Initial ASQ evidence attaches to Family Assessment.' });
+            }
+            if (kind === 'initialase' && field !== 'FamilyGoalPlan') {
+                return sendJSON(res, 400, { error: 'Initial ASE evidence attaches to Family Goal Plan.' });
             }
             if (kind === 'report' && REPORTS.indexOf(field) === -1) {
                 return sendJSON(res, 400, { error: 'A report card attaches to a report-card column.' });
@@ -6046,7 +6052,8 @@ DROP TABLE #cf;`;
             if (kind === 'interviewform' && field !== 'ParentInterview') {
                 return sendJSON(res, 400, { error: 'A scanned interview form attaches to the Parent Interview column.' });
             }
-            if (kind !== 'questionnaire' && kind !== 'report' && kind !== 'interviewform') {
+            if (kind !== 'questionnaire' && kind !== 'initialasq' && kind !== 'initialase'
+                    && kind !== 'report' && kind !== 'interviewform') {
                 return sendJSON(res, 400, { error: 'Unknown upload kind.' });
             }
         } else if (!CHILD_DOC_KEYS[kind]) {
@@ -6112,6 +6119,8 @@ DROP TABLE #cf;`;
                 const LABELS = {
                     BegASQ: 'Beginning ASQ-3 questionnaire', EndASQ: 'End ASQ-3 questionnaire',
                     BegASE: 'Beginning ASQ SE-2 questionnaire', EndASE: 'End ASQ SE-2 questionnaire',
+                    FamilyCenteredAssessment: 'Initial ASQ-3 - Family Assessment evidence',
+                    FamilyGoalPlan: 'Initial ASQ SE-2 - Family Goal Plan evidence',
                     MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card',
                     ParentInterview: 'Parent Interview Form'
                 };
@@ -6151,18 +6160,10 @@ ELSE
     INSERT INTO ChildFiles (StudentId,SchoolYear,FormField,Kind,FileName,RelPath,UploadedBy,UploadedAt)
     VALUES (${studentId},${esc(year)},${esc(field)},${esc(kind)},${esc(fileName)},${esc(rel)},${esc(uploader)},GETDATE());
 `;
-                // A report card is the whole requirement, so filing it ticks the box.
-                if (kind === 'report') sql += trackingTickSQL(studentId, year, field);
-                /* The center uses each beginning questionnaire in two places without
-                   duplicating the physical file: BegASQ is the Family Assessment evidence
-                   and BegASE is the Family Goal Plan evidence. Tick the PI6 alias when the
-                   shared source file is uploaded; the ASQ/ASE screening column keeps its
-                   own completion rules for scores and signatures. */
-                if (kind === 'questionnaire' && field === 'BegASQ') {
-                    sql += trackingTickSQL(studentId, year, 'FamilyCenteredAssessment');
-                }
-                if (kind === 'questionnaire' && field === 'BegASE') {
-                    sql += trackingTickSQL(studentId, year, 'FamilyGoalPlan');
+                // Report cards and explicitly identified initial assessments are the
+                // whole evidence item represented by their pill, so filing one ticks it.
+                if (kind === 'report' || kind === 'initialasq' || kind === 'initialase') {
+                    sql += trackingTickSQL(studentId, year, field);
                 }
                 /* A scanned Parent Interview Form is the whole requirement too: the signed
                    paper form is the compliance evidence. Tick the ParentInterview flag AND
@@ -6202,15 +6203,27 @@ ELSE
         return;
     }
 
-    /* Every uploaded child file for a year, without the bytes: the roster needs to
-       know which questionnaires and report cards are on file, and where. */
+    /* Uploaded child-file metadata. School-year evidence is limited to the selected
+       year. A child's explicitly identified initial ASQ/ASE is lifetime evidence, so
+       the newest dedicated record is returned in every year view. */
     if (req.method === 'GET' && url === '/api/child-files') {
         if (!checkClassroomAuth(req, res)) return;
         const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
         const r = runSQLRows(
-            `SELECT StudentId, FormField, Kind, FileName, RelPath,
-                    CONVERT(NVARCHAR(20), UploadedAt, 120) AS UploadedAt
-             FROM ChildFiles WHERE SchoolYear=${esc(year)}`,
+            `;WITH CandidateFiles AS (
+                SELECT StudentId,FormField,Kind,FileName,RelPath,UploadedAt,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY StudentId,FormField,Kind
+                           ORDER BY UploadedAt DESC,Id DESC
+                       ) AS rn
+                FROM ChildFiles
+                WHERE SchoolYear=${esc(year)}
+                   OR (FormField='FamilyCenteredAssessment' AND Kind='initialasq')
+                   OR (FormField='FamilyGoalPlan' AND Kind='initialase')
+             )
+             SELECT StudentId,FormField,Kind,FileName,RelPath,
+                    CONVERT(NVARCHAR(20),UploadedAt,120) AS UploadedAt
+             FROM CandidateFiles WHERE rn=1`,
             childFileEnsureSQL());
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         return sendJSON(res, 200, { year: year, files: r.rows });

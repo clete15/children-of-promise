@@ -1044,7 +1044,7 @@
     </div>
 </div>
 
-<!-- Shared evidence upload modal (report cards and PI6 initial ASQ/ASE files) -->
+<!-- Shared evidence upload modal (report cards and dedicated initial ASQ/ASE files) -->
 <div class="pi-overlay" id="rcOverlay">
     <div class="pi-modal">
         <div class="pi-modal-header">
@@ -1789,8 +1789,8 @@ const COLUMNS = [
        Results Shared (PICC PI10.H) is NOT an admin column: it is a teacher requirement
        captured in the report-card pills on the classroom card, so it does not appear on
        this admin sheet. */
-    { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASQ)</span>', programs: ['PI','PFA'], title: 'PICC PI6.A evidence — the family\u2019s initial ASQ-3 questionnaire. Upload once here or through the beginning ASQ workflow; the same permanent child file is reused.' },
-    { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASE)</span>', programs: ['PI','PFA'], title: 'PICC PI6.B evidence — the family\u2019s initial ASQ:SE-2 questionnaire. Upload once here or through the beginning ASE workflow; the same permanent child file is reused.' },
+    { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASQ)</span>', programs: ['PI','PFA'], title: 'PICC PI6.A evidence — the child\u2019s explicitly identified initial ASQ-3. This is separate from the selected school year\u2019s Beg ASQ unless that specific file is later confirmed as the child\u2019s initial assessment.' },
+    { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASE)</span>', programs: ['PI','PFA'], title: 'PICC PI6.B evidence — the child\u2019s explicitly identified initial ASQ:SE-2. This is separate from the selected school year\u2019s Beg ASE unless that specific file is later confirmed as the child\u2019s initial assessment.' },
     { field: 'TransitionPlan', label: 'Transition<br>Plan', docForm: 'transitionPlan', programs: ['PI'], title: 'PICC PI7.A - written individualized Transition Plan so children and families experience a seamless transition of services.' },
     { field: 'Referral', label: 'Referral', docForm: 'referral', programs: ['PI'], title: 'PICC PI7.B and PI10.I - referral to community resources when needed, and referral for further evaluation when a screening flags a concern.' },
     /* "Remove from SIS" was dropped from the roster on request — it is an end-of-year
@@ -2514,13 +2514,13 @@ async function createWeightedEligibility(studentId, button) {
     }
 }
 
-/* PI6 uses the same permanent initial questionnaire already collected for the
-   beginning screening. The alias pill opens that file when present and opens the shared
-   uploader when absent, so staff never upload a duplicate under a second name. */
+/* PI6 uses each child's explicitly identified initial-ever ASQ/ASE. These dedicated
+   records are separate from school-year BegASQ/BegASE files unless an existing file is
+   later reviewed and deliberately marked as initial. */
 function familyEvidenceCell(student, field) {
-    const sourceField = field === 'FamilyCenteredAssessment' ? 'BegASQ' : 'BegASE';
+    const kind = field === 'FamilyCenteredAssessment' ? 'initialasq' : 'initialase';
     const file = window.ChildForms && ChildForms.fileFor
-        ? ChildForms.fileFor(student.Id, sourceField, 'questionnaire') : null;
+        ? ChildForms.fileFor(student.Id, field, kind) : null;
     const label = field === 'FamilyCenteredAssessment' ? 'Initial ASQ' : 'Initial ASE';
     if (file && file.relPath) {
         return '<a class="cf-pill" href="#" title="' + label + ' is on file \u2014 click to open."'
@@ -2698,9 +2698,9 @@ function renderRoster() {
                     + weightedEligibilityCell(s) + '</td>';
             }
 
-            // Family Assessment and Family Goal Plan reuse the beginning ASQ/ASE
-            // questionnaire files. They are upload/open pills, not standalone forms or
-            // manual checkboxes, and both aliases point to the same permanent evidence.
+            // Family Assessment and Family Goal Plan use dedicated initial-ever ASQ/ASE
+            // files. They are upload/open pills, not inferred from this year's beginning
+            // screening and not standalone checkbox forms.
             if (f === 'FamilyCenteredAssessment' || f === 'FamilyGoalPlan') {
                 return '<td class="' + ('cf-doc' + divide).trim() + '">'
                     + familyEvidenceCell(s, f) + '</td>';
@@ -3506,7 +3506,7 @@ async function uploadScreeningQuestionnaire() {
    PI screening completes on that upload + entered scores + both signatures. The old
    uploadScreeningTestSheets() handler and its DOM section were removed with it. */
 
-// ── Shared evidence uploads (report cards and PI6 initial ASQ/ASE aliases) ──
+// ── Shared evidence uploads (report cards and dedicated initial ASQ/ASE files) ──
 var currentRCStudentId = null, currentRCField = null;
 var RC_UPLOADS = {
     MidYearReport: {
@@ -3520,14 +3520,14 @@ var RC_UPLOADS = {
         note: 'Upload the child\u2019s report card (PDF or a clear photo). It is filed in the child\u2019s permanent Teacher folder and marks this column complete.'
     },
     FamilyCenteredAssessment: {
-        label: 'Family Assessment (Initial ASQ)', sourceField: 'BegASQ', kind: 'questionnaire',
-        button: 'Upload initial ASQ', empty: 'No initial ASQ on file yet.',
-        note: 'Upload the family\u2019s initial ASQ-3 questionnaire. The same file is kept in the child\u2019s permanent Teacher folder and reused as Family Assessment evidence; do not upload a duplicate.'
+        label: 'Family Assessment (Initial ASQ)', sourceField: 'FamilyCenteredAssessment', kind: 'initialasq',
+        button: 'Upload initial ASQ', empty: 'No confirmed initial ASQ on file yet.',
+        note: 'Upload this child\u2019s initial-ever ASQ-3. Do not use this year\u2019s Beg ASQ unless it has been confirmed as the child\u2019s first ASQ. The file is kept in the permanent Teacher folder and marked specifically as initial ASQ evidence.'
     },
     FamilyGoalPlan: {
-        label: 'Family Goal Plan (Initial ASE)', sourceField: 'BegASE', kind: 'questionnaire',
-        button: 'Upload initial ASE', empty: 'No initial ASE on file yet.',
-        note: 'Upload the family\u2019s initial ASQ:SE-2 questionnaire. The same file is kept in the child\u2019s permanent Teacher folder and reused as Family Goal Plan evidence; do not upload a duplicate.'
+        label: 'Family Goal Plan (Initial ASE)', sourceField: 'FamilyGoalPlan', kind: 'initialase',
+        button: 'Upload initial ASE', empty: 'No confirmed initial ASE on file yet.',
+        note: 'Upload this child\u2019s initial-ever ASQ:SE-2. Do not use this year\u2019s Beg ASE unless it has been confirmed as the child\u2019s first ASE. The file is kept in the permanent Teacher folder and marked specifically as initial ASE evidence.'
     }
 };
 
@@ -4068,13 +4068,13 @@ const PICC_ITEMS = [
     },
     {
         num: 'PI6', title: 'Family Centered Assessment and Individual Family Goal Plan',
-        requires: 'File the family\u2019s initial ASQ-3 and ASQ:SE-2 questionnaires within 6 months of enrollment. The center uses those initial family questionnaires as its Family Assessment and Family Goal Plan evidence, with goals reviewed and updated annually.',
+        requires: 'File each child\u2019s confirmed initial ASQ-3 and initial ASQ:SE-2 within 6 months of enrollment. These are lifetime initial-assessment records and are separate from a school year\u2019s beginning screenings unless those specific screenings are confirmed as the child\u2019s first.',
         subs: [
-            'A. Initial ASQ-3 questionnaire filed as Family Centered Assessment evidence within 6 months of enrollment',
-            'B. Initial ASQ:SE-2 questionnaire filed as Individual Family Goal Plan evidence within 6 months of enrollment; review goals annually'
+            'A. Confirmed initial ASQ-3 filed as Family Centered Assessment evidence within 6 months of enrollment',
+            'B. Confirmed initial ASQ:SE-2 filed as Individual Family Goal Plan evidence within 6 months of enrollment; review goals annually'
         ],
         childFields: ['FamilyCenteredAssessment', 'FamilyGoalPlan'],
-        guidance: 'Upload each questionnaire once. Beg ASQ and Family Assessment point to the same permanent child file; Beg ASE and Family Goal Plan do the same. Use the family responses and concerns from the initial screening process when reviewing and updating individual family goals.'
+        guidance: 'Upload the child\u2019s actual initial assessments through these PI6 pills. Do not infer them from Beg ASQ or Beg ASE. A current-year file can be linked later only after it is individually confirmed as that child\u2019s initial assessment.'
     },
     {
         num: 'PI7', title: 'Referral system and written transition plans',
