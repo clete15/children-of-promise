@@ -3775,7 +3775,12 @@ async function openScreening(studentId, type, period) {
         { label: 'Staff signature', printedName: 'scrStaffSig', dateField: 'scrDate' });
     var qFile = document.getElementById('scrQuestFile');
     if (qFile) qFile.value = '';
-    var existingQ = ChildForms.fileFor(studentId, scrField, 'questionnaire');
+    /* Resolve the upload under EITHER kind — the current 'questionnaire' or the
+       retired 'testsheet' — so a PDF filed before the second slot was removed still
+       shows as on file here rather than reading as never uploaded. */
+    var existingQ = ChildForms.screeningUpload
+        ? ChildForms.screeningUpload(studentId, scrField)
+        : ChildForms.fileFor(studentId, scrField, 'questionnaire');
     setUploadStatus('scrQuestStatus', existingQ
         ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
         : null, 'No ASQ uploaded yet.');

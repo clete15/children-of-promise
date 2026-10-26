@@ -68,6 +68,26 @@
     // The two report-card columns are complete on an uploaded scan alone.
     var REPORT_FIELDS = ['MidYearReport', 'EndYearReport'];
 
+    /* The kinds a screening's uploaded ASQ/ASE can be filed under, newest naming first.
+       'questionnaire' is what the current single upload slot writes. 'testsheet' is the
+       RETIRED second slot: screenings used to take two uploads and needed both to go
+       green, and that slot was removed on 12 Oct 2026. Every PDF already filed under
+       the old kind is still a parent's completed ASQ/ASE sitting in the child's folder,
+       so it must keep counting — otherwise a column that was green goes amber and asks
+       a teacher to upload a document they already uploaded, which is exactly what
+       happened. Look under both names; never make somebody re-do filed work because an
+       internal label changed. */
+    var SCREENING_UPLOAD_KINDS = ['questionnaire', 'testsheet'];
+
+    /* The screening's uploaded ASQ/ASE under whichever kind it was filed as, or null. */
+    function screeningUpload(studentId, field) {
+        for (var i = 0; i < SCREENING_UPLOAD_KINDS.length; i++) {
+            var f = fileFor(studentId, field, SCREENING_UPLOAD_KINDS[i]);
+            if (f && (f.relPath || f.name)) return f;
+        }
+        return null;
+    }
+
     var forms = {};          // { studentId: { Field: { on, date } } }  in-app forms
     var files = {};          // { studentId: { Field: { Kind: { relPath, name, date } } } }  uploads
     var loadedYear = null;
@@ -244,7 +264,8 @@
 
         if (isScreening(field)) {
             var scored = hasForm(studentId, field);           // scores filed as the signed summary PDF
-            var quest = hasFile(studentId, field, 'questionnaire');  // the uploaded ASQ/ASE
+            // The uploaded ASQ/ASE, under either the current or the retired kind.
+            var quest = !!screeningUpload(studentId, field);
             var parentSig = hasSignature(studentId, field, 'parent');
             var staffSig = hasSignature(studentId, field, 'staff');
 
@@ -313,7 +334,7 @@
     function screeningNeeds(studentId, field) {
         var tool = (field === 'BegASQ' || field === 'EndASQ') ? 'ASQ' : 'ASE';
         var parts = [
-            ['the ' + tool + ' upload', hasFile(studentId, field, 'questionnaire')],
+            ['the ' + tool + ' upload', !!screeningUpload(studentId, field)],
             ['the entered scores', hasForm(studentId, field)],
             ['the parent signature', hasSignature(studentId, field, 'parent')],
             ['the staff signature', hasSignature(studentId, field, 'staff')]
@@ -404,6 +425,8 @@
         unmarkSignature: unmarkSignature,
         hasFile: hasFile,
         fileFor: fileFor,
+        screeningUpload: screeningUpload,
+        SCREENING_UPLOAD_KINDS: SCREENING_UPLOAD_KINDS,
         hasSignature: hasSignature,
         state: state,
         isDone: isDone,

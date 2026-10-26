@@ -1180,7 +1180,12 @@
         if (qSection) qSection.classList.toggle('scr-quest-required', questRequired);
         var qFile = document.getElementById('scrQuestFile');
         if (qFile) qFile.value = '';
-        var existingQ = ChildForms().fileFor(studentId, scrField, 'questionnaire');
+        /* Either kind: the current 'questionnaire' or the retired 'testsheet', so a PDF
+           filed before that second slot was removed still shows as on file. */
+        var cfReg = ChildForms();
+        var existingQ = (cfReg && cfReg.screeningUpload)
+            ? cfReg.screeningUpload(studentId, scrField)
+            : cfReg.fileFor(studentId, scrField, 'questionnaire');
         setUploadStatus('scrQuestStatus', existingQ
             ? { on: true, name: existingQ.name, relPath: existingQ.relPath }
             : null, questRequired
