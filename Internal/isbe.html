@@ -1777,7 +1777,7 @@ const COLUMNS = [
        Interview is the first thing staff sit down and complete with the family. Parent
        Interview is therefore an ADMIN duty (no teacher flag) and opens/saves/prints from
        this page. It used to be a teacher column filled from the classroom card. */
-    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', title: 'Weighted priority score calculated from the family\u2019s pre-enrollment answers and used to rank the waiting list. Proof of income is collected separately during enrollment; it is not part of this generated form.' },
+    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', title: 'One universal weighted-priority PDF, created when the child enrolls from the family\u2019s pre-enrollment answers. Both this roster and Child Files open the same saved document.' },
     { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Pre-fills from the pre-enrollment record; print the pre-filled form for the family to complete at enrollment, then save. Completed by admin at enrollment.' },
     { field: 'ProofOfIncome', label: 'Proof of<br>Income', title: 'Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.' },
     { field: 'EnterSIS', label: 'Enter<br>into SIS', title: 'Enter student into the ISBE Student Information System (SIS) before beginning screenings.' },
@@ -2700,8 +2700,8 @@ function renderRoster() {
                     + proofOfIncomeCell(s) + '</td>';
             }
 
-            // Weighted Eligibility is read-only here: a pill fed from the Child Files
-            // form, not the old editable checkbox+[form]. Editing happens in Child Files.
+            // Weighted Eligibility is one universal generated PDF. This roster and
+            // Child Files both open the same canonical path returned by the server.
             if (f === 'WeightedEligibility') {
                 return '<td class="' + ('cf-doc' + divide).trim() + '">'
                     + weightedEligibilityCell(s) + '</td>';
@@ -4126,7 +4126,6 @@ const PICC_ITEMS = [
         na: 'N. Families living outside Chicago/CPS applies to home visiting programs only.',
         guidance: 'The weighted score comes from the family\u2019s pre-enrollment answers and establishes waiting-list priority. Proof of income is collected separately during enrollment and retained in the child\u2019s physical file. Sections L and M of the Parent Interview may not be left blank.',
         waitlistLink: true,
-        forms: [{ label: 'Weighted Eligibility Form', href: 'pfa-item6-eligibility.html?program=PI&item=5' }],
         childDocGrid: 'PI'
     },
     {
@@ -4320,10 +4319,7 @@ const PFA_CHECKLIST_ITEMS = [
                'Screening indicated a developmental delay without a current special education referral'],
         evidence: 'Scoring criteria, weighted eligibility checklist in each child file, family income documentation where used.',
         guidance: 'Eligibility criteria may not exclude children who are not toilet trained.',
-        waitlistLink: true,
-        forms: [
-            { label: 'Weighted Eligibility Form', href: 'pfa-item6-eligibility.html' }
-        ]
+        waitlistLink: true
     },
     {
         num: 'Item7', n: '7', title: 'Minimum hours and days of instruction',

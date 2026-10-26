@@ -233,8 +233,8 @@
                 </button>
                 <button class="btn-secondary" id="cfRefreshBtn" onclick="backfillFolders(true)"
                     style="font-size:0.75rem;padding:6px 12px;"
-                    title="Regenerate every enrolled child's weighted eligibility form with the current design and scoring, replacing the existing one. Use after the form design or scoring rules change.">
-                    &#128260; Refresh weighted eligibility forms
+                    title="Rebuild every enrolled child's one universal weighted eligibility PDF with the current design and scoring. Superseded PDFs are archived, not deleted.">
+                    &#128260; Rebuild universal weighted forms
                 </button>
                 <span id="cfActionStatus" style="font-size:0.72rem;color:#6b7280;"></span>
             </div>
@@ -851,12 +851,11 @@ async function carryForward() {
 async function backfillFolders(overwrite) {
     var status = document.getElementById('cfActionStatus');
     var msg = overwrite
-        ? 'Regenerate EVERY enrolled child\u2019s weighted eligibility form with the current scoring, '
-            + 'replacing the existing one?\n\nUse this after the scoring rules change. The previous form is '
-            + 'removed and a fresh one written. Any criterion not on record is filled in as \u201CNo\u201D.'
-        : 'Create a document folder and a pre-filled weighted eligibility form for every currently '
-            + 'enrolled child?\n\nNew enrollments already get this automatically; this catches up children enrolled '
-            + 'earlier. Any criterion not on record is filled in as \u201CNo\u201D. Safe to run more than once.';
+        ? 'Rebuild EVERY enrolled child\u2019s one universal weighted eligibility PDF with the current scoring?\n\n'
+            + 'Both the PI/PFA roster and Child Files will open this same new PDF. Previous versions are '
+            + 'moved into the child\u2019s archive, not deleted. Every unchecked criterion displays 0 points.'
+        : 'Create the universal weighted eligibility PDF for every currently enrolled child who is missing one?\n\n'
+            + 'New enrollments already get this automatically. Safe to run more than once.';
     if (!confirm(msg)) return;
     var btn = document.getElementById(overwrite ? 'cfRefreshBtn' : 'cfBackfillBtn');
     btn.disabled = true;
@@ -866,6 +865,8 @@ async function backfillFolders(overwrite) {
         var d = await res.json();
         if (!d.success) throw new Error(d.error || 'failed');
         status.textContent = d.message; status.style.color = d.failed ? '#b45309' : '#166534';
+        adminLoaded = false;
+        await loadAdmin();
     } catch (e) {
         status.textContent = '\u26a0 ' + e.message; status.style.color = '#b91c1c';
     } finally { btn.disabled = false; }

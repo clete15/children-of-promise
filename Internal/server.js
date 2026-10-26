@@ -884,51 +884,6 @@ const PI_DOC_FORMS = {
             ['SignedDate', 'NVARCHAR(20)', 'signedDate']
         ]
     },
-    // Legacy online PI5 weighted-eligibility record schema. The generated priority PDF
-    // is separate and contains the PI5.A/PI5.B-G criteria plus PI5.H score result only;
-    // proof of income is collected independently during enrollment.
-    'weighted-eligibility': {
-        table: 'PIWeightedEligibility',
-        trackingColumn: 'WeightedEligibility',
-        columns: [
-            ['CompletedDate', 'NVARCHAR(20)', 'completedDate'],
-            ['EnrollmentDate', 'NVARCHAR(20)', 'enrollmentDate'],
-            ['CompletedBy', 'NVARCHAR(200)', 'completedBy'],
-            ['Homeless', 'NVARCHAR(10)', 'homeless'],
-            ['YouthInCare', 'NVARCHAR(10)', 'youthInCare'],
-            ['EarlyIntervention', 'NVARCHAR(10)', 'earlyIntervention'],
-            ['HasIep', 'NVARCHAR(10)', 'hasIep'],
-            ['ScreeningDelayNoEi', 'NVARCHAR(10)', 'screeningDelayNoEi'],
-            ['IncomeBelow50Fpl', 'NVARCHAR(10)', 'incomeBelow50Fpl'],
-            ['ParentEll', 'NVARCHAR(10)', 'parentEll'],
-            ['NonEnglishHome', 'NVARCHAR(10)', 'nonEnglishHome'],
-            ['PublicBenefits', 'NVARCHAR(10)', 'publicBenefits'],
-            ['AbuseHistory', 'NVARCHAR(10)', 'abuseHistory'],
-            ['MentalIllness', 'NVARCHAR(10)', 'mentalIllness'],
-            ['DcfsInvolvement', 'NVARCHAR(10)', 'dcfsInvolvement'],
-            ['SubstanceAbuse', 'NVARCHAR(10)', 'substanceAbuse'],
-            ['CaregiverOther', 'NVARCHAR(10)', 'caregiverOther'],
-            ['FamilyDeath', 'NVARCHAR(10)', 'familyDeath'],
-            ['LowBirthWeight', 'NVARCHAR(10)', 'lowBirthWeight'],
-            ['ParentIncarcerated', 'NVARCHAR(10)', 'parentIncarcerated'],
-            ['TeenParent', 'NVARCHAR(10)', 'teenParent'],
-            ['NoHsDiploma', 'NVARCHAR(10)', 'noHsDiploma'],
-            ['BornOutsideUs', 'NVARCHAR(10)', 'bornOutsideUs'],
-            ['ActiveMilitary', 'NVARCHAR(10)', 'activeMilitary'],
-            ['SingleParent', 'NVARCHAR(10)', 'singleParent'],
-            ['TotalPoints', 'NVARCHAR(10)', 'totalPoints'],
-            ['HouseholdIncome', 'NVARCHAR(40)', 'householdIncome'],
-            ['HouseholdSize', 'NVARCHAR(10)', 'householdSize'],
-            ['IncomeVerificationType', 'NVARCHAR(120)', 'incomeVerificationType'],
-            ['IncomeVerificationDate', 'NVARCHAR(20)', 'incomeVerificationDate'],
-            ['BenefitCardInParentName', 'NVARCHAR(20)', 'benefitCardInParentName'],
-            ['EligibilityResult', 'NVARCHAR(120)', 'eligibilityResult'],
-            ['Notes', 'NVARCHAR(MAX)', 'notes'],
-            ['ParentSignature', 'NVARCHAR(200)', 'parentSignature'],
-            ['StaffSignature', 'NVARCHAR(200)', 'staffSignature'],
-            ['SignedDate', 'NVARCHAR(20)', 'signedDate']
-        ]
-    },
     'screening-results-shared': {
         table: 'PIScreeningResultsShared',
         trackingColumn: 'ScreeningResultsShared',
@@ -2216,8 +2171,9 @@ function childRecordsForSeed(studentId) {
    recognize it without guessing from a filename. That semantic row is also the stable
    handoff a future SharePoint exporter can consume.
 
-   Idempotent: re-indexing an existing PDF updates its path/name but preserves the
-   original UploadedAt. */
+   This is a once-per-child document. Re-indexing replaces duplicate/stale generated
+   metadata with one canonical active row; superseded physical PDFs are archived by the
+   generator rather than deleted. */
 function indexWeightedEligibilityDoc(studentId, fullPath) {
     const id = parseInt(studentId, 10);
     const root = findDocRoot();
@@ -2228,14 +2184,11 @@ function indexWeightedEligibilityDoc(studentId, fullPath) {
     const fileName = path.basename(fullPath);
     const field = 'WeightedEligibility';
     const kind = 'generated';
-    const where = `StudentId=${id} AND SchoolYear=${esc(year)} AND FormField=${esc(field)} AND Kind=${esc(kind)}`;
     const sql = childFileEnsureSQL() + isbeTrackingEnsureSQL()
-        + `IF EXISTS (SELECT 1 FROM ChildFiles WHERE ${where})
-    UPDATE ChildFiles SET FileName=${esc(fileName)},RelPath=${esc(rel)},UploadedBy=${esc('system-generated')},
-        UploadedAt=CASE WHEN UploadedAt IS NULL THEN GETDATE() ELSE UploadedAt END WHERE ${where}
-ELSE
-    INSERT INTO ChildFiles (StudentId,SchoolYear,FormField,Kind,FileName,RelPath,UploadedBy,UploadedAt)
-    VALUES (${id},${esc(year)},${esc(field)},${esc(kind)},${esc(fileName)},${esc(rel)},${esc('system-generated')},GETDATE());
+        + `DELETE FROM ChildFiles
+WHERE StudentId=${id} AND FormField=${esc(field)} AND Kind=${esc(kind)};
+INSERT INTO ChildFiles (StudentId,SchoolYear,FormField,Kind,FileName,RelPath,UploadedBy,UploadedAt)
+VALUES (${id},${esc(year)},${esc(field)},${esc(kind)},${esc(fileName)},${esc(rel)},${esc('system-generated')},GETDATE());
 `
         + trackingTickSQL(id, year, field);
     const r = runSQL(sql);
@@ -2243,22 +2196,57 @@ ELSE
     return { ok: true, rel: rel, name: fileName, year: year };
 }
 
-/* Writes the child's FIRST document — a pre-filled Weighted Eligibility Determination
-   — into their folder, as a PDF matching the signed forms the app files elsewhere.
-   Best-effort: enrollment must not fail because the library is momentarily unreachable,
-   so this logs and returns { ok:false } rather than throwing. It never overwrites: if a
-   weighted-eligibility starter is already there, it leaves it alone, because staff may
-   have begun working the blanks.
+/* Move superseded weighted PDFs out of the active Administrative folder without
+   destroying them. Only the newly generated canonical PDF remains visible to either
+   UI; prior bytes stay under _Archive/Weighted Eligibility for recovery or audit. */
+function archiveWeightedEligibilityForms(files, administrativeFolder) {
+    const list = Array.isArray(files) ? files.filter(Boolean) : [];
+    if (!list.length) return { archived: 0, errors: [] };
+    const archiveDir = path.join(administrativeFolder, DOC_ARCHIVE_DIR, 'Weighted Eligibility');
+    const errors = [];
+    let archived = 0;
+    try { fs.mkdirSync(archiveDir, { recursive: true }); }
+    catch (e) { return { archived: 0, errors: ['Could not create archive: ' + e.message] }; }
 
-   opts.fillBlanksAsNo — when true, a criterion with no recorded answer prints "No"
-   instead of an empty pair of boxes. Used only by the one-time backfill of children
-   already enrolled: for them the form is a monitoring artefact after the fact, not a
-   live intake to be completed, so an unanswered criterion is treated as "No" to make a
-   finished document. A NEW enrollment leaves unknowns blank, because that form is a
-   live compliance form staff still complete and sign, and defaulting to "No" there
-   would misstate what the family actually reported. */
+    list.forEach(full => {
+        try {
+            if (!fs.existsSync(full)) return;
+            const base = path.basename(full);
+            const ext = path.extname(base);
+            const stem = base.slice(0, base.length - ext.length);
+            let target = path.join(archiveDir, base);
+            let n = 2;
+            while (fs.existsSync(target)) {
+                target = path.join(archiveDir, stem + ' (archived ' + n + ')' + ext);
+                n++;
+            }
+            try { fs.renameSync(full, target); }
+            catch (e) {
+                fs.copyFileSync(full, target);
+                if (!fs.existsSync(target) || fs.statSync(target).size !== fs.statSync(full).size) {
+                    throw new Error('archive copy did not verify');
+                }
+                fs.unlinkSync(full);
+            }
+            archived++;
+        } catch (e) {
+            errors.push(path.basename(full) + ': ' + e.message);
+        }
+    });
+    return { archived: archived, errors: errors };
+}
+
+/* Writes the child's one active, pre-filled Weighted Eligibility Determination
+   into the permanent Administrative folder. Normal creation is idempotent: an existing
+   PDF is indexed and returned. Refresh mode first builds and indexes a replacement,
+   then archives every former active copy so no evidence is destroyed and both UIs have
+   exactly one canonical document to open.
+
+   The document is a finalized snapshot of the waiting-list score at enrollment. A
+   criterion that does not score is shown unchecked with 0 points; missing historical
+   answers are also treated as unselected/zero for this score presentation, never as a
+   question mark or a light-gray potential score. */
 function seedWeightedEligibilityDoc(studentId, opts) {
-    const fillBlanksAsNo = !!(opts && opts.fillBlanksAsNo);
     // Weighted eligibility is an administrative document, so it lives in the child's
     // Administrative subfolder alongside the other required-for-everyone paperwork.
     const folder = childSubFolder(studentId, 'Administrative');
@@ -2285,10 +2273,8 @@ function seedWeightedEligibilityDoc(studentId, opts) {
             invalidateDocCache();
             return { ok: true, skipped: true, path: prior, rel: indexed.rel, name: indexed.name };
         }
-        /* Overwrite mode: remove the stale weighted-eligibility file(s) so a fresh one is
-           generated with the current scoring. This includes any pre-split copy left loose
-           in the parent child folder, so a child does not end up with two. */
-        priorForms.forEach(full => { try { fs.unlinkSync(full); } catch (e) { /* ignore */ } });
+        // Refresh mode keeps priorForms in place until the replacement has been
+        // written and indexed successfully. They are archived only at the end.
     }
 
     const recs = childRecordsForSeed(studentId);
@@ -2326,15 +2312,14 @@ function seedWeightedEligibilityDoc(studentId, opts) {
     SEEDED_WEIGHTED_CRITERIA.forEach(c => {
         let ans = '';
         try { ans = seededYesNoOrBlank(c.from(intake, enroll)); } catch (e) { ans = ''; }
-        const recorded = ans !== '';
-        if (!ans && fillBlanksAsNo) ans = 'No';
+        if (!ans) ans = 'No';
         const applies = ans === 'Yes';
         const pts = c.points || 0;
         if (applies) { total += pts; qualifying.push({ label: c.label, points: pts }); }
         const g = c.group || 'other';
         (itemsByGroup[g] = itemsByGroup[g] || []).push({
             label: (c.picc ? c.label + ' \u2014 ' + c.picc : c.label),
-            points: pts, applies: applies, recorded: recorded
+            points: applies ? pts : 0, applies: applies, recorded: true
         });
         subtotalByGroup[g] = (subtotalByGroup[g] || 0) + (applies ? pts : 0);
     });
@@ -2352,10 +2337,9 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         // Lead with the score banner + qualifying factors (PI5.H determination up top).
         { summary: { total: total, determination: 'Eligible', qualifying: qualifying } },
         { heading: 'All weighted eligibility criteria (PICC PI5.A / PI5.B\u2013G)',
-          text: 'Applicable factors are ticked and shown in bold; the rest are listed in '
-              + 'grey for the record. Pre-filled from the family\u2019s pre-enrollment '
-              + 'submission, falling back to the enrollment record. Review and update before '
-              + 'relying on it.' },
+          text: 'Applicable factors are ticked, bold, and show their awarded points. '
+              + 'Every unchecked factor shows 0. Values come from the family\u2019s '
+              + 'pre-enrollment submission, falling back to the enrollment record.' },
         ...criteriaBlocks
     ];
 
@@ -2390,13 +2374,25 @@ function seedWeightedEligibilityDoc(studentId, opts) {
     invalidateDocCache();   // new weighted-eligibility PDF filed — refresh the scan cache
     const indexed = indexWeightedEligibilityDoc(studentId, target);
     if (!indexed.ok) {
+        // The canonical pointer did not switch, so remove only the new unindexed attempt;
+        // every prior active PDF is still untouched in its original location.
+        try { fs.unlinkSync(target); } catch (e) { /* best-effort cleanup */ }
         return {
             ok: false,
-            error: 'The PDF was created, but its child-file record could not be saved: ' + indexed.error,
-            rel: path.relative(findDocRoot() || '', target).replace(/\\/g, '/')
+            error: 'The replacement PDF could not be recorded; the previous form was left unchanged: ' + indexed.error
         };
     }
-    return { ok: true, path: target, rel: indexed.rel, name: indexed.name };
+    const archived = overwrite
+        ? archiveWeightedEligibilityForms(priorForms, folder.path)
+        : { archived: 0, errors: [] };
+    if (archived.errors.length) {
+        console.warn('[SEED] weighted archive warnings for #' + studentId + ': ' + archived.errors.join('; '));
+    }
+    invalidateDocCache();
+    return {
+        ok: true, path: target, rel: indexed.rel, name: indexed.name,
+        archived: archived.archived, archiveWarnings: archived.errors
+    };
 }
 
 // ── Captured signatures ──
@@ -5455,7 +5451,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         // shared PI_DOC_FORMS config so a new form type is covered automatically.
         const childTables = ['ISBETracking', 'PermissionSlips', 'ChildSignatures',
             'ChildFiles', 'ChildDocChecklist', 'ScreeningScores', 'ParentInterviews',
-            'ParentCodes'];
+            'ParentCodes', 'PIWeightedEligibility'];
         try {
             Object.values(PI_DOC_FORMS).forEach(cfg => {
                 if (cfg && cfg.table && childTables.indexOf(cfg.table) === -1) childTables.push(cfg.table);
@@ -9509,13 +9505,10 @@ ELSE
     /* POST one-time backfill: a folder for every currently-enrolled child, each with a
        pre-filled weighted-eligibility form in it (internal - protected).
 
-       New enrollments get their folder and form automatically from now on; this catches
-       up the children who were already enrolled before that existed. Unrecorded criteria
-       are printed as "No" (fillBlanksAsNo) because for an already-enrolled child the form
-       is an after-the-fact monitoring artefact, not a live intake to complete — the office
-       is monitored on HAVING one for PI and PFA, and having a finished document on file is
-       the point. Every child gets a folder regardless of program; the form is only
-       relevant to PI/PFA but a copy on file is harmless and keeps the folders uniform.
+       New enrollments get their folder and universal PDF automatically. This route
+       catches up children already enrolled and, in refresh mode, safely rebuilds every
+       active child's canonical PDF before archiving the superseded copies. Unchecked or
+       unrecorded criteria display 0 points, matching the waiting-list score.
 
        Idempotent: seedWeightedEligibilityDoc skips a child who already has a weighted-
        eligibility file, so running this twice does not duplicate anything. */
@@ -9528,21 +9521,27 @@ ELSE
             `SELECT Id FROM rptMasterEnrollment WHERE Active='Yes' OR Active='YES' ORDER BY Id`);
         if (!list.ok) return sendJSON(res, 500, { error: list.error });
         const ids = list.rows.map(r => parseInt(r.Id)).filter(Boolean);
-        let created = 0, skipped = 0, failed = 0;
-        const errors = [];
+        let created = 0, skipped = 0, failed = 0, archived = 0;
+        const errors = [], archiveWarnings = [];
         for (const id of ids) {
             let out;
-            try { out = seedWeightedEligibilityDoc(id, { fillBlanksAsNo: true, overwrite: overwrite }); }
+            try { out = seedWeightedEligibilityDoc(id, { overwrite: overwrite }); }
             catch (e) { out = { ok: false, error: e.message }; }
             if (out && out.ok && out.skipped) skipped++;
-            else if (out && out.ok) created++;
-            else { failed++; if (errors.length < 10) errors.push('#' + id + ': ' + (out && out.error || 'unknown')); }
+            else if (out && out.ok) {
+                created++;
+                archived += parseInt(out.archived, 10) || 0;
+                if (out.archiveWarnings && out.archiveWarnings.length && archiveWarnings.length < 10) {
+                    archiveWarnings.push('#' + id + ': ' + out.archiveWarnings.join('; '));
+                }
+            } else { failed++; if (errors.length < 10) errors.push('#' + id + ': ' + (out && out.error || 'unknown')); }
         }
-        console.log(`[BACKFILL] overwrite=${overwrite} children=${ids.length} created=${created} skipped=${skipped} failed=${failed}`);
+        console.log(`[BACKFILL] overwrite=${overwrite} children=${ids.length} created=${created} skipped=${skipped} archived=${archived} failed=${failed}`);
         return sendJSON(res, 200, {
-            success: true, total: ids.length, created, skipped, failed,
+            success: true, total: ids.length, created, skipped, archived, failed,
             errors: errors.length ? errors : undefined,
-            message: `${ids.length} enrolled children: ${created} ${overwrite ? 'form(s) refreshed' : 'new form(s)'}, ${skipped} skipped, ${failed} failed.`
+            archiveWarnings: archiveWarnings.length ? archiveWarnings : undefined,
+            message: `${ids.length} enrolled children: ${created} ${overwrite ? 'universal form(s) rebuilt' : 'new form(s)'}, ${skipped} already current, ${archived} superseded file(s) archived, ${failed} failed.`
         });
     }
 
@@ -9605,9 +9604,9 @@ ELSE
         // Prefer semantic ChildFiles rows. They identify what a document is without
         // relying on its display filename and are the source a future exporter can use.
         const indexed = runSQLRows(
-            `SELECT StudentId,RelPath FROM ChildFiles
+            `SELECT Id,StudentId,RelPath FROM ChildFiles
              WHERE FormField='WeightedEligibility' AND Kind='generated'
-             ORDER BY UploadedAt DESC`,
+             ORDER BY UploadedAt DESC,Id DESC`,
             childFileEnsureSQL());
         if (indexed.ok) {
             indexed.rows.forEach(row => {
@@ -9627,8 +9626,14 @@ ELSE
         const findForm = dir => {
             const scan = p => {
                 try {
-                    const hit = fs.readdirSync(p).find(n => /weighted eligibility/i.test(n) && /\.(pdf|html?)$/i.test(n));
-                    return hit ? path.join(p, hit) : null;
+                    const hits = fs.readdirSync(p)
+                        .filter(n => /weighted eligibility/i.test(n) && /\.pdf$/i.test(n))
+                        .map(n => path.join(p, n))
+                        .sort((a, b) => {
+                            const mt = fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs;
+                            return mt || b.localeCompare(a);
+                        });
+                    return hits[0] || null;
                 } catch (e) { return null; }
             };
             return scan(path.join(dir, 'Administrative')) || scan(dir);
