@@ -276,6 +276,16 @@
                  admin sees, so the detail needed to enter the child into SIS is captured. -->
             <div id="piFormSections"></div>
 
+            <!-- PICC PI5.M requires the arrangements to be recorded even when no
+                 translator was needed (for example, "None — interview completed in
+                 English"). Language and yes/no are in the shared schema above. -->
+            <div class="p-section">
+                <div class="p-field">
+                    <label>Translator arrangements / accommodations provided</label>
+                    <textarea id="pi_translatorArrangements" rows="3" placeholder="Who translated and how it was arranged, or state that none was needed and why."></textarea>
+                </div>
+            </div>
+
             <!-- Signature -->
             <div class="p-section">
                 <p style="font-size:0.82rem;color:#374151;font-weight:500;margin-bottom:12px;">The information provided is true and accurate to the best of my (our) knowledge.</p>
@@ -304,9 +314,10 @@
 let parentStudent = null;
 let parentCode = '';
 let trackingStatus = {};
-// A saved interview for this child/year, if the login returned one, so a returning
-// parent edits rather than restarts. Null until/unless populated.
+// A saved electronic interview, or the authoritative uploaded scan source returned by
+// login. Scan wins, so the parent is never asked to create a second interview.
 let parentInterviewSaved = null;
+let parentInterviewSource = { source: 'none' };
 
 async function parentLogin() {
     const code = document.getElementById('codeInput').value.trim().toUpperCase();
@@ -325,6 +336,12 @@ async function parentLogin() {
             parentCode = code;
             trackingStatus = data.tracking || {};
             preEnrollData = data.preEnroll || {};
+            parentInterviewSource = data.interview || { source: 'none' };
+            parentInterviewSaved = parentInterviewSource.source === 'electronic'
+                ? (parentInterviewSource.record || null) : null;
+            if (parentInterviewSource.source === 'scan' || parentInterviewSource.source === 'electronic') {
+                trackingStatus.ParentInterview = true;
+            }
             localStorage.setItem('copParentCode', code);
             err.style.display = 'none';
             showForms();
@@ -355,8 +372,12 @@ function renderFormList() {
         {
             key: 'ParentInterview',
             title: 'Parent Interview',
-            desc: 'Share your goals, concerns, and observations about your child.',
-            action: "openModal('pInterviewOverlay');prefillInterview()"
+            desc: parentInterviewSource.source === 'scan'
+                ? 'Your completed signed Parent Interview is on file.'
+                : 'Share your goals, concerns, and observations about your child.',
+            action: parentInterviewSource.source === 'scan'
+                ? 'openParentInterviewScan()'
+                : "openModal('pInterviewOverlay');prefillInterview()"
         }
     ];
     // The PFA Exit Interview is an end-of-year form for Preschool for All children only.
@@ -384,7 +405,9 @@ function renderFormList() {
         const signed = trackingStatus[f.key];
         const statusClass = signed ? 'signed' : 'pending';
         const statusText = signed ? 'Signed' : 'Pending';
-        const btnText = signed ? 'View / Update' : 'Review & Sign';
+        const btnText = f.key === 'ParentInterview' && parentInterviewSource.source === 'scan'
+            ? 'View signed interview'
+            : (signed ? 'View / Update' : 'Review & Sign');
         return '<div class="form-item">' +
             '<div class="form-item-header">' +
                 '<span class="form-item-title">' + f.title + '</span>' +
@@ -399,6 +422,35 @@ function renderFormList() {
 
     // Check for active conference
     checkConference();
+}
+
+async function openParentInterviewScan() {
+    // Open a tab during the click event so popup blockers allow it, then replace its
+    // loading message after the code-scoped file request returns.
+    var viewer = window.open('', '_blank');
+    if (viewer) viewer.document.write('<p style="font-family:sans-serif;padding:20px;">Opening Parent Interview&hellip;</p>');
+    try {
+        var res = await fetch('/api/parent-portal/interview-file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: parentCode })
+        });
+        if (!res.ok) {
+            var problem = await res.json().catch(function () { return {}; });
+            throw new Error(problem.error || ('HTTP ' + res.status));
+        }
+        var blob = await res.blob();
+        var url = URL.createObjectURL(blob);
+        if (viewer) viewer.location.replace(url);
+        else {
+            var a = document.createElement('a');
+            a.href = url; a.target = '_blank'; a.click();
+        }
+        setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+    } catch (e) {
+        if (viewer) viewer.close();
+        alert('Could not open the Parent Interview: ' + e.message);
+    }
 }
 
 function openModal(id) { document.getElementById(id).classList.add('open'); }
@@ -536,6 +588,7 @@ function prefillInterview() {
     // Render the full shared schema form fresh into #piFormSections, then fill the
     // read-only child header and prefill from enrollment + pre-enrollment.
     renderInterviewForm();
+    document.getElementById('pi_translatorArrangements').value = '';
 
     document.getElementById('piChildName').textContent = parentStudent.First_Name + ' ' + parentStudent.Last_Name;
     document.getElementById('piDOB').textContent = parentStudent.Birth_date || '\u2014';
@@ -557,6 +610,8 @@ function prefillInterview() {
     if (pe.City) piPrefill('parent1City', pe.City);
     else if (parentStudent.City_Town) piPrefill('parent1City', parentStudent.City_Town);
     if (pe.Zip) piPrefill('parent1Zip', pe.Zip);
+    if (pe.HomeLanguage) piPrefill('parent1Language', pe.HomeLanguage);
+    else if (parentStudent.HomeLanguage) piPrefill('parent1Language', parentStudent.HomeLanguage);
 
     // Household / income — pre-enrollment first, then enrollment.
     if (pe.HouseholdIncome) piPrefill('income', pe.HouseholdIncome);
@@ -598,13 +653,40 @@ function prefillInterview() {
     // rather than starts over. A saved answer wins over a prefill.
     if (parentInterviewSaved && parentInterviewSaved.FormData) {
         try { loadInterviewForm(JSON.parse(parentInterviewSaved.FormData)); } catch (e) { /* ignore */ }
+    } else if (parentInterviewSaved) {
+        piSetFieldValue('parentGoals', parentInterviewSaved.ParentGoals || '');
+        piSetFieldValue('parentConcerns', parentInterviewSaved.ParentConcerns || '');
+        piSetFieldValue('childStrengths', parentInterviewSaved.ChildStrengths || '');
+        piSetFieldValue('additionalNotes', parentInterviewSaved.Notes || '');
+        if (parentInterviewSaved.PreferredLanguage) {
+            piSetFieldValue('parent1Language', parentInterviewSaved.PreferredLanguage);
+        }
+        if (parentInterviewSaved.TranslatorNeeded) {
+            piSetFieldValue('parent1Translator', parentInterviewSaved.TranslatorNeeded);
+        }
+    }
+    if (parentInterviewSaved && parentInterviewSaved.TranslatorArrangements) {
+        document.getElementById('pi_translatorArrangements').value = parentInterviewSaved.TranslatorArrangements;
     }
 
-    document.getElementById('pi_signDate').value = new Date().toISOString().split('T')[0];
+    document.getElementById('pi_signDate').value = parentInterviewSaved && parentInterviewSaved.InterviewDate
+        ? parentInterviewSaved.InterviewDate : new Date().toISOString().split('T')[0];
     resetParentSigPad('piSigPad');
 }
 
 async function submitInterview() {
+    // PI5.L/M must be complete before this one lifetime interview is accepted.
+    var formData = serializeInterviewForm();
+    formData.translatorArrangements = document.getElementById('pi_translatorArrangements').value.trim();
+    var missing = [];
+    if (!String(formData.parent1Language || '').trim()) missing.push('language spoken in the home');
+    if (!String(formData.parent1Translator || '').trim()) missing.push('whether a translator was needed');
+    if (!formData.translatorArrangements) missing.push('translator arrangements or a statement that none was needed');
+    if (missing.length) {
+        alert('Please complete: ' + missing.join(', ') + '.');
+        return;
+    }
+
     var pad = parentSigPad('piSigPad');
     var sig = pad ? pad.toDataUrl() : null;
     if (!sig) { alert('Please sign in the box before submitting.'); return; }
@@ -613,9 +695,8 @@ async function submitInterview() {
     btn.disabled = true; btn.textContent = 'Submitting...';
 
     // The whole form, serialized from the shared schema (keyed by schema id), plus the
-    // signature and date. The server stores this object as FormData JSON and maps the
-    // summary columns from it, so the admin roster reads exactly what the parent saved.
-    var formData = serializeInterviewForm();
+    // signature, date, and translator arrangements. The server maps the summary/PICC
+    // columns from this same object so the parent and admin records cannot disagree.
     formData.parentSignature = sig;
     formData.signDate = document.getElementById('pi_signDate').value;
 
@@ -632,6 +713,12 @@ async function submitInterview() {
         var data = await res.json();
         if (data.success) {
             trackingStatus.ParentInterview = true;
+            parentInterviewSaved = {
+                InterviewDate: formData.signDate || '',
+                FormData: JSON.stringify(formData),
+                TranslatorArrangements: formData.translatorArrangements || ''
+            };
+            parentInterviewSource = { source: 'electronic', record: parentInterviewSaved };
             renderFormList();
             closeModal('pInterviewOverlay');
             alert('Thank you! Your Parent Interview form has been submitted successfully.');

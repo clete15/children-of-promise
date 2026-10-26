@@ -225,6 +225,9 @@
     function state(studentId, field, ticked, isPI) {
         if (isPI === undefined) isPI = true;
         if (!isBacked(field)) return ticked ? 'tick' : 'none';
+        // A signed/scanned Parent Interview is the authoritative once-per-child
+        // evidence. Recognize it even if the electronic-form index failed to load.
+        if (field === 'ParentInterview' && hasFile(studentId, field, 'interviewform')) return 'form';
         if (loadState !== 'ready') return ticked ? 'unknown' : 'none';
 
         if (isScreening(field)) {

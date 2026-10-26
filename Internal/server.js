@@ -984,7 +984,8 @@ const PI_DOC_FORMS = {
 const PARENT_INTERVIEW_ADDED_COLUMNS = [
     ['PreferredLanguage', 'NVARCHAR(120)'],
     ['TranslatorNeeded', 'NVARCHAR(20)'],
-    ['TranslatorArrangements', 'NVARCHAR(MAX)']
+    ['TranslatorArrangements', 'NVARCHAR(MAX)'],
+    ['FormData', 'NVARCHAR(MAX)']
 ];
 
 function parentInterviewEnsureSQL() {
@@ -1006,6 +1007,9 @@ function parentInterviewEnsureSQL() {
     for (const [name, type] of PARENT_INTERVIEW_ADDED_COLUMNS) {
         sql += `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='${name}') ALTER TABLE ParentInterviews ADD ${name} ${type};\n`;
     }
+    // Parent portal signatures are JPEG data URLs, not short printed names.
+    sql += `IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='ParentSignature' AND CHARACTER_MAXIMUM_LENGTH <> -1)
+    ALTER TABLE ParentInterviews ALTER COLUMN ParentSignature NVARCHAR(MAX);\n`;
     sql += schoolYearColumnSQL('ParentInterviews');
     return sql;
 }
@@ -2626,6 +2630,22 @@ function childFileEnsureSQL() {
     );
 GO
 `;
+}
+
+/* Parent Interview is a once-per-child artefact. An uploaded signed scan is the
+   authoritative copy, regardless of the school year selected in the UI. Keep this
+   lookup in one place so roster opening, parent access, and save guards agree. */
+function latestParentInterviewScan(studentId) {
+    const id = parseInt(studentId, 10);
+    if (!id) return { ok: false, error: 'Invalid student id', row: null };
+    const r = runSQLRows(
+        `SELECT TOP 1 Id,StudentId,SchoolYear,FileName,RelPath,UploadedAt
+         FROM ChildFiles
+         WHERE StudentId=${id} AND FormField='ParentInterview' AND Kind='interviewform'
+         ORDER BY UploadedAt DESC,Id DESC`,
+        childFileEnsureSQL());
+    if (!r.ok) return { ok: false, error: r.error, row: null };
+    return { ok: true, row: r.rows[0] || null };
 }
 
 /* The "on file" checkbox state for each required child-file document (compliance
@@ -5213,6 +5233,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         if (!checkAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
         if (!studentId) return sendJSON(res, 400, { error: 'Student ID required' });
+        // HomeLanguage was added after the original waiting-list table; make it
+        // available to the prefill query without assuming every database started new.
+        runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE PreEnrollment ADD HomeLanguage NVARCHAR(60)`);
         // Free-text columns are flattened: rows are returned as pipe-delimited lines
         // split on newlines, so an embedded newline would corrupt the record.
         const flat = col => `REPLACE(REPLACE(ISNULL(${col},''),CHAR(13),' '),CHAR(10),' ')`;
@@ -5227,7 +5250,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             + `ISNULL(p.NoHSDiploma,'') AS NoHSDiploma,ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,`
             + `ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,ISNULL(p.PriorEarlyLearning,'') AS PriorEarlyLearning,ISNULL(p.BrightpointSubsidy,'') AS BrightpointSubsidy,`
             + `${flat('p.LivingSituation')} AS LivingSituation,ISNULL(p.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(p.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,`
-            + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,`
+            + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,ISNULL(p.HomeLanguage,'') AS HomeLanguage,`
             // PICC PI5.C / PI5.G / PI5.F priority populations. Added to the intake
             // form later than the rest, so older records return blank here.
             + `ISNULL(p.ScreeningDelayNoEi,'') AS ScreeningDelayNoEi,ISNULL(p.ParentEll,'') AS ParentEll,ISNULL(p.IncomeBelow50Fpl,'') AS IncomeBelow50Fpl,`
@@ -5237,7 +5260,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             SELECT TOP 1 ${cols},'name+dob' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date) WHERE e.Id=${studentId} AND e.PreEnrollmentId IS NULL`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const keys = ['Id','SubmittedAt','ParentFirst','ParentLast','Phone','Email','Address','City','Zip','ChildName','ChildBirthDate','AgeGroup','DaysRequested','Score','WaitlistStatus','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','CaregiverOther','FamilyDeath','LowBirthWeight','ParentIncarcerated','TeenParent','NoHSDiploma','BornOutsideUS','NonEnglishHome','ActiveMilitary','PriorEarlyLearning','BrightpointSubsidy','LivingSituation','HouseholdIncome','HouseholdSize','PublicBenefits','ScreeningDelayNoEi','ParentEll','IncomeBelow50Fpl','Notes','MatchType'];
+        const keys = ['Id','SubmittedAt','ParentFirst','ParentLast','Phone','Email','Address','City','Zip','ChildName','ChildBirthDate','AgeGroup','DaysRequested','Score','WaitlistStatus','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','CaregiverOther','FamilyDeath','LowBirthWeight','ParentIncarcerated','TeenParent','NoHSDiploma','BornOutsideUS','NonEnglishHome','ActiveMilitary','PriorEarlyLearning','BrightpointSubsidy','LivingSituation','HouseholdIncome','HouseholdSize','PublicBenefits','HomeLanguage','ScreeningDelayNoEi','ParentEll','IncomeBelow50Fpl','Notes','MatchType'];
         const line = r.data.trim().split('\n').find(l => /^\s*\d+\s*\|/.test(l));
         if (!line) return sendJSON(res, 200, { found: false });
         const v = line.split('|').map(x => x.trim());
@@ -5795,7 +5818,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         // Tables touched here get the SchoolYear migration first, for the same reason
         // every other reader does: without it an older table fails forever.
         const tables = [...new Set(sources.map(([, table]) => table))];
-        let sql = tables.map(t => schoolYearColumnSQL(t)).join('')
+        let sql = childFileEnsureSQL() + tables.map(t => schoolYearColumnSQL(t)).join('')
             + `IF OBJECT_ID('tempdb..#cf') IS NOT NULL DROP TABLE #cf;
 CREATE TABLE #cf (Field NVARCHAR(60), StudentId INT, Dt NVARCHAR(40));
 `;
@@ -5812,6 +5835,13 @@ CREATE TABLE #cf (Field NVARCHAR(60), StudentId INT, Dt NVARCHAR(40));
     EXEC('INSERT INTO #cf (Field,StudentId,Dt) SELECT ''${field}'', StudentId, ${dateExpr} FROM ${table} ${whereClause}');
 `;
         });
+        /* A signed/scanned Parent Interview is evidence on its own. Include it directly
+           from ChildFiles across all years, so future uploads no longer need a fake,
+           mostly-empty ParentInterviews row just to turn the checklist green. */
+        sql += `INSERT INTO #cf (Field,StudentId,Dt)
+SELECT 'ParentInterview',StudentId,ISNULL(CONVERT(NVARCHAR(40),UploadedAt,120),'')
+FROM ChildFiles WHERE FormField='ParentInterview' AND Kind='interviewform';
+`;
         // MAX picks a date over a blank one where a child somehow has two rows.
         sql += `SELECT Field, StudentId, MAX(Dt) AS Dt FROM #cf GROUP BY Field, StudentId;
 DROP TABLE #cf;`;
@@ -6132,11 +6162,18 @@ DROP TABLE #cf;`;
                 // The classroom checklist runs under the shared internal password, so
                 // there is no individual staff identity to record here.
                 const uploader = 'staff';
-                const where = `StudentId=${studentId} AND SchoolYear=${esc(year)} `
-                    + `AND FormField=${esc(field)} AND Kind=${esc(kind)}`;
+                /* Most uploads are one per child/year/field/kind. Parent Interview is
+                   explicitly once per child: a replacement scan re-points the newest
+                   semantic row while the superseded physical file remains on disk. */
+                const where = kind === 'interviewform'
+                    ? `StudentId=${studentId} AND FormField=${esc(field)} AND Kind=${esc(kind)}`
+                    : `StudentId=${studentId} AND SchoolYear=${esc(year)} AND FormField=${esc(field)} AND Kind=${esc(kind)}`;
+                const updateWhere = kind === 'interviewform'
+                    ? `Id=(SELECT TOP 1 Id FROM ChildFiles WHERE ${where} ORDER BY UploadedAt DESC,Id DESC)`
+                    : where;
                 let sql = childFileEnsureSQL()
                     + `IF EXISTS (SELECT 1 FROM ChildFiles WHERE ${where})
-    UPDATE ChildFiles SET FileName=${esc(fileName)},RelPath=${esc(rel)},UploadedBy=${esc(uploader)},UploadedAt=GETDATE() WHERE ${where}
+    UPDATE ChildFiles SET FileName=${esc(fileName)},RelPath=${esc(rel)},UploadedBy=${esc(uploader)},UploadedAt=GETDATE() WHERE ${updateWhere}
 ELSE
     INSERT INTO ChildFiles (StudentId,SchoolYear,FormField,Kind,FileName,RelPath,UploadedBy,UploadedAt)
     VALUES (${studentId},${esc(year)},${esc(field)},${esc(kind)},${esc(fileName)},${esc(rel)},${esc(uploader)},GETDATE());
@@ -6146,23 +6183,11 @@ ELSE
                 if (kind === 'report' || kind === 'initialasq' || kind === 'initialase') {
                     sql += trackingTickSQL(studentId, year, field);
                 }
-                /* A scanned Parent Interview Form is the whole requirement too: the signed
-                   paper form is the compliance evidence. Tick the ParentInterview flag AND
-                   seed a ParentInterviews row so /api/child-forms reads the cell as evidence
-                   on file (it keys on a non-empty InterviewDate). The interview date the
-                   family signed is passed as ?date=; today is a safe fallback. The row is
-                   only created if one does not already exist, so re-uploading a corrected
-                   scan never clobbers a typed-in electronic interview for the same year. */
+                /* A scanned Parent Interview is the complete, authoritative interview.
+                   Tick the checklist directly; /api/child-forms now reads this ChildFiles
+                   row, so no sparse electronic-form placeholder is created. */
                 if (kind === 'interviewform') {
-                    const interviewDate = /^\d{4}-\d{2}-\d{2}$/.test(String(qs.get('date') || ''))
-                        ? qs.get('date') : new Date().toISOString().slice(0, 10);
-                    sql = parentInterviewEnsureSQL() + sql
-                        + `\nIF NOT EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(year)})
-    INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,Notes)
-    VALUES (${studentId},${esc(year)},${esc(interviewDate)},${esc('Scanned paper Parent Interview Form filed ' + stamp + '.')});
-ELSE
-    UPDATE ParentInterviews SET InterviewDate=CASE WHEN ISNULL(InterviewDate,'')='' THEN ${esc(interviewDate)} ELSE InterviewDate END WHERE StudentId=${studentId} AND SchoolYear=${esc(year)};\n`
-                        + trackingTickSQL(studentId, year, field);
+                    sql += trackingTickSQL(studentId, year, field);
                 }
                 // Proof of income also lives on the enrollment record; a scan here is the
                 // real evidence, so mark the flag and remember the file so the roster's
@@ -6185,8 +6210,8 @@ ELSE
     }
 
     /* Uploaded child-file metadata. School-year evidence is limited to the selected
-       year. A child's explicitly identified initial ASQ/ASE is lifetime evidence, so
-       the newest dedicated record is returned in every year view. */
+       year. A Parent Interview scan and a child's explicitly identified initial ASQ/ASE
+       are lifetime evidence, so their newest dedicated records appear in every year. */
     if (req.method === 'GET' && url === '/api/child-files') {
         if (!checkClassroomAuth(req, res)) return;
         const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
@@ -6199,6 +6224,7 @@ ELSE
                        ) AS rn
                 FROM ChildFiles
                 WHERE SchoolYear=${esc(year)}
+                   OR (FormField='ParentInterview' AND Kind='interviewform')
                    OR (FormField='FamilyCenteredAssessment' AND Kind='initialasq')
                    OR (FormField='FamilyGoalPlan' AND Kind='initialase')
              )
@@ -6297,17 +6323,19 @@ SELECT @@ROWCOUNT AS Copied;`;
         if (!checkClassroomAuth(req, res)) return;
         const studentId = parseInt(url.split('/')[3]);
         const iqs = new URLSearchParams(req.url.split('?')[1] || '');
-        const year = resolveSchoolYear(iqs.get('year'));
-        /* ?priorTo=<year> returns the newest interview from an EARLIER year, for
-           carrying a returning child's answers forward as a starting point rather than
-           a blank form. SchoolYear is stored "YYYY-YYYY", so a plain string comparison
-           orders chronologically. Otherwise this returns the interview for `year`. */
+        /* Parent Interview is once per child. ?priorTo remains for compatibility, but
+           the normal read returns the newest populated electronic record across years.
+           Sparse legacy rows created by old scan uploads sort behind real typed content. */
         const priorTo = iqs.get('priorTo') ? resolveSchoolYear(iqs.get('priorTo')) : null;
+        const populatedOrder = `CASE WHEN NULLIF(FormData,'') IS NOT NULL
+                OR NULLIF(ParentGoals,'') IS NOT NULL OR NULLIF(ParentConcerns,'') IS NOT NULL
+                OR NULLIF(ChildStrengths,'') IS NOT NULL OR NULLIF(ParentSignature,'') IS NOT NULL
+            THEN 0 ELSE 1 END,ISNULL(UpdatedAt,CreatedAt) DESC,Id DESC`;
         const whereYear = priorTo
-            ? `SchoolYear < ${esc(priorTo)} ORDER BY SchoolYear DESC`
-            : `SchoolYear=${esc(year)}`;
+            ? `SchoolYear < ${esc(priorTo)} ORDER BY SchoolYear DESC,${populatedOrder}`
+            : `1=1 ORDER BY ${populatedOrder}`;
         const sql = parentInterviewEnsureSQL()
-            + `SELECT ${priorTo ? 'TOP 1 ' : ''}Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')},${txCol('FormData')} FROM ParentInterviews WHERE StudentId=${studentId} AND ${whereYear}`;
+            + `SELECT TOP 1 Id,StudentId,InterviewDate,${txCol('ParentGoals')},${txCol('ParentConcerns')},${txCol('ChildStrengths')},${txCol('ParentSignature')},${txCol('StaffSignature')},${txCol('Notes')},${txCol('PreferredLanguage')},${txCol('TranslatorNeeded')},${txCol('TranslatorArrangements')},${txCol('FormData')} FROM ParentInterviews WHERE StudentId=${studentId} AND ${whereYear}`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = r.data.trim().split('\n')
@@ -6326,14 +6354,21 @@ SELECT @@ROWCOUNT AS Copied;`;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const year = resolveSchoolYear(d.year);
+            const scan = latestParentInterviewScan(studentId);
+            if (!scan.ok) return sendJSON(res, 500, { error: scan.error });
+            if (scan.row) {
+                return sendJSON(res, 409, {
+                    error: 'A signed/scanned Parent Interview is already on file. Open that document instead of creating a second interview.'
+                });
+            }
             // The whole form arrives as an object; store it as a JSON string. esc()
             // adds the SQL quoting, so JSON.stringify must stay raw here or the stored
             // JSON ends up double-escaped and unparseable (same rule as parent-portal/sign).
             const formDataJson = d.formData ? JSON.stringify(d.formData) : '';
             const sql = parentInterviewEnsureSQL()
                 + isbeTrackingEnsureSQL()
-                + `IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(year)})
-                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},PreferredLanguage=${esc(d.preferredLanguage)},TranslatorNeeded=${esc(d.translatorNeeded)},TranslatorArrangements=${esc(d.translatorArrangements)},FormData=${esc(formDataJson)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(year)}
+                + `IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId})
+                    UPDATE ParentInterviews SET InterviewDate=${esc(d.interviewDate)},ParentGoals=${esc(d.parentGoals)},ParentConcerns=${esc(d.parentConcerns)},ChildStrengths=${esc(d.childStrengths)},ParentSignature=${esc(d.parentSignature)},StaffSignature=${esc(d.staffSignature)},Notes=${esc(d.notes)},PreferredLanguage=${esc(d.preferredLanguage)},TranslatorNeeded=${esc(d.translatorNeeded)},TranslatorArrangements=${esc(d.translatorArrangements)},FormData=${esc(formDataJson)},UpdatedAt=GETDATE() WHERE Id=(SELECT TOP 1 Id FROM ParentInterviews WHERE StudentId=${studentId} ORDER BY ISNULL(UpdatedAt,CreatedAt) DESC,Id DESC)
                 ELSE
                     INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,ParentSignature,StaffSignature,Notes,PreferredLanguage,TranslatorNeeded,TranslatorArrangements,FormData) VALUES (${studentId},${esc(year)},${esc(d.interviewDate)},${esc(d.parentGoals)},${esc(d.parentConcerns)},${esc(d.childStrengths)},${esc(d.parentSignature)},${esc(d.staffSignature)},${esc(d.notes)},${esc(d.preferredLanguage)},${esc(d.translatorNeeded)},${esc(d.translatorArrangements)},${esc(formDataJson)});
 `
@@ -6573,6 +6608,11 @@ ELSE
             const code = (d.code || '').trim().toUpperCase();
             if (!code) return sendJSON(res, 400, { error: 'Code required' });
 
+            // Ensure the enrollment language field exists before selecting it in the
+            // separate lookup batch below (newer databases already have it).
+            runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE rptMasterEnrollment ADD HomeLanguage NVARCHAR(60);
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE PreEnrollment ADD HomeLanguage NVARCHAR(60)`);
+
             // Ensure table exists and look up code
             const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentCodes')
                 CREATE TABLE ParentCodes (
@@ -6584,7 +6624,8 @@ ELSE
                 SELECT pc.StudentId,e.First_Name,e.Last_Name,e.Birth_date,e.RoomNumber,r.Room,r.TeacherDescription,
                     ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
                     ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(e.IEP,'') AS IEP,ISNULL(e.Military,'') AS Military,
-                    ISNULL(e.Category,'') AS Category,ISNULL(e.City_Town,'') AS City_Town,ISNULL(e.PFA_PI_na,'') AS PFA_PI_na
+                    ISNULL(e.Category,'') AS Category,ISNULL(e.City_Town,'') AS City_Town,ISNULL(e.PFA_PI_na,'') AS PFA_PI_na,
+                    ISNULL(e.HomeLanguage,'') AS HomeLanguage
                 FROM ParentCodes pc
                 JOIN rptMasterEnrollment e ON pc.StudentId=e.Id
                 LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber
@@ -6595,7 +6636,7 @@ ELSE
                 .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
             if (!lines.length) return sendJSON(res, 200, { success: false, error: 'Invalid code' });
             const v = lines[0].split('|').map(x => x.trim());
-            const student = { Id:v[0], First_Name:v[1], Last_Name:v[2], Birth_date:v[3], RoomNumber:v[4], Room:v[5], TeacherDescription:v[6], HouseholdIncome:v[7], HouseholdSize:v[8], PublicBenefits:v[9], IEP:v[10], Military:v[11], Category:v[12], City_Town:v[13], PFA_PI_na:v[14] };
+            const student = { Id:v[0], First_Name:v[1], Last_Name:v[2], Birth_date:v[3], RoomNumber:v[4], Room:v[5], TeacherDescription:v[6], HouseholdIncome:v[7], HouseholdSize:v[8], PublicBenefits:v[9], IEP:v[10], Military:v[11], Category:v[12], City_Town:v[13], PFA_PI_na:v[14], HomeLanguage:v[15] };
 
             // Get tracking status for the year in progress. A parent following a
             // code should see whether THIS year's slip and interview are done, not
@@ -6627,7 +6668,7 @@ ELSE
                 + `ISNULL(p.Phone,'') AS Phone,ISNULL(p.Email,'') AS Email,ISNULL(p.Address,'') AS Address,`
                 + `ISNULL(p.City,'') AS City,ISNULL(p.Zip,'') AS Zip,`
                 + `ISNULL(p.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(p.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,`
-                + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,`
+                + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,ISNULL(p.HomeLanguage,'') AS HomeLanguage,`
                 + `ISNULL(p.Homeless,'') AS Homeless,ISNULL(p.FosterAdopted,'') AS FosterAdopted,ISNULL(p.IEP,'') AS IEP,`
                 + `ISNULL(p.EarlyIntervention,'') AS EarlyIntervention,ISNULL(p.AbuseHistory,'') AS AbuseHistory,`
                 + `ISNULL(p.MentalIllness,'') AS MentalIllness,ISNULL(p.DcfsInvolvement,'') AS DcfsInvolvement,`
@@ -6636,7 +6677,7 @@ ELSE
                 + `ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,`
                 + `ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,${flat('p.LivingSituation')} AS LivingSituation,`
                 + `${flat('p.Notes')} AS Notes,ISNULL(p.ChildName,'') AS ChildName,ISNULL(p.ChildBirthDate,'') AS ChildBirthDate`;
-            const peKeys = ['ParentFirst','ParentLast','Phone','Email','Address','City','Zip','HouseholdIncome','HouseholdSize','PublicBenefits','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','FamilyDeath','ParentIncarcerated','TeenParent','BornOutsideUS','NonEnglishHome','ActiveMilitary','LivingSituation','Notes','ChildName','ChildBirthDate'];
+            const peKeys = ['ParentFirst','ParentLast','Phone','Email','Address','City','Zip','HouseholdIncome','HouseholdSize','PublicBenefits','HomeLanguage','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','FamilyDeath','ParentIncarcerated','TeenParent','BornOutsideUS','NonEnglishHome','ActiveMilitary','LivingSituation','Notes','ChildName','ChildBirthDate'];
             const peSql = `SELECT TOP 1 ${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${parseInt(student.Id)}
                 UNION ALL
                 SELECT TOP 1 ${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date) WHERE e.Id=${parseInt(student.Id)} AND e.PreEnrollmentId IS NULL`;
@@ -6650,7 +6691,68 @@ ELSE
                 }
             }
 
-            sendJSON(res, 200, { success: true, student, tracking, preEnroll });
+            /* Resolve the child's one Parent Interview. A signed scan wins over any
+               electronic draft/record. The parent page uses this source to open the
+               scan directly instead of presenting a second blank electronic form. */
+            const scanResult = latestParentInterviewScan(student.Id);
+            if (!scanResult.ok) return sendJSON(res, 500, { error: scanResult.error });
+            let interview = { source: 'none' };
+            if (scanResult.row) {
+                interview = { source: 'scan', name: scanResult.row.FileName || 'Parent Interview' };
+            } else {
+                const saved = runSQLRows(
+                    `SELECT TOP 1 Id,InterviewDate,FormData,ParentGoals,ParentConcerns,
+                            ChildStrengths,Notes,PreferredLanguage,TranslatorNeeded,TranslatorArrangements
+                     FROM ParentInterviews
+                     WHERE StudentId=${parseInt(student.Id)}
+                       AND (NULLIF(FormData,'') IS NOT NULL OR NULLIF(ParentGoals,'') IS NOT NULL
+                            OR NULLIF(ParentConcerns,'') IS NOT NULL OR NULLIF(ChildStrengths,'') IS NOT NULL
+                            OR NULLIF(ParentSignature,'') IS NOT NULL)
+                     ORDER BY ISNULL(UpdatedAt,CreatedAt) DESC,Id DESC`,
+                    parentInterviewEnsureSQL());
+                if (!saved.ok) return sendJSON(res, 500, { error: saved.error });
+                if (saved.rows.length) interview = { source: 'electronic', record: saved.rows[0] };
+            }
+
+            sendJSON(res, 200, { success: true, student, tracking, preEnroll, interview });
+        });
+        return;
+    }
+
+    /* Parent-scoped access to the one uploaded Parent Interview scan. The browser sends
+       only its family code; the server resolves both child and file, so a parent can
+       never request an arbitrary library path. */
+    if (req.method === 'POST' && url === '/api/parent-portal/interview-file') {
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const code = String(d.code || '').trim().toUpperCase();
+            if (!code) return sendJSON(res, 400, { error: 'Parent code required' });
+            const owner = runSQLRows(
+                `SELECT TOP 1 StudentId FROM ParentCodes WHERE Code=${esc(code)}`);
+            if (!owner.ok) return sendJSON(res, 500, { error: owner.error });
+            if (!owner.rows.length) return sendJSON(res, 403, { error: 'Invalid code' });
+            const scan = latestParentInterviewScan(owner.rows[0].StudentId);
+            if (!scan.ok) return sendJSON(res, 500, { error: scan.error });
+            if (!scan.row) return sendJSON(res, 404, { error: 'No uploaded Parent Interview is on file.' });
+            const full = resolveDocPath(scan.row.RelPath);
+            if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) {
+                return sendJSON(res, 404, { error: 'The Parent Interview file could not be found.' });
+            }
+            let buf;
+            try { buf = fs.readFileSync(full); }
+            catch (e) { return sendJSON(res, 500, { error: 'Could not read the Parent Interview file.' }); }
+            const ext = path.extname(full).toLowerCase();
+            const mime = MIME[ext] || 'application/octet-stream';
+            const inline = ['.pdf', '.png', '.jpg', '.jpeg'].includes(ext);
+            res.writeHead(200, {
+                'Content-Type': mime,
+                'Content-Length': buf.length,
+                'Content-Disposition': (inline ? 'inline' : 'attachment')
+                    + '; filename="' + path.basename(full).replace(/"/g, '') + '"',
+                'X-Content-Type-Options': 'nosniff',
+                'Cache-Control': 'no-store'
+            });
+            return res.end(buf);
         });
         return;
     }
@@ -6702,6 +6804,13 @@ ELSE
             }
 
             if (formType === 'ParentInterview') {
+                const scan = latestParentInterviewScan(studentId);
+                if (!scan.ok) return sendJSON(res, 500, { error: scan.error });
+                if (scan.row) {
+                    return sendJSON(res, 409, {
+                        error: 'A signed Parent Interview is already on file. Open that document instead.'
+                    });
+                }
                 // Full interview payload kept as JSON alongside the mapped columns.
                 // esc() handles the quote escaping, so this must stay raw or the
                 // stored JSON ends up double-escaped and unparseable.
@@ -6717,28 +6826,20 @@ ELSE
                     strengths: data.childStrengths || '',
                     notes: data.additionalNotes || '',
                     prefLang: data.parent1Language || '',
-                    translatorNeeded: data.parent1Translator || ''
+                    translatorNeeded: data.parent1Translator || '',
+                    translatorArrangements: data.translatorArrangements || ''
                 };
-                const sql = `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='ParentInterviews')
-                    CREATE TABLE ParentInterviews (
-                        Id INT IDENTITY(1,1) PRIMARY KEY,StudentId INT NOT NULL,
-                        InterviewDate NVARCHAR(20),ParentGoals NVARCHAR(MAX),ParentConcerns NVARCHAR(MAX),
-                        ChildStrengths NVARCHAR(MAX),ParentSignature NVARCHAR(200),StaffSignature NVARCHAR(200),
-                        Notes NVARCHAR(MAX),CreatedAt DATETIME DEFAULT GETDATE(),UpdatedAt DATETIME DEFAULT GETDATE()
-                    );
-                    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='FormData') ALTER TABLE ParentInterviews ADD FormData NVARCHAR(MAX);
-                    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='PreferredLanguage') ALTER TABLE ParentInterviews ADD PreferredLanguage NVARCHAR(100);
-                    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='TranslatorNeeded') ALTER TABLE ParentInterviews ADD TranslatorNeeded NVARCHAR(20);
-                    IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='TranslatorArrangements') ALTER TABLE ParentInterviews ADD TranslatorArrangements NVARCHAR(MAX);
-                    /* Parent now signs with a stylus, so ParentSignature holds an image data
-                       URL, not a typed name — widen the original 200-char column, once. */
-                    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='ParentInterviews' AND COLUMN_NAME='ParentSignature' AND CHARACTER_MAXIMUM_LENGTH <> -1)
-                        ALTER TABLE ParentInterviews ALTER COLUMN ParentSignature NVARCHAR(MAX);
-                    ${schoolYearColumnSQL('ParentInterviews')}
-                    IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)})
-                        UPDATE ParentInterviews SET InterviewDate=${esc(data.signDate||'')},ParentGoals=${esc(summary.goals)},ParentConcerns=${esc(summary.concerns)},ChildStrengths=${esc(summary.strengths)},Notes=${esc(summary.notes)},PreferredLanguage=${esc(summary.prefLang)},TranslatorNeeded=${esc(summary.translatorNeeded)},ParentSignature=${esc(data.parentSignature||'')},FormData=${esc(jsonData)},UpdatedAt=GETDATE() WHERE StudentId=${studentId} AND SchoolYear=${esc(formYear)}
+                if (!summary.prefLang.trim() || !summary.translatorNeeded.trim()
+                        || !summary.translatorArrangements.trim()) {
+                    return sendJSON(res, 400, {
+                        error: 'Language, translator-needed, and translator-arrangements answers are required.'
+                    });
+                }
+                const sql = parentInterviewEnsureSQL()
+                    + `IF EXISTS (SELECT 1 FROM ParentInterviews WHERE StudentId=${studentId})
+                        UPDATE ParentInterviews SET InterviewDate=${esc(data.signDate||'')},ParentGoals=${esc(summary.goals)},ParentConcerns=${esc(summary.concerns)},ChildStrengths=${esc(summary.strengths)},Notes=${esc(summary.notes)},PreferredLanguage=${esc(summary.prefLang)},TranslatorNeeded=${esc(summary.translatorNeeded)},TranslatorArrangements=${esc(summary.translatorArrangements)},ParentSignature=${esc(data.parentSignature||'')},FormData=${esc(jsonData)},UpdatedAt=GETDATE() WHERE Id=(SELECT TOP 1 Id FROM ParentInterviews WHERE StudentId=${studentId} ORDER BY ISNULL(UpdatedAt,CreatedAt) DESC,Id DESC)
                     ELSE
-                        INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,Notes,PreferredLanguage,TranslatorNeeded,ParentSignature,FormData) VALUES (${studentId},${esc(formYear)},${esc(data.signDate||'')},${esc(summary.goals)},${esc(summary.concerns)},${esc(summary.strengths)},${esc(summary.notes)},${esc(summary.prefLang)},${esc(summary.translatorNeeded)},${esc(data.parentSignature||'')},${esc(jsonData)});
+                        INSERT INTO ParentInterviews (StudentId,SchoolYear,InterviewDate,ParentGoals,ParentConcerns,ChildStrengths,Notes,PreferredLanguage,TranslatorNeeded,TranslatorArrangements,ParentSignature,FormData) VALUES (${studentId},${esc(formYear)},${esc(data.signDate||'')},${esc(summary.goals)},${esc(summary.concerns)},${esc(summary.strengths)},${esc(summary.notes)},${esc(summary.prefLang)},${esc(summary.translatorNeeded)},${esc(summary.translatorArrangements)},${esc(data.parentSignature||'')},${esc(jsonData)});
 `
                     + trackingTickSQL(studentId, formYear, 'ParentInterview');
                 const r = runSQL(sql);

@@ -695,8 +695,8 @@
         </div>
         <div class="pi-modal-body">
             <!-- Attach a signed/scanned paper Parent Interview Form. This is the path for
-                 returning families who pre-date the online form: the scan IS the evidence,
-                 so uploading it files the PDF in the child's folder and ticks the column. -->
+                 any family who completes the prefilled printout by hand: the scan becomes
+                 the one authoritative interview, so no fields need to be retyped. -->
             <div class="pi-section" id="piScanSection">
                 <h4>Signed / Scanned Form on File</h4>
                 <div class="doc-note">
@@ -2357,17 +2357,23 @@ function cellClass(student, field) {
 /* Resolve the saved file (PDF or scan) behind an "on file" pill, so clicking the
    pill opens the actual document a monitor would review.
 
-   Two sources, in order:
-     1. A signed-form PDF: /api/child-signed-form files the whole form as a PDF and
-        records its RelPath in ChildSignatures (loaded into `signatures`). Either
-        role (staff/parent) points at the same PDF, so the first found wins.
-     2. An uploaded scan: report cards, parent questionnaires and scanned interview
-        forms are tracked by ChildForms.fileFor(field, kind) with a relPath.
+   Sources are resolved in evidence order:
+     1. For Parent Interview, an uploaded signed scan is authoritative.
+     2. A generated signed-form PDF recorded in ChildSignatures.
+     3. Other uploaded scans such as report cards and questionnaires.
    Returns { rel, name } or null when nothing resolvable is on file (e.g. a PFA tick
    whose evidence is the physical folder, not a file here). */
 function childFormFileRel(student, field) {
     const id = student.Id;
-    // 1. Signed-form PDF via the signatures index (staff first, then parent).
+    // An uploaded signed Parent Interview is the one authoritative interview and
+    // therefore wins over any generated electronic PDF that may also exist.
+    if (field === 'ParentInterview' && window.ChildForms && ChildForms.fileFor) {
+        const scan = ChildForms.fileFor(id, field, 'interviewform');
+        if (scan && scan.relPath) {
+            return { rel: scan.relPath, name: scan.name || (scan.relPath.split('/').pop() || 'Parent Interview') };
+        }
+    }
+    // Signed-form PDF via the signatures index (staff first, then parent).
     for (const role of ['staff', 'parent']) {
         const sig = (typeof signatureFor === 'function') ? signatureFor(id, field, role) : null;
         if (sig && sig.RelPath) {
@@ -2736,24 +2742,24 @@ function renderRoster() {
                 const tdc = ('cf-doc' + divide).trim();
                 if (st === 'form') {
                     const d = ChildForms.formDate(s.Id, f);
-                    /* Two ways this is "on file", and they open DIFFERENTLY:
-                       - an ONLINE record (ChildForms.hasForm) -> open the editable modal
-                         to view/update the typed answers;
-                       - a SCANNED paper form with no online record -> open the scanned PDF,
-                         because opening the editable modal would show a blank form (there
-                         are no typed answers to load) and read as a bug. */
-                    const online = window.ChildForms && ChildForms.hasForm && ChildForms.hasForm(s.Id, f);
-                    const scan = online ? null : childFormFileRel(s, f);
-                    if (!online && scan) {
+                    /* An uploaded signed scan is the one authoritative interview and
+                       opens immediately. Only a child with no scan uses the editable
+                       electronic record. This deliberately ignores sparse placeholder
+                       ParentInterviews rows created by older scan uploads. */
+                    const scan = window.ChildForms && ChildForms.fileFor
+                        ? ChildForms.fileFor(s.Id, f, 'interviewform') : null;
+                    if (scan && scan.relPath) {
                         return '<td class="' + tdc + '">'
-                            + '<a class="cf-pill" href="#" title="Parent Interview on file as a scanned form'
-                            + (d ? ', dated ' + d : '') + ' \u2014 click to open the scan."'
-                            + ' onclick="event.preventDefault();openDoc(\'' + escapeHtml(scan.rel).replace(/'/g, "\\'")
-                            + '\',\'' + escapeHtml(scan.name).replace(/'/g, "\\'") + '\',true)">\u2713 on file</a>'
+                            + '<a class="cf-pill" href="#" title="Parent Interview on file as a signed scan'
+                            + (d ? ', dated ' + d : '') + ' \u2014 click to open."'
+                            + ' onclick="event.preventDefault();openDoc(\'' + escapeHtml(scan.relPath).replace(/'/g, "\\'")
+                            + '\',\'' + escapeHtml(scan.name || 'Parent Interview').replace(/'/g, "\\'") + '\',true)">\u2713 on file</a>'
+                            + '<a href="#" style="' + LINK_STYLE + '" title="Replace this scan; the previous file is retained"'
+                            + ' onclick="event.preventDefault();replaceInterviewScan(' + s.Id + ')">[replace]</a>'
                             + '</td>';
                     }
                     return '<td class="' + tdc + '">'
-                        + '<a class="cf-pill" href="#" title="Parent Interview on file'
+                        + '<a class="cf-pill" href="#" title="Electronic Parent Interview on file'
                         + (d ? ', dated ' + d : '') + ' \u2014 click to view or update."'
                         + ' onclick="event.preventDefault();openInterview(' + s.Id + ')">\u2713 on file</a>'
                         + '</td>';
@@ -2848,6 +2854,14 @@ async function saveField(studentId, field, value) {
    interviewFormBlocks, piEsc) are globals, so the calls below are unchanged. */
 
 async function openInterview(studentId) {
+    // Any uploaded signed scan is final. Open it directly instead of showing a second,
+    // blank electronic form behind a small "view" link.
+    const existingScan = window.ChildForms && ChildForms.fileFor
+        ? ChildForms.fileFor(studentId, 'ParentInterview', 'interviewform') : null;
+    if (existingScan && existingScan.relPath) {
+        openDoc(existingScan.relPath, existingScan.name || 'Parent Interview', true);
+        return;
+    }
     currentInterviewStudentId = studentId;
     const student = students.find(s => String(s.Id) === String(studentId));
     if (!student) return;
@@ -2912,9 +2926,9 @@ async function openInterview(studentId) {
     // Existing scanned paper form on file?
     var scanFileInput = document.getElementById('piScanFile');
     if (scanFileInput) scanFileInput.value = '';
-    var existingScan = ChildForms.fileFor(studentId, 'ParentInterview', 'interviewform');
-    setUploadStatus('piScanStatus', existingScan
-        ? { on: true, name: existingScan.name, relPath: existingScan.relPath }
+    var scanOnFile = ChildForms.fileFor(studentId, 'ParentInterview', 'interviewform');
+    setUploadStatus('piScanStatus', scanOnFile
+        ? { on: true, name: scanOnFile.name, relPath: scanOnFile.relPath }
         : null, 'No signed form on file yet.');
 
     document.getElementById('piOverlay').classList.add('open');
@@ -2935,11 +2949,18 @@ async function prefillInterviewForm(studentId, student) {
         publicBenefits: student.PublicBenefits || '',
         iep: isYes(student.IEP) ? 'Yes' : '',
         military: isYes(student.Military) ? 'Yes' : '',
+        foster: String(student.Category || '').trim().toLowerCase() === 'foster' ? 'Yes' : '',
         homeLanguage: student.HomeLanguage || ''
     };
     if (enr.householdIncome) piPrefill('income', enr.householdIncome);
     if (enr.householdSize) piPrefill('householdSize', enr.householdSize);
+    if (enr.iep) piPrefill('disabilityYN', 'Yes');
     if (enr.military) piPrefill('activeMilitary', 'Yes');
+    if (enr.foster) piPrefill('childLivesWith', 'foster');
+    if (enr.homeLanguage) {
+        piPrefill('parent1Language', enr.homeLanguage);
+        document.getElementById('piPreferredLanguage').value = enr.homeLanguage;
+    }
     // Public benefits string -> the program checkboxes.
     if (enr.publicBenefits) {
         const b = enr.publicBenefits.toLowerCase();
@@ -2959,7 +2980,8 @@ async function prefillInterviewForm(studentId, student) {
         d = await res.json();
     } catch (e) { d = null; }
 
-    const anyPrefill = enr.householdIncome || enr.householdSize || enr.military || enr.publicBenefits;
+    const anyPrefill = enr.householdIncome || enr.householdSize || enr.military
+        || enr.iep || enr.foster || enr.homeLanguage || enr.publicBenefits;
     const note = document.getElementById('piPrefillNote');
 
     if (!d || !d.found) {
@@ -2975,6 +2997,22 @@ async function prefillInterviewForm(studentId, student) {
     if (d.Address) piPrefill('parent1Address', d.Address);
     if (d.City) piPrefill('parent1City', d.City);
     if (d.Zip) piPrefill('parent1Zip', d.Zip);
+    if (d.HomeLanguage) {
+        piPrefill('parent1Language', d.HomeLanguage);
+        document.getElementById('piPreferredLanguage').value = d.HomeLanguage;
+    }
+    // If benefits have not yet been copied onto enrollment, keep the family's intake
+    // answers on the prefilled/printed form rather than dropping them.
+    if (d.PublicBenefits && !enr.publicBenefits) {
+        const b = d.PublicBenefits.toLowerCase();
+        const progs = [];
+        if (b.includes('wic')) progs.push('WIC');
+        if (b.includes('medicaid')) progs.push('Medicaid');
+        if (b.includes('snap')) progs.push('SNAP');
+        if (b.includes('tanf')) progs.push('TANF');
+        if (b.includes('ccap')) progs.push('CCAP');
+        if (progs.length) piPrefillGroup('publicPrograms', progs);
+    }
     if (d.HouseholdIncome && !enr.householdIncome) piPrefill('income', d.HouseholdIncome);
     if (d.HouseholdSize && !enr.householdSize) piPrefill('householdSize', d.HouseholdSize);
     if (d.LivingSituation) piPrefill('livingSituationNote', d.LivingSituation);
@@ -3196,8 +3234,8 @@ function previewBulkInterviewImport() {
 }
 
 /* Upload every matched file in turn, updating its row status. Reuses the same
-   per-child upload the single modal uses, so filing, the ChildFiles row, the seeded
-   ParentInterviews row and the ticked flag are all identical. */
+   per-child upload as the single modal, so each scan becomes the authoritative
+   lifetime Parent Interview and ticks the checklist without creating a blank form. */
 async function runBulkInterviewImport() {
     const btn = document.getElementById('piImportBtn');
     btn.disabled = true;
@@ -3212,7 +3250,6 @@ async function runBulkInterviewImport() {
             ChildForms.markFile(m.student.Id, 'ParentInterview', 'interviewform', d.relPath, d.name);
             if (!trackingData[m.student.Id]) trackingData[m.student.Id] = {};
             trackingData[m.student.Id].ParentInterview = 1;
-            ChildForms.mark(m.student.Id, 'ParentInterview', new Date().toISOString().slice(0, 10));
             if (cell) { cell.textContent = '\u2713 Filed'; cell.style.color = '#166534'; }
             done++;
         } catch (e) {
@@ -3428,16 +3465,12 @@ function escUpload(s) {
 /* Upload one child evidence file (parent questionnaire or report card) into the
    child's folder via /api/child-file-upload. Multipart, so credentials are attached
    by hand and Content-Type is left for the browser to set its own boundary. */
-async function uploadChildFile(studentId, field, kind, file, extraDate) {
+async function uploadChildFile(studentId, field, kind, file) {
     var form = new FormData();
     form.append('file', file, file.name);
-    // A scanned interview form carries the date the family signed, so the roster's
-    // Parent Interview cell reads that date rather than the day it was scanned in.
-    var dateQS = /^\d{4}-\d{2}-\d{2}$/.test(String(extraDate || ''))
-        ? '&date=' + encodeURIComponent(extraDate) : '';
     var res = await fetch('/api/child-file-upload?studentId=' + encodeURIComponent(studentId)
         + '&field=' + encodeURIComponent(field) + '&kind=' + encodeURIComponent(kind)
-        + '&year=' + encodeURIComponent(activeSchoolYear) + dateQS,
+        + '&year=' + encodeURIComponent(activeSchoolYear),
         { method: 'POST',
           headers: (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {},
           body: form });
@@ -3592,11 +3625,38 @@ async function uploadReportCard() {
     }
 }
 
-/* Attach a signed/scanned paper Parent Interview Form for the child open in the modal.
-   Files the scan in the child's folder, ticks the Parent Interview column, and seeds a
-   ParentInterviews row so the roster reads the cell as evidence on file. The interview
-   date comes from the modal's Interview Date field so the cell shows the date the family
-   signed, not the day it was scanned. */
+/* Replace an existing authoritative scan without routing through the electronic form.
+   The server writes a new physical file and re-points the one semantic interview row;
+   the prior scan remains on disk as evidence history. */
+function replaceInterviewScan(studentId) {
+    if (!confirm('Replace the Parent Interview scan on file?\n\nThe previous file will be retained in the child\'s folder.')) return;
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.pdf,.jpg,.jpeg,.png';
+    input.onchange = async function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        if (file.size > 15 * 1024 * 1024) {
+            alert('That file is over 15 MB. A PDF scan is usually much smaller.');
+            return;
+        }
+        try {
+            var d = await uploadChildFile(studentId, 'ParentInterview', 'interviewform', file);
+            ChildForms.markFile(studentId, 'ParentInterview', 'interviewform', d.relPath, d.name);
+            if (!trackingData[studentId]) trackingData[studentId] = {};
+            trackingData[studentId].ParentInterview = 1;
+            refreshActiveView();
+            openDoc(d.relPath, d.name || 'Parent Interview', true);
+        } catch (e) {
+            alert('Could not replace the Parent Interview scan: ' + e.message);
+        }
+    };
+    input.click();
+}
+
+/* Attach the signed/scanned Parent Interview for the child open in the modal. The
+   scan becomes the one authoritative interview, files in the permanent child folder,
+   and future clicks open it directly rather than returning to the electronic editor. */
 async function uploadInterviewScan() {
     if (!currentInterviewStudentId) return;
     var input = document.getElementById('piScanFile');
@@ -3613,18 +3673,17 @@ async function uploadInterviewScan() {
     var btn = document.getElementById('piScanBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Uploading\u2026'; }
     if (statusEl) { statusEl.textContent = 'Uploading\u2026'; statusEl.style.color = '#64748b'; }
-    var dateField = document.getElementById('piDate');
-    var signedDate = dateField ? dateField.value : '';
     try {
-        var d = await uploadChildFile(currentInterviewStudentId, 'ParentInterview', 'interviewform', file, signedDate);
+        var d = await uploadChildFile(currentInterviewStudentId, 'ParentInterview', 'interviewform', file);
         ChildForms.markFile(currentInterviewStudentId, 'ParentInterview', 'interviewform', d.relPath, d.name);
         // The scan is the whole requirement, so reflect the tick and evidence locally
         // without waiting for a reload.
         if (!trackingData[currentInterviewStudentId]) trackingData[currentInterviewStudentId] = {};
         trackingData[currentInterviewStudentId].ParentInterview = 1;
-        ChildForms.mark(currentInterviewStudentId, 'ParentInterview', signedDate || new Date().toISOString().slice(0, 10));
         setUploadStatus('piScanStatus', { on: true, name: d.name, relPath: d.relPath }, '');
         refreshActiveView();
+        closeInterview();
+        openDoc(d.relPath, d.name || 'Parent Interview', true);
     } catch (e) {
         if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
     } finally {
