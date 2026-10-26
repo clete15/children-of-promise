@@ -2263,6 +2263,57 @@ function rosterEditHtml(roomNumber) {
 /* The rendered checklist once the data is in. Kept apart from classroomSection so
    renderClassroomPanel can rebuild just this without touching the loading/error
    wrapper logic. */
+/* Explain a non-green classroom pill using the same evidence facts that determine its
+   ChildForms state. This is presentation only: it does not change completion, counts,
+   deadlines, or what clicking the pill opens. */
+function classroomMissingReason(student, field, state, childIsPI) {
+    const label = {
+        PermissionSlip: 'Permission Slip',
+        BegASQ: 'Beginning ASQ', BegASE: 'Beginning ASE',
+        EndASQ: 'End ASQ', EndASE: 'End ASE',
+        MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card'
+    }[field] || field;
+    const checked = state === 'tick-only';
+
+    if (field === 'PermissionSlip') {
+        return (checked ? 'Checked off, but no saved Permission Slip is on file. ' : '')
+            + 'Still needed: complete and save the Permission Slip. Click to open it.';
+    }
+
+    const screening = field === 'BegASQ' || field === 'EndASQ'
+        || field === 'BegASE' || field === 'EndASE';
+    if (screening) {
+        const tool = (field === 'BegASQ' || field === 'EndASQ') ? 'ASQ' : 'ASE';
+        if (!childIsPI) {
+            return 'Still needed: enter and save the ' + tool + ' scores, or upload the completed '
+                + tool + '. Click to open ' + label + '.';
+        }
+        const id = student.Id;
+        const have = [], need = [];
+        const quest = ChildForms.hasFile && ChildForms.hasFile(id, field, 'questionnaire');
+        const scored = ChildForms.hasForm && ChildForms.hasForm(id, field);
+        const parentSig = ChildForms.hasSignature && ChildForms.hasSignature(id, field, 'parent');
+        const staffSig = ChildForms.hasSignature && ChildForms.hasSignature(id, field, 'staff');
+        (quest ? have : need).push('the ' + tool + ' upload');
+        (scored ? have : need).push('the entered scores');
+        (parentSig ? have : need).push('the parent signature');
+        (staffSig ? have : need).push('the staff signature');
+        const list = items => items.length === 1 ? items[0]
+            : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+        return (checked ? 'Checked off, but the required saved evidence is not complete. ' : '')
+            + (have.length ? 'On file: ' + list(have) + '. ' : '')
+            + (need.length ? 'Still needed: ' + list(need) + '. ' : '')
+            + 'Click to open ' + label + ' and finish it.';
+    }
+
+    if (field === 'MidYearReport' || field === 'EndYearReport') {
+        return (checked ? 'Checked off, but no uploaded report-card file is on file. ' : '')
+            + 'Still needed: upload the ' + label + '. Click to open the upload.';
+    }
+
+    return 'Still needed: complete ' + label + '. Click to open it.';
+}
+
 function classroomChecklistHtml(rooms) {
     // Land on the first assigned room that actually has children, else the first.
     const openable = rooms.filter(r => r.roomNumber);
@@ -2356,8 +2407,7 @@ function classroomChecklistHtml(rooms) {
             const done = st === 'form' || st === 'tick' || st === 'unknown';
             const label = col.label.replace(/<br>/g, ' ');
             let extra = st === 'tick-only'
-                ? '<span class="cls-paper" title="Ticked, but nothing is saved here. '
-                  + 'If it was done on paper that is fine; otherwise open the form.">on paper?</span>'
+                ? '<span class="cls-paper">on paper?</span>'
                 : '';
             // A screening completes on the teacher-scored summary alone (staff-
             // administered; see compliance steering). No "needs questionnaire" state —
@@ -2383,9 +2433,11 @@ function classroomChecklistHtml(rooms) {
             const cls = 'cls-chip' + (done ? ' cls-chip-done' : '')
                 + (st === 'partial' ? ' cls-chip-partial' : '');
             const inner = (done ? '\u2713 ' : '') + label + extra;
+            const tip = done ? '' : classroomMissingReason(s, col.field, st, childIsPI);
+            const tipAttr = tip ? ' title="' + esc(tip) + '"' : '';
             return action
-                ? '<a href="#" class="' + cls + '" data-act="' + esc(action) + '">' + inner + '</a>'
-                : '<span class="' + cls + '">' + inner + '</span>';
+                ? '<a href="#" class="' + cls + '"' + tipAttr + ' data-act="' + esc(action) + '">' + inner + '</a>'
+                : '<span class="' + cls + '"' + tipAttr + '>' + inner + '</span>';
         }).join('');
 
         /* Weighted Eligibility is no longer shown here — it is an admin document,
