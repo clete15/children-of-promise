@@ -92,6 +92,9 @@
     var files = {};          // { studentId: { Field: { Kind: { relPath, name, date } } } }  uploads
     var loadedYear = null;
     var loadState = 'idle';  // idle | loading | ready | failed
+    /* Tracked separately from loadState, which covers the FORMS index only. A page can
+       read forms fine and still have lost the file index, which is what happened. */
+    var filesState = 'idle'; // idle | loading | ready | failed
 
     function isBacked(field) {
         return BACKED_FIELDS.indexOf(field) !== -1;
@@ -149,9 +152,16 @@
        forms. Loaded from /api/child-files. Failure is again swallowed: an upload
        index that will not load should not blank the roster. */
     function loadFiles(year, fetcher) {
+        filesState = 'loading';
         return fetcher('/api/child-files?year=' + encodeURIComponent(year))
             .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
             .then(function (d) {
+                /* A server-reported error is NOT an empty file index. This endpoint spent
+                   eleven days answering 200 with {files:[]} because of a SQL syntax error
+                   it could not see, and this function recorded that as "no child has any
+                   upload" — so every PI screening asked teachers to re-upload documents
+                   that were sitting on disk the whole time. Treat it as a failed read. */
+                if (d && d.error) throw new Error(d.error);
                 files = {};
                 (d && d.files || []).forEach(function (f) {
                     var id = String(f.StudentId);
@@ -161,9 +171,18 @@
                         relPath: f.RelPath, name: f.FileName, date: f.UploadedAt || ''
                     };
                 });
+                filesState = 'ready';
                 return files;
             })
-            .catch(function () { files = {}; return null; });
+            .catch(function (e) {
+                files = {};
+                filesState = 'failed';
+                /* Loud on the console, because the visible symptom of this failing is a
+                   screening that looks unfinished rather than an error anybody can see. */
+                console.error('[ChildForms] could not read the uploaded-file index; '
+                    + 'uploads will read as missing until this is fixed:', e && e.message);
+                return null;
+            });
     }
 
     // Records an upload that just happened, so the cell updates without a reload.
@@ -435,6 +454,7 @@
         rollup: rollup,
         indexItems: indexItems,
         get loadState() { return loadState; },
+        get filesState() { return filesState; },
         get year() { return loadedYear; },
         // Exposed for tests and for a page that wants the raw index.
         get all() { return forms; },

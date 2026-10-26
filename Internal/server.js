@@ -3976,6 +3976,18 @@ ORDER BY c.Seq`;
    the bug this replaces, because "no rows" and "could not read" then look
    identical to the page. */
 function runSQLRows(innerSelect, ensure) {
+    /* The payload is embedded in a scalar subquery, so a CTE or a leading ';' cannot
+       compile there. Caught here rather than at the database, because the failure is
+       otherwise invisible: sqlcmd exits 0, no chunk rows are produced, and the empty
+       payload reads as a legitimate "no rows". /api/child-files shipped exactly that
+       for eleven days and reported every uploaded document as missing. Fail loudly and
+       name the fix instead. */
+    const head = String(innerSelect || '').replace(/^\s+/, '').slice(0, 6).toUpperCase();
+    if (head.startsWith(';') || head.startsWith('WITH')) {
+        return { ok: false, error: 'runSQLRows cannot take a CTE or a leading ";" — '
+            + 'it is embedded in a scalar subquery. Rewrite the CTE as a derived table.' };
+    }
+
     const sql = (ensure || '') + 'SET NOCOUNT ON;\n' + jsonChunkSQL(innerSelect);
     const r = runSQL(sql);
     if (!r.ok) return { ok: false, error: r.error };
@@ -4001,6 +4013,16 @@ function runSQLRows(innerSelect, ensure) {
     }
 
     const raw = parts.join('');
+    /* An error inside the batch AND nothing parsed back is a failed read, not an empty
+       table. runSQL deliberately returns ok:true with sqlError set so ensure-block noise
+       cannot kill a request, and this function only checked ok — so a statement that
+       failed to compile produced zero chunks and fell straight into the "no rows" branch
+       below. That is the precise mechanism that made every child's uploaded ASQ/ASE look
+       missing. Scoped to the no-chunks case on purpose: an endpoint that parses rows
+       today keeps working exactly as it does now. */
+    if (r.sqlError && !parts.length) {
+        return { ok: false, error: r.sqlError };
+    }
     // FOR JSON returns nothing at all for an empty result set.
     if (!raw.trim()) return { ok: true, rows: [] };
     try {
@@ -6211,8 +6233,27 @@ ELSE
     if (req.method === 'GET' && url === '/api/child-files') {
         if (!checkClassroomAuth(req, res)) return;
         const year = resolveSchoolYear(new URLSearchParams(req.url.split('?')[1] || '').get('year'));
+        /* A DERIVED TABLE, deliberately — not a CTE.
+
+           runSQLRows embeds whatever it is given inside a scalar subquery
+           (`ISNULL(( <innerSelect> FOR JSON PATH ), '')`). A CTE cannot live there,
+           and a leading ';' inside '(' is a syntax error outright. This endpoint was
+           written as `;WITH CandidateFiles AS (...)` on 2026-10-14, which made every
+           request fail to compile. sqlcmd reports that on stdout and still exits 0, so
+           runSQL returned ok, no chunk rows were produced, and the empty-payload branch
+           turned it into a perfectly healthy-looking `files: []` with HTTP 200.
+
+           The effect: every uploaded parent questionnaire and report card in the
+           program read as "not uploaded". PI screenings dropped to amber because their
+           completion needs the questionnaire; non-PI children were unaffected because
+           theirs does not. Nothing was ever deleted — the read was broken for eleven
+           days while the documents sat on disk.
+
+           A derived table is valid in this position and produces identical rows. */
         const r = runSQLRows(
-            `;WITH CandidateFiles AS (
+            `SELECT StudentId,FormField,Kind,FileName,RelPath,
+                    CONVERT(NVARCHAR(20),UploadedAt,120) AS UploadedAt
+             FROM (
                 SELECT StudentId,FormField,Kind,FileName,RelPath,UploadedAt,
                        ROW_NUMBER() OVER (
                            PARTITION BY StudentId,FormField,Kind
@@ -6223,10 +6264,8 @@ ELSE
                    OR (FormField='ParentInterview' AND Kind='interviewform')
                    OR (FormField='FamilyCenteredAssessment' AND Kind='initialasq')
                    OR (FormField='FamilyGoalPlan' AND Kind='initialase')
-             )
-             SELECT StudentId,FormField,Kind,FileName,RelPath,
-                    CONVERT(NVARCHAR(20),UploadedAt,120) AS UploadedAt
-             FROM CandidateFiles WHERE rn=1`,
+             ) AS CandidateFiles
+             WHERE rn=1`,
             childFileEnsureSQL());
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         return sendJSON(res, 200, { year: year, files: r.rows });
