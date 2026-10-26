@@ -1774,7 +1774,7 @@ const COLUMNS = [
        Interview is the first thing staff sit down and complete with the family. Parent
        Interview is therefore an ADMIN duty (no teacher flag) and opens/saves/prints from
        this page. It used to be a teacher column filled from the classroom card. */
-    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', title: 'Weighted eligibility form with income verification, dated on or before enrollment, retained in the child\u2019s file. Auto-created when the child is enrolled; pre-fills from the pre-enrollment record. Required for PFA (priority/weighted enrollment) and PI.' },
+    { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', docForm: 'weightedEligibility', title: 'Weighted priority score calculated from the family\u2019s pre-enrollment answers and used to rank the waiting list. Proof of income is collected separately during enrollment; it is not part of this generated form.' },
     { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Pre-fills from the pre-enrollment record; print the pre-filled form for the family to complete at enrollment, then save. Completed by admin at enrollment.' },
     { field: 'ProofOfIncome', label: 'Proof of<br>Income', title: 'Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.' },
     { field: 'EnterSIS', label: 'Enter<br>into SIS', title: 'Enter student into the ISBE Student Information System (SIS) before beginning screenings.' },
@@ -4048,7 +4048,7 @@ const PICC_ITEMS = [
     },
     {
         num: 'PI5', title: 'Eligibility screening documentation in every child file',
-        requires: 'Every enrolled child has a completed weighted eligibility form with income verification and a Parent Interview Form, all dated on or before the enrollment date.',
+        requires: 'Use the weighted eligibility score to prioritise the waiting list before enrollment. During enrollment, collect proof of income and complete the Parent Interview Form for the permanent child file.',
         subs: [
             'A. Weighted eligibility form on file for every child',
             'B-G. Priority populations on the form: developmental delay, screening-indicated delay with no EI referral, homelessness, Youth in Care, income at or below 50% FPL, parent is an English language learner',
@@ -4061,7 +4061,7 @@ const PICC_ITEMS = [
         ],
         childFields: ['WeightedEligibility', 'ProofOfIncome', 'ParentInterview'],
         na: 'N. Families living outside Chicago/CPS applies to home visiting programs only.',
-        guidance: 'Eligibility documents must be completed and dated on or prior to the enrollment date. Income verification is required each time a weighted eligibility form is completed. Sections L and M may not be left blank.',
+        guidance: 'The weighted score comes from the family\u2019s pre-enrollment answers and establishes waiting-list priority. Proof of income is collected separately during enrollment and retained in the child\u2019s physical file. Sections L and M of the Parent Interview may not be left blank.',
         waitlistLink: true,
         forms: [{ label: 'Weighted Eligibility Form', href: 'pfa-item6-eligibility.html?program=PI&item=5' }],
         childDocGrid: 'PI'

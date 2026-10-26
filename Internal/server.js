@@ -884,9 +884,9 @@ const PI_DOC_FORMS = {
             ['SignedDate', 'NVARCHAR(20)', 'signedDate']
         ]
     },
-    // PI5.A weighted eligibility form, with PI5.B-G priority populations,
-    // PI5.H determination and PI5.J income verification on the same document.
-    // One column per criterion so eligibility can be reported on later.
+    // Legacy online PI5 weighted-eligibility record schema. The generated priority PDF
+    // is separate and contains the PI5.A/PI5.B-G criteria plus PI5.H score result only;
+    // proof of income is collected independently during enrollment.
     'weighted-eligibility': {
         table: 'PIWeightedEligibility',
         trackingColumn: 'WeightedEligibility',
@@ -2296,21 +2296,6 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         : (String(enroll.PFA_PI_na || '').trim() || 'Other / not assigned');
     const childName = (enroll.First_Name + ' ' + enroll.Last_Name).trim();
 
-    /* Income verification auto-feeds from the child's Proof of Income upload: the person
-       who uploaded it and the date they did. Read from ChildFiles (the same row the
-       Administrative Proof of Income scan writes). Blank when nothing is on file yet. */
-    let incVerifiedBy = '', incVerifiedDate = '';
-    try {
-        const pf = runSQLRows(
-            `SELECT TOP 1 ISNULL(UploadedBy,'') AS UploadedBy, ISNULL(CONVERT(NVARCHAR(20),UploadedAt,101),'') AS UploadedAt
-             FROM ChildFiles WHERE StudentId=${parseInt(studentId)} AND Kind='incomeproof' ORDER BY UploadedAt DESC`,
-            childFileEnsureSQL());
-        if (pf.ok && pf.rows.length) {
-            incVerifiedBy = pf.rows[0].UploadedBy || '';
-            incVerifiedDate = pf.rows[0].UploadedAt || '';
-        }
-    } catch (e) { /* leave blank */ }
-
     const rows = [
         { label: 'Child', value: childName || ('Student ' + studentId) },
         { label: 'Date of birth', value: enroll.Birth_date || '\u2014' },
@@ -2367,11 +2352,7 @@ function seedWeightedEligibilityDoc(studentId, opts) {
               + 'grey for the record. Pre-filled from the family\u2019s pre-enrollment '
               + 'submission, falling back to the enrollment record. Review and update before '
               + 'relying on it.' },
-        ...criteriaBlocks,
-        { heading: 'Income verification (PICC PI5.J)',
-          // Auto-fed from the Proof of Income upload; blank lines remain if none on file.
-          text: 'Income verified by: ' + (incVerifiedBy || '____________________________')
-              + '     Date verified: ' + (incVerifiedDate || '______________') }
+        ...criteriaBlocks
     ];
 
     let pdf;
