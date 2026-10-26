@@ -2404,9 +2404,12 @@ function classroomChecklistHtml(rooms) {
             let extra = st === 'tick-only'
                 ? '<span class="cls-paper">on paper?</span>'
                 : '';
-            // A screening completes on the teacher-scored summary alone (staff-
-            // administered; see compliance steering). No "needs questionnaire" state —
-            // the parent questionnaire is optional best practice, not required.
+            /* The teacher administers and scores the screening (see compliance
+               steering). For a non-PI child that scored summary alone completes it and
+               the parent questionnaire upload is optional; for a PI child the upload is
+               required alongside the scores and both signatures, which is what the
+               amber 'partial' chip means. classroomMissingReason() spells out which
+               parts are still outstanding. */
             let action = '';
             if (col.field === 'BegASQ' || col.field === 'EndASQ' || col.field === 'BegASE' || col.field === 'EndASE') {
                 const type = (col.field === 'BegASQ' || col.field === 'EndASQ') ? 'ASQ-3' : 'ASQ:SE-2';

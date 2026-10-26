@@ -1339,9 +1339,10 @@
         };
     }
 
-    /* Attach a parent's completed questionnaire for the screening currently open.
-       OPTIONAL: the teacher-scored summary already completes the screening; this just
-       files the questionnaire into the child's folder if the family did one. */
+    /* Attach the parent's completed ASQ/ASE questionnaire for the screening currently
+       open. REQUIRED for a PI child — their column stays amber until it is uploaded,
+       the scores are entered and both signatures are on the summary. OPTIONAL for a
+       non-PI child, whose scored summary alone completes the screening. */
     async function uploadScreeningQuestionnaire() {
         if (!currentScrStudentId) return;
         var field = screeningField(currentScrType, currentScrPeriod);

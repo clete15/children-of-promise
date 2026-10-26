@@ -1015,7 +1015,7 @@
             </div>
             <div class="pi-section">
                 <h4>Upload the ASQ</h4>
-                <div class="doc-note">Attach the completed ASQ (PDF or a clear photo). For a PI child the column turns <strong>green</strong> only when this is uploaded, the scores are entered, and the summary below is signed by both the parent and staff. If there are several pages, combine them into one PDF; re-uploading replaces the file on record.</div>
+                <div class="doc-note">Attach the parent&rsquo;s completed ASQ (PDF or a clear photo). For a PI child the column turns <strong>green</strong> only when this is uploaded, the scores are entered, and the summary below is signed by both the parent and staff &mdash; the upload is <strong>required</strong>. For a non-PI child the scored summary alone completes it and this upload is optional. If there are several pages, combine them into one PDF; re-uploading replaces the file on record.</div>
                 <div class="cls-upload-row">
                     <input type="file" id="scrQuestFile" accept=".pdf,.jpg,.jpeg,.png">
                     <button type="button" class="pi-btn pi-btn-primary" id="scrQuestBtn" onclick="uploadScreeningQuestionnaire()">Upload ASQ</button>
@@ -1584,8 +1584,8 @@ async function init() {
             // Which forms exist, so a tick with nothing behind it is visible as
             // such from the first render rather than after an interaction.
             ChildForms.load(activeSchoolYear, apiFetch),
-            // Uploaded evidence: optional parent questionnaires (best practice) and the
-            // required report-card scans.
+            // Uploaded evidence: the parent ASQ/ASE questionnaires (required for a PI
+            // child, optional otherwise) and the report-card scans.
             ChildForms.loadFiles(activeSchoolYear, apiFetch),
             // Signatures into ChildForms too — the screening rule needs both sigs.
             ChildForms.loadSignatures(activeSchoolYear, apiFetch),
@@ -1793,11 +1793,16 @@ const COLUMNS = [
     { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Pre-fills from the pre-enrollment record; print the pre-filled form for the family to complete at enrollment, then save. Completed by admin at enrollment.' },
     { field: 'ProofOfIncome', label: 'Proof of<br>Income', title: 'Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.' },
     { field: 'EnterSIS', label: 'Enter<br>into SIS', title: 'Enter student into the ISBE Student Information System (SIS) before beginning screenings.' },
-    { field: 'BegASQ', teacher: true, label: 'Beg ASQ', title: 'Administer and score the ASQ-3 developmental screening at the beginning of the school year. Teacher-administered; the scored summary completes it. A parent-completed questionnaire is optional.' },
-    { field: 'BegASE', teacher: true, label: 'Beg ASE', title: 'Administer and score the ASQ:SE-2 social-emotional screening at the beginning of the school year. Teacher-administered; the scored summary completes it. A parent-completed questionnaire is optional.' },
+    /* The screening columns state the completion rule the app actually enforces, which
+       differs by program. These used to read "a parent-completed questionnaire is
+       optional" flat out, which contradicted the amber pill a PI child got for a
+       missing upload — and our own written guides can be held against us at a
+       monitoring visit, so the header and the behaviour have to agree. */
+    { field: 'BegASQ', teacher: true, label: 'Beg ASQ', title: 'Administer and score the ASQ-3 developmental screening at the beginning of the school year. Teacher-administered \u2014 the teacher scores the summary, not the parent. For a PI child this is complete only with all four: the parent-completed questionnaire uploaded, the scores entered, and the summary signed by both parent and staff. For a non-PI child the scored summary alone completes it and the upload is optional.' },
+    { field: 'BegASE', teacher: true, label: 'Beg ASE', title: 'Administer and score the ASQ:SE-2 social-emotional screening at the beginning of the school year. Teacher-administered \u2014 the teacher scores the summary, not the parent. For a PI child this is complete only with all four: the parent-completed questionnaire uploaded, the scores entered, and the summary signed by both parent and staff. For a non-PI child the scored summary alone completes it and the upload is optional.' },
     { field: 'MidYearReport', teacher: true, label: 'Mid Year<br>Report Card', title: 'Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.' },
-    { field: 'EndASQ', teacher: true, label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores.' },
-    { field: 'EndASE', teacher: true, label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores.' },
+    { field: 'EndASQ', teacher: true, label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores. Same completion rule as Beg ASQ: all four parts for a PI child, the scored summary alone for a non-PI child.' },
+    { field: 'EndASE', teacher: true, label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores. Same completion rule as Beg ASE: all four parts for a PI child, the scored summary alone for a non-PI child.' },
     { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card', title: 'Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.' },
     /* (Weighted Eligibility now leads the admin group above — it applies to BOTH programs,
        so it carries no `programs` restriction.)

@@ -511,8 +511,9 @@ var COLS = null;
 function chipFor(s, col) {
     var t = TRACKING[s.Id] || {};
     // Only PI children need a real backing form; PFA and non-PI rooms count a checked
-    // box as done (see compliance steering). A screening completes on the teacher-scored
-    // summary alone, so there is no "needs questionnaire" state any more.
+    // box as done (see compliance steering). A screening is complete on the scored
+    // summary alone for a non-PI child; a PI child also needs the parent questionnaire
+    // uploaded and both signatures, so a PI screening can sit in the 'partial' state.
     var isPI = String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI';
     var st = ChildForms.state(s.Id, col.field, !!t[col.field], isPI);
     var done = st === 'form' || st === 'tick' || st === 'unknown';

@@ -54,10 +54,16 @@
     ];
 
     /* The four screening columns. For a PI child a column is complete only when the
-       ASQ/ASE questionnaire is uploaded, the form is scored (filed as the summary PDF),
-       AND that summary is signed by both the parent and the staff member — see the PI
-       branch in state(). One upload (the ASQ/ASE) plus the signed scored summary; there
-       is no separate "test sheets" artefact. */
+       parent-completed ASQ/ASE questionnaire is uploaded, the form is scored (filed as
+       the summary PDF), AND that summary is signed by both the parent and the staff
+       member — see the PI branch in state(). For a non-PI child the questionnaire
+       upload is optional and the scored summary alone completes it.
+       One upload (the ASQ/ASE) plus the signed scored summary; there is no separate
+       "test sheets" artefact.
+
+       Note this questionnaire is the parent-filled ASQ-3 / ASQ:SE-2 sheet. It is NOT
+       the Parent Interview Form, which is a separate once-per-child enrollment
+       document (PI5.K/L/M) with no bearing on any screening. */
     var SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
     // The two report-card columns are complete on an uploaded scan alone.
     var REPORT_FIELDS = ['MidYearReport', 'EndYearReport'];
@@ -205,13 +211,19 @@
        direction.
 
        Two columns are special:
-         - A screening (ASQ/ASE) is 'form' (complete) once the TEACHER-SCORED summary
-           is on file. The screening is staff-administered and the scored result is
-           what PI10 documents (see the compliance steering: PI10 requires the
-           screening on file + parent permission + results shared, NOT a parent-
-           completed questionnaire). A parent questionnaire upload is optional best
-           practice: if present it also counts as complete, but its absence never holds
-           a screening back. Nothing there but a tick is 'tick-only'.
+         - A screening (ASQ/ASE). Who may SCORE it and what must be FILED are two
+           different questions, and this comment used to run them together.
+             Scoring: the TEACHER administers and scores it. A teacher-scored summary
+             is compliant for PICC/monitoring — PI10 requires the screening on file,
+             parent permission and results shared, and does not require the parent to
+             be the screener.
+             Filing: the parent-completed questionnaire upload is REQUIRED for a PI
+             child (program policy) and OPTIONAL for everyone else. So a PI screening
+             is 'form' only with all four parts — questionnaire upload, entered scores,
+             parent signature, staff signature — while a PFA/non-PI screening is 'form'
+             on the scored summary (or an uploaded questionnaire) alone.
+           Some-but-not-all of the four on a PI child is 'partial'; nothing but a tick
+           is 'tick-only'.
          - A report card is 'form' when its scan is uploaded, else tick-only/none.
 
        isPI — whether this child is in the Prevention Initiative. Only PI children need
