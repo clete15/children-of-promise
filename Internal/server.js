@@ -6672,8 +6672,22 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                 + `ISNULL(p.ParentIncarcerated,'') AS ParentIncarcerated,ISNULL(p.TeenParent,'') AS TeenParent,`
                 + `ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,`
                 + `ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,${flat('p.LivingSituation')} AS LivingSituation,`
-                + `${flat('p.Notes')} AS Notes,ISNULL(p.ChildName,'') AS ChildName,ISNULL(p.ChildBirthDate,'') AS ChildBirthDate`;
-            const peKeys = ['ParentFirst','ParentLast','Phone','Email','Address','City','Zip','HouseholdIncome','HouseholdSize','PublicBenefits','HomeLanguage','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','FamilyDeath','ParentIncarcerated','TeenParent','BornOutsideUS','NonEnglishHome','ActiveMilitary','LivingSituation','Notes','ChildName','ChildBirthDate'];
+                + `${flat('p.Notes')} AS Notes,ISNULL(p.ChildName,'') AS ChildName,ISNULL(p.ChildBirthDate,'') AS ChildBirthDate`
+                /* Appended, never inserted: the row is parsed positionally, so a new
+                   column in the middle would shift every later value by one. These are
+                   the application answers the state Parent Interview form has no
+                   question for — they fill its "From the Pre-Enrollment Application"
+                   section, so a parent is not asked again for what they already told
+                   us. SubmittedAt is a DATETIME, so it is converted to a plain date
+                   rather than ISNULL'd to '' (which would land as 1900-01-01). */
+                + `,ISNULL(CONVERT(NVARCHAR(10),p.SubmittedAt,120),'') AS SubmittedAt,`
+                + `ISNULL(p.AgeGroup,'') AS AgeGroup,ISNULL(p.DaysRequested,'') AS DaysRequested,`
+                + `ISNULL(p.CaregiverOther,'') AS CaregiverOther,ISNULL(p.LowBirthWeight,'') AS LowBirthWeight,`
+                + `ISNULL(p.NoHSDiploma,'') AS NoHSDiploma,ISNULL(p.PriorEarlyLearning,'') AS PriorEarlyLearning,`
+                + `ISNULL(p.BrightpointSubsidy,'') AS BrightpointSubsidy,ISNULL(p.ScreeningDelayNoEi,'') AS ScreeningDelayNoEi,`
+                + `ISNULL(p.ParentEll,'') AS ParentEll,ISNULL(p.IncomeBelow50Fpl,'') AS IncomeBelow50Fpl`;
+            const peKeys = ['ParentFirst','ParentLast','Phone','Email','Address','City','Zip','HouseholdIncome','HouseholdSize','PublicBenefits','HomeLanguage','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','FamilyDeath','ParentIncarcerated','TeenParent','BornOutsideUS','NonEnglishHome','ActiveMilitary','LivingSituation','Notes','ChildName','ChildBirthDate',
+                'SubmittedAt','AgeGroup','DaysRequested','CaregiverOther','LowBirthWeight','NoHSDiploma','PriorEarlyLearning','BrightpointSubsidy','ScreeningDelayNoEi','ParentEll','IncomeBelow50Fpl'];
             const peSql = `SELECT TOP 1 ${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${parseInt(student.Id)}
                 UNION ALL
                 SELECT TOP 1 ${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date) WHERE e.Id=${parseInt(student.Id)} AND e.PreEnrollmentId IS NULL`;

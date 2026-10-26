@@ -2939,98 +2939,22 @@ async function openInterview(studentId) {
    only when the source has a value, so nothing overwrites a blank with a blank. A
    field that gets prefilled is tinted so staff can see what came from the record. */
 async function prefillInterviewForm(studentId, student) {
-    const yes = v => String(v == null ? '' : v).trim().toLowerCase();
-    const isYes = v => ['yes', 'y', 'true', '1'].indexOf(yes(v)) !== -1;
-
-    // Enrollment-derived values.
-    const enr = {
-        householdIncome: student.HouseholdIncome ? String(student.HouseholdIncome) : '',
-        householdSize: student.HouseholdSize ? String(student.HouseholdSize) : '',
-        publicBenefits: student.PublicBenefits || '',
-        iep: isYes(student.IEP) ? 'Yes' : '',
-        military: isYes(student.Military) ? 'Yes' : '',
-        foster: String(student.Category || '').trim().toLowerCase() === 'foster' ? 'Yes' : '',
-        homeLanguage: student.HomeLanguage || ''
-    };
-    if (enr.householdIncome) piPrefill('income', enr.householdIncome);
-    if (enr.householdSize) piPrefill('householdSize', enr.householdSize);
-    if (enr.iep) piPrefill('disabilityYN', 'Yes');
-    if (enr.military) piPrefill('activeMilitary', 'Yes');
-    if (enr.foster) piPrefill('childLivesWith', 'foster');
-    if (enr.homeLanguage) {
-        piPrefill('parent1Language', enr.homeLanguage);
-        document.getElementById('piPreferredLanguage').value = enr.homeLanguage;
-    }
-    // Public benefits string -> the program checkboxes.
-    if (enr.publicBenefits) {
-        const b = enr.publicBenefits.toLowerCase();
-        const progs = [];
-        if (b.includes('wic')) progs.push('WIC');
-        if (b.includes('medicaid')) progs.push('Medicaid');
-        if (b.includes('snap')) progs.push('SNAP');
-        if (b.includes('tanf')) progs.push('TANF');
-        if (b.includes('ccap')) progs.push('CCAP');
-        if (progs.length) piPrefillGroup('publicPrograms', progs);
-    }
-
-    // Pre-enrollment intake record.
-    let d = null;
+    // The intake record is the pre-enrollment application. Best-effort: a missing
+    // or failed lookup still leaves the enrollment half of the crosswalk to apply,
+    // which is the case for any child enrolled before the online form went live.
+    let intake = null;
     try {
         const res = await apiFetch('/api/student-intake/' + studentId);
-        d = await res.json();
-    } catch (e) { d = null; }
+        intake = await res.json();
+    } catch (e) { intake = null; }
 
-    const anyPrefill = enr.householdIncome || enr.householdSize || enr.military
-        || enr.iep || enr.foster || enr.homeLanguage || enr.publicBenefits;
+    /* The mapping itself lives in pi-interview-schema.js, next to the field
+       definitions it refers to, because the parent portal renders the same form
+       and has to prefill it identically. */
+    const filled = applyInterviewPrefill(student, intake);
+
     const note = document.getElementById('piPrefillNote');
-
-    if (!d || !d.found) {
-        if (note) note.style.display = anyPrefill ? 'block' : 'none';
-        return;
-    }
-    if (note) note.style.display = 'block';
-
-    const parentName = [d.ParentFirst, d.ParentLast].filter(Boolean).join(' ');
-    if (parentName) { piPrefill('parent1Name', parentName); piPrefill('personInterviewed', parentName); }
-    if (d.Phone) piPrefill('parent1Phone', d.Phone);
-    if (d.Email) piPrefill('parent1Email', d.Email);
-    if (d.Address) piPrefill('parent1Address', d.Address);
-    if (d.City) piPrefill('parent1City', d.City);
-    if (d.Zip) piPrefill('parent1Zip', d.Zip);
-    if (d.HomeLanguage) {
-        piPrefill('parent1Language', d.HomeLanguage);
-        document.getElementById('piPreferredLanguage').value = d.HomeLanguage;
-    }
-    // If benefits have not yet been copied onto enrollment, keep the family's intake
-    // answers on the prefilled/printed form rather than dropping them.
-    if (d.PublicBenefits && !enr.publicBenefits) {
-        const b = d.PublicBenefits.toLowerCase();
-        const progs = [];
-        if (b.includes('wic')) progs.push('WIC');
-        if (b.includes('medicaid')) progs.push('Medicaid');
-        if (b.includes('snap')) progs.push('SNAP');
-        if (b.includes('tanf')) progs.push('TANF');
-        if (b.includes('ccap')) progs.push('CCAP');
-        if (progs.length) piPrefillGroup('publicPrograms', progs);
-    }
-    if (d.HouseholdIncome && !enr.householdIncome) piPrefill('income', d.HouseholdIncome);
-    if (d.HouseholdSize && !enr.householdSize) piPrefill('householdSize', d.HouseholdSize);
-    if (d.LivingSituation) piPrefill('livingSituationNote', d.LivingSituation);
-
-    // Risk questions the intake already answered → the matching Yes/No fields.
-    if (isYes(d.IEP)) piPrefill('disabilityYN', 'Yes');
-    if (isYes(d.FosterAdopted)) piPrefill('childLivesWith', 'foster');
-    if (isYes(d.SubstanceAbuse)) piPrefill('drugAlcohol', 'Yes');
-    if (isYes(d.AbuseHistory)) piPrefill('trauma', 'Yes');
-    if (isYes(d.DcfsInvolvement)) piPrefill('dcfs', 'Yes');
-    if (isYes(d.MentalIllness)) piPrefill('caregiverIllness', 'Yes');
-    if (isYes(d.FamilyDeath)) piPrefill('familyDeath', 'Yes');
-    if (isYes(d.ParentIncarcerated)) piPrefill('incarcerated', 'Yes');
-    if (isYes(d.ActiveMilitary)) piPrefill('activeMilitary', 'Yes');
-    if (isYes(d.BornOutsideUS)) piPrefill('immigrated', 'Yes');
-    if (isYes(d.Homeless)) piPrefill('livingSituation', 'shares');
-    if (isYes(d.TeenParent)) piPrefill('householdStructure', 'teenParent');
-    if (d.Notes) piPrefill('additionalNotes', d.Notes);
+    if (note) note.style.display = filled ? 'block' : 'none';
 }
 
 function closeInterview() {

@@ -598,56 +598,14 @@ function prefillInterview() {
     piSetFieldValue('childFullName', parentStudent.First_Name + ' ' + parentStudent.Last_Name);
     piSetFieldValue('childDob', parentStudent.Birth_date || '');
 
-    var yes = function (v) { return ['yes', 'y', 'true', '1'].indexOf(String(v == null ? '' : v).trim().toLowerCase()) !== -1; };
-    var pe = preEnrollData || {};
+    /* Enrollment record + the family's own pre-enrollment answers, through the one
+       crosswalk in pi-interview-schema.js. The admin roster (isbe.html) calls the
+       same function against the same schema, so the family and the office can never
+       be looking at a differently pre-filled version of the same form.
 
-    // Parent 1 contact, from the pre-enrollment submission.
-    var parentName = [pe.ParentFirst, pe.ParentLast].filter(Boolean).join(' ');
-    if (parentName) { piPrefill('parent1Name', parentName); piPrefill('personInterviewed', parentName); }
-    if (pe.Phone) piPrefill('parent1Phone', pe.Phone);
-    if (pe.Email) piPrefill('parent1Email', pe.Email);
-    if (pe.Address) piPrefill('parent1Address', pe.Address);
-    if (pe.City) piPrefill('parent1City', pe.City);
-    else if (parentStudent.City_Town) piPrefill('parent1City', parentStudent.City_Town);
-    if (pe.Zip) piPrefill('parent1Zip', pe.Zip);
-    if (pe.HomeLanguage) piPrefill('parent1Language', pe.HomeLanguage);
-    else if (parentStudent.HomeLanguage) piPrefill('parent1Language', parentStudent.HomeLanguage);
-
-    // Household / income — pre-enrollment first, then enrollment.
-    if (pe.HouseholdIncome) piPrefill('income', pe.HouseholdIncome);
-    else if (parentStudent.HouseholdIncome) piPrefill('income', parentStudent.HouseholdIncome);
-    if (pe.HouseholdSize) piPrefill('householdSize', pe.HouseholdSize);
-    else if (parentStudent.HouseholdSize) piPrefill('householdSize', parentStudent.HouseholdSize);
-    if (pe.LivingSituation) piPrefill('livingSituationNote', pe.LivingSituation);
-
-    // Public benefits string -> the program checkboxes.
-    var benefits = (pe.PublicBenefits || parentStudent.PublicBenefits || '').toLowerCase();
-    if (benefits) {
-        var progs = [];
-        if (benefits.indexOf('wic') !== -1) progs.push('WIC');
-        if (benefits.indexOf('medicaid') !== -1) progs.push('Medicaid');
-        if (benefits.indexOf('snap') !== -1) progs.push('SNAP');
-        if (benefits.indexOf('tanf') !== -1) progs.push('TANF');
-        if (benefits.indexOf('ccap') !== -1) progs.push('CCAP');
-        if (progs.length) piPrefillGroup('publicPrograms', progs);
-    }
-
-    // The risk factors the FAMILY reported at pre-enrollment -> the matching Yes/No
-    // fields, so they confirm rather than re-enter. (The family is the source of this,
-    // so surfacing it back to them is appropriate.)
-    if (yes(pe.IEP) || parentStudent.IEP === 'Yes') piPrefill('disabilityYN', 'Yes');
-    if (yes(pe.FosterAdopted) || parentStudent.Category === 'Foster') piPrefill('childLivesWith', 'foster');
-    if (yes(pe.SubstanceAbuse)) piPrefill('drugAlcohol', 'Yes');
-    if (yes(pe.AbuseHistory)) piPrefill('trauma', 'Yes');
-    if (yes(pe.DcfsInvolvement)) piPrefill('dcfs', 'Yes');
-    if (yes(pe.MentalIllness)) piPrefill('caregiverIllness', 'Yes');
-    if (yes(pe.FamilyDeath)) piPrefill('familyDeath', 'Yes');
-    if (yes(pe.ParentIncarcerated)) piPrefill('incarcerated', 'Yes');
-    if (yes(pe.ActiveMilitary) || parentStudent.Military === 'Yes') piPrefill('activeMilitary', 'Yes');
-    if (yes(pe.BornOutsideUS)) piPrefill('immigrated', 'Yes');
-    if (yes(pe.Homeless)) piPrefill('livingSituation', 'shares');
-    if (yes(pe.TeenParent)) piPrefill('householdStructure', 'teenParent');
-    if (pe.Notes) piPrefill('additionalNotes', pe.Notes);
+       Surfacing the family's own reported answers back to them is deliberate: they
+       are the source of this information, and confirming beats re-entering. */
+    applyInterviewPrefill(parentStudent, preEnrollData);
 
     // Load any interview already saved this year on top, so a returning parent edits
     // rather than starts over. A saved answer wins over a prefill.

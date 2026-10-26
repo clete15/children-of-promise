@@ -183,6 +183,37 @@ const PI_INTERVIEW_SCHEMA = [
         { id: 'insurance', label: 'Insurance', type: 'checks', full: true,
           opts: ['Private (parent\u2019s work)', 'All Kids', 'Medicaid', 'No insurance', 'Other', 'Covered for another pregnancy'] },
     ] },
+    /* ── Answers carried forward from the pre-enrollment application ──────────
+       The family answered all of these when they applied. The state Parent
+       Interview form has no equivalent question for any of them, so without this
+       section the answers live only on the waiting list and the weighted
+       eligibility form — and the interviewer either asks the family again or the
+       answer never reaches the child's file at all.
+
+       These are recorded verbatim, Yes AND No, because what the family reported
+       IS the record here; the job at interview is to confirm or correct it, not
+       to re-ask it. That is the opposite of the sensitive questions in the
+       sections above, where only a reported Yes is carried over so the question
+       stays open for the conversation.
+
+       Three are PICC PI5 priority populations (C, F and G) and are labelled as
+       such, because a file review looks for them by name. */
+    { title: 'From the Pre-Enrollment Application', fields: [
+        { id: 'peApplicationDate', label: 'Application submitted', type: 'text' },
+        { id: 'peProgramApplied', label: 'Program applied for', type: 'text' },
+        { id: 'peDaysRequested', label: 'Days of care requested', type: 'text' },
+        { id: 'peEarlyIntervention', label: 'Child, or a sibling, receiving early intervention or special education services', type: 'yesno', full: true },
+        { id: 'peScreeningDelayNoEi', label: 'A developmental screening suggested a delay with no current Early Intervention referral (PI5.C)', type: 'yesno', full: true },
+        { id: 'peLowBirthWeight', label: 'Low birth weight, or diagnosed failure to thrive', type: 'yesno', full: true },
+        { id: 'peCaregiverOther', label: 'Child is being raised by a caregiver other than a parent (grandparent, relative, guardian)', type: 'yesno', full: true },
+        { id: 'peNoHSDiploma', label: 'Primary caregiver has not completed high school or a GED', type: 'yesno', full: true },
+        { id: 'peNonEnglishHome', label: 'A language other than English is primarily spoken at home', type: 'yesno', full: true },
+        { id: 'peParentEll', label: 'Parent or primary caregiver is still learning English (PI5.F)', type: 'yesno', full: true },
+        { id: 'pePriorEarlyLearning', label: 'Child has previously attended a formal early learning program', type: 'yesno', full: true },
+        { id: 'peBrightpointSubsidy', label: 'Family receives Brightpoint childcare subsidies', type: 'yesno', full: true },
+        { id: 'peIncomeBelow50Fpl', label: 'Household income at or below 50% of the federal poverty level (PI5.G)', type: 'radio', full: true,
+          opts: [['Yes', 'Yes'], ['No', 'No'], ['Unsure', 'Not sure \u2014 settle from income verification']] },
+    ] },
     { title: 'Interview Summary', fields: [
         { id: 'parentGoals', label: 'Parent goals for their child', type: 'textarea', full: true, ph: 'What goals do the parents have for their child this year?' },
         { id: 'parentConcerns', label: 'Parent concerns', type: 'textarea', full: true, ph: 'Any concerns the parents would like to discuss?' },
@@ -308,6 +339,178 @@ function piPrefillGroup(id, values) {
     const wrap = document.getElementById('pf_' + id);
     const field = wrap ? wrap.closest('.pi-field') : null;
     if (field) field.classList.add('pi-prefilled');
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Pre-enrollment → Parent Interview crosswalk
+
+   ONE place that says what fills what. This mapping used to be an imperative
+   `if (x) piPrefill(...)` run copied into isbe.html (admin roster) and
+   parent.html (parent portal), which is how the two drifted: the portal fell
+   back to City_Town and the roster did not, and seventeen answers the intake
+   endpoint already returned were mapped in neither.
+
+   Two sources:
+     enr   the enrollment row (rptMasterEnrollment) — the maintained copy
+     pe    the pre-enrollment intake record from GET /api/student-intake/:id
+
+   Precedence is per-field and deliberate, noted at each rule. Nothing ever
+   overwrites with a blank (piPrefill no-ops on '' / null), and a saved
+   interview is loaded AFTER this, so a saved answer always beats a prefill.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+function piIsYes(v) {
+    return ['yes', 'y', 'true', '1'].indexOf(String(v == null ? '' : v).trim().toLowerCase()) !== -1;
+}
+function piIsNo(v) {
+    return ['no', 'n', 'false', '0'].indexOf(String(v == null ? '' : v).trim().toLowerCase()) !== -1;
+}
+/* The family's answer verbatim: Yes, No, or blank when they were never asked
+   (older intake records predate some questions and come back empty). */
+function piYesNo(v) {
+    if (piIsYes(v)) return 'Yes';
+    if (piIsNo(v)) return 'No';
+    return '';
+}
+/* The 50%-FPL question is the only three-way one — "Not sure" is a real answer
+   the public form offers, and it scores nothing, so it must not read as a No. */
+function piYesNoUnsure(v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    if (s === 'unsure' || s === 'not sure') return 'Unsure';
+    return piYesNo(v);
+}
+/* One comma-joined benefits string -> the publicPrograms checkbox values. */
+function piBenefitList(s) {
+    const b = String(s == null ? '' : s).toLowerCase();
+    if (!b) return [];
+    return ['WIC', 'Medicaid', 'SNAP', 'TANF', 'CCAP'].filter(p => b.indexOf(p.toLowerCase()) !== -1);
+}
+// The public form's program codes, spelled out for a printed form.
+const PI_PROGRAM_LABELS = {
+    '0-2': 'Infant & Toddler (birth \u2013 2 years)',
+    '2-3': '2-Year-Old Program (2 \u2013 3 years)',
+    '3-5': 'Pre-School (3 \u2013 5 years)',
+    'ba': 'Before & Afterschool (school age)'
+};
+
+const PI_INTERVIEW_PREFILL = [
+    // ── Who we are talking to. The intake is the only place a parent/guardian
+    //    name, phone, email or address is captured; enrollment drops all of it.
+    ['personInterviewed', c => c.parentName],
+    ['parent1Name', c => c.parentName],
+    ['parent1Phone', c => c.pe.Phone],
+    ['parent1Email', c => c.pe.Email],
+    ['parent1Address', c => c.pe.Address],
+    // City is on both records; the application is more specific than the
+    // enrollment town field, so it wins and City_Town is the fallback.
+    ['parent1City', c => c.pe.City || c.enr.City_Town],
+    ['parent1Zip', c => c.pe.Zip],
+    ['parent1Language', c => c.language],
+
+    // ── Household and money. Staff maintain these on the enrollment record
+    //    (F/R/P depends on them), so enrollment wins and the application is the
+    //    fallback for a child enrolled before the values were copied across.
+    ['income', c => c.enr.HouseholdIncome || c.pe.HouseholdIncome],
+    ['householdSize', c => c.enr.HouseholdSize || c.pe.HouseholdSize],
+    ['publicPrograms', c => piBenefitList(c.enr.PublicBenefits || c.pe.PublicBenefits)],
+    ['livingSituationNote', c => c.pe.LivingSituation],
+
+    /* ── Questions the state form already asks in its own words.
+         Only a reported YES is carried over. A blank leaves the question open
+         for the interview instead of putting a sensitive "No" in the family's
+         mouth — and the appendix section records every answer verbatim anyway,
+         so nothing is lost by leaving these open. */
+    ['disabilityYN', c => (piIsYes(c.enr.IEP) || piIsYes(c.pe.IEP)) ? 'Yes' : ''],
+    ['childLivesWith', c => (c.isFoster || piIsYes(c.pe.FosterAdopted)) ? 'foster' : ''],
+    ['activeMilitary', c => (piIsYes(c.enr.Military) || piIsYes(c.pe.ActiveMilitary)) ? 'Yes' : ''],
+    ['drugAlcohol', c => piIsYes(c.pe.SubstanceAbuse) ? 'Yes' : ''],
+    ['trauma', c => piIsYes(c.pe.AbuseHistory) ? 'Yes' : ''],
+    ['dcfs', c => piIsYes(c.pe.DcfsInvolvement) ? 'Yes' : ''],
+    ['caregiverIllness', c => piIsYes(c.pe.MentalIllness) ? 'Yes' : ''],
+    ['familyDeath', c => piIsYes(c.pe.FamilyDeath) ? 'Yes' : ''],
+    ['incarcerated', c => piIsYes(c.pe.ParentIncarcerated) ? 'Yes' : ''],
+    ['immigrated', c => piIsYes(c.pe.BornOutsideUS) ? 'Yes' : ''],
+    ['livingSituation', c => piIsYes(c.pe.Homeless) ? 'shares' : ''],
+    ['householdStructure', c => piIsYes(c.pe.TeenParent) ? 'teenParent' : ''],
+    ['additionalNotes', c => c.pe.Notes],
+
+    // ── The appendix: answers with no equivalent question on the state form,
+    //    recorded exactly as the family gave them.
+    ['peApplicationDate', c => String(c.pe.SubmittedAt || '').split(' ')[0]],
+    ['peProgramApplied', c => PI_PROGRAM_LABELS[c.pe.AgeGroup] || c.pe.AgeGroup],
+    ['peDaysRequested', c => c.pe.DaysRequested],
+    ['peEarlyIntervention', c => piYesNo(c.pe.EarlyIntervention)],
+    ['peScreeningDelayNoEi', c => piYesNo(c.pe.ScreeningDelayNoEi)],
+    ['peLowBirthWeight', c => piYesNo(c.pe.LowBirthWeight)],
+    ['peCaregiverOther', c => piYesNo(c.pe.CaregiverOther)],
+    ['peNoHSDiploma', c => piYesNo(c.pe.NoHSDiploma)],
+    ['peNonEnglishHome', c => piYesNo(c.pe.NonEnglishHome)],
+    ['peParentEll', c => piYesNo(c.pe.ParentEll)],
+    ['pePriorEarlyLearning', c => piYesNo(c.pe.PriorEarlyLearning)],
+    ['peBrightpointSubsidy', c => piYesNo(c.pe.BrightpointSubsidy)],
+    ['peIncomeBelow50Fpl', c => piYesNoUnsure(c.pe.IncomeBelow50Fpl)],
+];
+
+/* Intake keys deliberately NOT mapped, so the next reader does not have to
+   wonder whether they were forgotten:
+     Id, MatchType       plumbing for the lookup itself
+     ChildName,
+     ChildBirthDate      already set from the enrollment record, which is the
+                         maintained spelling and the one on the roster
+     Score, WaitlistStatus
+                         waiting-list prioritisation. PI5.H wants the eligibility
+                         result in the file, and the weighted eligibility form is
+                         where it lives; a priority score on a form the parent
+                         signs would invite a conversation we do not want to have.
+     HomeLanguage        used, but via c.language (it feeds two fields). */
+
+/* Apply the whole crosswalk to the rendered form. Returns how many fields were
+   filled, so a caller can show or hide its "pre-filled from the record" note
+   without repeating the logic. */
+function applyInterviewPrefill(student, intake) {
+    const enr = student || {};
+    /* Accept any intake-shaped object, and reject only an explicit found:false.
+       The two callers hand us DIFFERENT shapes: the admin roster passes the
+       /api/student-intake response, which carries found:true|false, while the
+       parent portal passes data.preEnroll from its login response, which has no
+       found key at all. Testing truthiness of `found` would therefore have
+       silently dropped every prefill on the parent portal. A failed fetch, a
+       null, or no record leaves the enrollment half of the mapping to apply. */
+    const pe = (intake && typeof intake === 'object' && intake.found !== false) ? intake : {};
+    const ctx = {
+        enr: enr,
+        pe: pe,
+        parentName: [pe.ParentFirst, pe.ParentLast].filter(Boolean).join(' '),
+        // The application is the family's own words and the more recent of the
+        // two, so it wins for language.
+        language: pe.HomeLanguage || enr.HomeLanguage || '',
+        isFoster: String(enr.Category || '').trim().toLowerCase() === 'foster'
+    };
+
+    let filled = 0;
+    PI_INTERVIEW_PREFILL.forEach(rule => {
+        const id = rule[0];
+        let v;
+        // One bad value must not abandon the rest of the prefill.
+        try { v = rule[1](ctx); } catch (e) { v = ''; }
+        if (v == null || v === '') return;
+        if (Array.isArray(v)) {
+            if (!v.length) return;
+            piPrefillGroup(id, v);
+        } else {
+            piPrefill(id, v);
+        }
+        filled++;
+    });
+
+    /* PI5.L's preferred language sits outside the schema, in the admin modal's
+       own Language & Translation block. Fill it from the same source rather
+       than making the caller re-derive it. Only when empty, so re-opening a
+       saved interview never clobbers what was recorded. */
+    const langEl = document.getElementById('piPreferredLanguage');
+    if (langEl && !langEl.value && ctx.language) { langEl.value = ctx.language; filled++; }
+
+    return filled;
 }
 
 /* Read the whole form into a plain object keyed by schema id. */
