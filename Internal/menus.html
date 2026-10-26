@@ -6,33 +6,62 @@
     <title>Menu</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Fredoka:wght@500;600&display=swap" rel="stylesheet">
+    <script>
+        (function () {
+            try {
+                var params = new URLSearchParams(location.search);
+                if (params.get('embedded') === '1') document.documentElement.classList.add('menu-embedded');
+                var saved = localStorage.getItem('copStaffTheme');
+                var dark = saved === null
+                    ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                    : saved === 'dark';
+                if (dark) document.documentElement.classList.add('sp-dark');
+            } catch (e) {}
+        })();
+    </script>
     <style>
-        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
-        .menu-layout { display:flex;align-items:flex-start;justify-content:center;padding:20px;min-height:calc(100vh - 90px); }
-        .menu-container { background:white;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2);width:100%;max-width:1200px;overflow:hidden; }
-        .menu-header { padding:16px 24px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px; }
-        .menu-header h2 { font-size:1.1rem;font-weight:800;color:#1e3a8a;margin:0; }
-        .menu-controls { display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
-        .menu-controls button, .menu-controls a { padding:6px 14px;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer;border:none;transition:all 0.15s;text-decoration:none;display:inline-block; }
-        .btn-primary { background:#2563eb;color:white; }
-        .btn-primary:hover { background:#1d4ed8; }
-        .btn-green { background:#16a34a;color:white; }
-        .btn-purple { background:#7c3aed;color:white; }
-        .btn-orange { background:#ea580c;color:white; }
-        .menu-body { padding:24px;overflow-y:auto;max-height:calc(100vh - 180px); }
-        .menu-section { margin-bottom:28px; }
-        .menu-section-title { font-size:0.85rem;font-weight:700;color:#1e3a8a;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;padding-bottom:6px;border-bottom:2px solid #2563eb; }
-        .menu-grid { display:grid;grid-template-columns:repeat(5,1fr);gap:8px; }
-        .menu-day { border:1px solid #e5e7eb;border-radius:8px;overflow:hidden; }
-        .menu-day-header { background:#f1f5f9;padding:8px 10px;font-size:0.72rem;font-weight:700;color:#374151;text-align:center;border-bottom:1px solid #e5e7eb; }
-        .menu-day-header .day-date { font-size:0.65rem;font-weight:400;color:#6b7280;margin-top:2px; }
-        .menu-day.holiday .menu-day-header { background:#fef2f2;color:#dc2626; }
-        .menu-meal { padding:5px 8px;border-bottom:1px solid #f3f4f6; }
-        .menu-meal:last-child { border-bottom:none; }
-        .menu-meal-label { font-size:0.58rem;font-weight:700;text-transform:uppercase;color:#6b7280;margin-bottom:2px; }
-        .menu-meal textarea { width:100%;border:1px solid #e5e7eb;border-radius:4px;padding:4px 6px;font-size:0.7rem;font-family:inherit;resize:vertical;min-height:62px;height:62px;transition:border-color 0.15s; }
-        .menu-meal textarea:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
-        .seasonal-banner { text-align:center;padding:8px;font-size:0.8rem;font-weight:700;border-radius:6px;margin-bottom:12px; }
+        body.menu-page { background:var(--sp-bg);color:var(--sp-text);font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;min-height:100vh; }
+        .menu-layout { display:flex;align-items:flex-start;justify-content:center;padding:18px 16px 50px;min-height:calc(100vh - 90px); }
+        .menu-container { background:var(--sp-surface);border:1.5px solid var(--sp-border);border-radius:10px;width:100%;max-width:1200px;overflow:hidden; }
+        .menu-header { padding:15px 18px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px; }
+        .menu-header h2 { font-size:1.02rem;font-weight:800;color:var(--sp-text);margin:0; }
+        #rotationLabel { color:var(--sp-muted) !important; }
+        .menu-controls { display:flex;gap:6px;align-items:center;flex-wrap:wrap; }
+        .menu-controls button,.menu-controls a { appearance:none;padding:7px 12px;border-radius:7px;font-family:inherit;font-size:0.75rem;font-weight:700;cursor:pointer;border:1px solid var(--sp-border-in);transition:border-color 0.12s,background 0.12s,color 0.12s;text-decoration:none;display:inline-flex;align-items:center;justify-content:center; }
+        .menu-controls button:focus-visible,.menu-controls a:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
+        .btn-primary,.btn-purple,.btn-orange { background:var(--sp-surface-2);color:var(--sp-text-2); }
+        .btn-primary:hover,.btn-purple:hover,.btn-orange:hover { border-color:var(--sp-accent);color:var(--sp-accent); }
+        .btn-green { background:var(--sp-accent);border-color:var(--sp-accent) !important;color:#fff; }
+        .btn-green:hover { background:var(--primary-dark);border-color:var(--primary-dark) !important; }
+        .menu-body { padding:18px; }
+        .menu-section { margin-bottom:24px;min-width:0;overflow-x:auto;scrollbar-color:var(--sp-border-in) transparent; }
+        .menu-section:last-child { margin-bottom:0; }
+        .menu-section-title { font-size:0.75rem;font-weight:800;color:var(--sp-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:10px;padding-bottom:7px;border-bottom:1px solid var(--sp-border); }
+        .menu-grid { display:grid;grid-template-columns:repeat(5,minmax(175px,1fr));gap:8px;min-width:915px;padding-bottom:5px; }
+        .menu-day { border:1px solid var(--sp-border);border-radius:9px;overflow:hidden;background:var(--sp-surface); }
+        .menu-day-header { background:var(--sp-surface-2);padding:9px 10px;font-size:0.75rem;font-weight:800;color:var(--sp-text);text-align:center;border-bottom:1px solid var(--sp-border); }
+        .menu-day-header .day-date { font-size:0.66rem;font-weight:500;color:var(--sp-muted);margin-top:2px; }
+        .menu-day.holiday .menu-day-header { background:var(--sp-bad-bg);color:var(--sp-bad-fg); }
+        .menu-meal { padding:7px 8px;border-bottom:1px solid var(--sp-border); }
+        .menu-meal:last-child { border-bottom:0; }
+        .menu-meal-label { font-size:0.62rem;font-weight:800;text-transform:uppercase;letter-spacing:0.03em;color:var(--sp-muted);margin-bottom:4px; }
+        .menu-meal textarea { width:100%;border:1px solid var(--sp-border-in);border-radius:6px;padding:6px 7px;font-size:0.75rem;font-family:inherit;resize:vertical;min-height:68px;height:68px;color:var(--sp-text);background:var(--sp-field-bg);transition:border-color 0.15s,box-shadow 0.15s; }
+        .menu-meal textarea::placeholder { color:var(--sp-quiet); }
+        .menu-meal textarea:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 2px rgba(37,99,235,0.12); }
+        .seasonal-banner { text-align:center;padding:9px 12px;font-size:0.8rem;font-weight:700;border-radius:8px;margin-bottom:14px; }
+        .menu-warning { background:var(--sp-bad-bg);border:1.5px solid var(--sp-bad-br);color:var(--sp-bad-fg);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:0.8rem;line-height:1.5; }
+        html.menu-embedded .site-header { display:none; }
+        html.menu-embedded body { min-height:0; }
+        html.menu-embedded .menu-layout { padding:0;min-height:0;display:block; }
+        html.menu-embedded .menu-container { max-width:none;border:0;border-radius:0; }
+        @media (max-width:680px) {
+            .menu-layout { padding:12px 10px 36px; }
+            .menu-header { padding:13px 14px;align-items:flex-start; }
+            .menu-controls { width:100%; }
+            .menu-controls button,.menu-controls a { flex:1 1 auto; }
+            .menu-body { padding:14px; }
+            .menu-grid { grid-template-columns:repeat(5,minmax(160px,1fr));min-width:840px; }
+        }
 
         @media print {
             body { background:white !important; -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
@@ -54,17 +83,20 @@
         #printArea .holiday-cell { background:#f0fdf4;color:#16a34a;font-weight:700;font-size:14px; }
     </style>
 </head>
-<body>
+<body class="menu-page">
 
 <header class="site-header">
-    <a class="brand-link" href="/staff/">
+    <a class="brand-link" href="/staff/foodreport.html">
         <img src="logo-sm.png" alt="Children Of Promise">
         <div class="brand-text">
             <h1>Children Of Promise</h1>
             <p>Weekly Menu Planner &nbsp;·&nbsp; Millstadt, IL</p>
         </div>
     </a>
-    <a class="header-back" href="/staff/">← Staff Portal</a>
+    <div class="header-actions">
+        <button type="button" id="spTheme" class="header-theme-btn" aria-pressed="false" title="Switch between light and dark"></button>
+        <a class="header-back" href="/staff/foodreport.html">&#8592; Food Program</a>
+    </div>
 </header>
 
 <div class="menu-layout">
@@ -96,6 +128,7 @@
     </div>
 </div>
 
+<script src="app.js"></script>
 <script src="/staff/auth.js"></script>
 <script>
 /* Credentials come from the Staff Portal sign-in, never from source. Use
@@ -568,11 +601,7 @@ function applyMenuData(data) {
 function showLoadWarning(html) {
     const el = document.getElementById('menuLoadWarning');
     if (el) {
-        el.innerHTML = html
-            ? '<div style="background:#fef2f2;border:1.5px solid #fca5a5;color:#991b1b;'
-              + 'border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:0.8rem;'
-              + 'line-height:1.5;">' + html + '</div>'
-            : '';
+        el.innerHTML = html ? '<div class="menu-warning">' + html + '</div>' : '';
     }
 }
 

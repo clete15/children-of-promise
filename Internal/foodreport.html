@@ -5,62 +5,165 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Food Program – Children Of Promise</title>
     <link rel="stylesheet" href="styles.css">
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem('copStaffTheme');
+                var dark = saved === null
+                    ? (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+                    : saved === 'dark';
+                if (dark) document.documentElement.classList.add('sp-dark');
+            } catch (e) {}
+        })();
+    </script>
     <style>
-        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
-        .fp-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
-        .fp-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1100px; }
-        .fp-sidebar { width:180px;flex-shrink:0;background:rgba(255,255,255,0.12);overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
-        .fp-sidebar button, .fp-sidebar a { display:block;width:100%;text-align:left;padding:12px 16px;border:none;cursor:pointer;background:transparent;transition:background 0.15s;text-decoration:none; }
-        .fp-sidebar button.active { background:rgba(255,255,255,0.2); }
-        .fp-sidebar button:hover:not(.active), .fp-sidebar a:hover { background:rgba(255,255,255,0.1); }
-        .fp-sidebar .nav-label { font-size:0.82rem;font-weight:700;color:white; }
-        .fp-sidebar .nav-sub { font-size:0.75rem;font-weight:600;color:rgba(255,255,255,0.8);padding-left:28px; }
-        .fp-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;box-shadow:0 4px 24px rgba(0,0,0,0.2);max-height:calc(100vh - 130px);max-width:900px; }
-        .fp-header { padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px; }
-        .fp-header h2 { font-size:1rem;font-weight:800;color:#1e3a8a;margin:0; }
-        .fp-body { overflow-y:auto;flex:1;padding:20px 24px; }
+        body.fp-page { background:var(--sp-bg);color:var(--sp-text);font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif; }
+        .fp-layout { max-width:1180px;margin:0 auto;padding:18px 16px 60px; }
+        .fp-topbar { display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--sp-surface);border:1.5px solid var(--sp-border);border-radius:10px;padding:12px 16px;margin-bottom:16px; }
+        .fp-back { display:inline-flex;align-items:center;gap:4px;font-size:0.82rem;font-weight:600;text-decoration:none;color:var(--sp-text-2);background:var(--sp-surface-2);border:1px solid var(--sp-border-in);border-radius:7px;padding:5px 11px; }
+        .fp-back:hover { color:var(--sp-accent);border-color:var(--sp-accent); }
+        .fp-brand { min-width:0; }
+        .fp-brand strong { display:block;font-size:0.92rem;color:var(--sp-text); }
+        .fp-brand span { display:block;font-size:0.76rem;color:var(--sp-muted);margin-top:2px; }
+        .fp-theme { margin-left:auto;background:none;border:0;padding:4px 6px;cursor:pointer;font:inherit;font-size:0.82rem;font-weight:600;color:var(--sp-muted); }
+        .fp-theme:hover { color:var(--sp-accent); }
+        .fp-wrapper { width:100%; }
+        .fp-sidebar { display:flex;gap:2px;margin-bottom:16px;border-bottom:1.5px solid var(--sp-border);overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none; }
+        .fp-sidebar::-webkit-scrollbar { display:none; }
+        .fp-sidebar button { appearance:none;background:transparent;border:0;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;color:var(--sp-muted);cursor:pointer;font-family:inherit;font-size:0.88rem;font-weight:700;padding:10px 14px 11px;margin-bottom:-1.5px;white-space:nowrap;transition:color 0.12s,background 0.12s,border-color 0.12s; }
+        .fp-sidebar button:hover { color:var(--sp-text);background:var(--sp-surface-2); }
+        .fp-sidebar button.active { color:var(--sp-accent);border-bottom-color:var(--sp-accent); }
+        .fp-sidebar button:focus-visible,.fp-theme:focus-visible,.fp-back:focus-visible,.fp-btn:focus-visible,.fp-filter:focus-visible,.fp-month-btn:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
+        .fp-sidebar .nav-label,.fp-sidebar .nav-sub { font:inherit;color:inherit; }
+        .fp-card { background:var(--sp-surface);border:1.5px solid var(--sp-border);border-radius:10px;overflow:hidden; }
+        .fp-header { padding:17px 20px 15px;border-bottom:1px solid var(--sp-border); }
+        .fp-eyebrow { margin:0 0 3px;font-size:0.68rem;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:var(--sp-accent); }
+        .fp-header h1 { margin:0;font-size:1.12rem;font-weight:800;color:var(--sp-text); }
+        .fp-body { padding:20px;min-height:360px; }
+        .fp-loading,.fp-empty,.fp-error { padding:18px;border:1px solid var(--sp-border);border-radius:9px;background:var(--sp-surface-2);color:var(--sp-muted);font-size:0.86rem; }
+        .fp-error { color:var(--sp-bad-fg);background:var(--sp-bad-bg);border-color:var(--sp-bad-br); }
+
+        .fp-summary-grid { display:grid;grid-template-columns:repeat(4,minmax(130px,1fr));gap:10px;margin-bottom:18px; }
+        .fp-stat { background:var(--sp-surface-2);border:1px solid var(--sp-border);border-radius:9px;padding:12px 14px; }
+        .fp-stat-label { font-size:0.7rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--sp-muted); }
+        .fp-stat-value { margin-top:4px;font-size:1.45rem;line-height:1;font-weight:800;color:var(--sp-text); }
+        .fp-section { border:1px solid var(--sp-border);border-radius:10px;padding:15px 16px;background:var(--sp-surface); }
+        .fp-section-head { margin-bottom:14px; }
+        .fp-section-head h2 { margin:0;font-size:0.96rem;color:var(--sp-text); }
+        .fp-section-head p { margin:4px 0 0;font-size:0.8rem;line-height:1.5;color:var(--sp-muted); }
+        .fp-bar-row { display:grid;grid-template-columns:78px minmax(0,1fr) 32px;align-items:center;gap:10px;margin-top:10px; }
+        .fp-bar-label { font-size:0.8rem;font-weight:700;color:var(--sp-text-2); }
+        .fp-bar-track { height:10px;background:var(--sp-border);border-radius:999px;overflow:hidden; }
+        .fp-bar-fill { height:100%;border-radius:999px;min-width:3px; }
+        .fp-bar-fill.free { background:#16a34a; }.fp-bar-fill.reduced { background:#6366f1; }
+        .fp-bar-fill.paid { background:#2563eb; }.fp-bar-fill.unknown { background:#94a3b8; }
+        .fp-bar-count { text-align:right;font-size:0.8rem;font-weight:800;color:var(--sp-text); }
+
+        .fp-roster-tools { display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap; }
+        .fp-filters { display:flex;gap:6px;flex-wrap:wrap;min-width:0; }
+        .fp-filter { appearance:none;border:1px solid var(--sp-border);border-radius:999px;background:var(--sp-surface-2);color:var(--sp-text-2);padding:6px 11px;font:inherit;font-size:0.74rem;font-weight:700;cursor:pointer; }
+        .fp-filter:hover { border-color:var(--sp-accent);color:var(--sp-accent); }
+        .fp-filter.active { background:var(--sp-accent);border-color:var(--sp-accent);color:#fff; }
+        .fp-btn { appearance:none;border:1px solid var(--sp-border-in);border-radius:7px;background:var(--sp-surface-2);color:var(--sp-text-2);padding:7px 12px;font:inherit;font-size:0.76rem;font-weight:700;cursor:pointer;white-space:nowrap; }
+        .fp-btn:hover { border-color:var(--sp-accent);color:var(--sp-accent); }
+        .fp-btn-primary { background:var(--sp-accent);border-color:var(--sp-accent);color:#fff; }
+        .fp-btn-primary:hover { background:var(--primary-dark);border-color:var(--primary-dark);color:#fff; }
+        .fp-btn[disabled] { opacity:0.35;cursor:default; }
+        .fp-table-wrap { overflow:auto;border:1px solid var(--sp-border);border-radius:9px; }
+        .fp-table { width:100%;min-width:760px;border-collapse:collapse;font-size:0.8rem;table-layout:fixed; }
+        .fp-table thead tr { background:var(--sp-surface-2);border-bottom:1.5px solid var(--sp-border); }
+        .fp-table th { position:sticky;top:0;z-index:1;background:var(--sp-surface-2);padding:9px 8px;text-align:left;font-size:0.66rem;font-weight:800;letter-spacing:0.05em;text-transform:uppercase;color:var(--sp-muted); }
+        .fp-table th.center,.fp-table td.center { text-align:center; }
+        .fp-table th.right,.fp-table td.right { text-align:right; }
+        .fp-table td { padding:7px 8px;border-bottom:1px solid var(--sp-border);vertical-align:middle;color:var(--sp-text-2); }
+        .fp-table tbody tr:last-child td { border-bottom:0; }
+        .fp-table tbody tr.fp-band { background:var(--sp-surface-2); }
+        .fp-table tbody tr:hover { background:var(--sp-accent-soft); }
+        .fp-child-name { font-size:0.82rem;font-weight:700;color:var(--sp-text); }
+        .fp-teacher { display:block;margin-top:2px;font-size:0.68rem;color:var(--sp-muted);font-weight:500;white-space:normal; }
+        .fp-table select,.fp-table input { width:100%;box-sizing:border-box;padding:6px 7px;border:1px solid var(--sp-border-in);border-radius:6px;background:var(--sp-field-bg);color:var(--sp-text);font:inherit;font-size:0.76rem; }
+        .fp-table input { text-align:right; }
+        .fp-table .fp-hh { text-align:center; }
+        .fp-table select:focus,.fp-table input:focus { outline:0;border-color:var(--sp-accent);box-shadow:0 0 0 2px rgba(37,99,235,0.12); }
+        .fp-frp { display:inline-flex;align-items:center;justify-content:center;min-width:62px;padding:3px 8px;border-radius:999px;font-size:0.68rem;font-weight:800; }
+        .fp-frp.free { color:var(--sp-good-fg);background:var(--sp-good-bg); }
+        .fp-frp.reduced { color:var(--sp-warn-fg);background:var(--sp-warn-bg); }
+        .fp-frp.paid,.fp-frp.unknown { color:var(--sp-muted);background:var(--sp-surface-2);border:1px solid var(--sp-border); }
+        .fp-save { min-width:54px;padding:5px 9px; }
+
+        .fp-picker { max-width:620px;margin:0 auto; }
+        .fp-picker-intro { margin:0 0 16px;font-size:0.86rem;line-height:1.6;color:var(--sp-muted); }
+        .fp-month-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px; }
+        .fp-month-btn { appearance:none;padding:15px 12px;border-radius:9px;border:1px solid var(--sp-border);background:var(--sp-surface-2);color:var(--sp-text-2);cursor:pointer;font:inherit;text-align:left;transition:border-color 0.12s,background 0.12s; }
+        .fp-month-btn:hover { border-color:var(--sp-accent);background:var(--sp-accent-soft); }
+        .fp-month-btn.recommended { border:1.5px solid var(--sp-accent);background:var(--sp-accent-soft); }
+        .fp-month-name { display:block;font-size:0.86rem;font-weight:800;color:var(--sp-text); }
+        .fp-month-year { display:block;margin-top:3px;font-size:0.72rem;color:var(--sp-muted); }
+        .fp-month-note { display:block;margin-top:7px;font-size:0.63rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--sp-accent); }
+        .fp-menu-frame { width:100%;height:calc(100vh - 250px);min-height:700px;border:0;border-radius:8px;background:var(--sp-surface); }
+
+        @media (max-width:780px) {
+            .fp-layout { padding:12px 10px 36px; }
+            .fp-topbar { padding:10px 12px;margin-bottom:12px; }
+            .fp-brand span { display:none; }
+            .fp-sidebar { margin-bottom:12px; }
+            .fp-sidebar button { font-size:0.8rem;padding:9px 11px 10px; }
+            .fp-card { border-radius:9px; }
+            .fp-header { padding:14px 15px 12px; }
+            .fp-body { padding:14px;min-height:300px; }
+            .fp-summary-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+            .fp-roster-tools { display:block; }
+            .fp-filters { flex-wrap:nowrap;overflow-x:auto;padding-bottom:7px;scrollbar-width:none; }
+            .fp-filters::-webkit-scrollbar { display:none; }
+            .fp-roster-tools .fp-btn { margin-top:5px; }
+            .fp-menu-frame { height:800px;min-height:800px; }
+        }
+        @media (max-width:440px) {
+            .fp-theme { width:100%;margin-left:0;text-align:left;padding-left:0; }
+            .fp-summary-grid { grid-template-columns:1fr 1fr;gap:7px; }
+            .fp-stat { padding:10px 11px; }
+            .fp-month-grid { grid-template-columns:1fr 1fr; }
+        }
     </style>
 </head>
-<body>
-
-<header class="site-header">
-    <a class="brand-link" href="/staff/">
-        <img src="logo-sm.png" alt="Children Of Promise">
-        <div class="brand-text">
-            <h1>Children Of Promise</h1>
-            <p>Food Program Management System &nbsp;·&nbsp; Millstadt, IL</p>
-        </div>
-    </a>
-    <a class="header-back" href="/staff/">← Staff Portal</a>
-</header>
+<body class="fp-page">
 
 <div class="fp-layout">
-    <div class="fp-wrapper">
-        <div class="fp-sidebar">
-            <button class="active" id="navFood" onclick="showPanel('food')">
-                <div class="nav-label">🍽️ Food Program</div>
-            </button>
-            <button id="navRoster" onclick="showPanel('roster')">
-                <div class="nav-sub">📋 Full Roster</div>
-            </button>
-            <button id="navCount" onclick="showPanel('countPicker')">
-                <div class="nav-sub">🖨️ Monthly Count Sheets</div>
-            </button>
-            <button id="navMenus" onclick="showPanel('menus')">
-                <div class="nav-sub">🍽️ Weekly Menus</div>
-            </button>
-            <button id="navRecap" onclick="showPanel('recapPicker')">
-                <div class="nav-sub">📊 Total Meal Recap</div>
-            </button>
+    <div class="fp-topbar">
+        <a class="fp-back" href="/staff/">&#8592; Staff Portal</a>
+        <div class="fp-brand">
+            <strong>Food Program</strong>
+            <span>Roster eligibility, monthly forms, and weekly menus</span>
         </div>
-        <div class="fp-card">
+        <button type="button" id="spTheme" class="fp-theme" aria-pressed="false" title="Switch between light and dark"></button>
+    </div>
+    <div class="fp-wrapper">
+        <nav class="fp-sidebar" role="tablist" aria-label="Food Program sections">
+            <button class="active" role="tab" aria-selected="true" id="navFood" onclick="showPanel('food')">
+                <span class="nav-label">Overview</span>
+            </button>
+            <button role="tab" aria-selected="false" id="navRoster" onclick="showPanel('roster')">
+                <span class="nav-sub">Full Roster</span>
+            </button>
+            <button role="tab" aria-selected="false" id="navCount" onclick="showPanel('countPicker')">
+                <span class="nav-sub">Monthly Count Sheets</span>
+            </button>
+            <button role="tab" aria-selected="false" id="navMenus" onclick="showPanel('menus')">
+                <span class="nav-sub">Weekly Menus</span>
+            </button>
+            <button role="tab" aria-selected="false" id="navRecap" onclick="showPanel('recapPicker')">
+                <span class="nav-sub">Total Meal Recap</span>
+            </button>
+        </nav>
+        <main class="fp-card">
             <div class="fp-header">
-                <h2 id="fpTitle">Food Program</h2>
+                <p class="fp-eyebrow">Food Program</p>
+                <h1 id="fpTitle">Overview</h1>
             </div>
             <div class="fp-body" id="fpBody">
-                <div>Loading...</div>
+                <div class="fp-loading">Loading food program data&hellip;</div>
             </div>
-        </div>
+        </main>
     </div>
 </div>
 
@@ -71,6 +174,8 @@
 <script>
 // AUTH, apiFetch, isTruthy, students and classrooms come from app.js.
 let currentPanel = 'food';
+const fpEsc = s => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 async function init() {
     try {
@@ -82,27 +187,34 @@ async function init() {
         classrooms = await cRes.json();
         showPanel('food');
     } catch (e) {
-        document.getElementById('fpBody').innerHTML = '<div style="color:red;padding:20px;">Error loading data: ' + e.message + '</div>';
+        document.getElementById('fpBody').innerHTML = '<div class="fp-error">Could not load food program data: ' + e.message + '</div>';
     }
 }
 
 function showPanel(panel) {
     currentPanel = panel;
-    document.querySelectorAll('.fp-sidebar button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.fp-sidebar button').forEach(b => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+    });
     if (panel === 'food') {
         document.getElementById('navFood').classList.add('active');
-        document.getElementById('fpTitle').textContent = 'Food Program';
+        document.getElementById('navFood').setAttribute('aria-selected', 'true');
+        document.getElementById('fpTitle').textContent = 'Overview';
         renderFoodReport();
     } else if (panel === 'roster') {
         document.getElementById('navRoster').classList.add('active');
+        document.getElementById('navRoster').setAttribute('aria-selected', 'true');
         document.getElementById('fpTitle').textContent = 'Full Roster';
         renderFullRoster();
     } else if (panel === 'menus') {
         document.getElementById('navMenus').classList.add('active');
+        document.getElementById('navMenus').setAttribute('aria-selected', 'true');
         document.getElementById('fpTitle').textContent = 'Weekly Menus';
-        document.getElementById('fpBody').innerHTML = '<iframe src="/staff/menus.html" style="width:100%;height:calc(100vh - 200px);border:none;border-radius:8px;"></iframe>';
+        document.getElementById('fpBody').innerHTML = '<iframe class="fp-menu-frame" title="Weekly Menu Planner" src="/staff/menus.html?embedded=1"></iframe>';
     } else if (panel === 'countPicker') {
         document.getElementById('navCount').classList.add('active');
+        document.getElementById('navCount').setAttribute('aria-selected', 'true');
         document.getElementById('fpTitle').textContent = 'Monthly Count Sheets';
         const now = new Date();
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -113,21 +225,23 @@ function showPanel(panel) {
         }
         const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         document.getElementById('fpBody').innerHTML = `
-            <div style="max-width:400px;margin:0 auto;padding:20px 0;">
-                <p style="font-size:0.82rem;color:#6b7280;margin-bottom:16px;">Select a month to generate attendance and meal participation sheets for all classrooms.</p>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            <div class="fp-picker">
+                <p class="fp-picker-intro">Select a month to generate attendance and meal participation sheets for every classroom.</p>
+                <div class="fp-month-grid">
                     ${months.map(d => {
                         const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
                         const isNext = d.getMonth() === nextMonth.getMonth() && d.getFullYear() === nextMonth.getFullYear();
-                        return `<button onclick="printFoodCountSheets('${key}')" style="padding:14px 10px;border-radius:8px;border:${isNext?'2px solid #2563eb':'1px solid #d1d5db'};background:${isNext?'#eff6ff':'white'};cursor:pointer;transition:all 0.15s;font-size:0.8rem;font-weight:${isNext?'700':'500'};color:#374151;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='${isNext?'#eff6ff':'white'}'">
-                            <div>${monthNames[d.getMonth()]}</div>
-                            <div style="font-size:0.68rem;color:#6b7280;margin-top:2px;">${d.getFullYear()}</div>
+                        return `<button class="fp-month-btn${isNext?' recommended':''}" onclick="printFoodCountSheets('${key}')">
+                            <span class="fp-month-name">${monthNames[d.getMonth()]}</span>
+                            <span class="fp-month-year">${d.getFullYear()}</span>
+                            ${isNext?'<span class="fp-month-note">Next month</span>':''}
                         </button>`;
                     }).join('')}
                 </div>
             </div>`;
     } else if (panel === 'recapPicker') {
         document.getElementById('navRecap').classList.add('active');
+        document.getElementById('navRecap').setAttribute('aria-selected', 'true');
         document.getElementById('fpTitle').textContent = 'Total Meal Recap';
         const now = new Date();
         const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -138,15 +252,16 @@ function showPanel(panel) {
         }
         const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
         document.getElementById('fpBody').innerHTML = `
-            <div style="max-width:400px;margin:0 auto;padding:20px 0;">
-                <p style="font-size:0.82rem;color:#6b7280;margin-bottom:16px;">Select a month to generate Total Meal Recap sheets (Breakfast, Lunch, PM Snack) with classroom rows.</p>
-                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+            <div class="fp-picker">
+                <p class="fp-picker-intro">Select a month to generate Total Meal Recap sheets for Breakfast, Lunch, and PM Snack with classroom rows.</p>
+                <div class="fp-month-grid">
                     ${months.map(d => {
                         const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
                         const isNext = d.getMonth() === nextMonth.getMonth() && d.getFullYear() === nextMonth.getFullYear();
-                        return `<button onclick="printMealRecap('${key}')" style="padding:14px 10px;border-radius:8px;border:${isNext?'2px solid #2563eb':'1px solid #d1d5db'};background:${isNext?'#eff6ff':'white'};cursor:pointer;transition:all 0.15s;font-size:0.8rem;font-weight:${isNext?'700':'500'};color:#374151;" onmouseover="this.style.background='#dbeafe'" onmouseout="this.style.background='${isNext?'#eff6ff':'white'}'">
-                            <div>${monthNames[d.getMonth()]}</div>
-                            <div style="font-size:0.68rem;color:#6b7280;margin-top:2px;">${d.getFullYear()}</div>
+                        return `<button class="fp-month-btn${isNext?' recommended':''}" onclick="printMealRecap('${key}')">
+                            <span class="fp-month-name">${monthNames[d.getMonth()]}</span>
+                            <span class="fp-month-year">${d.getFullYear()}</span>
+                            ${isNext?'<span class="fp-month-note">Next month</span>':''}
                         </button>`;
                     }).join('')}
                 </div>
@@ -162,77 +277,88 @@ function renderFoodReport() {
     const unknown = active.length - free - reduced - paid;
     const max = Math.max(free, reduced, paid, unknown, 1);
 
-    function bar(label, count, color) {
+    function stat(label, count) {
+        return '<div class="fp-stat"><div class="fp-stat-label">' + label
+            + '</div><div class="fp-stat-value">' + count + '</div></div>';
+    }
+    function bar(label, count, cls) {
         const pct = Math.round(count / max * 100);
-        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-            <div style="font-size:0.8rem;font-weight:600;color:#374151;min-width:80px;">${label}</div>
-            <div style="flex:1;background:#e2e8f0;border-radius:4px;height:20px;overflow:hidden;">
-                <div style="height:100%;width:${Math.max(pct,3)}%;background:${color};border-radius:4px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;">
-                    <span style="font-size:0.7rem;font-weight:700;color:white;">${count}</span>
-                </div>
-            </div>
-        </div>`;
+        return '<div class="fp-bar-row"><div class="fp-bar-label">' + label + '</div>'
+            + '<div class="fp-bar-track"><div class="fp-bar-fill ' + cls
+            + '" style="width:' + Math.max(pct, 1) + '%"></div></div>'
+            + '<div class="fp-bar-count">' + count + '</div></div>';
     }
 
     document.getElementById('fpBody').innerHTML =
-        bar('Free', free, '#16a34a') +
-        bar('Reduced', reduced, '#d97706') +
-        bar('Paid', paid, '#2563eb') +
-        bar('Unknown', unknown, '#94a3b8');
+        '<div class="fp-summary-grid">'
+        + stat('Active children', active.length)
+        + stat('Free', free)
+        + stat('Reduced', reduced)
+        + stat('Paid', paid)
+        + '</div>'
+        + '<section class="fp-section"><div class="fp-section-head">'
+        + '<h2>Meal eligibility distribution</h2>'
+        + '<p>Current Free, Reduced, and Paid classifications across the active roster.</p>'
+        + '</div>'
+        + bar('Free', free, 'free')
+        + bar('Reduced', reduced, 'reduced')
+        + bar('Paid', paid, 'paid')
+        + bar('Unknown', unknown, 'unknown')
+        + '</section>';
 }
 
 function renderFullRoster() {
     const active = students.filter(s => isTruthy(s.Active));
-    const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
-    const roomOpts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.Room}</option>`).join('');
+    const frpClass = v => v === 'Free' ? 'free' : v === 'Reduced' ? 'reduced' : v === 'Paid' ? 'paid' : 'unknown';
+    const roomOpts = classrooms.map(r => `<option value="${fpEsc(r.RoomNumber)}">${fpEsc(r.Room)}</option>`).join('');
     const rooms = [...new Set(active.map(s => s.Room || 'Unknown'))];
     const filterRoom = window._fpFilterRoom || 'All';
     const filtered = filterRoom === 'All' ? active : active.filter(s => (s.Room || 'Unknown') === filterRoom);
 
-    let filterHtml = `<div style="display:grid;grid-template-columns:repeat(5,auto);gap:4px;margin-bottom:8px;align-items:center;">
-        <button onclick="window._fpFilterRoom='All';renderFullRoster()" style="padding:3px 10px;border-radius:4px;border:none;font-size:0.7rem;cursor:pointer;background:${filterRoom==='All'?'#2563eb':'#e2e8f0'};color:${filterRoom==='All'?'white':'#374151'};font-weight:600;">All (${active.length})</button>`;
+    let filterHtml = '<div class="fp-roster-tools"><div class="fp-filters">'
+        + `<button type="button" class="fp-filter${filterRoom==='All'?' active':''}" onclick="window._fpFilterRoom='All';renderFullRoster()">All (${active.length})</button>`;
     rooms.forEach(rm => {
         const cnt = active.filter(s => (s.Room || 'Unknown') === rm).length;
-        filterHtml += `<button onclick="window._fpFilterRoom='${rm}';renderFullRoster()" style="padding:3px 10px;border-radius:4px;border:none;font-size:0.7rem;cursor:pointer;background:${filterRoom===rm?'#2563eb':'#e2e8f0'};color:${filterRoom===rm?'white':'#374151'};font-weight:600;">${rm} (${cnt})</button>`;
+        const roomArg = fpEsc(JSON.stringify(rm));
+        filterHtml += `<button type="button" class="fp-filter${filterRoom===rm?' active':''}" onclick="window._fpFilterRoom=${roomArg};renderFullRoster()">${fpEsc(rm)} (${cnt})</button>`;
     });
-    filterHtml += `</div><div style="text-align:right;margin-bottom:6px;"><button onclick="exportFoodExcel()" style="padding:4px 12px;background:#16a34a;color:white;border:none;border-radius:5px;font-size:0.7rem;font-weight:600;cursor:pointer;">📥 Export</button></div>`;
+    filterHtml += '</div><button type="button" class="fp-btn fp-btn-primary" onclick="exportFoodExcel()">&#8595; Export CSV</button></div>';
 
     document.getElementById('fpBody').innerHTML = filterHtml + `
-        <div style="max-height:calc(100vh - 300px);overflow:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:0.78rem;table-layout:fixed;">
+        <div class="fp-table-wrap">
+        <table class="fp-table">
             <colgroup>
-                <col style="width:160px;">
-                <col style="width:130px;">
-                <col style="width:45px;">
-                <col style="width:80px;">
-                <col style="width:40px;">
-                <col style="width:42px;">
+                <col style="width:220px;">
+                <col style="width:170px;">
+                <col style="width:90px;">
+                <col style="width:110px;">
+                <col style="width:70px;">
+                <col style="width:75px;">
             </colgroup>
-            <thead><tr style="background:#f8fafc;border-bottom:2px solid #e5e7eb;position:sticky;top:0;z-index:1;">
-                <th style="padding:6px 6px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Name</th>
-                <th style="padding:6px 4px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Room</th>
-                <th style="padding:6px 4px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">F/R/P</th>
-                <th style="padding:6px 4px;text-align:right;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Income</th>
-                <th style="padding:6px 4px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">HH</th>
-                <th style="padding:6px 3px;text-align:center;font-size:0.65rem;font-weight:700;text-transform:uppercase;color:#6b7280;">Save</th>
+            <thead><tr>
+                <th>Name</th>
+                <th>Room</th>
+                <th class="center">F/R/P</th>
+                <th class="right">Income</th>
+                <th class="center">HH</th>
+                <th class="center">Save</th>
             </tr></thead>
             <tbody>${(() => {
                 let lastRoom = ''; let roomIdx = 0;
                 return filtered.map((s, i) => {
                     if (s.Room !== lastRoom) { if (lastRoom) roomIdx++; lastRoom = s.Room; }
-                    const rowBg = roomIdx % 2 === 0 ? 'background:white;' : 'background:#e8edf5;';
-                    return `<tr style="border-bottom:1px solid #f3f4f6;${rowBg}" onmouseover="this.style.background='#eff6ff'" onmouseout="this.style.background='${roomIdx%2===0?'white':'#e8edf5'}'">
-                <td style="padding:4px 6px;font-weight:600;white-space:nowrap;font-size:0.75rem;">${s.Last_Name}, ${s.First_Name} <span style="font-weight:500;color:#dc2626;font-size:0.65rem;margin-left:6px;">${s.TeacherDescription || ''}</span></td>
-                <td style="padding:3px 3px;"><select id="frRoom_${i}" onchange="markFRChanged(${i})" style="padding:2px 2px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;width:100%;">${roomOpts}</select></td>
-                <td style="padding:4px 4px;text-align:center;font-weight:700;color:${frpColor(s.F_R_P_Food)};" id="frFRP_${i}">${s.F_R_P_Food || '—'}</td>
-                <td style="padding:3px 3px;"><input type="number" id="frIncome_${i}" value="${s.HouseholdIncome || ''}" onchange="markFRChanged(${i})" style="width:100%;padding:2px 3px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;text-align:right;box-sizing:border-box;"></td>
-                <td style="padding:3px 3px;"><input type="number" id="frHH_${i}" value="${s.HouseholdSize || ''}" min="1" max="15" onchange="markFRChanged(${i})" style="width:100%;padding:2px 2px;border:1px solid #d1d5db;border-radius:3px;font-size:0.67rem;text-align:center;box-sizing:border-box;"></td>
-                <td style="padding:3px 3px;text-align:center;"><button id="frSave_${i}" onclick="saveFRRow(${i})" disabled style="padding:2px 5px;background:#2563eb;color:white;border:none;border-radius:3px;font-size:0.6rem;font-weight:700;cursor:pointer;opacity:0.3;">Save</button></td>
+                    return `<tr class="${roomIdx % 2 ? 'fp-band' : ''}">
+                <td><span class="fp-child-name">${fpEsc(s.Last_Name)}, ${fpEsc(s.First_Name)}</span><span class="fp-teacher">${fpEsc(s.TeacherDescription || 'No teacher listed')}</span></td>
+                <td><select id="frRoom_${i}" onchange="markFRChanged(${i})">${roomOpts}</select></td>
+                <td class="center"><span class="fp-frp ${frpClass(s.F_R_P_Food)}" id="frFRP_${i}">${fpEsc(s.F_R_P_Food || 'Unknown')}</span></td>
+                <td><input type="number" aria-label="Household income for ${fpEsc(s.First_Name)} ${fpEsc(s.Last_Name)}" id="frIncome_${i}" value="${fpEsc(s.HouseholdIncome || '')}" onchange="markFRChanged(${i})"></td>
+                <td><input class="fp-hh" type="number" aria-label="Household size for ${fpEsc(s.First_Name)} ${fpEsc(s.Last_Name)}" id="frHH_${i}" value="${fpEsc(s.HouseholdSize || '')}" min="1" max="15" onchange="markFRChanged(${i})"></td>
+                <td class="center"><button type="button" class="fp-btn fp-btn-primary fp-save" id="frSave_${i}" onclick="saveFRRow(${i})" disabled>Save</button></td>
             </tr>`;
                 }).join('');
             })()}</tbody>
         </table></div>`;
-    // Set room dropdowns
+    // Set room dropdowns after the generated controls exist.
     filtered.forEach((s, i) => {
         const sel = document.getElementById('frRoom_' + i);
         if (sel) sel.value = s.RoomNumber || '';
@@ -273,8 +399,11 @@ async function saveFRRow(i) {
             if (updated) {
                 s.F_R_P_Food = updated.F_R_P_Food;
                 const frpEl = document.getElementById('frFRP_' + i);
-                const frpColor = v => v === 'Free' ? '#16a34a' : v === 'Reduced' ? '#d97706' : '#64748b';
-                if (frpEl) { frpEl.textContent = updated.F_R_P_Food || '—'; frpEl.style.color = frpColor(updated.F_R_P_Food); }
+                const frpClass = v => v === 'Free' ? 'free' : v === 'Reduced' ? 'reduced' : v === 'Paid' ? 'paid' : 'unknown';
+                if (frpEl) {
+                    frpEl.textContent = updated.F_R_P_Food || 'Unknown';
+                    frpEl.className = 'fp-frp ' + frpClass(updated.F_R_P_Food);
+                }
             }
             students = allStudents;
             btn.style.opacity = '0.3';
