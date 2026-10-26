@@ -35,6 +35,48 @@ login `cofpadmin`). These are two different databases.
   `dimClassrooms` UPDATE looked correct locally but never touched the live site.
   It was only fixed by running the UPDATE in SSMS against `160.153.187.39`.
 
+## 25 Oct 2026 — the eleven-day silent read failure (read `sql-reads.md`)
+
+The worst bug this project has had, because it accused staff of not doing work they had
+done. Full writeup and the rules that came out of it are in `.kiro/steering/sql-reads.md`.
+
+**Symptom:** every PI child's Beg ASQ / Beg ASE chip turned from green to amber, and the
+screening modal said "Required — no ASQ uploaded yet." Non-PI children were unaffected.
+
+**Cause:** `/api/child-files` was rewritten on 14 Oct as
+`` runSQLRows(`;WITH CandidateFiles AS (...)`) ``. `runSQLRows` embeds its argument in a
+scalar subquery, where a CTE and a leading `;` are both illegal. It never compiled —
+but `sqlcmd` exits 0, `runSQLRows` ignored `sqlError`, and zero parsed chunks fell
+through to `return { ok: true, rows: [] }`. The endpoint answered **HTTP 200 with
+`files: []`**, and the client's `.catch` turned that into "no child has any upload."
+
+**Nothing was deleted.** The PDFs and their `ChildFiles` rows were intact throughout.
+
+Fixed in `10d3acb` at three layers: derived table instead of the CTE; `runSQLRows` now
+rejects a leading `WITH`/`;` and fails on "batch error + nothing parsed"; and
+`ChildForms.loadFiles` now tracks `filesState` and throws instead of silently emptying.
+
+**Debugging order that found it** (steps 1–2 both looked perfect, which is the trap):
+query the table directly → run the endpoint's exact query → **check how the query is
+wrapped** → then the browser. Three wrong theories were burned first; see `sql-reads.md`
+for what they were so they are not re-tried.
+
+### Also landed this session
+- **Weighted Eligibility** unified to one generated PDF per child, superseded copies
+  archived rather than deleted (`7bc1ccc`), and the roster pill fixed — it showed
+  "Create form" for every child because of a `Promise.all` destructuring off-by-one
+  (`9e5a5d8`).
+- **Pre-enrollment → Parent Interview crosswalk** (`29422f3`): one declarative mapping
+  in `pi-interview-schema.js`, replacing two drifted copies; 17 previously-dropped
+  answers now carried forward.
+- **ASQ/ASE screening rule documented honestly** (`9a137ba`): the questionnaire upload is
+  **required for PI, optional for non-PI**. Six places in the app said "optional" flat
+  out while the code enforced otherwise — including a column header sitting directly
+  above an amber cell. Decision recorded in `compliance.md`.
+- `ChildForms.screeningNeeds()` / `phraseList()` added so the roster and staff portal
+  phrase "what's still missing" from one source. The roster's old copy said "the ASQ
+  upload" on ASE cells.
+
 ## Recent Changes (June 2026 Session)
 
 ### Food Program Management System (`foodreport.html`)

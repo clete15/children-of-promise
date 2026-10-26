@@ -83,6 +83,19 @@ screening modal's note, the staff handouts) must state both halves. A header tha
 "the questionnaire is optional" over a cell that is amber for a missing upload is the
 kind of contradiction a monitor reads as a program that does not know its own procedure.
 
+### Before concluding that evidence is missing, read `sql-reads.md`
+
+A checklist cell saying "not on file" is a claim about a READ, not about the folder. On
+25 Oct 2026 every PI child's ASQ/ASE questionnaire read as missing for eleven days
+because one endpoint had a SQL syntax error that surfaced as `HTTP 200 {files:[]}`. The
+documents were on disk the whole time.
+
+So: if a whole program's children lose the same item at once, that is a code fault, not
+lost paperwork — deletion does not respect the PI flag. Verify against the database
+before asking a parent or teacher to redo anything. Being told to re-upload work you
+already did is worse than a blank cell, and it is the one failure this system must not
+produce.
+
 ## Caveat: our own written policy can bind us
 
 If our own Staff/Parent guides (`Handouts/ASQ and Teaching Strategies - *.pdf`) state

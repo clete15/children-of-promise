@@ -106,14 +106,23 @@ Waiting List | EMS | Room Roster | Benefits | Reports | Alerts
 - Checklist columns: Permission Slip, Parent Interview, Proof of Income, Beg ASQ, Beg ASE, Mid Year Report, End ASQ, End ASE, End Year Report
 - Linked to `ISBETracking` table by `StudentId` (FK to `rptMasterEnrollment.Id`)
 
-## Next Task
+## Parent Interview Form — built, do not rebuild
 
-Build a **Parent Interview Form** modal on the ISBE page:
-- Opens when clicking "Parent Interview" column header for a student
-- Pre-fills from enrollment data (child name, DOB, room, household income, HH size, benefits, IEP, foster, military, etc.)
-- Manual fields: parent goals, concerns, strengths, signatures, date
-- Save button (stores to DB) and Print button
-- When saved, auto-checks the ParentInterview checkbox for that student
+Done. ~100 fields, defined once in `Internal/pi-interview-schema.js` and rendered by
+BOTH the ISBE admin roster (`isbe.html`) and the parent portal (`parent.html`), so the
+family and the office always see the identical form. Saves to `ParentInterviews`, with
+everything beyond the summary columns held in a `FormData` JSON blob — so adding a field
+needs no migration. Files a PDF on save and auto-ticks `ParentInterview`.
+
+- An uploaded signed **scan** is authoritative: if one exists the roster opens it and
+  the save endpoint returns 409 rather than creating a second interview.
+- Pre-enrollment answers are carried forward by ONE declarative crosswalk,
+  `PI_INTERVIEW_PREFILL` + `applyInterviewPrefill()` in `pi-interview-schema.js`. Add
+  mappings there, never in a page — the two pages had their own copies and drifted.
+- Answers with no equivalent question on the state form live in a
+  "From the Pre-Enrollment Application" section, recorded verbatim (Yes *and* No).
+- It is **entirely separate** from the ASQ/ASE parent questionnaire. Different document,
+  different table, no shared state. The names collide; the things do not.
 
 ## F/R/P Rules
 
@@ -127,7 +136,19 @@ Build a **Parent Interview Form** modal on the ISBE page:
 
 - **SSL Certificate** — ✅ Done (Let's Encrypt, auto-renews)
 - **Install SSMS locally** — ✅ Done
-- **Parent Interview Form** — Next up
+- **Parent Interview Form** — ✅ Done (see the section above)
+- **`staff-portal.html` `loadClassroomData()` destructuring off-by-one** — `weRes` binds
+  `CofpForms.loadSignatures` instead of `/api/weighted-eligibility-files`, so
+  `CLS_WEIGHTED` is always `{}`. Harmless today (the weighted pill was moved off the
+  classroom card) but it is a live landmine. Fix by naming the promise — see
+  `sql-reads.md`. Same bug was fixed in `isbe.html`.
+- **`ChildFiles` has 71 `WeightedEligibility/generated` rows for ~17 children** — the
+  backfill re-indexed repeatedly. `indexWeightedEligibilityDoc` now DELETEs before
+  INSERTing so it will not grow further, but the existing duplicates are still there and
+  inflate every `/api/child-files` payload. Worth a one-off cleanup keeping the newest
+  row per child.
+- **Pre-enrollment → Parent Interview crosswalk** — ✅ Done. Deferred piece: nothing
+  maps `ChildStartDate`; `Score`/`WaitlistStatus` are deliberately excluded.
 - **Cloudflare / transfer domain from Wix** — blocked by a registrar lock
   (`clientUpdateProhibited`), not by Wix refusing. Ask Wix support to unlock if ever wanted.
   SSL was done directly on the server instead, so there is no pressing need. See Domain & DNS above.
