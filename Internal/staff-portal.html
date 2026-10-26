@@ -2288,21 +2288,16 @@ function classroomMissingReason(student, field, state, childIsPI) {
             return 'Still needed: enter and save the ' + tool + ' scores, or upload the completed '
                 + tool + '. Click to open ' + label + '.';
         }
-        const id = student.Id;
-        const have = [], need = [];
-        const quest = ChildForms.hasFile && ChildForms.hasFile(id, field, 'questionnaire');
-        const scored = ChildForms.hasForm && ChildForms.hasForm(id, field);
-        const parentSig = ChildForms.hasSignature && ChildForms.hasSignature(id, field, 'parent');
-        const staffSig = ChildForms.hasSignature && ChildForms.hasSignature(id, field, 'staff');
-        (quest ? have : need).push('the ' + tool + ' upload');
-        (scored ? have : need).push('the entered scores');
-        (parentSig ? have : need).push('the parent signature');
-        (staffSig ? have : need).push('the staff signature');
-        const list = items => items.length === 1 ? items[0]
-            : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1];
+        /* The four facts and the list punctuation come from ChildForms, which is also
+           what state() reads to choose the chip colour — so these words cannot
+           contradict the colour, and the ISBE roster (which explains the same cells)
+           cannot drift from this page. It did once: the roster's own copy said "the ASQ
+           upload" on an ASE chip because the tool name was hardcoded. */
+        const n = ChildForms.screeningNeeds(student.Id, field);
+        const list = ChildForms.phraseList;
         return (checked ? 'Checked off, but the required saved evidence is not complete. ' : '')
-            + (have.length ? 'On file: ' + list(have) + '. ' : '')
-            + (need.length ? 'Still needed: ' + list(need) + '. ' : '')
+            + (n.have.length ? 'On file: ' + list(n.have) + '. ' : '')
+            + (n.need.length ? 'Still needed: ' + list(n.need) + '. ' : '')
             + 'Click to open ' + label + ' and finish it.';
     }
 

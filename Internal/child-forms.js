@@ -288,6 +288,38 @@
         return s === 'form' || s === 'tick' || s === 'unknown';
     }
 
+    /* What a screening column already has and what it still needs, as two lists of
+       plain phrases ready to drop into a sentence.
+
+       It reads the SAME four facts the screening branch of state() uses to pick a
+       pill's colour, so a tooltip phrased from this can never contradict the colour
+       beside it. It lives here, not on a page, because the ISBE roster and the staff
+       portal both explain these cells and had grown their own near-duplicate copies —
+       which is how one of them ended up saying "the ASQ upload" on an ASE cell.
+
+       `tool` is ASQ or ASE, named from the field so the wording is right for both. */
+    function screeningNeeds(studentId, field) {
+        var tool = (field === 'BegASQ' || field === 'EndASQ') ? 'ASQ' : 'ASE';
+        var parts = [
+            ['the ' + tool + ' upload', hasFile(studentId, field, 'questionnaire')],
+            ['the entered scores', hasForm(studentId, field)],
+            ['the parent signature', hasSignature(studentId, field, 'parent')],
+            ['the staff signature', hasSignature(studentId, field, 'staff')]
+        ];
+        var have = [], need = [];
+        parts.forEach(function (p) { (p[1] ? have : need).push(p[0]); });
+        return { tool: tool, have: have, need: need };
+    }
+
+    /* "a", "a and b", "a, b and c" — for reading a list out inside a sentence.
+       Shared so the two pages' tooltips punctuate identically. */
+    function phraseList(items) {
+        var a = items || [];
+        if (!a.length) return '';
+        if (a.length === 1) return a[0];
+        return a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
+    }
+
     /* ── Compliance roll-up ────────────────────────────────────────────────
        Counts how many children's files would survive a review of these fields,
        and separates the two ways a file can fail: nothing there at all, or a
@@ -363,6 +395,8 @@
         hasSignature: hasSignature,
         state: state,
         isDone: isDone,
+        screeningNeeds: screeningNeeds,
+        phraseList: phraseList,
         rollup: rollup,
         indexItems: indexItems,
         get loadState() { return loadState; },

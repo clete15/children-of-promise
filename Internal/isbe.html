@@ -1560,9 +1560,22 @@ let currentInterviewStudentId = null;
 async function init() {
     try {
         renderYearPicker();
+        /* Which children have a weighted-eligibility form on disk (Child Files), so the
+           roster's Weighted Eligibility cell shows a green pill fed from there.
+
+           Held in its OWN named promise rather than read back out of the Promise.all
+           by position. It used to be the tenth entry, picked up by a destructuring
+           pattern with four elision holes — which binds the NINTH, i.e. the local
+           loadSignatures() call, and that returns nothing. So weightedFiles was always
+           {} and every child's cell showed "Create form" however many PDFs were really
+           on disk. Naming it means adding or reordering a fetch can never silently
+           repoint it again. Still inside the Promise.all, so it is fetched in parallel
+           and init waits for it exactly as before. */
+        const weightedP = apiFetch('/api/weighted-eligibility-files')
+            .then(r => r.ok ? r.json() : null).catch(() => null);
         // Site-level facts (DCFS license). Awaited so the CB2 status and the
         // license alert are correct on first render, including via a deep link.
-        const [sRes, cRes, tRes, scrRes, , , , , weData] = await Promise.all([
+        const [sRes, cRes, tRes, scrRes] = await Promise.all([
             apiFetch('/api/students'),
             apiFetch('/api/classrooms'),
             apiFetch(yearQS('/api/isbe-tracking')),
@@ -1577,10 +1590,9 @@ async function init() {
             // Signatures into ChildForms too — the screening rule needs both sigs.
             ChildForms.loadSignatures(activeSchoolYear, apiFetch),
             loadSignatures(activeSchoolYear),
-            // Which children have a weighted-eligibility form on disk (Child Files), so
-            // the roster's Weighted Eligibility cell shows a green pill fed from there.
-            apiFetch('/api/weighted-eligibility-files').then(r => r.ok ? r.json() : null).catch(() => null)
+            weightedP
         ]);
+        const weData = await weightedP;
         /* The roster cannot render without the student list, so a failure here is fatal
            and must say WHY — a 401 (expired session) used to surface as a silent "0
            students", which reads as the children having vanished. Check .ok and show a
@@ -2386,7 +2398,12 @@ function childFormFileRel(student, field) {
             MidYearReport: ['report'], EndYearReport: ['report'],
             BegASQ: ['testsheet', 'questionnaire'], EndASQ: ['testsheet', 'questionnaire'],
             BegASE: ['testsheet', 'questionnaire'], EndASE: ['testsheet', 'questionnaire'],
-            ParentInterview: ['interviewform']
+            ParentInterview: ['interviewform'],
+            // The generated weighted-eligibility PDF, so the shared resolver finds it
+            // too. Its own cell reads the weightedFiles map directly, but PI5 jumps and
+            // any future caller of onFilePill would otherwise get a dead pill.
+            WeightedEligibility: ['generated'],
+            FamilyCenteredAssessment: ['initialasq'], FamilyGoalPlan: ['initialase']
         };
         for (const kind of (KINDS[field] || [])) {
             const f = ChildForms.fileFor(id, field, kind);
@@ -2419,65 +2436,102 @@ function onFilePill(student, field, label, tip) {
 function teacherPill(student, field, extra) {
     const isPI = String(student.PFA_PI_na || '').trim().toUpperCase() === 'PI';
     const st = ChildForms.state(student.Id, field, !!(trackingData[student.Id] || {})[field], isPI);
+    /* The four ASQ/ASE columns get a computed "what is still missing" tooltip in every
+       state. The other teacher columns (permission slip, the two report cards) are
+       single-artefact items with nothing to enumerate, so they keep their plain text. */
+    const isScr = !!(window.ChildForms && ChildForms.isScreening && ChildForms.isScreening(field));
+    const q = t => String(t).replace(/"/g, '&quot;');
+
     // PI: only a real filed form ('form') shows the pill — a bare tick is not evidence.
     // PFA: a checked box counts as done, so a 'tick' shows a green pill too (the folder,
     // not the app, is the monitored evidence for PFA).
     if (st === 'form') {
         const d = ChildForms.formDate(student.Id, field);
-        const tip = 'On file' + (d ? ', dated ' + d : '') + '. Entered by the teacher in the classroom card.';
+        const dated = d ? ', dated ' + d : '';
+        const tip = isScr
+            ? 'On file' + dated + '. ' + screeningReason(student, field, st, isPI)
+            : 'On file' + dated + '. Entered by the teacher in the classroom card.';
         return onFilePill(student, field, '\u2713 on file', tip) + (extra || '');
     }
     if (st === 'tick') {
-        return onFilePill(student, field, '\u2713 done',
-            'Checked off by the teacher. For PFA the evidence lives in the child\u2019s physical folder.')
-            + (extra || '');
+        const tip = isScr
+            ? screeningReason(student, field, st, isPI)
+            : 'Checked off by the teacher. For PFA the evidence lives in the child\u2019s physical folder.';
+        return onFilePill(student, field, '\u2713 done', tip) + (extra || '');
     }
     if (st === 'partial') {
         // Some but not all of the four requirements are in: ASQ/ASE uploaded, scores
         // entered, parent signature, staff signature. Yellow and clickable so it opens
         // the screening form; the tooltip names exactly what is still missing.
-        const tip = partialScreeningReason(student, field);
-        return '<a class="cf-pill cf-pill-partial" href="#" title="' + tip.replace(/"/g, '&quot;') + '"'
+        const tip = screeningReason(student, field, st, isPI);
+        return '<a class="cf-pill cf-pill-partial" href="#" title="' + q(tip) + '"'
             + ' onclick="event.preventDefault();' + screeningOpenCall(student, field) + '">\u25B2 finish</a>'
             + (extra || '');
     }
-    /* Nothing on file yet. Rather than an empty cell, show a CLEAR "not started" pill so
-       an item nobody has begun reads as an open slot at a glance. A screening pill is
-       clickable (opens the screening form, like the yellow "finish" pill); the other
-       teacher items are read-only on the roster, so theirs is a plain, non-clickable
-       pill — they are completed in the classroom card. */
+    /* Nothing on file yet ('none'), or ticked with nothing behind it ('tick-only').
+       Rather than an empty cell, show a CLEAR "not started" pill so an item nobody has
+       begun reads as an open slot at a glance. A screening pill is clickable (opens the
+       screening form, like the yellow "finish" pill); the other teacher items are
+       read-only on the roster, so theirs is a plain, non-clickable pill — they are
+       completed in the classroom card. */
     const openCall = screeningOpenCall(student, field);
+    const tip = isScr
+        ? screeningReason(student, field, st, isPI)
+        : (st === 'tick-only'
+            ? 'Checked off, but nothing is saved here. If it was done on paper and filed, '
+              + 'the paper is the evidence \u2014 otherwise the box is ahead of the work.'
+            : 'Not started yet. Completed by the teacher in the classroom card.');
     if (openCall && openCall !== 'void 0') {
-        return '<a class="cf-pill cf-pill-clear" href="#" title="Not started yet \u2014 click to open the screening and begin."'
+        return '<a class="cf-pill cf-pill-clear" href="#" title="' + q(tip) + '"'
             + ' onclick="event.preventDefault();' + openCall + '">not started</a>'
             + (extra || '');
     }
-    return '<span class="cf-pill cf-pill-clear" title="Not started yet. Completed by the teacher in the classroom card.">not started</span>';
+    return '<span class="cf-pill cf-pill-clear" title="' + q(tip) + '">not started</span>';
 }
 
-/* Why a screening cell is yellow, in words, for the pill's hover tooltip. A PI
-   screening is green only with all four: the ASQ/ASE uploaded, the scores entered
-   (filed as the signed summary), and BOTH the parent and staff signatures. This lists
-   what is already in and what is still needed. */
-function partialScreeningReason(student, field) {
-    const id = student.Id;
-    const have = [], need = [];
-    const cf = window.ChildForms || {};
-    const quest = cf.hasFile && cf.hasFile(id, field, 'questionnaire');
-    const scored = cf.hasForm && cf.hasForm(id, field);
-    const parentSig = cf.hasSignature && cf.hasSignature(id, field, 'parent');
-    const staffSig = cf.hasSignature && cf.hasSignature(id, field, 'staff');
-    (quest ? have : need).push('the ASQ upload');
-    (scored ? have : need).push('the entered scores');
-    (parentSig ? have : need).push('the parent signature');
-    (staffSig ? have : need).push('the staff signature');
-    const list = a => a.length === 1 ? a[0]
-        : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1];
-    const haveTxt = have.length ? 'You have ' + list(have) + ' on file. ' : '';
-    const needTxt = need.length ? 'Still needed: ' + list(need) + '. ' : '';
-    return 'Still yellow \u2014 not all four parts are in yet. '
-        + haveTxt + needTxt
-        + 'Click to open the screening and finish it \u2014 then this turns green.';
+/* What an ASQ/ASE cell still needs, in words, for its hover tooltip — in EVERY state,
+   not just the amber one. A "not started" pill that only said "not started yet" made
+   the teacher open the screening to find out what it wanted; now the hover says so.
+
+   The four facts come from ChildForms.screeningNeeds, which is also what state() reads
+   to choose the colour, so the words and the colour cannot disagree. `st` is passed in
+   rather than re-derived, for the same reason.
+
+   NOTE the PI rule here is the one the code actually enforces: a PI screening is green
+   only with all four parts, the uploaded ASQ/ASE included. The column headers still
+   describe that upload as optional — see the mismatch flagged to the user. */
+function screeningReason(student, field, st, isPI) {
+    const n = ChildForms.screeningNeeds(student.Id, field);
+    const list = ChildForms.phraseList;
+    const tool = n.tool;
+
+    /* PFA and the non-PI rooms complete on the scored summary alone (or an uploaded
+       questionnaire): a monitor reviews their physical folder, not this app. Reciting
+       four required parts at them would invent work they do not owe. */
+    if (!isPI) {
+        if (st === 'form') return 'On file for the ' + tool + '. For PFA the monitored evidence is the child\u2019s physical folder.';
+        if (st === 'tick') return 'Checked off by the teacher. For PFA the evidence lives in the child\u2019s physical folder.';
+        return 'Still needed: enter and save the ' + tool + ' scores, or upload the completed '
+            + tool + '. Click to open the screening.';
+    }
+
+    const haveTxt = n.have.length ? 'On file: ' + list(n.have) + '. ' : '';
+    const needTxt = n.need.length ? 'Still needed: ' + list(n.need) + '. ' : '';
+
+    if (st === 'form') {
+        return 'Complete \u2014 all four parts are on file: ' + list(n.have) + '.';
+    }
+    if (st === 'tick-only') {
+        return 'Checked off, but nothing is saved here for the ' + tool + '. ' + needTxt
+            + 'If it was done on paper and filed, the paper is the evidence \u2014 otherwise the box is ahead of the work.';
+    }
+    if (st === 'partial') {
+        return 'Not all four parts are in yet. ' + haveTxt + needTxt
+            + 'Click to open the screening and finish it \u2014 then this turns green.';
+    }
+    // 'none' — nothing at all yet.
+    return 'Not started. Needed: ' + list(n.need)
+        + '. Click to open the screening and begin.';
 }
 
 /* The openScreening(...) call for a screening field, so the yellow "partial" pill can
@@ -2495,13 +2549,23 @@ function screeningOpenCall(student, field) {
    enrolled child is missing one, staff can create that child's automated form in place;
    the server files and indexes it before this roster turns the pill green. */
 function weightedEligibilityCell(student) {
-    const rel = weightedFiles[student.Id] || weightedFiles[String(student.Id)];
+    /* Two sources for the same document, checked in order, because "Create form" is a
+       destructive-looking offer to make a second copy of something the child already
+       has. It must only appear when the form is genuinely absent — not when one fetch
+       happened to fail. weightedFiles comes from /api/weighted-eligibility-files (the
+       map Child Files uses); the ChildForms entry is seeded from that same map and by
+       createWeightedEligibility, so it also covers a form filed earlier this session. */
+    let rel = weightedFiles[student.Id] || weightedFiles[String(student.Id)];
+    if (!rel && window.ChildForms && ChildForms.fileFor) {
+        const f = ChildForms.fileFor(student.Id, 'WeightedEligibility', 'generated');
+        if (f && f.relPath) rel = f.relPath;
+    }
     if (rel) {
-        return '<a class="cf-pill" href="#" title="Weighted eligibility form is on file (Child Files) \u2014 click to open."'
+        return '<a class="cf-pill" href="#" title="Weighted eligibility form is on file in this child\u2019s Child Files (Administrative) \u2014 click to open the saved PDF. This roster and Child Files open the same document."'
             + ' onclick="event.preventDefault();openDoc(\'' + String(rel).replace(/'/g, "\\'") + '\',\'Weighted Eligibility\',true)">'
             + '\u2713 on file</a>';
     }
-    return '<a class="cf-pill cf-pill-clear" href="#" title="Create the automated weighted eligibility PDF in this child\u2019s permanent folder."'
+    return '<a class="cf-pill cf-pill-clear" href="#" title="No weighted eligibility form on file for this child yet. Click to create the automated PDF in their permanent folder from the family\u2019s pre-enrollment answers."'
         + ' onclick="event.preventDefault();createWeightedEligibility(' + student.Id + ',this)">Create form</a>';
 }
 
@@ -2523,20 +2587,59 @@ async function createWeightedEligibility(studentId, button) {
     }
 }
 
+/* PI6 wants each assessment within 6 months of enrollment, so "what is missing" for an
+   empty Initial ASQ/ASE cell includes BY WHEN. Returns a sentence, or '' when the start
+   date is unusable — never a guess. 182 days matches the window in DOC_FORM_SPECS. */
+function piSixMonthDue(student) {
+    const start = String(student.Start_Date || '').slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return '';
+    const due = new Date(start + 'T00:00:00');
+    if (isNaN(due.getTime())) return '';
+    due.setDate(due.getDate() + 182);
+    const iso = due.toISOString().slice(0, 10);
+    const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00');
+    const days = Math.round((due - today) / 86400000);
+    if (days < 0) {
+        return 'Due within 6 months of enrollment \u2014 that window closed on ' + iso
+            + ' (' + Math.abs(days) + ' days ago). ';
+    }
+    return 'Due within 6 months of enrollment \u2014 by ' + iso + ' (' + days + ' days left). ';
+}
+
 /* PI6 uses each child's explicitly identified initial-ever ASQ/ASE. These dedicated
    records are separate from school-year BegASQ/BegASE files unless an existing file is
-   later reviewed and deliberately marked as initial. */
+   later reviewed and deliberately marked as initial.
+
+   The empty state spells out what is wanted, because "Upload" alone did not say WHICH
+   ASQ — and picking this year's Beg ASQ for an established child is precisely the
+   mistake the separation exists to prevent. */
 function familyEvidenceCell(student, field) {
-    const kind = field === 'FamilyCenteredAssessment' ? 'initialasq' : 'initialase';
+    const isAsq = field === 'FamilyCenteredAssessment';
+    const kind = isAsq ? 'initialasq' : 'initialase';
     const file = window.ChildForms && ChildForms.fileFor
         ? ChildForms.fileFor(student.Id, field, kind) : null;
-    const label = field === 'FamilyCenteredAssessment' ? 'Initial ASQ' : 'Initial ASE';
+    const label = isAsq ? 'Initial ASQ' : 'Initial ASE';
+    const tool = isAsq ? 'ASQ-3' : 'ASQ:SE-2';
+    const begCol = isAsq ? 'Beg ASQ' : 'Beg ASE';
+    const picc = isAsq ? 'PI6.A' : 'PI6.B';
+    const q = t => String(t).replace(/"/g, '&quot;');
+
     if (file && file.relPath) {
-        return '<a class="cf-pill" href="#" title="' + label + ' is on file \u2014 click to open."'
+        const d = file.date ? ', filed ' + String(file.date).slice(0, 10) : '';
+        const tip = label + ' is on file' + d + ' \u2014 click to open. '
+            + picc + ' evidence: this child\u2019s initial-ever ' + tool + '.';
+        return '<a class="cf-pill" href="#" title="' + q(tip) + '"'
             + ' onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
             + '\',\'' + escapeHtml(file.name || label).replace(/'/g, "\\'") + '\',true)">\u2713 on file</a>';
     }
-    return '<a class="cf-pill cf-pill-clear" href="#" title="Upload ' + label + ' into this child\u2019s permanent folder."'
+    // The 6-month clock is a PI requirement; it would be wrong to assert it for a PFA child.
+    const isPI = String(student.PFA_PI_na || '').trim().toUpperCase() === 'PI';
+    const tip = 'Nothing on file for ' + picc + ' yet. Still needed: this child\u2019s '
+        + 'initial-ever ' + tool + ' \u2014 the first one ever administered, not the selected '
+        + 'year\u2019s ' + begCol + ' unless that file has been confirmed as their first. '
+        + (isPI ? piSixMonthDue(student) : '')
+        + 'Click to upload it into the child\u2019s permanent folder.';
+    return '<a class="cf-pill cf-pill-clear" href="#" title="' + q(tip) + '"'
         + ' onclick="event.preventDefault();openReportUpload(' + student.Id + ',\'' + field + '\')">Upload</a>';
 }
 
