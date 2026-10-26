@@ -1044,21 +1044,21 @@
     </div>
 </div>
 
-<!-- Report Card upload modal (Mid-Year / End-Year) -->
+<!-- Shared evidence upload modal (report cards and PI6 initial ASQ/ASE files) -->
 <div class="pi-overlay" id="rcOverlay">
     <div class="pi-modal">
         <div class="pi-modal-header">
-            <h3 id="rcModalTitle">Report Card</h3>
+            <h3 id="rcModalTitle">Upload Evidence</h3>
             <button class="pi-close" onclick="closeReportUpload()" aria-label="Close">&times;</button>
         </div>
         <div class="pi-modal-body">
             <div class="pi-section"><h4>Child</h4><div class="pi-value" id="rcChildName"></div></div>
             <div class="pi-section">
-                <h4 id="rcWhich">Report Card</h4>
-                <div class="doc-note">Upload the child&rsquo;s report card (PDF or a clear photo). It is filed in the child&rsquo;s folder and marks this column complete.</div>
+                <h4 id="rcWhich">Evidence</h4>
+                <div class="doc-note" id="rcNote">Upload a PDF or clear photo. It is filed in the child&rsquo;s permanent folder and marks this item complete.</div>
                 <div class="cls-upload-row">
                     <input type="file" id="rcFile" accept=".pdf,.jpg,.jpeg,.png">
-                    <button type="button" class="pi-btn pi-btn-primary" id="rcBtn" onclick="uploadReportCard()">Upload report card</button>
+                    <button type="button" class="pi-btn pi-btn-primary" id="rcBtn" onclick="uploadReportCard()">Upload file</button>
                     <span id="rcStatus" class="cls-upload-status"></span>
                 </div>
             </div>
@@ -1155,6 +1155,8 @@ if (!window.ChildForms) {
         hasForm: function () { return false; },
         formDate: function () { return ''; },
         mark: function () {},
+        fileFor: function () { return null; },
+        markFile: function () {},
         state: function (id, field, ticked) { return ticked ? 'tick' : 'none'; },
         isDone: function (id, field, ticked) { return !!ticked; },
         // Counts ticks, which is exactly what the compliance panel did before.
@@ -1592,6 +1594,13 @@ async function init() {
         students = await sRes.json();
         classrooms = (cRes && cRes.ok) ? await cRes.json() : [];
         weightedFiles = (weData && weData.files) ? weData.files : {};
+        // Weighted Eligibility is one enrollment document per child rather than a
+        // school-year upload. Seed ChildForms from the unscoped generated-file map so
+        // PI5 rollups recognize exactly the same PDF as the roster pill.
+        Object.keys(weightedFiles).forEach(id => {
+            ChildForms.markFile(id, 'WeightedEligibility', 'generated',
+                weightedFiles[id], 'Weighted Eligibility');
+        });
         // Tracking/screening are additive — a failure must not blank the roster.
         const tData = (tRes && tRes.ok) ? await tRes.json() : [];
         (Array.isArray(tData) ? tData : []).forEach(t => { trackingData[t.StudentId] = t; });
@@ -1755,8 +1764,8 @@ function updateRosterCount() {
    docForm  key in DOC_FORM_SPECS (pi-forms.js) -- renders a [form] link
    programs restrict the column to these programs; omitted means both
 
-   The four PICC document columns are Prevention Initiative only: PI6 and PI7 come
-   from the Prevention Initiative Compliance Checklist and have no PFA counterpart. */
+   The PI6 evidence columns also appear on the PFA roster because the center uses the
+   same initial ASQ/ASE filing workflow for both programs. PI7 remains PI-only. */
 const COLUMNS = [
     { field: 'PermissionSlip', teacher: true, label: 'Permission<br>Slip', title: 'Parent signs consent form allowing ASQ and ASE developmental screenings to be performed on their child for the school year.' },
     /* Weighted Eligibility and Parent Interview lead the ADMIN group, in the order the
@@ -1780,8 +1789,8 @@ const COLUMNS = [
        Results Shared (PICC PI10.H) is NOT an admin column: it is a teacher requirement
        captured in the report-card pills on the classroom card, so it does not appear on
        this admin sheet. */
-    { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASQ)</span>', docForm: 'familyAssessment', programs: ['PI','PFA'], title: 'PICC PI6.A - published, research-based Family Centered Assessment conducted within 6 months of enrollment (LSP, Baby TALK, FROG).' },
-    { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASE)</span>', docForm: 'familyGoalPlan', programs: ['PI','PFA'], title: 'PICC PI6.B - Individual Family Goal Plan developed within 6 months of enrollment and updated annually thereafter.' },
+    { field: 'FamilyCenteredAssessment', label: 'Family<br>Assessment<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASQ)</span>', programs: ['PI','PFA'], title: 'PICC PI6.A evidence — the family\u2019s initial ASQ-3 questionnaire. Upload once here or through the beginning ASQ workflow; the same permanent child file is reused.' },
+    { field: 'FamilyGoalPlan', label: 'Family<br>Goal Plan<br><span style="font-weight:400;font-size:0.85em;opacity:0.8;">(Initial ASE)</span>', programs: ['PI','PFA'], title: 'PICC PI6.B evidence — the family\u2019s initial ASQ:SE-2 questionnaire. Upload once here or through the beginning ASE workflow; the same permanent child file is reused.' },
     { field: 'TransitionPlan', label: 'Transition<br>Plan', docForm: 'transitionPlan', programs: ['PI'], title: 'PICC PI7.A - written individualized Transition Plan so children and families experience a seamless transition of services.' },
     { field: 'Referral', label: 'Referral', docForm: 'referral', programs: ['PI'], title: 'PICC PI7.B and PI10.I - referral to community resources when needed, and referral for further evaluation when a screening flags a concern.' },
     /* "Remove from SIS" was dropped from the roster on request — it is an end-of-year
@@ -2473,18 +2482,53 @@ function screeningOpenCall(student, field) {
     return "void 0";
 }
 
-/* Weighted Eligibility on the roster is a read-only VIEW of the Child Files form, not a
-   separate record. A green pill when the form exists on disk (click to open it), a plain
-   pill when it does not. Editing/generating happens in Child Files — this only reflects
-   it, the same way the teacher pills reflect the classroom card. */
+/* Weighted Eligibility on the roster opens the generated Child Files PDF. If an
+   enrolled child is missing one, staff can create that child's automated form in place;
+   the server files and indexes it before this roster turns the pill green. */
 function weightedEligibilityCell(student) {
     const rel = weightedFiles[student.Id] || weightedFiles[String(student.Id)];
     if (rel) {
-        return '<a class="cf-pill" href="#" title="Weighted eligibility form is on file (Child Files) — click to open."'
-            + ' onclick="event.preventDefault();openDoc(\'' + String(rel).replace(/'/g, "\\'") + "','Weighted Eligibility',true)\">"
+        return '<a class="cf-pill" href="#" title="Weighted eligibility form is on file (Child Files) \u2014 click to open."'
+            + ' onclick="event.preventDefault();openDoc(\'' + String(rel).replace(/'/g, "\\'") + '\',\'Weighted Eligibility\',true)">'
             + '\u2713 on file</a>';
     }
-    return '<span class="cf-pill" style="opacity:0.6;" title="No weighted eligibility form on file yet. Create it in Child Files.">not on file</span>';
+    return '<a class="cf-pill cf-pill-clear" href="#" title="Create the automated weighted eligibility PDF in this child\u2019s permanent folder."'
+        + ' onclick="event.preventDefault();createWeightedEligibility(' + student.Id + ',this)">Create form</a>';
+}
+
+async function createWeightedEligibility(studentId, button) {
+    if (button && button.getAttribute('aria-disabled') === 'true') return;
+    if (button) { button.setAttribute('aria-disabled', 'true'); button.textContent = 'Creating\u2026'; }
+    try {
+        const res = await apiFetch('/api/weighted-eligibility/' + encodeURIComponent(studentId), { method: 'POST' });
+        const d = await res.json();
+        if (!res.ok || !d.success || !d.relPath) throw new Error(d.error || ('HTTP ' + res.status));
+        weightedFiles[String(studentId)] = d.relPath;
+        ChildForms.markFile(studentId, 'WeightedEligibility', 'generated', d.relPath,
+            d.name || 'Weighted Eligibility');
+        renderRoster();
+        openDoc(d.relPath, d.name || 'Weighted Eligibility', true);
+    } catch (e) {
+        if (button) { button.removeAttribute('aria-disabled'); button.textContent = 'Create form'; }
+        alert('Could not create the weighted eligibility form: ' + (e.message || e));
+    }
+}
+
+/* PI6 uses the same permanent initial questionnaire already collected for the
+   beginning screening. The alias pill opens that file when present and opens the shared
+   uploader when absent, so staff never upload a duplicate under a second name. */
+function familyEvidenceCell(student, field) {
+    const sourceField = field === 'FamilyCenteredAssessment' ? 'BegASQ' : 'BegASE';
+    const file = window.ChildForms && ChildForms.fileFor
+        ? ChildForms.fileFor(student.Id, sourceField, 'questionnaire') : null;
+    const label = field === 'FamilyCenteredAssessment' ? 'Initial ASQ' : 'Initial ASE';
+    if (file && file.relPath) {
+        return '<a class="cf-pill" href="#" title="' + label + ' is on file \u2014 click to open."'
+            + ' onclick="event.preventDefault();openDoc(\'' + escapeHtml(file.relPath).replace(/'/g, "\\'")
+            + '\',\'' + escapeHtml(file.name || label).replace(/'/g, "\\'") + '\',true)">\u2713 on file</a>';
+    }
+    return '<a class="cf-pill cf-pill-clear" href="#" title="Upload ' + label + ' into this child\u2019s permanent folder."'
+        + ' onclick="event.preventDefault();openReportUpload(' + student.Id + ',\'' + field + '\')">Upload</a>';
 }
 
 /* Proof of Income on the roster is a READ-ONLY status pill, fed from Child Files →
@@ -2652,6 +2696,14 @@ function renderRoster() {
             if (f === 'WeightedEligibility') {
                 return '<td class="' + ('cf-doc' + divide).trim() + '">'
                     + weightedEligibilityCell(s) + '</td>';
+            }
+
+            // Family Assessment and Family Goal Plan reuse the beginning ASQ/ASE
+            // questionnaire files. They are upload/open pills, not standalone forms or
+            // manual checkboxes, and both aliases point to the same permanent evidence.
+            if (f === 'FamilyCenteredAssessment' || f === 'FamilyGoalPlan') {
+                return '<td class="' + ('cf-doc' + divide).trim() + '">'
+                    + familyEvidenceCell(s, f) + '</td>';
             }
 
             // Transition Plan and Referral are now filled out in Child Files (the
@@ -3454,25 +3506,50 @@ async function uploadScreeningQuestionnaire() {
    PI screening completes on that upload + entered scores + both signatures. The old
    uploadScreeningTestSheets() handler and its DOM section were removed with it. */
 
-// ── Report card uploads (Mid-Year / End-Year) ──
+// ── Shared evidence uploads (report cards and PI6 initial ASQ/ASE aliases) ──
 var currentRCStudentId = null, currentRCField = null;
-var RC_LABELS = { MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card' };
+var RC_UPLOADS = {
+    MidYearReport: {
+        label: 'Mid-Year Report Card', sourceField: 'MidYearReport', kind: 'report',
+        button: 'Upload report card', empty: 'No report card on file yet.',
+        note: 'Upload the child\u2019s report card (PDF or a clear photo). It is filed in the child\u2019s permanent Teacher folder and marks this column complete.'
+    },
+    EndYearReport: {
+        label: 'End-Year Report Card', sourceField: 'EndYearReport', kind: 'report',
+        button: 'Upload report card', empty: 'No report card on file yet.',
+        note: 'Upload the child\u2019s report card (PDF or a clear photo). It is filed in the child\u2019s permanent Teacher folder and marks this column complete.'
+    },
+    FamilyCenteredAssessment: {
+        label: 'Family Assessment (Initial ASQ)', sourceField: 'BegASQ', kind: 'questionnaire',
+        button: 'Upload initial ASQ', empty: 'No initial ASQ on file yet.',
+        note: 'Upload the family\u2019s initial ASQ-3 questionnaire. The same file is kept in the child\u2019s permanent Teacher folder and reused as Family Assessment evidence; do not upload a duplicate.'
+    },
+    FamilyGoalPlan: {
+        label: 'Family Goal Plan (Initial ASE)', sourceField: 'BegASE', kind: 'questionnaire',
+        button: 'Upload initial ASE', empty: 'No initial ASE on file yet.',
+        note: 'Upload the family\u2019s initial ASQ:SE-2 questionnaire. The same file is kept in the child\u2019s permanent Teacher folder and reused as Family Goal Plan evidence; do not upload a duplicate.'
+    }
+};
 
 function openReportUpload(studentId, field) {
+    var config = RC_UPLOADS[field];
+    if (!config) return;
     currentRCStudentId = studentId;
     currentRCField = field;
     var student = students.find(function (s) { return String(s.Id) === String(studentId); });
-    var label = RC_LABELS[field] || 'Report Card';
-    document.getElementById('rcModalTitle').textContent = label;
-    document.getElementById('rcWhich').textContent = label;
+    document.getElementById('rcModalTitle').textContent = config.label;
+    document.getElementById('rcWhich').textContent = config.label;
     document.getElementById('rcChildName').textContent =
         student ? student.First_Name + ' ' + student.Last_Name : '';
+    document.getElementById('rcNote').textContent = config.note;
     var f = document.getElementById('rcFile');
     if (f) f.value = '';
-    var existing = ChildForms.fileFor(studentId, field, 'report');
+    var btn = document.getElementById('rcBtn');
+    if (btn) btn.textContent = config.button;
+    var existing = ChildForms.fileFor(studentId, config.sourceField, config.kind);
     setUploadStatus('rcStatus', existing
         ? { on: true, name: existing.name, relPath: existing.relPath }
-        : null, 'No report card on file yet.');
+        : null, config.empty);
     document.getElementById('rcOverlay').classList.add('open');
 }
 function closeReportUpload() {
@@ -3481,6 +3558,8 @@ function closeReportUpload() {
 }
 async function uploadReportCard() {
     if (!currentRCStudentId || !currentRCField) return;
+    var config = RC_UPLOADS[currentRCField];
+    if (!config) return;
     var input = document.getElementById('rcFile');
     var statusEl = document.getElementById('rcStatus');
     if (!input || !input.files || !input.files.length) {
@@ -3496,8 +3575,8 @@ async function uploadReportCard() {
     if (btn) { btn.disabled = true; btn.textContent = 'Uploading\u2026'; }
     if (statusEl) { statusEl.textContent = 'Uploading\u2026'; statusEl.style.color = '#64748b'; }
     try {
-        var d = await uploadChildFile(currentRCStudentId, currentRCField, 'report', file);
-        ChildForms.markFile(currentRCStudentId, currentRCField, 'report', d.relPath, d.name);
+        var d = await uploadChildFile(currentRCStudentId, config.sourceField, config.kind, file);
+        ChildForms.markFile(currentRCStudentId, config.sourceField, config.kind, d.relPath, d.name);
         if (!trackingData[currentRCStudentId]) trackingData[currentRCStudentId] = {};
         trackingData[currentRCStudentId][currentRCField] = 1;
         setUploadStatus('rcStatus', { on: true, name: d.name, relPath: d.relPath }, '');
@@ -3505,7 +3584,7 @@ async function uploadReportCard() {
     } catch (e) {
         if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = 'Upload report card'; }
+        if (btn) { btn.disabled = false; btn.textContent = config.button; }
     }
 }
 
@@ -3989,14 +4068,13 @@ const PICC_ITEMS = [
     },
     {
         num: 'PI6', title: 'Family Centered Assessment and Individual Family Goal Plan',
-        requires: 'Both documents completed within 6 months of enrollment, with the goal plan updated annually thereafter.',
+        requires: 'File the family\u2019s initial ASQ-3 and ASQ:SE-2 questionnaires within 6 months of enrollment. The center uses those initial family questionnaires as its Family Assessment and Family Goal Plan evidence, with goals reviewed and updated annually.',
         subs: [
-            'A. Published, research-based Family Centered Assessment within 6 months of enrollment',
-            'B. Individual Family Goal Plan within 6 months of enrollment, updated annually'
+            'A. Initial ASQ-3 questionnaire filed as Family Centered Assessment evidence within 6 months of enrollment',
+            'B. Initial ASQ:SE-2 questionnaire filed as Individual Family Goal Plan evidence within 6 months of enrollment; review goals annually'
         ],
         childFields: ['FamilyCenteredAssessment', 'FamilyGoalPlan'],
-        guidance: 'Acceptable assessments include the Life Skills Progression, Baby TALK Family Centered Assessment and FROG. The LSP child portion may be replaced by the ASQ or another child developmental tool.',
-        forms: [{ label: 'Individual Family Goal Plan', href: 'pi6-family-goal-plan.html?program=PI&item=6' }]
+        guidance: 'Upload each questionnaire once. Beg ASQ and Family Assessment point to the same permanent child file; Beg ASE and Family Goal Plan do the same. Use the family responses and concerns from the initial screening process when reviewing and updating individual family goals.'
     },
     {
         num: 'PI7', title: 'Referral system and written transition plans',

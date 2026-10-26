@@ -2206,6 +2206,39 @@ function childRecordsForSeed(studentId) {
     return { enroll, intake };
 }
 
+/* Give every generated Weighted Eligibility PDF the same semantic index used by
+   uploaded child evidence. The physical file stays in the permanent Administrative
+   folder; ChildFiles says what it IS, and ISBETracking lets current checklist views
+   recognize it without guessing from a filename. That semantic row is also the stable
+   handoff a future SharePoint exporter can consume.
+
+   Idempotent: re-indexing an existing PDF updates its path/name but preserves the
+   original UploadedAt. */
+function indexWeightedEligibilityDoc(studentId, fullPath) {
+    const id = parseInt(studentId, 10);
+    const root = findDocRoot();
+    if (!id || !root || !fullPath) return { ok: false, error: 'Could not index the weighted eligibility form.' };
+    const rel = path.relative(root, fullPath).replace(/\\/g, '/');
+    if (!rel || rel.startsWith('..')) return { ok: false, error: 'Weighted eligibility file is outside the document library.' };
+    const year = currentSchoolYear();
+    const fileName = path.basename(fullPath);
+    const field = 'WeightedEligibility';
+    const kind = 'generated';
+    const where = `StudentId=${id} AND SchoolYear=${esc(year)} AND FormField=${esc(field)} AND Kind=${esc(kind)}`;
+    const sql = childFileEnsureSQL() + isbeTrackingEnsureSQL()
+        + `IF EXISTS (SELECT 1 FROM ChildFiles WHERE ${where})
+    UPDATE ChildFiles SET FileName=${esc(fileName)},RelPath=${esc(rel)},UploadedBy=${esc('system-generated')},
+        UploadedAt=CASE WHEN UploadedAt IS NULL THEN GETDATE() ELSE UploadedAt END WHERE ${where}
+ELSE
+    INSERT INTO ChildFiles (StudentId,SchoolYear,FormField,Kind,FileName,RelPath,UploadedBy,UploadedAt)
+    VALUES (${id},${esc(year)},${esc(field)},${esc(kind)},${esc(fileName)},${esc(rel)},${esc('system-generated')},GETDATE());
+`
+        + trackingTickSQL(id, year, field);
+    const r = runSQL(sql);
+    if (!r.ok || r.sqlError) return { ok: false, error: r.error || r.sqlError || 'Could not index the generated form.' };
+    return { ok: true, rel: rel, name: fileName, year: year };
+}
+
 /* Writes the child's FIRST document — a pre-filled Weighted Eligibility Determination
    — into their folder, as a PDF matching the signed forms the app files elsewhere.
    Best-effort: enrollment must not fail because the library is momentarily unreachable,
@@ -2230,24 +2263,37 @@ function seedWeightedEligibilityDoc(studentId, opts) {
     const overwrite = !!(opts && opts.overwrite);
     let existing = [];
     try { existing = fs.readdirSync(folder.path); } catch (e) { /* new folder */ }
-    const priorForms = existing.filter(n => /weighted eligibility/i.test(n));
+    const parent = path.dirname(folder.path);
+    const isWeighted = n => /weighted eligibility/i.test(n) && /\.pdf$/i.test(n);
+    const priorForms = existing.filter(isWeighted).map(n => path.join(folder.path, n));
+    // Before the permanent Teacher/Administrative split, generated forms sat loose in
+    // the child's parent folder. Recognize that legacy copy instead of creating a second.
+    try {
+        fs.readdirSync(parent).filter(isWeighted).forEach(n => priorForms.push(path.join(parent, n)));
+    } catch (e) { /* parent unreadable — no legacy copy to consider */ }
     if (priorForms.length) {
-        if (!overwrite) return { ok: true, skipped: true };
+        if (!overwrite) {
+            const prior = priorForms.sort((a, b) => {
+                try { return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs; } catch (e) { return 0; }
+            })[0];
+            const indexed = indexWeightedEligibilityDoc(studentId, prior);
+            if (!indexed.ok) return { ok: false, error: indexed.error, rel: path.relative(findDocRoot() || '', prior).replace(/\\/g, '/') };
+            invalidateDocCache();
+            return { ok: true, skipped: true, path: prior, rel: indexed.rel, name: indexed.name };
+        }
         /* Overwrite mode: remove the stale weighted-eligibility file(s) so a fresh one is
-           generated with the current scoring. Also clears any pre-split copy left loose in
-           the parent child folder, so a child does not end up with two. */
-        priorForms.forEach(n => { try { fs.unlinkSync(path.join(folder.path, n)); } catch (e) { /* ignore */ } });
-        try {
-            const parent = path.dirname(folder.path);
-            fs.readdirSync(parent).filter(n => /weighted eligibility/i.test(n))
-                .forEach(n => { try { fs.unlinkSync(path.join(parent, n)); } catch (e) { /* ignore */ } });
-        } catch (e) { /* parent unreadable — nothing to clean */ }
+           generated with the current scoring. This includes any pre-split copy left loose
+           in the parent child folder, so a child does not end up with two. */
+        priorForms.forEach(full => { try { fs.unlinkSync(full); } catch (e) { /* ignore */ } });
     }
 
     const recs = childRecordsForSeed(studentId);
     if (recs.error) { console.warn('[SEED] ' + recs.error); return { ok: false, error: recs.error }; }
     const { enroll, intake } = recs;
-    const program = String(enroll.PFA_PI_na).toUpperCase() === 'PFA' ? 'PFA' : 'PI';
+    const programCode = String(enroll.PFA_PI_na || '').trim().toUpperCase();
+    const programLabel = programCode === 'PFA' ? 'Preschool for All'
+        : programCode === 'PI' ? 'Prevention Initiative'
+        : (String(enroll.PFA_PI_na || '').trim() || 'Other / not assigned');
     const childName = (enroll.First_Name + ' ' + enroll.Last_Name).trim();
 
     /* Income verification auto-feeds from the child's Proof of Income upload: the person
@@ -2269,7 +2315,7 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         { label: 'Child', value: childName || ('Student ' + studentId) },
         { label: 'Date of birth', value: enroll.Birth_date || '\u2014' },
         { label: 'Enrollment date', value: enroll.Start_Date || '\u2014' },
-        { label: 'Program', value: program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative' },
+        { label: 'Program', value: programLabel },
         { label: 'Household size', value: (intake.HouseholdSize || enroll.HouseholdSize || '\u2014') },
         { label: 'Household income', value: (intake.HouseholdIncome || enroll.HouseholdIncome || '\u2014') }
     ];
@@ -2332,8 +2378,7 @@ function seedWeightedEligibilityDoc(studentId, opts) {
     try {
         pdf = buildFormPdf({
             title: 'Weighted Eligibility Determination',
-            subtitle: 'Children of Promise LLC \u2014 '
-                + (program === 'PFA' ? 'Preschool for All' : 'Prevention Initiative'),
+            subtitle: 'Children of Promise LLC \u2014 ' + programLabel,
             rows: rows,
             blocks: blocks,
             signatures: [],
@@ -2358,7 +2403,15 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         return { ok: false, error: e.message };
     }
     invalidateDocCache();   // new weighted-eligibility PDF filed — refresh the scan cache
-    return { ok: true, path: target, rel: path.relative(findDocRoot() || '', target).replace(/\\/g, '/') };
+    const indexed = indexWeightedEligibilityDoc(studentId, target);
+    if (!indexed.ok) {
+        return {
+            ok: false,
+            error: 'The PDF was created, but its child-file record could not be saved: ' + indexed.error,
+            rel: path.relative(findDocRoot() || '', target).replace(/\\/g, '/')
+        };
+    }
+    return { ok: true, path: target, rel: indexed.rel, name: indexed.name };
 }
 
 // ── Captured signatures ──
@@ -6100,6 +6153,17 @@ ELSE
 `;
                 // A report card is the whole requirement, so filing it ticks the box.
                 if (kind === 'report') sql += trackingTickSQL(studentId, year, field);
+                /* The center uses each beginning questionnaire in two places without
+                   duplicating the physical file: BegASQ is the Family Assessment evidence
+                   and BegASE is the Family Goal Plan evidence. Tick the PI6 alias when the
+                   shared source file is uploaded; the ASQ/ASE screening column keeps its
+                   own completion rules for scores and signatures. */
+                if (kind === 'questionnaire' && field === 'BegASQ') {
+                    sql += trackingTickSQL(studentId, year, 'FamilyCenteredAssessment');
+                }
+                if (kind === 'questionnaire' && field === 'BegASE') {
+                    sql += trackingTickSQL(studentId, year, 'FamilyGoalPlan');
+                }
                 /* A scanned Parent Interview Form is the whole requirement too: the signed
                    paper form is the compliance evidence. Tick the ParentInterview flag AND
                    seed a ParentInterviews row so /api/child-forms reads the cell as evidence
@@ -9322,6 +9386,31 @@ ELSE
         return;
     }
 
+    /* POST one child's weighted-eligibility PDF. Missing pills call this route so staff
+       can create the existing automated form in place instead of running a bulk refresh.
+       Create-only by default: if a PDF already exists, seedWeightedEligibilityDoc indexes
+       that copy and returns it without replacing possible handwritten/compliance work. */
+    const weightedOne = url.match(/^\/api\/weighted-eligibility\/(\d+)$/);
+    if (req.method === 'POST' && weightedOne) {
+        if (!checkClassroomAuth(req, res)) return;
+        const studentId = parseInt(weightedOne[1], 10);
+        let out;
+        try { out = seedWeightedEligibilityDoc(studentId); }
+        catch (e) { out = { ok: false, error: e.message }; }
+        if (!out || !out.ok) {
+            return sendJSON(res, 500, {
+                error: (out && out.error) || 'Could not create the weighted eligibility form.',
+                relPath: out && out.rel || undefined
+            });
+        }
+        return sendJSON(res, 200, {
+            success: true,
+            created: !out.skipped,
+            relPath: out.rel,
+            name: out.name || path.basename(out.path || out.rel || 'Weighted Eligibility.pdf')
+        });
+    }
+
     /* POST one-time backfill: a folder for every currently-enrolled child, each with a
        pre-filled weighted-eligibility form in it (internal - protected).
 
@@ -9397,12 +9486,11 @@ ELSE
         });
     }
 
-    /* GET each active child's weighted-eligibility file path (internal - protected).
-       Returns { files: { <studentId>: <relPath> } } for children that have one on disk,
-       so the classroom view can show a "Weighted Eligibility" pill — highlighted when the
-       form exists — and open it. Walks the Child Files tree once and matches folders to
-       children by the trailing " - <Id>" suffix; looks in the Administrative subfolder
-       first, then loose in the child folder (pre-split seeds). */
+    /* GET each child's weighted-eligibility file path (internal - protected).
+       Returns { files: { <studentId>: <relPath> } } for children that have one on disk.
+       Semantic ChildFiles rows are preferred across school years because this is one
+       enrollment document per child. A filesystem fallback discovers and idempotently
+       indexes older files from before ChildFiles metadata existed. */
     if (req.method === 'GET' && url === '/api/weighted-eligibility-files') {
         if (!checkClassroomAuth(req, res)) return;
         const DOC_ROOT = findDocRoot();
@@ -9412,9 +9500,35 @@ ELSE
         // filing clears it, so a newly saved weighted-eligibility form still shows up.
         const cached = docCacheGet('weighted');
         if (cached !== undefined) return sendJSON(res, 200, { files: cached });
+        const files = {};
+        const rootPath = path.resolve(DOC_ROOT);
+        const insideRoot = full => {
+            const resolved = path.resolve(full);
+            return resolved.toLowerCase().startsWith((rootPath + path.sep).toLowerCase());
+        };
+
+        // Prefer semantic ChildFiles rows. They identify what a document is without
+        // relying on its display filename and are the source a future exporter can use.
+        const indexed = runSQLRows(
+            `SELECT StudentId,RelPath FROM ChildFiles
+             WHERE FormField='WeightedEligibility' AND Kind='generated'
+             ORDER BY UploadedAt DESC`,
+            childFileEnsureSQL());
+        if (indexed.ok) {
+            indexed.rows.forEach(row => {
+                const id = String(parseInt(row.StudentId, 10) || '');
+                const rel = String(row.RelPath || '').replace(/\\/g, '/');
+                const full = path.resolve(DOC_ROOT, rel);
+                if (id && !files[id] && rel && insideRoot(full) && fs.existsSync(full)) files[id] = rel;
+            });
+        }
+
+        // Compatibility fallback for PDFs created before semantic indexing existed.
+        // Discovery idempotently adds the semantic ChildFiles row and current tracking
+        // tick without replacing or moving the physical legacy document.
         const base = path.join(DOC_ROOT, CHILD_FILES_ROOT_FOLDER);
         let dirs = [];
-        try { dirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory()); } catch (e) { return sendJSON(res, 200, { files: {} }); }
+        try { dirs = fs.readdirSync(base, { withFileTypes: true }).filter(d => d.isDirectory()); } catch (e) { /* no legacy tree */ }
         const findForm = dir => {
             const scan = p => {
                 try {
@@ -9424,12 +9538,16 @@ ELSE
             };
             return scan(path.join(dir, 'Administrative')) || scan(dir);
         };
-        const files = {};
         dirs.forEach(d => {
             const m = d.name.match(/ - (\d+)$/);
-            if (!m) return;
+            if (!m || files[m[1]]) return;
             const full = findForm(path.join(base, d.name));
-            if (full) files[m[1]] = path.relative(DOC_ROOT, full).replace(/\\/g, '/');
+            if (full) {
+                const migrated = indexWeightedEligibilityDoc(parseInt(m[1], 10), full);
+                files[m[1]] = migrated.ok
+                    ? migrated.rel
+                    : path.relative(DOC_ROOT, full).replace(/\\/g, '/');
+            }
         });
         docCacheSet('weighted', files);
         return sendJSON(res, 200, { files: files });

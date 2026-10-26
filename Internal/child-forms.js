@@ -254,6 +254,23 @@
             if (scored || quest) return 'form';
             return ticked ? 'tick' : 'none';
         }
+        if (field === 'WeightedEligibility') {
+            /* Weighted eligibility is one enrollment document per child, not a form the
+               family repeats every school year. The roster seeds this file entry from
+               the unscoped generated-document map after load, so PI5 rollups recognize
+               the same PDF that its green pill opens. */
+            if (hasFile(studentId, field, 'generated')) return 'form';
+            return ticked ? 'tick-only' : 'none';
+        }
+        if (field === 'FamilyCenteredAssessment' || field === 'FamilyGoalPlan') {
+            /* PI6 reuses the already-filed beginning questionnaire instead of asking
+               staff to upload a duplicate under a second name. A legacy family-form row
+               or a bare tracking tick is not enough for these new pills: the source file
+               itself must exist so it can be opened now and exported later. */
+            var sourceField = field === 'FamilyCenteredAssessment' ? 'BegASQ' : 'BegASE';
+            if (hasFile(studentId, sourceField, 'questionnaire')) return 'form';
+            return ticked ? 'tick-only' : 'none';
+        }
         if (isReport(field)) {
             if (hasFile(studentId, field, 'report')) return 'form';
             return ticked ? (isPI ? 'tick-only' : 'tick') : 'none';
