@@ -199,11 +199,25 @@
             width:220px;min-width:220px;max-width:220px;white-space:normal;
             box-shadow:7px 0 7px -5px rgba(15,23,42,0.13);
         }
-        /* Body name cells stay on ONE line so every row is a uniform height — the
-           "Name – Room" tag used to wrap the longer rooms (Infants / Toddlers) onto a
-           second line and make those rows taller than the rest. Overflow is clipped
-           with an ellipsis; the full name is in the cell's title on hover. */
-        tbody td.pin-1 { white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        /* The Student cell is TWO deliberate lines: the name, then a muted meta line
+           carrying the room and the enrollment date.
+
+           The room used to sit beside the name as a "– Room" tag, and the pair
+           overflowed the 220px pinned column: "Beyer, Daniel – Infants / Todd…".
+           Moving it to its own line recovers the room AND makes space for the
+           enrollment date, which the roster genuinely needs — PI6's 6-month
+           assessment window and the 45-day beginning-screening clock are both
+           measured from it.
+
+           Each line clips independently with its own ellipsis, so one long room name
+           can never push the other line out of shape. The two lines together come to
+           about 42px, inside the 44px row height above, so grid density is unchanged. */
+        tbody td.pin-1 { white-space:normal;overflow:hidden; }
+        .roster-name { font-weight:600;font-size:0.73rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+        /* Indented to clear .roster-num (22px + 7px margin) so it aligns under the name
+           rather than under the row number. */
+        .roster-meta { margin-left:29px;font-weight:400;font-size:0.645rem;color:var(--sp-muted);
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25; }
         /* Only the right-edge drop shadow that lifts the frozen column off the scrolling
            grid. The old inset bottom-border (inset 0 -1px 0 var(--border)) drew a light
            1px line under every name cell — in dark mode that read as a thick white rule
@@ -2913,11 +2927,8 @@ function renderRoster() {
             return td + box + '</td>';
         }).join('');
         const transferred = isTransferred(s);
-        // Room column is gone. For PI the room rides after the name (children span
-        // several rooms); PFA is all Pre-School so its room is left off entirely.
-        const roomTag = (activeProgram === 'PI')
-            ? ' <span style="font-weight:400;color:var(--sp-muted);">\u2013 ' + getRoom(s.RoomNumber) + '</span>'
-            : '';
+        /* There is no Room column; the room rides in the meta line under the name,
+           built below alongside the enrollment date. */
         // Last row of an age group: the next child is in a different room, or this is
         // the final child. That row carries the single full-width rule at the bottom
         // of the group.
@@ -2925,15 +2936,24 @@ function renderRoster() {
             || String(s.RoomNumber) !== String(roster[i + 1].RoomNumber);
         const rowClasses = [transferred ? 'cf-transferred' : '', groupEnd ? 'group-end' : '']
             .filter(Boolean).join(' ');
-        // Full "Last, First – Room" in the cell title so it is recoverable on hover if
-        // a long name is clipped by the single-line Student column.
+        /* Second line under the name: the room and the date the child enrolled.
+           PFA is all Pre-School so its room is left off, leaving just the date. */
+        const roomName = activeProgram === 'PI' ? getRoom(s.RoomNumber) : '';
+        const enrolledOn = String(s.Start_Date || '').slice(0, 10);
+        const metaBits = [roomName, enrolledOn ? 'enrolled ' + enrolledOn : ''].filter(Boolean);
+        const metaLine = metaBits.length
+            ? '<div class="roster-meta">' + escapeHtml(metaBits.join(' \u00b7 ')) + '</div>'
+            : '';
+        // Everything in the cell's title too, so a clipped line is recoverable on hover.
         const nameTitle = (s.Last_Name + ', ' + s.First_Name
-            + (activeProgram === 'PI' ? ' \u2013 ' + getRoom(s.RoomNumber) : ''))
+            + (metaBits.length ? ' \u2013 ' + metaBits.join(' \u00b7 ') : ''))
             .replace(/"/g, '&quot;');
         return '<tr' + (rowClasses ? ' class="' + rowClasses + '"' : '') + '>'
-            + '<td class="left pin-1" title="' + nameTitle + '" style="font-weight:600;font-size:0.73rem;">'
+            + '<td class="left pin-1" title="' + nameTitle + '">'
+            + '<div class="roster-name">'
             + '<span class="roster-num">' + (i + 1) + '.</span>'
-            + childNameCell(s) + roomTag + transferMarker(s)
+            + childNameCell(s) + transferMarker(s)
+            + '</div>' + metaLine
             + '</td>' + cells + '</tr>';
     }).join('');
 }
