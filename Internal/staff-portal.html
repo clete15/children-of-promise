@@ -700,6 +700,26 @@
     .cls-roompick select { padding:6px 10px;border:1px solid var(--sp-border-in);border-radius:6px;font-size:0.85rem;font-weight:600;font-family:inherit;background:var(--sp-surface);color:var(--sp-text); }
     .cls-roompick select:focus { outline:none;border-color:var(--sp-accent);box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
     .cls-roompick #clsTeacher { font-size:0.76rem;color:var(--sp-muted); }
+    /* ── Report-card due dates ──
+       One chip per term above this room's cards, carrying the due date and how many
+       of this teacher's children still owe it. Deliberately the same classes and the
+       same colour rules as the ISBE roster strip (isbe.html), so the office and the
+       teacher are looking at the same thing: red once the date has passed, amber
+       inside three weeks, green when every child in the room has handed it in. */
+    .rc-due-strip { display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:16px; }
+    .rc-due-label { font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--sp-muted); }
+    .rc-due { display:inline-flex;align-items:baseline;gap:7px;padding:5px 11px;border-radius:999px;
+              border:1px solid var(--sp-border);background:var(--sp-surface);font-size:0.74rem; }
+    .rc-due b { font-weight:800; }
+    .rc-due .rc-due-when { font-weight:600;color:var(--sp-muted); }
+    .rc-due .rc-due-count { font-weight:700;font-size:0.7rem;opacity:0.85; }
+    .rc-due.overdue { color:var(--sp-bad-fg);background:var(--sp-bad-bg);border-color:var(--sp-bad-br); }
+    .rc-due.overdue .rc-due-when { color:inherit; }
+    .rc-due.due-soon { color:#92400e;background:#fef3c7;border-color:#f59e0b; }
+    .rc-due.due-soon .rc-due-when { color:inherit; }
+    .rc-due.settled { color:#166534;background:#dcfce7;border-color:#86efac; }
+    .rc-due.settled .rc-due-when { color:inherit; }
+
     .cls-batch { border:1px solid var(--sp-border);border-radius:10px;overflow:hidden;margin-bottom:18px; }
     /* The header is a full-width toggle button now. The caret rotates when open, and the
        bottom border only shows while expanded so a collapsed summary is a clean single bar. */
@@ -2267,12 +2287,17 @@ function rosterEditHtml(roomNumber) {
    ChildForms state. This is presentation only: it does not change completion, counts,
    deadlines, or what clicking the pill opens. */
 function classroomMissingReason(student, field, state, childIsPI) {
-    const label = {
+    /* Report-card labels come from ChildForms.REPORT_CARDS rather than being spelled
+       again here — the field names are historical (MidYearReport is the WINTER card,
+       EndYearReport the SPRING one) and a second hand-written map is how they would
+       drift back to the old names. */
+    const reportLabels = {};
+    (ChildForms.REPORT_CARDS || []).forEach(c => { reportLabels[c.field] = c.label; });
+    const label = Object.assign({
         PermissionSlip: 'Permission Slip',
         BegASQ: 'Beginning ASQ', BegASE: 'Beginning ASE',
-        EndASQ: 'End ASQ', EndASE: 'End ASE',
-        MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card'
-    }[field] || field;
+        EndASQ: 'End ASQ', EndASE: 'End ASE'
+    }, reportLabels)[field] || field;
     const checked = state === 'tick-only';
 
     if (field === 'PermissionSlip') {
@@ -2301,9 +2326,23 @@ function classroomMissingReason(student, field, state, childIsPI) {
             + 'Click to open ' + label + ' and finish it.';
     }
 
-    if (field === 'MidYearReport' || field === 'EndYearReport') {
-        return (checked ? 'Checked off, but no uploaded report-card file is on file. ' : '')
-            + 'Still needed: upload the ' + label + '. Click to open the upload.';
+    /* Report cards lead with the DUE DATE, because that is the thing a teacher is
+       deciding against when they hover. Everything else follows it. */
+    if (ChildForms.isReport && ChildForms.isReport(field)) {
+        const d = ChildForms.reportCardDue ? ChildForms.reportCardDue(field, CLS_YEAR) : null;
+        let lead = '';
+        if (d) {
+            if (d.state === 'overdue') {
+                lead = 'OVERDUE \u2014 was due ' + d.dueText
+                    + ' (' + Math.abs(d.days) + ' day' + (Math.abs(d.days) === 1 ? '' : 's') + ' ago). ';
+            } else {
+                lead = 'Due ' + d.dueText
+                    + ' (' + (d.days === 0 ? 'today' : d.days + ' day' + (d.days === 1 ? '' : 's') + ' left') + '). ';
+            }
+        }
+        return lead
+            + (checked ? 'Checked off, but no uploaded report-card file is on file. ' : '')
+            + 'Still needed: upload the signed ' + label + '. Click to open the upload.';
     }
 
     return 'Still needed: complete ' + label + '. Click to open it.';
@@ -2356,6 +2395,40 @@ function classroomChecklistHtml(rooms) {
     // "Outstanding for this classroom" is collapsible: the child cards below are the
     // working surface, so the summary starts collapsed unless the teacher opens it.
     // clsOutstandingOpen persists the open/closed choice across re-renders.
+    /* Report-card due dates for THIS classroom. Same helper and same wording as the
+       ISBE roster's strip, counted against this teacher's own children so the number
+       is their workload rather than the centre's. */
+    const dueStrip = (function () {
+        const dues = (window.ChildForms && ChildForms.reportCardDues)
+            ? ChildForms.reportCardDues(CLS_YEAR) : [];
+        // Before/Afterschool children (room Type 'n/a') have no checklist, so they are
+        // not counted here either — same exclusion the batch summary above uses.
+        const counted = roster.filter(s => String(s.Type || '').trim().toLowerCase() !== 'n/a');
+        if (!dues.length || !counted.length) return '';
+        const chips = dues.map(d => {
+            const outstanding = counted.filter(s => !ChildForms.isDone(
+                s.Id, d.field, !!(CLS_TRACKING[s.Id] || {})[d.field],
+                String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI')).length;
+            const state = outstanding === 0 ? 'settled' : d.state;
+            const when = d.state === 'overdue' && outstanding
+                ? 'overdue since ' + d.dueText
+                : 'due ' + d.dueText;
+            const count = outstanding
+                ? outstanding + ' of ' + counted.length + ' left'
+                : '\u2713 all in';
+            const tip = d.label + ' \u2014 ' + when + '. '
+                + (outstanding
+                    ? outstanding + ' of ' + counted.length + ' children in this room still need the signed report card uploaded.'
+                    : 'Every child in this room has it uploaded.');
+            return '<span class="rc-due ' + state + '" title="' + esc(tip) + '">'
+                + '<b>' + esc(d.term) + '</b>'
+                + '<span class="rc-due-when">' + esc(when) + '</span>'
+                + '<span class="rc-due-count">' + esc(count) + '</span>'
+                + '</span>';
+        }).join('');
+        return '<div class="rc-due-strip"><span class="rc-due-label">Report cards</span>' + chips + '</div>';
+    })();
+
     const batchBlock = batch
         ? '<div class="cls-batch' + (clsOutstandingOpen ? ' open' : '') + '">'
             + '<button type="button" class="cls-batch-head" id="clsOutstandingToggle" '
@@ -2424,8 +2497,8 @@ function classroomChecklistHtml(rooms) {
                 }
             } else if (col.field === 'PermissionSlip') {
                 action = 'permission|' + s.Id;
-            } else if (col.field === 'MidYearReport' || col.field === 'EndYearReport') {
-                // Report cards are produced elsewhere and uploaded here.
+            } else if (ChildForms.isReport && ChildForms.isReport(col.field)) {
+                // All three report cards are produced elsewhere and uploaded here.
                 action = 'upload|' + s.Id + '|' + col.field;
             }
             const cls = 'cls-chip' + (done ? ' cls-chip-done' : '')
@@ -2481,7 +2554,8 @@ function classroomChecklistHtml(rooms) {
             + '<div class="cls-chips">' + chips + exitChip + '</div></div>';
     }).join('');
 
-    return pick + rosterEditHtml(activeClsRoom) + batchBlock + '<div class="cls-cards">' + cards + '</div>';
+    return pick + dueStrip + rosterEditHtml(activeClsRoom) + batchBlock
+        + '<div class="cls-cards">' + cards + '</div>';
 }
 
 /* Wire the classroom panel's controls after each render: the room picker, the chip

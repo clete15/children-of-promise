@@ -488,9 +488,10 @@ function cols() {
         { field: 'PermissionSlip', label: 'Permission Slip' },
         { field: 'ParentInterview', label: 'Parent Interview' },
         { field: 'BegASQ', label: 'Beg ASQ' }, { field: 'BegASE', label: 'Beg ASE' },
-        { field: 'MidYearReport', label: 'Mid Year Report Card' },
+        { field: 'FallReport', label: 'Fall Report Card' },
+        { field: 'MidYearReport', label: 'Winter Report Card' },
         { field: 'EndASQ', label: 'End ASQ' }, { field: 'EndASE', label: 'End ASE' },
-        { field: 'EndYearReport', label: 'End Year Report Card' }
+        { field: 'EndYearReport', label: 'Spring Report Card' }
     ];
 }
 
@@ -529,7 +530,7 @@ function outstandingCount(s) {
 const CK_SHORT = {
     PermissionSlip: 'Permission', ParentInterview: 'Interview',
     BegASQ: 'Beg ASQ', BegASE: 'Beg ASE', EndASQ: 'End ASQ', EndASE: 'End ASE',
-    MidYearReport: 'Mid Report', EndYearReport: 'End Report'
+    FallReport: 'Fall Report', MidYearReport: 'Winter Report', EndYearReport: 'Spring Report'
 };
 
 function actionFor(field, id) {
@@ -537,7 +538,11 @@ function actionFor(field, id) {
     if (field === 'BegASE' || field === 'EndASE') return 'screening|' + id + '|ASQ:SE-2|' + (field === 'BegASE' ? 'Beginning' : 'End');
     if (field === 'PermissionSlip') return 'permission|' + id;
     if (field === 'ParentInterview') return 'interview|' + id;
-    if (field === 'MidYearReport' || field === 'EndYearReport') return 'upload|' + id + '|' + field;
+    // All three report cards are uploads. Asked of ChildForms rather than listed here,
+    // so adding or renaming a term never needs a change in this file.
+    if (window.ChildForms && ChildForms.isReport && ChildForms.isReport(field)) {
+        return 'upload|' + id + '|' + field;
+    }
     return '';
 }
 

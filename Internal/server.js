@@ -740,7 +740,12 @@ GO
 // checkboxes silently failed to save until this list took over.
 const ISBE_TRACKING_COLUMNS = [
     'PermissionSlip', 'ParentInterview', 'ProofOfIncome', 'EnterSIS',
-    'BegASQ', 'BegASE', 'MidYearReport', 'EndASQ', 'EndASE', 'EndYearReport',
+    /* Three report cards: Fall, Winter, Spring. FallReport is the new one; the two
+       older names are kept because they hold live ticks and uploaded files —
+       MidYearReport IS the winter card and EndYearReport IS the spring card. The
+       term-to-field mapping and the due dates live in ONE place, REPORT_CARDS in
+       Internal/child-forms.js. Do not rename these columns. */
+    'BegASQ', 'BegASE', 'FallReport', 'MidYearReport', 'EndASQ', 'EndASE', 'EndYearReport',
     // Weighted Eligibility applies to BOTH programs (PFA priority/weighted enrollment
     // and PI), so it has no program restriction on the roster.
     'WeightedEligibility',
@@ -6062,7 +6067,9 @@ DROP TABLE #cf;`;
             // ASQ/ASE evidence uses distinct field/kind pairs so it cannot be inferred
             // from whichever questionnaire happens to be this year's beginning upload.
             const SCREENING = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
-            const REPORTS = ['MidYearReport', 'EndYearReport'];
+            // Fall, Winter, Spring. Field names are historical — see REPORT_CARDS in
+            // child-forms.js for which field is which term.
+            const REPORTS = ['FallReport', 'MidYearReport', 'EndYearReport'];
             if (kind === 'questionnaire' && SCREENING.indexOf(field) === -1) {
                 return sendJSON(res, 400, { error: 'A questionnaire attaches to an ASQ or ASE column.' });
             }
@@ -6150,7 +6157,9 @@ DROP TABLE #cf;`;
                     BegASE: 'Beginning ASQ SE-2 questionnaire', EndASE: 'End ASQ SE-2 questionnaire',
                     FamilyCenteredAssessment: 'Initial ASQ-3 - Family Assessment evidence',
                     FamilyGoalPlan: 'Initial ASQ SE-2 - Family Goal Plan evidence',
-                    MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card',
+                    // Filed-document names follow the TERM, not the historical field name.
+                    FallReport: 'Fall Report Card',
+                    MidYearReport: 'Winter Report Card', EndYearReport: 'Spring Report Card',
                     ParentInterview: 'Parent Interview Form'
                 };
                 const label = isChildDoc ? (CHILD_DOC_KEYS[kind] || kind) : (LABELS[field] || field);

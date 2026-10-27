@@ -124,7 +124,7 @@
         { folder: 'PI7.A Written Individualized Transition Plans, as applicable', piccItem: 'PI7.A', source: 'perChild', field: 'TransitionPlan',
           childSub: 'Administrative', note: 'Transition Plan form, where applicable.' },
         { folder: 'PI10 H Teaching Stategies Report Cards', piccItem: 'PI10.H', source: 'perChild', field: 'MidYearReport',
-          childSub: 'Teacher', note: 'Mid-year + end-year Teaching Strategies report cards (report-card uploads). "Stategies" as on SharePoint.' },
+          childSub: 'Teacher', note: 'Fall, Winter and Spring Teaching Strategies report cards (report-card uploads: FallReport, MidYearReport = Winter, EndYearReport = Spring). "Stategies" as on SharePoint.' },
         { folder: 'PI10 A-F Ages and Stages', piccItem: 'PI10.A-F', source: 'perChild', field: 'BegASQ',
           childSub: 'Teacher', note: 'ASQ-3 + ASQ:SE-2 scored summaries and sheets (BegASQ/BegASE/EndASQ/EndASE).' },
         { folder: 'PI10 G - Signed Permission Slips', piccItem: 'PI10.G', source: 'perChild', field: 'PermissionSlip',

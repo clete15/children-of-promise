@@ -47,7 +47,9 @@
     var BACKED_FIELDS = [
         'ParentInterview', 'PermissionSlip',
         'BegASQ', 'BegASE', 'EndASQ', 'EndASE',
-        'MidYearReport', 'EndYearReport',
+        // The three report cards. See REPORT_CARDS below — the field names are the two
+        // historical ones plus FallReport, and they do not match the term names.
+        'FallReport', 'MidYearReport', 'EndYearReport',
         'WeightedEligibility', 'ScreeningResultsShared',
         'ExitInterview',
         'FamilyCenteredAssessment', 'FamilyGoalPlan', 'TransitionPlan', 'Referral'
@@ -65,8 +67,69 @@
        the Parent Interview Form, which is a separate once-per-child enrollment
        document (PI5.K/L/M) with no bearing on any screening. */
     var SCREENING_FIELDS = ['BegASQ', 'BegASE', 'EndASQ', 'EndASE'];
-    // The two report-card columns are complete on an uploaded scan alone.
-    var REPORT_FIELDS = ['MidYearReport', 'EndYearReport'];
+
+    /* ── The three report cards ───────────────────────────────────────────────
+       Fall, Winter and Spring, each completed by uploading the signed report card.
+
+       ⚠ The FIELD NAMES DO NOT MATCH THE TERMS, on purpose. The program ran two
+       report cards (mid-year and end-year) before moving to three, and those two
+       columns hold real ticks and real uploaded files in ChildFiles/ISBETracking.
+       Renaming them would orphan every one of those, so the two existing fields keep
+       their names and are relabelled to the terms they always actually were:
+
+           Fall    -> FallReport      (new; the ensure block adds the column)
+           Winter  -> MidYearReport   (mid-year WAS the winter card)
+           Spring  -> EndYearReport   (end-year WAS the spring card)
+
+       Read the term off `term`/`label`, never off `field`. Anything user-facing goes
+       through this table so no page invents its own name again.
+
+       Due dates are fixed calendar days within the school year. Fall falls in the
+       FIRST calendar year of a 'YYYY-YYYY' school year; Winter and Spring in the
+       second. Change a date here and every roster, card and tooltip follows. */
+    var REPORT_CARDS = [
+        { field: 'FallReport',    term: 'Fall',   label: 'Fall Report Card',   month: 10, day: 30, half: 'start' },
+        { field: 'MidYearReport', term: 'Winter', label: 'Winter Report Card', month: 2,  day: 5,  half: 'end' },
+        { field: 'EndYearReport', term: 'Spring', label: 'Spring Report Card', month: 5,  day: 31, half: 'end' }
+    ];
+    // A report-card column is complete on an uploaded scan alone.
+    var REPORT_FIELDS = REPORT_CARDS.map(function (c) { return c.field; });
+
+    var MONTH_ABBR = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    function pad2(n) { return (n < 10 ? '0' : '') + n; }
+    function todayISO() {
+        var d = new Date();
+        return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+    }
+
+    /* The due date for one report card in a given school year, or null if the field is
+       not a report card or the year is not 'YYYY-YYYY'. Never guesses a year. */
+    function reportCardDue(field, schoolYear) {
+        var spec = null;
+        for (var i = 0; i < REPORT_CARDS.length; i++) {
+            if (REPORT_CARDS[i].field === field) { spec = REPORT_CARDS[i]; break; }
+        }
+        var m = /^(\d{4})-(\d{4})$/.exec(String(schoolYear || ''));
+        if (!spec || !m) return null;
+        var yr = parseInt(spec.half === 'start' ? m[1] : m[2], 10);
+        var due = yr + '-' + pad2(spec.month) + '-' + pad2(spec.day);
+        var days = Math.round(
+            (new Date(due + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000);
+        return {
+            field: spec.field, term: spec.term, label: spec.label,
+            due: due,
+            dueText: MONTH_ABBR[spec.month - 1] + ' ' + spec.day + ', ' + yr,
+            days: days,
+            // 'due-soon' at three weeks out: long enough to write a report card.
+            state: days < 0 ? 'overdue' : (days <= 21 ? 'due-soon' : 'upcoming')
+        };
+    }
+    // All three, in term order, for the due-date strips above the roster and the cards.
+    function reportCardDues(schoolYear) {
+        return REPORT_CARDS
+            .map(function (c) { return reportCardDue(c.field, schoolYear); })
+            .filter(Boolean);
+    }
 
     /* The kinds a screening's uploaded ASQ/ASE can be filed under, newest naming first.
        'questionnaire' is what the current single upload slot writes. 'testsheet' is the
@@ -451,6 +514,9 @@
         isDone: isDone,
         screeningNeeds: screeningNeeds,
         phraseList: phraseList,
+        REPORT_CARDS: REPORT_CARDS,
+        reportCardDue: reportCardDue,
+        reportCardDues: reportCardDues,
         rollup: rollup,
         indexItems: indexItems,
         get loadState() { return loadState; },

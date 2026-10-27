@@ -251,10 +251,14 @@
         // (and printed) from the ISBE roster's admin columns, not by the teacher here.
         { field: 'BegASQ', teacher: true, label: 'Beg ASQ' },
         { field: 'BegASE', teacher: true, label: 'Beg ASE' },
-        { field: 'MidYearReport', teacher: true, label: 'Mid Year<br>Report Card' },
+        /* Three report cards in chronological order. Field names are historical and do
+           not match the terms — MidYearReport is Winter, EndYearReport is Spring. The
+           terms and due dates come from ChildForms.REPORT_CARDS. */
+        { field: 'FallReport', teacher: true, label: 'Fall<br>Report Card' },
+        { field: 'MidYearReport', teacher: true, label: 'Winter<br>Report Card' },
         { field: 'EndASQ', teacher: true, label: 'End ASQ' },
         { field: 'EndASE', teacher: true, label: 'End ASE' },
-        { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card' }
+        { field: 'EndYearReport', teacher: true, label: 'Spring<br>Report Card' }
         // Screening results shared with the parent (PICC PI10.H) is NOT shown on the
         // classroom card: that evidence is carried by the parent/teacher signatures on
         // the screening cards above. The ScreeningResultsShared field, its modal and its
@@ -1386,7 +1390,12 @@
     // ── Report card uploads (Mid-Year / End-Year) ─────────────────────────────
     var currentRCStudentId = null;
     var currentRCField = null;
-    var RC_LABELS = { MidYearReport: 'Mid-Year Report Card', EndYearReport: 'End-Year Report Card' };
+    // Term names, not the historical field names. See ChildForms.REPORT_CARDS.
+    var RC_LABELS = {
+        FallReport: 'Fall Report Card',
+        MidYearReport: 'Winter Report Card',
+        EndYearReport: 'Spring Report Card'
+    };
 
     function openReportUpload(studentId, field) {
         currentRCStudentId = studentId;

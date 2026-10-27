@@ -89,6 +89,30 @@
            the grid scrolls horizontally. Student/Room are excluded — they are fixed. */
         th.col-teacher, th.col-admin { min-width:96px; }
 
+        /* ── Report-card due dates ──
+           One chip per term above the roster, carrying the due date and how many
+           children still owe that card. Red once the date has passed, amber inside
+           three weeks, quiet otherwise — so "what is late" is answerable without
+           reading the grid. */
+        .rc-due-strip { display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 20px 0; }
+        .rc-due-label { font-size:0.68rem;font-weight:800;text-transform:uppercase;letter-spacing:0.05em;color:var(--sp-muted); }
+        .rc-due { display:inline-flex;align-items:baseline;gap:7px;padding:4px 11px;border-radius:999px;
+                  border:1px solid var(--sp-border);background:var(--sp-surface);font-size:0.72rem; }
+        .rc-due b { font-weight:800; }
+        .rc-due .rc-due-when { font-weight:600;color:var(--sp-muted); }
+        .rc-due .rc-due-count { font-weight:700;font-size:0.68rem;opacity:0.85; }
+        /* Past the date. Same red as a missing required document, because that is what
+           an un-uploaded report card past its due date is. */
+        .rc-due.overdue { color:var(--sp-bad-fg);background:var(--sp-bad-bg);border-color:var(--sp-bad-br); }
+        .rc-due.overdue .rc-due-when { color:inherit; }
+        /* Within three weeks — amber, matching the "finish this" screening pill. */
+        .rc-due.due-soon { color:#92400e;background:#fef3c7;border-color:#f59e0b; }
+        .rc-due.due-soon .rc-due-when { color:inherit; }
+        /* Everything uploaded: green regardless of the date, since there is nothing left
+           to be late for. */
+        .rc-due.settled { color:#166534;background:#dcfce7;border-color:#86efac; }
+        .rc-due.settled .rc-due-when { color:inherit; }
+
         /* Classroom-card / Admin roster toggle tabs. */
         .rg-tab { padding:7px 14px;border:1px solid var(--sp-border);background:var(--sp-surface);cursor:pointer;
                   font-size:0.78rem;font-weight:700;color:var(--sp-muted);border-radius:8px;margin-right:6px; }
@@ -647,6 +671,11 @@
                 <button type="button" class="rg-tab" data-group="admin" onclick="setRosterGroup('admin')">🗂️ Admin</button>
                 <button type="button" class="rg-tab" data-group="all" onclick="setRosterGroup('all')">Both</button>
             </div>
+            <!-- Report-card due dates for the school year in the picker, with how many
+                 children on this roster still owe each one. Populated by
+                 renderReportDueStrip() from ChildForms.REPORT_CARDS, so the dates here
+                 and the column tooltips can never disagree. -->
+            <div id="rcDueStrip" class="rc-due-strip" style="display:none;"></div>
             <!-- Student roster grid -->
             <div class="isbe-grid" id="isbeRosterGrid">
                 <table>
@@ -1749,6 +1778,10 @@ function renderActiveView() {
     const compliance = document.getElementById('compliancePanel');
     const childFiles = document.getElementById('childFilesPanel');
     [grid, compliance, childFiles].forEach(el => { if (el) el.style.display = 'none'; });
+    // The report-card due strip belongs only to the roster view, like the toggle below.
+    // It sits outside #isbeRosterGrid, so hiding the grid does not hide it.
+    var rcd = document.getElementById('rcDueStrip');
+    if (rcd && v !== 'roster') rcd.style.display = 'none';
     // The classroom/admin column toggle belongs only to the roster view.
     var rgt = document.getElementById('rgToggle');
     if (rgt) rgt.style.display = (v === 'roster') ? '' : 'none';
@@ -1814,10 +1847,16 @@ const COLUMNS = [
        monitoring visit, so the header and the behaviour have to agree. */
     { field: 'BegASQ', teacher: true, label: 'Beg ASQ', title: 'Administer and score the ASQ-3 developmental screening at the beginning of the school year. Teacher-administered \u2014 the teacher scores the summary, not the parent. For a PI child this is complete only with all four: the parent-completed questionnaire uploaded, the scores entered, and the summary signed by both parent and staff. For a non-PI child the scored summary alone completes it and the upload is optional.' },
     { field: 'BegASE', teacher: true, label: 'Beg ASE', title: 'Administer and score the ASQ:SE-2 social-emotional screening at the beginning of the school year. Teacher-administered \u2014 the teacher scores the summary, not the parent. For a PI child this is complete only with all four: the parent-completed questionnaire uploaded, the scores entered, and the summary signed by both parent and staff. For a non-PI child the scored summary alone completes it and the upload is optional.' },
-    { field: 'MidYearReport', teacher: true, label: 'Mid Year<br>Report Card', title: 'Print and send home the Teaching Strategies mid-year report card/progress report. Share screening results with parents.' },
+    /* Three report cards, in chronological order among the screenings: Fall before the
+       winter card, Spring after the end-of-year screenings. The field names are
+       historical and do NOT match the terms — MidYearReport is the Winter card and
+       EndYearReport is the Spring one. See REPORT_CARDS in child-forms.js, which is
+       also where the due dates live. */
+    { field: 'FallReport', teacher: true, label: 'Fall<br>Report Card', title: 'Fall Teaching Strategies report card \u2014 due 30 October. Completed by uploading the signed report card, which is filed in the child\u2019s permanent Teacher folder.' },
+    { field: 'MidYearReport', teacher: true, label: 'Winter<br>Report Card', title: 'Winter Teaching Strategies report card \u2014 due 5 February. Completed by uploading the signed report card. Share screening results with parents at the same time.' },
     { field: 'EndASQ', teacher: true, label: 'End ASQ', title: 'Administer the ASQ-3 developmental screening at the end of the school year. Compare results to beginning-of-year scores. Same completion rule as Beg ASQ: all four parts for a PI child, the scored summary alone for a non-PI child.' },
     { field: 'EndASE', teacher: true, label: 'End ASE', title: 'Administer the ASQ:SE-2 social-emotional screening at the end of the school year. Compare results to beginning-of-year scores. Same completion rule as Beg ASE: all four parts for a PI child, the scored summary alone for a non-PI child.' },
-    { field: 'EndYearReport', teacher: true, label: 'End Year<br>Report Card', title: 'Print and send home the Teaching Strategies end-of-year report card/progress report. Include final screening results and transition notes.' },
+    { field: 'EndYearReport', teacher: true, label: 'Spring<br>Report Card', title: 'Spring Teaching Strategies report card \u2014 due 31 May. Completed by uploading the signed report card. Include final screening results and transition notes.' },
     /* (Weighted Eligibility now leads the admin group above — it applies to BOTH programs,
        so it carries no `programs` restriction.)
        Results Shared (PICC PI10.H) is NOT an admin column: it is a teacher requirement
@@ -2414,7 +2453,7 @@ function childFormFileRel(student, field) {
     // 2. Uploaded scan, by the kinds each field can carry.
     if (window.ChildForms && ChildForms.fileFor) {
         const KINDS = {
-            MidYearReport: ['report'], EndYearReport: ['report'],
+            FallReport: ['report'], MidYearReport: ['report'], EndYearReport: ['report'],
             BegASQ: ['testsheet', 'questionnaire'], EndASQ: ['testsheet', 'questionnaire'],
             BegASE: ['testsheet', 'questionnaire'], EndASE: ['testsheet', 'questionnaire'],
             ParentInterview: ['interviewform'],
@@ -2551,6 +2590,53 @@ function screeningReason(student, field, st, isPI) {
     // 'none' — nothing at all yet.
     return 'Not started. Needed: ' + list(n.need)
         + '. Click to open the screening and begin.';
+}
+
+/* The three report-card due dates for the selected school year, with how many children
+   on the roster in front of you still owe each one.
+
+   The counts are the point. A bare date is a calendar; a date plus "6 left" is a piece
+   of work. They follow the roster, so switching PI/PFA or the school year re-counts
+   against whoever is actually displayed. Dates and terms come from
+   ChildForms.REPORT_CARDS, the same source the column headers use. */
+function renderReportDueStrip(roster) {
+    const host = document.getElementById('rcDueStrip');
+    if (!host) return;
+    const dues = (window.ChildForms && ChildForms.reportCardDues)
+        ? ChildForms.reportCardDues(activeSchoolYear) : [];
+    /* No children (or no resolvable school year) means there is nothing to be due.
+       Without this an empty roster would claim "all in", which reads as reassurance
+       about work that simply has nobody to do it for. */
+    if (!dues.length || !roster || !roster.length) {
+        host.innerHTML = ''; host.style.display = 'none'; return;
+    }
+
+    const chips = dues.map(d => {
+        const outstanding = roster.filter(s => !ChildForms.isDone(
+            s.Id, d.field, !!(trackingData[s.Id] || {})[d.field],
+            String(s.PFA_PI_na || '').trim().toUpperCase() === 'PI')).length;
+        /* Nothing outstanding wins over the date: a term everyone has handed in is
+           done, not overdue. Otherwise the date decides the colour. */
+        const state = outstanding === 0 ? 'settled' : d.state;
+        const when = d.state === 'overdue' && outstanding
+            ? 'overdue since ' + d.dueText
+            : 'due ' + d.dueText;
+        const count = outstanding
+            ? outstanding + ' of ' + roster.length + ' left'
+            : '\u2713 all in';
+        const tip = d.label + ' \u2014 ' + when + '. '
+            + (outstanding
+                ? outstanding + ' of ' + roster.length + ' children still need the signed report card uploaded.'
+                : 'Every child on this roster has it uploaded.');
+        return '<span class="rc-due ' + state + '" title="' + escapeHtml(tip) + '">'
+            + '<b>' + escapeHtml(d.term) + '</b>'
+            + '<span class="rc-due-when">' + escapeHtml(when) + '</span>'
+            + '<span class="rc-due-count">' + count + '</span>'
+            + '</span>';
+    }).join('');
+
+    host.innerHTML = '<span class="rc-due-label">Report cards</span>' + chips;
+    host.style.display = 'flex';
 }
 
 /* The openScreening(...) call for a screening field, so the yellow "partial" pill can
@@ -2790,6 +2876,8 @@ function renderRoster() {
     const activeCount = roster.length - transferredCount;
     document.getElementById('isbeCount').textContent = activeCount + ' students'
         + (transferredCount ? ' \u00b7 ' + transferredCount + ' transferred' : '');
+    // Report-card due dates + outstanding counts for exactly the children listed below.
+    renderReportDueStrip(roster);
     const tbody = document.getElementById('isbeBody');
     if (!roster.length) { tbody.innerHTML = '<tr><td colspan="' + span + '" style="text-align:center;padding:40px;color:var(--text-muted);">No students in this program.</td></tr>'; return; }
 
@@ -3598,15 +3686,23 @@ async function uploadScreeningQuestionnaire() {
 // ── Shared evidence uploads (report cards and dedicated initial ASQ/ASE files) ──
 var currentRCStudentId = null, currentRCField = null;
 var RC_UPLOADS = {
+    /* The three report cards. Built from ChildForms.REPORT_CARDS further down so the
+       term labels and due dates cannot drift from the roster columns; these literal
+       entries are only the per-field upload wording. */
+    FallReport: {
+        label: 'Fall Report Card', sourceField: 'FallReport', kind: 'report',
+        button: 'Upload report card', empty: 'No Fall report card on file yet.',
+        note: 'Upload the child\u2019s SIGNED Fall report card (PDF or a clear photo). Due 30 October. It is filed in the child\u2019s permanent Teacher folder and marks this column complete.'
+    },
     MidYearReport: {
-        label: 'Mid-Year Report Card', sourceField: 'MidYearReport', kind: 'report',
-        button: 'Upload report card', empty: 'No report card on file yet.',
-        note: 'Upload the child\u2019s report card (PDF or a clear photo). It is filed in the child\u2019s permanent Teacher folder and marks this column complete.'
+        label: 'Winter Report Card', sourceField: 'MidYearReport', kind: 'report',
+        button: 'Upload report card', empty: 'No Winter report card on file yet.',
+        note: 'Upload the child\u2019s SIGNED Winter report card (PDF or a clear photo). Due 5 February. It is filed in the child\u2019s permanent Teacher folder and marks this column complete.'
     },
     EndYearReport: {
-        label: 'End-Year Report Card', sourceField: 'EndYearReport', kind: 'report',
-        button: 'Upload report card', empty: 'No report card on file yet.',
-        note: 'Upload the child\u2019s report card (PDF or a clear photo). It is filed in the child\u2019s permanent Teacher folder and marks this column complete.'
+        label: 'Spring Report Card', sourceField: 'EndYearReport', kind: 'report',
+        button: 'Upload report card', empty: 'No Spring report card on file yet.',
+        note: 'Upload the child\u2019s SIGNED Spring report card (PDF or a clear photo). Due 31 May. It is filed in the child\u2019s permanent Teacher folder and marks this column complete.'
     },
     FamilyCenteredAssessment: {
         label: 'Family Assessment (Initial ASQ)', sourceField: 'FamilyCenteredAssessment', kind: 'initialasq',
@@ -4438,9 +4534,11 @@ const PFA_CHECKLIST_ITEMS = [
                'At least two benchmarks per reporting period from language arts, maths, social-emotional, science, social studies, physical, fine arts and ELL domains',
                'Narrative summary reports shared with the parent or guardian'],
         /* From the last sub-item: the report cards are the narrative summaries that
-           go to parents. The roster tracks two of the three reporting periods, so
-           this counts the sending of them, not the quality of the portfolios. */
-        childFields: ['MidYearReport', 'EndYearReport'],
+           go to parents. The item requires THREE reporting periods and the roster now
+           tracks all three — Fall, Winter and Spring — so this counts the sending of
+           them, not the quality of the portfolios. (It tracked only two until Oct 2026,
+           which left this item structurally short of its own requirement.) */
+        childFields: ['FallReport', 'MidYearReport', 'EndYearReport'],
         evidence: 'Portfolios for all enrolled children, narrative summary reports, documentation reflecting the IELDS.',
         excelerate: '1E. Child Assessment'
     },

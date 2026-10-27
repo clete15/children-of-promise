@@ -526,7 +526,9 @@ function chipFor(s, col) {
     else if (col.field === 'ParentInterview') act = 'interview|' + s.Id;
     else if (col.field === 'BegASQ' || col.field === 'EndASQ') act = 'screening|' + s.Id + '|ASQ-3|' + (col.field === 'BegASQ' ? 'Beginning' : 'End');
     else if (col.field === 'BegASE' || col.field === 'EndASE') act = 'screening|' + s.Id + '|ASQ:SE-2|' + (col.field === 'BegASE' ? 'Beginning' : 'End');
-    else if (col.field === 'MidYearReport' || col.field === 'EndYearReport') act = 'upload|' + s.Id + '|' + col.field;
+    // All three report cards (Fall / Winter / Spring) are uploads; ask ChildForms
+    // rather than naming the historical fields here.
+    else if (ChildForms.isReport && ChildForms.isReport(col.field)) act = 'upload|' + s.Id + '|' + col.field;
     else if (col.field === 'ScreeningResultsShared') act = 'resultsShared|' + s.Id;
     var cls = 'tf-chip' + (done ? ' done' : '');
     return act
