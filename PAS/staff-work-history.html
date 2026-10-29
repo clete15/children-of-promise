@@ -43,6 +43,16 @@
            helper), and only the ink on paper. The pad host (.pf-sign) and its hidden
            carrier are styled by pas-form.js; this only aligns the row to the date. */
         .sig-row { align-items: flex-end; }
+        /* On screen the signing pad has its own visible box, so it needs no extra
+           line. The ruled underline is added for PRINT only (see @media print below),
+           where the pad chrome is gone and an unsigned form would otherwise have
+           nothing to sign on and a signed one would float in space.
+
+           The print rule is scoped to `.sig-row .pf-sign` ON PURPOSE: pas-form.js
+           injects its own `.pf-sign { flex; min-width; max-width }` into a <style> at
+           runtime, same specificity as a bare `.pf-sign`, so the descendant selector
+           is what guarantees the line and the full width win regardless of load
+           order. */
         .footer {
             margin-top: 16px; padding-top: 6px; border-top: 1px solid #bbb;
             display: flex; justify-content: space-between; font-size: 8pt; color: #666;
@@ -70,9 +80,18 @@
             .fill { min-height: 1.1em; }
             .sig-label { font-size: 9pt; margin-top: 6px; }
             .sig-row { margin-top: 2px; }
-            /* Keep the signature area short in print so a pad doesn't eat vertical
-               space, but scale the drawn ink to fit rather than cropping it. */
-            .pf-sign { max-height: 0.5in; overflow: hidden; }
+            /* The signature line on paper: a ruled underline to the left of "Date:",
+               matching the date and text blanks, so the drawn ink sits ON a line and
+               an unsigned printout has one to sign. Grows to fill the width left of
+               the fixed-width Date field; the shared runtime rule's 460px cap is
+               overridden so the line runs the whole way. Kept short in height so a pad
+               does not eat vertical space, with the ink scaled to fit rather than
+               cropped. */
+            .sig-row .pf-sign {
+                flex: 1 1 auto; min-width: 150px; max-width: none;
+                border-bottom: 1px solid #333;
+                max-height: 0.5in; overflow: hidden;
+            }
             .pf-sign img, .pf-sign canvas { max-height: 0.5in; width: auto; }
             .legal { font-size: 6.6pt; line-height: 1.22; margin-top: 3px; text-align: justify; }
             .footer { margin-top: 8px; padding-top: 4px; font-size: 7pt; }
