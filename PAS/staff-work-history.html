@@ -264,15 +264,85 @@
 
 const GROUPS = ['it', 'ps', 'sa', 'dir'];
 
+/* A date in the MO/YR form this form asks for, or null.
+
+   "Present" has to parse, because the prefill writes it into the End field for
+   anyone still employed — and an end date that cannot be read is why a row with a
+   start date still showed no years. Blank means the same thing: still here.
+
+   Anything unparseable returns null and derives nothing, rather than quietly
+   assuming today and inventing a length of service. */
+function parseMonthYear(s, blankIsToday) {
+    const t = String(s == null ? '' : s).replace(/\u00a0/g, ' ').trim();
+    if (!t) return blankIsToday ? new Date() : null;
+    if (/^(present|current|ongoing)$/i.test(t)) return new Date();
+    let m = /^(\d{1,2})\s*\/\s*(\d{4})$/.exec(t);                     // 1/1989
+    if (m) return new Date(+m[2], +m[1] - 1, 1);
+    m = /^(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})$/.exec(t);        // 1/15/1989
+    if (m) return new Date(+m[3], +m[1] - 1, +m[2]);
+    m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);                      // 1989-01-15
+    if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+    m = /^(\d{4})$/.exec(t);                                          // 1989
+    if (m) return new Date(+m[1], 0, 1);
+    return NaN;   // present but unreadable — distinct from "not given"
+}
+
+/* Years of service between two MO/YR fields, to one decimal.
+
+   Counted in MONTHS, not days. The form asks for MO/YR, so the month is the finest
+   thing it actually knows, and counting elapsed days instead would invent precision
+   it does not have — 10/2013 to 7/2022 is exactly 8.75 years (105 months), where a
+   day count gives 8.748 and rounds to the wrong tenth.
+
+   Two decimals, not one: this figure gets MULTIPLIED by hours and weeks, so rounding
+   it coarsely puts real error into the total hours a credential is assessed on. 105
+   months is exactly 8.75 years — at 30 hrs x 52 wks that is 13,650 hours, where 8.8
+   would claim 13,728. Whole months land exactly on quarters, so two decimals are
+   usually exact rather than approximate, and JavaScript drops the trailing zeros so
+   a round figure still prints as "9" rather than "9.00".
+
+   NaN when either end cannot be read, so a typo never turns into a number on a form
+   somebody signs. */
+function yearsBetween(startStr, endStr) {
+    const a = parseMonthYear(startStr, false);
+    const b = parseMonthYear(endStr, true);
+    const bad = v => !(v instanceof Date) || isNaN(v.getTime());
+    if (bad(a) || bad(b)) return NaN;
+    const months = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+    if (!(months > 0)) return NaN;
+    return Math.round((months / 12) * 100) / 100;
+}
+
 // Recompute a row's total from its three inputs, unless somebody has typed over it.
 function recalc(prefix) {
+    const cell = k => document.querySelector('[data-k="' + prefix + k + '"]');
     const num = k => {
-        const el = document.querySelector('[data-k="' + prefix + k + '"]');
+        const el = cell(k);
         if (!el) return NaN;
         return parseFloat(String(el.innerText).replace(/[^0-9.]/g, ''));
     };
+
+    /* Derive "# of years" from the start and end dates while it is still blank.
+
+       The form presents this as something to work out by hand, but both dates are
+       already on the page, so the subtraction is a fact rather than an assumption —
+       unlike weeks per year, which is deliberately left alone below. It also
+       unblocks the total: hrs x wks x yrs needs all three, so a blank years field
+       silently blanked Total Hours as well, which is how a row reading
+       "30 x 52 x [blank] = [blank]" came about.
+
+       Only ever fills an empty cell. Anyone with broken service or a period of
+       unpaid leave can type over it and the typed figure stands, exactly as it does
+       for the total. */
+    const yrsEl = cell('Yrs');
+    if (yrsEl && !String(yrsEl.innerText).replace(/\u00a0/g, ' ').trim()) {
+        const s = cell('Start'), e = cell('End');
+        const y = yearsBetween(s ? s.innerText : '', e ? e.innerText : '');
+        if (isFinite(y) && y > 0) yrsEl.textContent = String(y);
+    }
+
     const hrs = num('Hrs'), wks = num('Wks'), yrs = num('Yrs');
-    const totalEl = document.querySelector('[data-k="' + prefix + 'Total"]');
+    const totalEl = cell('Total');
     if (!totalEl) return;
     if (totalEl.dataset.manual === '1') return;
     if (!isFinite(hrs) || !isFinite(wks) || !isFinite(yrs)) return;
@@ -282,7 +352,10 @@ function recalc(prefix) {
 
 function wireCalc() {
     GROUPS.forEach(g => {
-        ['Hrs', 'Wks', 'Yrs'].forEach(k => {
+        /* Start and End are in here because the years figure is derived from them.
+           Correcting a start date should move the years and the total with it; before
+           this, editing a date changed nothing and the row looked stale. */
+        ['Hrs', 'Wks', 'Yrs', 'Start', 'End'].forEach(k => {
             const el = document.querySelector('[data-k="' + g + k + '"]');
             if (el) el.addEventListener('input', () => recalc(g));
         });
