@@ -380,6 +380,17 @@ function getRoomName(roomNumber) {
     var c = (classrooms || []).find(function (r) { return String(r.RoomNumber) === String(roomNumber); });
     return c ? (c.Room || ('Room ' + roomNumber)) : (roomNumber || '\u2014');
 }
+/* Vision & hearing screening (77 Ill. Adm. Code 685/675) are school-age rules. The
+   program applies them only to the "2 & 3 Year Olds" and "Pre-School" classrooms; every
+   other room (Infant, Infants/Toddlers, Toddlers, Toddlers/2 Year Olds, 2 Year Olds,
+   Before and Afterschool) shows n/a. Matched on the room NAME, normalised (lowercased,
+   non-alphanumerics stripped) so punctuation/spacing variants still match: "2 & 3 Year
+   Olds" -> "23yearolds"; any "Pre-School" -> contains "preschool". Plain "2 Year Olds"
+   -> "2yearolds" is deliberately excluded. */
+function roomScreensVisionHearing(roomNumber) {
+    var norm = String(getRoomName(roomNumber) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return norm.indexOf('preschool') !== -1 || norm === '23yearolds';
+}
 function activeRoster() {
     return students.filter(function (s) { return s.Active === 'Yes' || s.Active === 'YES'; });
 }
@@ -423,9 +434,10 @@ function roomNeedsDocs(s) {
     // True if this child is missing any Administrative document. Mirrors the checkbox /
     // file logic in renderAdmin so the sidebar count matches the grid exactly.
     return CHILD_DOCS.some(function (doc) {
-        // Vision/hearing don't apply to a PI child, so a missing one is not "needs docs"
-        // (keeps the sidebar count in step with the n/a cells in the grid).
-        if ((doc.key === 'vision' || doc.key === 'hearing') && s.PFA_PI_na === 'PI') return false;
+        // Vision/hearing apply only to the 2 & 3 Year Olds and Pre-School rooms, so a
+        // missing one elsewhere is not "needs docs" (keeps the sidebar count in step
+        // with the n/a cells in the grid).
+        if ((doc.key === 'vision' || doc.key === 'hearing') && !roomScreensVisionHearing(s.RoomNumber)) return false;
         var file = childDocFile(s.Id, doc.key);
         if (file) return false;                       // a scan is on file
         if (doc.key === 'behaviorplan' || doc.key === 'transitionplan') return true; // upload-only, no file = missing
@@ -751,12 +763,11 @@ function renderAdmin() {
     var rows = roster.map(function (s) {
         var cells = CHILD_DOCS.map(function (doc) {
             /* Vision and hearing screening are school-age rules (77 Ill. Adm. Code
-               685/675). A PI child (birth-to-3) is not subject to them, so those two
-               columns do not apply — show an explicit n/a rather than an empty box a
-               teacher might feel obliged to tick. PFA (preschool) children in the same
-               room still get the real checkbox, so the column stays for them. */
-            if ((doc.key === 'vision' || doc.key === 'hearing') && s.PFA_PI_na === 'PI') {
-                return '<td class="cfg-cell cfg-na" title="Not required for PI (birth-to-3) children">n/a</td>';
+               685/675). The program applies them only in the "2 & 3 Year Olds" and
+               "Pre-School" classrooms; every other room shows an explicit n/a rather
+               than an empty box a teacher might feel obliged to tick. */
+            if ((doc.key === 'vision' || doc.key === 'hearing') && !roomScreensVisionHearing(s.RoomNumber)) {
+                return '<td class="cfg-cell cfg-na" title="Vision/hearing screening applies only to the 2 &amp; 3 Year Olds and Pre-School classrooms">n/a</td>';
             }
             var file = childDocFile(s.Id, doc.key);
             /* Behavior Plan and Transition Plan are UPLOAD-ONLY pills: no "on paper"
