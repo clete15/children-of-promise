@@ -5640,12 +5640,28 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             // form later than the rest, so older records return blank here.
             + `ISNULL(p.ScreeningDelayNoEi,'') AS ScreeningDelayNoEi,ISNULL(p.ParentEll,'') AS ParentEll,ISNULL(p.IncomeBelow50Fpl,'') AS IncomeBelow50Fpl,`
             + `${flat('p.Notes')} AS Notes`;
-        const sql = `SELECT TOP 1 ${cols},'linked' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${studentId}
+        /* Match the intake three ways, best first, taking the FIRST that hits — the
+           SAME proven rule childRecordsForSeed uses. The earlier version here used
+           CONVERT (throws on a bad date) and a case-sensitive name compare with no
+           name-only tier, which made most backfilled children match nothing and the
+           admin roster form prefill blank. Case/whitespace-folded name + TRY_CONVERT
+           date, plus a name-only newest-submission fallback for a DOB typo/format
+           mismatch, fixes that without loosening the authoritative PreEnrollmentId
+           link. TOP 1 over the priority-ordered union keeps the best available match. */
+        const nameMatch = `LOWER(LTRIM(RTRIM(p.ChildName)))=LOWER(LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)))`;
+        // The inner SELECTs alias every column; the outer SELECT must reference those
+        // aliases (NOT the p.-prefixed expressions, which don't exist at that level).
+        const keys = ['Id','SubmittedAt','ParentFirst','ParentLast','Phone','Email','Address','City','Zip','ChildName','ChildBirthDate','AgeGroup','DaysRequested','Score','WaitlistStatus','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','CaregiverOther','FamilyDeath','LowBirthWeight','ParentIncarcerated','TeenParent','NoHSDiploma','BornOutsideUS','NonEnglishHome','ActiveMilitary','PriorEarlyLearning','BrightpointSubsidy','LivingSituation','HouseholdIncome','HouseholdSize','PublicBenefits','HomeLanguage','ScreeningDelayNoEi','ParentEll','IncomeBelow50Fpl','Notes','MatchType'];
+        const outerCols = keys.join(',');
+        const sql = `SELECT TOP 1 ${outerCols} FROM (
+            SELECT TOP 1 1 AS pri, ${cols},'linked' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${studentId} ORDER BY p.Id DESC
             UNION ALL
-            SELECT TOP 1 ${cols},'name+dob' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND CONVERT(date,p.ChildBirthDate)=CONVERT(date,e.Birth_date) WHERE e.Id=${studentId} AND e.PreEnrollmentId IS NULL`;
+            SELECT TOP 1 2 AS pri, ${cols},'name+dob' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON ${nameMatch} AND TRY_CONVERT(date,p.ChildBirthDate)=TRY_CONVERT(date,e.Birth_date) WHERE e.Id=${studentId} ORDER BY p.Id DESC
+            UNION ALL
+            SELECT TOP 1 3 AS pri, ${cols},'name' AS MatchType FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON ${nameMatch} WHERE e.Id=${studentId} ORDER BY p.Id DESC
+        ) matches ORDER BY pri`;
         const r = runSQL(sql);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const keys = ['Id','SubmittedAt','ParentFirst','ParentLast','Phone','Email','Address','City','Zip','ChildName','ChildBirthDate','AgeGroup','DaysRequested','Score','WaitlistStatus','Homeless','FosterAdopted','IEP','EarlyIntervention','AbuseHistory','MentalIllness','DcfsInvolvement','SubstanceAbuse','CaregiverOther','FamilyDeath','LowBirthWeight','ParentIncarcerated','TeenParent','NoHSDiploma','BornOutsideUS','NonEnglishHome','ActiveMilitary','PriorEarlyLearning','BrightpointSubsidy','LivingSituation','HouseholdIncome','HouseholdSize','PublicBenefits','HomeLanguage','ScreeningDelayNoEi','ParentEll','IncomeBelow50Fpl','Notes','MatchType'];
         const line = r.data.trim().split('\n').find(l => /^\s*\d+\s*\|/.test(l));
         if (!line) return sendJSON(res, 200, { found: false });
         const v = line.split('|').map(x => x.trim());
