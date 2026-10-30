@@ -119,8 +119,9 @@ needs no migration. Files a PDF on save and auto-ticks `ParentInterview`.
 - Pre-enrollment answers are carried forward by ONE declarative crosswalk,
   `PI_INTERVIEW_PREFILL` + `applyInterviewPrefill()` in `pi-interview-schema.js`. Add
   mappings there, never in a page — the two pages had their own copies and drifted.
-- Answers with no equivalent question on the state form live in a
-  "From the Pre-Enrollment Application" section, recorded verbatim (Yes *and* No).
+- The old "From the Pre-Enrollment Application" section was **removed** from the Parent
+  Interview — it duplicated priority-population data that already lives on the waiting
+  list and the Weighted Eligibility form, which is the only place it is needed.
 - It is **entirely separate** from the ASQ/ASE parent questionnaire. Different document,
   different table, no shared state. The names collide; the things do not.
 

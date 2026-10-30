@@ -6740,11 +6740,10 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                 + `${flat('p.Notes')} AS Notes,ISNULL(p.ChildName,'') AS ChildName,ISNULL(p.ChildBirthDate,'') AS ChildBirthDate`
                 /* Appended, never inserted: the row is parsed positionally, so a new
                    column in the middle would shift every later value by one. These are
-                   the application answers the state Parent Interview form has no
-                   question for — they fill its "From the Pre-Enrollment Application"
-                   section, so a parent is not asked again for what they already told
-                   us. SubmittedAt is a DATETIME, so it is converted to a plain date
-                   rather than ISNULL'd to '' (which would land as 1900-01-01). */
+                   the pre-enrollment application answers the Weighted Eligibility form
+                   and the waiting-list score are built from. SubmittedAt is a DATETIME,
+                   so it is converted to a plain date rather than ISNULL'd to '' (which
+                   would land as 1900-01-01). */
                 + `,ISNULL(CONVERT(NVARCHAR(10),p.SubmittedAt,120),'') AS SubmittedAt,`
                 + `ISNULL(p.AgeGroup,'') AS AgeGroup,ISNULL(p.DaysRequested,'') AS DaysRequested,`
                 + `ISNULL(p.CaregiverOther,'') AS CaregiverOther,ISNULL(p.LowBirthWeight,'') AS LowBirthWeight,`

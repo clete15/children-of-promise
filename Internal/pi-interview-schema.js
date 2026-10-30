@@ -183,38 +183,10 @@ const PI_INTERVIEW_SCHEMA = [
         { id: 'insurance', label: 'Insurance', type: 'checks', full: true,
           opts: ['Private (parent\u2019s work)', 'All Kids', 'Medicaid', 'No insurance', 'Other', 'Covered for another pregnancy'] },
     ] },
-    /* ── Answers carried forward from the pre-enrollment application ──────────
-       The family answered all of these when they applied. The state Parent
-       Interview form has no equivalent question for any of them, so without this
-       section the answers live only on the waiting list and the weighted
-       eligibility form — and the interviewer either asks the family again or the
-       answer never reaches the child's file at all.
-
-       These are recorded verbatim, Yes AND No, because what the family reported
-       IS the record here; the job at interview is to confirm or correct it, not
-       to re-ask it. That is the opposite of the sensitive questions in the
-       sections above, where only a reported Yes is carried over so the question
-       stays open for the conversation.
-
-       Three are PICC PI5 priority populations (C, F and G) and are labelled as
-       such, because a file review looks for them by name. */
-    { title: 'From the Pre-Enrollment Application', fields: [
-        { id: 'peApplicationDate', label: 'Application submitted', type: 'text' },
-        { id: 'peProgramApplied', label: 'Program applied for', type: 'text' },
-        { id: 'peDaysRequested', label: 'Days of care requested', type: 'text' },
-        { id: 'peEarlyIntervention', label: 'Child, or a sibling, receiving early intervention or special education services', type: 'yesno', full: true },
-        { id: 'peScreeningDelayNoEi', label: 'A developmental screening suggested a delay with no current Early Intervention referral (PI5.C)', type: 'yesno', full: true },
-        { id: 'peLowBirthWeight', label: 'Low birth weight, or diagnosed failure to thrive', type: 'yesno', full: true },
-        { id: 'peCaregiverOther', label: 'Child is being raised by a caregiver other than a parent (grandparent, relative, guardian)', type: 'yesno', full: true },
-        { id: 'peNoHSDiploma', label: 'Primary caregiver has not completed high school or a GED', type: 'yesno', full: true },
-        { id: 'peNonEnglishHome', label: 'A language other than English is primarily spoken at home', type: 'yesno', full: true },
-        { id: 'peBornOutsideUS', label: 'Child or a parent was born outside the United States', type: 'yesno', full: true },
-        { id: 'peParentEll', label: 'Parent or primary caregiver is still learning English (PI5.F)', type: 'yesno', full: true },
-        { id: 'pePriorEarlyLearning', label: 'Child has previously attended a formal early learning program', type: 'yesno', full: true },
-        { id: 'peBrightpointSubsidy', label: 'Family receives Brightpoint childcare subsidies', type: 'yesno', full: true },
-        { id: 'peIncomeBelow50Fpl', label: 'Household income at or below 50% of the federal poverty level (PI5.G)', type: 'radio', full: true,
-          opts: [['Yes', 'Yes'], ['No', 'No'], ['Unsure', 'Not sure \u2014 settle from income verification']] },
-    ] },
+    /* The old "From the Pre-Enrollment Application" section was removed: it duplicated
+       data that already lives on the waiting list and the Weighted Eligibility form,
+       which is the only place those priority-population answers are needed. The Parent
+       Interview no longer re-displays them. */
     { title: 'Interview Summary', fields: [
         { id: 'parentGoals', label: 'Parent goals for their child', type: 'textarea', full: true, ph: 'What goals do the parents have for their child this year?' },
         { id: 'parentConcerns', label: 'Parent concerns', type: 'textarea', full: true, ph: 'Any concerns the parents would like to discuss?' },
@@ -457,22 +429,8 @@ const PI_INTERVIEW_PREFILL = [
     ['parent1Translator', c => piIsYes(c.pe.NonEnglishHome) ? 'Yes' : ''],
     ['additionalNotes', c => c.pe.Notes],
 
-    // ── The appendix: answers with no equivalent question on the state form,
-    //    recorded exactly as the family gave them.
-    ['peApplicationDate', c => String(c.pe.SubmittedAt || '').split(' ')[0]],
-    ['peProgramApplied', c => PI_PROGRAM_LABELS[c.pe.AgeGroup] || c.pe.AgeGroup],
-    ['peDaysRequested', c => c.pe.DaysRequested],
-    ['peEarlyIntervention', c => piYesNo(c.pe.EarlyIntervention)],
-    ['peScreeningDelayNoEi', c => piYesNo(c.pe.ScreeningDelayNoEi)],
-    ['peLowBirthWeight', c => piYesNo(c.pe.LowBirthWeight)],
-    ['peCaregiverOther', c => piYesNo(c.pe.CaregiverOther)],
-    ['peNoHSDiploma', c => piYesNo(c.pe.NoHSDiploma)],
-    ['peNonEnglishHome', c => piYesNo(c.pe.NonEnglishHome)],
-    ['peBornOutsideUS', c => piYesNo(c.pe.BornOutsideUS)],
-    ['peParentEll', c => piYesNo(c.pe.ParentEll)],
-    ['pePriorEarlyLearning', c => piYesNo(c.pe.PriorEarlyLearning)],
-    ['peBrightpointSubsidy', c => piYesNo(c.pe.BrightpointSubsidy)],
-    ['peIncomeBelow50Fpl', c => piYesNoUnsure(c.pe.IncomeBelow50Fpl)],
+    // The "From the Pre-Enrollment Application" appendix was removed from the form, so
+    // its prefill rules are gone too — that data stays on the Weighted Eligibility form.
 ];
 
 /* Intake keys deliberately NOT mapped, so the next reader does not have to
