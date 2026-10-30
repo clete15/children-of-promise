@@ -506,36 +506,46 @@
         var student = students().find(function (s) { return String(s.Id) === String(studentId); });
         if (!student) return;
 
+        /* Any uploaded signed scan is final: open it directly rather than showing a
+           second, blank electronic form. Matches isbe.html exactly. */
+        var cfEarly = ChildForms();
+        var existingScan = cfEarly && cfEarly.fileFor
+            ? cfEarly.fileFor(studentId, 'ParentInterview', 'interviewform') : null;
+        if (existingScan && existingScan.relPath) {
+            openDoc(existingScan.relPath, existingScan.name || 'Parent Interview', true);
+            return;
+        }
+
+        /* The whole state Parent Interview Form is rendered from PI_INTERVIEW_SCHEMA in
+           pi-interview-schema.js, the SAME module isbe.html and the parent portal use,
+           so all three render the identical form. Bail loudly if the host page forgot to
+           load it rather than opening a broken half-form. */
+        if (typeof renderInterviewForm !== 'function') {
+            alert('The Parent Interview form could not load (pi-interview-schema.js is missing on this page).');
+            return;
+        }
+
         document.getElementById('piModalTitle').textContent = 'Parent Interview \u2013 ' + student.First_Name + ' ' + student.Last_Name;
         document.getElementById('piChildName').textContent = student.First_Name + ' ' + student.Last_Name;
         document.getElementById('piDOB').textContent = student.Birth_date || '\u2014';
         document.getElementById('piRoom').textContent = getRoom(student.RoomNumber) || '\u2014';
-        document.getElementById('piIncome').textContent = student.HouseholdIncome ? '$' + Number(student.HouseholdIncome).toLocaleString() : '\u2014';
-        document.getElementById('piHHSize').textContent = student.HouseholdSize || '\u2014';
-        document.getElementById('piBenefits').textContent = student.PublicBenefits || 'None';
-        document.getElementById('piFRP').textContent = student.F_R_P_Food || '\u2014';
-        document.getElementById('piIEP').textContent = yesNo(student.IEP);
-        document.getElementById('piFoster').textContent = student.Category === 'Foster' ? 'Yes' : 'No';
-        document.getElementById('piMilitary').textContent = yesNo(student.Military);
-        document.getElementById('piCategory').textContent = student.Category || '\u2014';
 
         var oldCarry = document.getElementById('piCarryNote');
         if (oldCarry) oldCarry.remove();
+
+        // Render the full schema form fresh (clears any prior child's values).
+        renderInterviewForm();
         document.getElementById('piDate').value = new Date().toISOString().split('T')[0];
-        document.getElementById('piGoals').value = '';
-        document.getElementById('piConcerns').value = '';
-        document.getElementById('piStrengths').value = '';
-        document.getElementById('piNotes').value = '';
         document.getElementById('piParentSig').value = '';
         document.getElementById('piStaffSig').value = '';
-        /* Preferred language defaults from the child's enrollment HomeLanguage so the
-           ISBE-required language field is pre-filled rather than retyped. A saved
-           interview value (loaded below) still wins. Blank HomeLanguage or plain
-           "English" leaves it for the interviewer to confirm. */
-        document.getElementById('piPreferredLanguage').value = student.HomeLanguage || '';
+        document.getElementById('piPreferredLanguage').value = '';
         document.getElementById('piTranslatorNeeded').value = '';
         document.getElementById('piTranslatorArrangements').value = '';
         document.getElementById('piSavedBadge').style.display = 'none';
+
+        // Seed the always-known header bits before any pre-enrollment lookup returns.
+        piSetFieldValue('childFullName', student.First_Name + ' ' + student.Last_Name);
+        piSetFieldValue('childDob', student.Birth_date || '');
 
         sigPads = {};
         mountSigPad('piParentSigPad', studentId, 'ParentInterview', 'parent',
@@ -543,50 +553,66 @@
         mountSigPad('piStaffSigPad', studentId, 'ParentInterview', 'staff',
             { label: 'Staff signature', printedName: 'piStaffSig', dateField: 'piDate' });
 
+        // Prefill from pre-enrollment + enrollment (best-effort), then load any saved
+        // interview on top so a saved answer always wins over a prefill.
+        await prefillInterviewForm(studentId, student);
         try {
             var res = await apiFetch(yearQS('/api/parent-interview/' + studentId));
             var data = await res.json();
             if (data && data.Id) {
                 document.getElementById('piDate').value = data.InterviewDate || '';
-                document.getElementById('piGoals').value = data.ParentGoals || '';
-                document.getElementById('piConcerns').value = data.ParentConcerns || '';
-                document.getElementById('piStrengths').value = data.ChildStrengths || '';
-                document.getElementById('piNotes').value = data.Notes || '';
                 document.getElementById('piParentSig').value = data.ParentSignature || '';
                 document.getElementById('piStaffSig').value = data.StaffSignature || '';
-                // A saved language wins, but keep the HomeLanguage pre-fill when the
-                // saved record has none (older interviews predate the language field).
                 if (data.PreferredLanguage) document.getElementById('piPreferredLanguage').value = data.PreferredLanguage;
                 document.getElementById('piTranslatorNeeded').value = data.TranslatorNeeded || '';
                 document.getElementById('piTranslatorArrangements').value = data.TranslatorArrangements || '';
+                // The full form lives in FormData JSON; fall back to the mapped columns
+                // for interviews saved before the schema overhaul.
+                var fd = null;
+                if (data.FormData) { try { fd = JSON.parse(data.FormData); } catch (e) { fd = null; } }
+                if (fd) {
+                    loadInterviewForm(fd);
+                } else {
+                    piSetFieldValue('parentGoals', data.ParentGoals || '');
+                    piSetFieldValue('parentConcerns', data.ParentConcerns || '');
+                    piSetFieldValue('childStrengths', data.ChildStrengths || '');
+                    piSetFieldValue('additionalNotes', data.Notes || '');
+                }
             } else {
                 /* No interview for this year yet. For a returning child, carry the most
                    recent PRIOR year's answers forward as a starting point so this is an
-                   update, not a blank restart. Signatures and the interview date are NOT
-                   carried (each year is signed fresh); the narrative and language are. */
+                   update, not a blank restart. */
                 await carryForwardInterview(studentId);
             }
         } catch (e) { console.error('Failed to load interview', e); }
 
-        loadIntakeRecord(studentId);
-
-        /* If a signed Parent Interview Form is already on file for this child, there is
-           nothing to sign — hide the signature pads and show a short note instead. "On
-           file" means either a scanned paper form was imported (a ChildFiles
-           'interviewform' record) or the form was signed in-app before (a filed
-           signature with a document behind it). Print still shows the filed copy. */
-        var cf = ChildForms();
-        var hasScan = cf && cf.fileFor && cf.fileFor(studentId, 'ParentInterview', 'interviewform');
-        var sig = signatureFor(studentId, 'ParentInterview', 'parent');
-        var hasSignedPdf = !!(sig && (sig.RelPath || sig.SigImagePath));
-        var alreadyOnFile = !!hasScan || hasSignedPdf;
-        var sigSection = document.getElementById('piSigSection');
-        var signedNote = document.getElementById('piSignedNote');
-        if (sigSection) sigSection.style.display = alreadyOnFile ? 'none' : '';
-        if (signedNote) signedNote.style.display = alreadyOnFile ? '' : 'none';
+        // Existing scanned paper form on file? (Shown in the scan-upload row.)
+        var scanFileInput = document.getElementById('piScanFile');
+        if (scanFileInput) scanFileInput.value = '';
+        var cfScan = ChildForms();
+        var scanOnFile = cfScan && cfScan.fileFor ? cfScan.fileFor(studentId, 'ParentInterview', 'interviewform') : null;
+        setUploadStatus('piScanStatus', scanOnFile
+            ? { on: true, name: scanOnFile.name, relPath: scanOnFile.relPath }
+            : null, 'No signed form on file yet.');
 
         document.getElementById('piOverlay').classList.add('open');
         refreshSigPads();
+    }
+
+    /* Prefill the schema form from the enrollment row (already in `student`) and the
+       pre-enrollment intake record. The crosswalk lives in pi-interview-schema.js so
+       the parent portal prefills identically. Only mapped fields with a source value
+       are filled, and each is tinted so staff see what came from the record. */
+    async function prefillInterviewForm(studentId, student) {
+        var intake = null;
+        try {
+            var res = await apiFetch('/api/student-intake/' + studentId);
+            intake = await res.json();
+        } catch (e) { intake = null; }
+        var filled = (typeof applyInterviewPrefill === 'function')
+            ? applyInterviewPrefill(student, intake) : 0;
+        var note = document.getElementById('piPrefillNote');
+        if (note) note.style.display = filled ? 'block' : 'none';
     }
 
     /* Pull the newest interview from an earlier year and pre-fill the narrative +
@@ -598,10 +624,18 @@
             var res = await apiFetch('/api/parent-interview/' + studentId + '?priorTo=' + encodeURIComponent(year()));
             var prior = await res.json();
             if (!prior || !prior.Id) return;
-            document.getElementById('piGoals').value = prior.ParentGoals || '';
-            document.getElementById('piConcerns').value = prior.ParentConcerns || '';
-            document.getElementById('piStrengths').value = prior.ChildStrengths || '';
-            document.getElementById('piNotes').value = prior.Notes || '';
+            // Prefer the whole prior-year form (schema FormData JSON); fall back to the
+            // mapped narrative columns for interviews saved before the schema overhaul.
+            var pfd = null;
+            if (prior.FormData) { try { pfd = JSON.parse(prior.FormData); } catch (e) { pfd = null; } }
+            if (pfd && typeof loadInterviewForm === 'function') {
+                loadInterviewForm(pfd);
+            } else if (typeof piSetFieldValue === 'function') {
+                piSetFieldValue('parentGoals', prior.ParentGoals || '');
+                piSetFieldValue('parentConcerns', prior.ParentConcerns || '');
+                piSetFieldValue('childStrengths', prior.ChildStrengths || '');
+                piSetFieldValue('additionalNotes', prior.Notes || '');
+            }
             if (prior.PreferredLanguage) document.getElementById('piPreferredLanguage').value = prior.PreferredLanguage;
             if (prior.TranslatorNeeded) document.getElementById('piTranslatorNeeded').value = prior.TranslatorNeeded;
             if (prior.TranslatorArrangements) document.getElementById('piTranslatorArrangements').value = prior.TranslatorArrangements;
@@ -667,18 +701,24 @@
     async function saveInterview() {
         if (!currentInterviewStudentId) return;
         var btn = document.getElementById('piSaveBtn');
+
+        // The whole form, serialized from the schema, travels as formData JSON. The few
+        // columns the roster and quick reads use are also sent as named fields, pulled
+        // from the same serialized values so the two never disagree. Identical to isbe.html.
+        var formData = serializeInterviewForm();
         var body = {
             interviewDate: document.getElementById('piDate').value,
-            parentGoals: document.getElementById('piGoals').value,
-            parentConcerns: document.getElementById('piConcerns').value,
-            childStrengths: document.getElementById('piStrengths').value,
-            notes: document.getElementById('piNotes').value,
+            parentGoals: formData.parentGoals || '',
+            parentConcerns: formData.parentConcerns || '',
+            childStrengths: formData.childStrengths || '',
+            notes: formData.additionalNotes || '',
             year: year(),
             parentSignature: document.getElementById('piParentSig').value,
             staffSignature: document.getElementById('piStaffSig').value,
             preferredLanguage: document.getElementById('piPreferredLanguage').value,
             translatorNeeded: document.getElementById('piTranslatorNeeded').value,
-            translatorArrangements: document.getElementById('piTranslatorArrangements').value
+            translatorArrangements: document.getElementById('piTranslatorArrangements').value,
+            formData: formData
         };
         var missing = [];
         if (!body.preferredLanguage.trim()) missing.push('Preferred Language (PI5.L)');
@@ -702,7 +742,7 @@
                 ChildForms().mark(currentInterviewStudentId, 'ParentInterview', body.interviewDate);
                 var student = students().find(function (s) { return String(s.Id) === String(currentInterviewStudentId); });
                 var sigProblems = await fileSignedForm(currentInterviewStudentId, 'ParentInterview', {
-                    formTitle: 'Parent Interview',
+                    formTitle: 'Prevention Initiative Parent Interview Form',
                     rows: [
                         { label: 'Child', value: student ? student.Last_Name + ', ' + student.First_Name : '' },
                         { label: 'Date of birth', value: student ? (student.Birth_date || '') : '' },
@@ -711,13 +751,10 @@
                         { label: 'Translator needed', value: body.translatorNeeded },
                         { label: 'Translator arrangements', value: body.translatorArrangements }
                     ],
-                    blocks: [
-                        { heading: 'Parent goals for their child', text: body.parentGoals },
-                        { heading: 'Parent concerns', text: body.parentConcerns },
-                        { heading: 'Child strengths', text: body.childStrengths },
-                        { heading: 'Notes', text: body.notes }
-                    ]
-                });
+                    // Every answered field, grouped by section, so the filed PDF is the
+                    // whole interview and not just the summary boxes.
+                    blocks: (typeof interviewFormBlocks === 'function') ? interviewFormBlocks(formData) : []
+                }, true);   // file the PDF even when no signature was drawn on the pad
                 refreshActiveView();
                 if (sigProblems.length) {
                     alert('The interview was saved, but the signed copy was not filed:\n\n' + sigProblems.join('\n'));
@@ -739,6 +776,42 @@
         document.getElementById('piOverlay').setAttribute('data-printing', '1');
         window.print();
         document.getElementById('piOverlay').removeAttribute('data-printing');
+    }
+
+    /* Attach a signed/scanned paper Parent Interview Form. The scan is authoritative:
+       it files in the child's folder, ticks the column, and future opens show it
+       directly rather than the electronic editor. Mirrors isbe.html's uploadInterviewScan. */
+    async function uploadInterviewScan() {
+        if (!currentInterviewStudentId) return;
+        var input = document.getElementById('piScanFile');
+        var statusEl = document.getElementById('piScanStatus');
+        if (!input || !input.files || !input.files.length) {
+            if (statusEl) { statusEl.textContent = 'Choose a file first.'; statusEl.style.color = '#b91c1c'; }
+            return;
+        }
+        var file = input.files[0];
+        if (file.size > 15 * 1024 * 1024) {
+            if (statusEl) { statusEl.textContent = 'That is over 15 MB. A PDF is usually much smaller.'; statusEl.style.color = '#b91c1c'; }
+            return;
+        }
+        var btn = document.getElementById('piScanBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Uploading\u2026'; }
+        if (statusEl) { statusEl.textContent = 'Uploading\u2026'; statusEl.style.color = '#64748b'; }
+        try {
+            var d = await uploadChildFile(currentInterviewStudentId, 'ParentInterview', 'interviewform', file);
+            ChildForms().markFile(currentInterviewStudentId, 'ParentInterview', 'interviewform', d.relPath, d.name);
+            var t = tracking();
+            if (!t[currentInterviewStudentId]) t[currentInterviewStudentId] = {};
+            t[currentInterviewStudentId].ParentInterview = 1;
+            setUploadStatus('piScanStatus', { on: true, name: d.name, relPath: d.relPath }, '');
+            refreshActiveView();
+            closeInterview();
+            openDoc(d.relPath, d.name || 'Parent Interview', true);
+        } catch (e) {
+            if (statusEl) { statusEl.textContent = '\u26a0 ' + e.message; statusEl.style.color = '#b91c1c'; }
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = 'Upload signed form'; }
+        }
     }
 
     // ── Permission Slip ──────────────────────────────────────────────────────
@@ -1539,46 +1612,37 @@
     // still ships the markup inline for now), injection is skipped so we never
     // duplicate the ids.
     var MODAL_HTML = [
+        /* The Parent Interview modal renders the WHOLE state form from PI_INTERVIEW_SCHEMA
+           (pi-interview-schema.js) into #piFormSections, so this page, the ISBE PI admin
+           roster and the parent portal all show the identical, pre-filled, signable form.
+           Kept byte-for-byte in step with the inline copy in isbe.html. */
         '<div class="pi-overlay" id="piOverlay"><div class="pi-modal">',
         '<div class="pi-modal-header"><h3 id="piModalTitle">Parent Interview Form</h3>',
         '<button class="pi-close" onclick="CofpForms.closeInterview()" aria-label="Close">&times;</button></div>',
         '<div class="pi-modal-body">',
+        // Attach a signed/scanned paper form the family completed by hand.
+        '<div class="pi-section" id="piScanSection"><h4>Signed / Scanned Form on File</h4>',
+        '<div class="doc-note">For a paper Parent Interview Form the family filled out and signed, attach the scan (PDF or a clear photo). It is filed in the child&rsquo;s folder and marks the Parent Interview column complete &mdash; no need to re-type the fields below.</div>',
+        '<div class="cls-upload-row"><input type="file" id="piScanFile" accept=".pdf,.jpg,.jpeg,.png">',
+        '<button type="button" class="pi-btn pi-btn-primary" id="piScanBtn" onclick="CofpForms.uploadInterviewScan()">Upload signed form</button>',
+        '<span id="piScanStatus" class="cls-upload-status"></span></div></div>',
+        // Read-only child header.
         '<div class="pi-section"><h4>Child Information</h4><div class="pi-grid three">',
         '<div class="pi-field"><label>Child Name</label><div class="pi-value" id="piChildName"></div></div>',
         '<div class="pi-field"><label>Date of Birth</label><div class="pi-value" id="piDOB"></div></div>',
-        '<div class="pi-field"><label>Classroom</label><div class="pi-value" id="piRoom"></div></div></div></div>',
-        '<div class="pi-section"><h4>Household Information</h4><div class="pi-grid">',
-        '<div class="pi-field"><label>Household Income</label><div class="pi-value" id="piIncome"></div></div>',
-        '<div class="pi-field"><label>Household Size</label><div class="pi-value" id="piHHSize"></div></div>',
-        '<div class="pi-field"><label>Public Benefits</label><div class="pi-value" id="piBenefits"></div></div>',
-        '<div class="pi-field"><label>F/R/P Status</label><div class="pi-value" id="piFRP"></div></div>',
-        '<div class="pi-field"><label>IEP</label><div class="pi-value" id="piIEP"></div></div>',
-        '<div class="pi-field"><label>Foster Care</label><div class="pi-value" id="piFoster"></div></div>',
-        '<div class="pi-field"><label>Military</label><div class="pi-value" id="piMilitary"></div></div>',
-        '<div class="pi-field"><label>Category</label><div class="pi-value" id="piCategory"></div></div></div></div>',
-        '<div class="pi-section" id="piIntakeSection"><h4>From Pre-Enrollment Intake <span id="piIntakeMeta" style="font-weight:400;text-transform:none;letter-spacing:0;color:#9ca3af;font-size:0.7rem;"></span></h4><div id="piIntakeBody"></div></div>',
-        '<div class="pi-section"><h4>Interview Details</h4><div class="pi-grid">',
-        '<div class="pi-field"><label>Interview Date</label><input type="date" id="piDate"></div>',
-        '<div class="pi-field"></div>',
-        '<div class="pi-field pi-full"><label>Parent Goals for Child</label><textarea id="piGoals" placeholder="What goals do the parents have for their child this year?"></textarea></div>',
-        '<div class="pi-field pi-full"><label>Parent Concerns</label><textarea id="piConcerns" placeholder="Are there any concerns the parents would like to discuss?"></textarea></div>',
-        '<div class="pi-field pi-full"><label>Child Strengths</label><textarea id="piStrengths" placeholder="What strengths does the child demonstrate at home?"></textarea></div>',
-        '<div class="pi-field pi-full"><label>Additional Notes</label><textarea id="piNotes" placeholder="Any additional notes from the interview..."></textarea></div></div></div>',
+        '<div class="pi-field"><label>Classroom</label><div class="pi-value" id="piRoom"></div></div></div>',
+        '<div class="doc-note" id="piPrefillNote" style="margin-top:12px;display:none;">Some fields below are pre-filled from this family&rsquo;s pre-enrollment and enrollment record. Review each one with the family and correct anything that has changed &mdash; what you save here is the record.</div></div>',
+        // The whole state Parent Interview Form, rendered from the schema.
+        '<div id="piFormSections"></div>',
+        // PICC PI5.L / PI5.M live on the form itself and may not be left blank.
         '<div class="pi-section"><h4>Language &amp; Translation</h4>',
         '<div class="doc-note">PICC PI5.L requires the preferred language to be identified here, and PI5.M requires the translator arrangements to be recorded. Neither may be left blank &mdash; if no translator was needed, say so.</div>',
         '<div class="pi-grid"><div class="pi-field"><label>Preferred Language</label><input type="text" id="piPreferredLanguage" placeholder="e.g. English, Spanish"></div>',
         '<div class="pi-field"><label>Translator Needed for the Interview</label><select id="piTranslatorNeeded"><option value="">&mdash; select &mdash;</option><option value="No">No &ndash; interview conducted in the family\'s preferred language</option><option value="Yes">Yes</option></select></div>',
         '<div class="pi-field pi-full"><label>Translator Arrangements / Accommodations Provided</label><textarea id="piTranslatorArrangements" placeholder="Who translated and how it was arranged, or state that none was needed and why."></textarea></div></div></div>',
-        // Side by side, not stacked full-width — same reasoning as the permission slip:
-        // two independent people signing, nothing that needs to line up between them,
-        // and stacking pushes the modal past a laptop's height. The whole section is
-        // hidden by openInterview() when a signed form is already on file for the child
-        // (there is nothing to collect), and a short note stands in its place.
-        '<div class="pi-section" id="piSignedNote" style="display:none;"><h4>Signed Form on File</h4>',
-        '<div class="doc-note">A signed Parent Interview Form is already on file for this child. Use Print to view the filed copy; there is nothing left to sign.</div></div>',
-        '<div class="pi-section" id="piSigSection"><h4>Signatures</h4><div class="pi-grid">',
-        '<div class="pi-field"><label>Parent/Guardian Signature</label><div id="piParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="piParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="piParentSigDate" style="flex:1;" title="Date signed"></div></div>',
-        '<div class="pi-field"><label>Staff Signature</label><div id="piStaffSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="piStaffSig" placeholder="Printed name" style="flex:2;"><input type="date" id="piStaffSigDate" style="flex:1;" title="Date signed"></div></div></div></div>',
+        '<div class="pi-section"><h4>Signatures</h4><div class="pi-grid">',
+        '<div class="pi-field pi-full"><label>Parent/Guardian Signature</label><div id="piParentSigPad"></div><div style="display:flex;gap:10px;margin-top:7px;"><input type="text" id="piParentSig" placeholder="Printed name" style="flex:2;"><input type="date" id="piDate" style="flex:1;" title="Interview date"></div></div>',
+        '<div class="pi-field pi-full"><label>Staff Signature</label><div id="piStaffSigPad"></div><input type="text" id="piStaffSig" placeholder="Printed name" style="margin-top:7px;"></div></div></div>',
         '</div>',
         '<div class="pi-modal-footer"><span class="pi-saved-badge" id="piSavedBadge" style="display:none;">&#10003; Saved</span>',
         '<button class="pi-btn pi-btn-secondary" onclick="CofpForms.printInterview()">&#x1F5A8;&#xFE0F; Print</button>',
@@ -1833,7 +1897,44 @@
         '.cls-upload-row { display:flex;align-items:center;gap:10px;flex-wrap:wrap; }',
         '.cls-upload-row input[type=file] { font-size:0.8rem; }',
         '.cls-upload-status { font-size:0.75rem;font-weight:600; }',
+        /* Parent Interview schema-rendered controls (radios, checkbox grids, repeat
+           tables, prefill tint). Kept identical to isbe.html / parent.html, which render
+           the same PI_INTERVIEW_SCHEMA, so the form looks the same on every page. */
+        '.pi-radio-row, .pi-check-grid { grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:6px 16px;padding:4px 0; }',
+        '.pi-radio-row.pi-short { grid-template-columns:repeat(auto-fit, minmax(0, max-content));gap:6px 26px; }',
+        '.pi-opt { display:flex;align-items:flex-start;gap:6px;min-width:0;font-size:0.82rem;color:#111;cursor:pointer;line-height:1.3;overflow-wrap:break-word; }',
+        '.pi-opt input { flex:0 0 auto;margin:2px 0 0;accent-color:#2563eb; }',
+        '.pi-yesno { display:inline-flex;gap:14px; }',
+        '.pi-repeat table { width:100%;border-collapse:collapse;font-size:0.8rem; }',
+        '.pi-repeat th { text-align:left;font-size:0.68rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;padding:2px 6px; }',
+        '.pi-repeat td { padding:2px 6px; }',
+        '.pi-repeat td input { width:100%;box-sizing:border-box;font-size:0.8rem;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit; }',
+        '.pi-repeat .pi-rowdel { background:none;border:none;color:#b91c1c;cursor:pointer;font-size:1rem;padding:0 6px;line-height:1; }',
+        '.pi-repeat-add { margin-top:6px;font-size:0.76rem;font-weight:600;color:#2563eb;background:none;border:1px dashed #93c5fd;border-radius:6px;padding:6px 12px;cursor:pointer; }',
+        '.pi-prefilled input, .pi-prefilled textarea, .pi-prefilled select { background:#f0f7ff; }',
         '@media print { .cls-upload-row { display:none !important; } }',
+        /* Parent Interview printed as a fillable PAPER form: prefilled values print as
+           text on a line, everything else as a blank writing line. Mirrors isbe.html. */
+        '@media print {',
+        '  #piOverlay[data-printing] .pi-modal, #piOverlay[data-printing] .pi-modal * { -webkit-print-color-adjust:exact;print-color-adjust:exact; }',
+        '  #piOverlay[data-printing] #piScanSection, #piOverlay[data-printing] #piPrefillNote, #piOverlay[data-printing] .doc-note, #piOverlay[data-printing] .pi-repeat-add, #piOverlay[data-printing] .pi-rowdel { display:none !important; }',
+        '  #piOverlay[data-printing] .pi-section { margin-bottom:14px;break-inside:avoid; }',
+        '  #piOverlay[data-printing] .pi-section h4 { color:#000;font-size:0.78rem; }',
+        '  #piOverlay[data-printing] .pi-field label { color:#000;font-size:0.72rem; }',
+        '  #piOverlay[data-printing] .pi-value { background:none;padding:2px 0;min-height:0;font-weight:600; }',
+        '  #piOverlay[data-printing] .pi-field input[type=text], #piOverlay[data-printing] .pi-field input[type=date], #piOverlay[data-printing] .pi-field select, #piOverlay[data-printing] .pi-repeat td input { border:none;border-bottom:1px solid #6b7280;border-radius:0;background:none;padding:2px 2px;min-height:20px;-webkit-appearance:none;appearance:none;color:#000;font-weight:600; }',
+        '  #piOverlay[data-printing] .pi-field textarea { border:none;border-radius:0;background:none;padding:0;resize:none;color:#000;font-weight:600;min-height:0;height:3.9em;overflow:hidden;background-image:repeating-linear-gradient(to bottom, transparent 0, transparent calc(1.3em - 1px), #9ca3af calc(1.3em - 1px), #9ca3af 1.3em);line-height:1.3em; }',
+        '  #piOverlay[data-printing] .pi-full textarea { height:5.2em; }',
+        '  #piOverlay[data-printing] .pi-prefilled input, #piOverlay[data-printing] .pi-prefilled textarea, #piOverlay[data-printing] .pi-prefilled select { background-image:none;background:none; }',
+        '  #piOverlay[data-printing] .pi-field select { color:transparent; }',
+        '  #piOverlay[data-printing] .pi-prefilled select { color:#000; }',
+        '  #piOverlay[data-printing] .pi-opt { color:#000;font-size:0.8rem; }',
+        '  #piOverlay[data-printing] .pi-opt input { -webkit-appearance:auto;appearance:auto; }',
+        '  #piOverlay[data-printing] .pi-repeat th { color:#000; }',
+        '  #piOverlay[data-printing] .pi-repeat td { border-bottom:1px solid #e5e7eb; }',
+        '  #piOverlay[data-printing] #piParentSigPad, #piOverlay[data-printing] #piStaffSigPad { border:none;border-bottom:1px solid #000;height:2.2em;background:none; }',
+        '  #piOverlay[data-printing] #piParentSigPad *, #piOverlay[data-printing] #piStaffSigPad * { display:none !important; }',
+        '}',
         '#printAllContainer { display:none; }',
         '.print-value { display:inline-block;min-height:1em; }',
         '@media print {',
@@ -1883,6 +1984,7 @@
         saveInterview: saveInterview,
         closeInterview: closeInterview,
         printInterview: printInterview,
+        uploadInterviewScan: uploadInterviewScan,
         openPermissionSlip: openPermissionSlip,
         savePermissionSlip: savePermissionSlip,
         closePermissionSlip: closePermissionSlip,

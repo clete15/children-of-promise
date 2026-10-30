@@ -262,7 +262,12 @@
     </div>
 </div>
 
-<!-- Shared per-child form machinery for the Teacher subset. -->
+<!-- Shared per-child form machinery for both subsets. pi-interview-schema.js defines
+     the Parent Interview form schema + render/prefill engine; classroom-forms.js renders
+     that schema into the shared modal, so this page shows the IDENTICAL interactive,
+     pre-filled, signable Parent Interview form as the ISBE PI admin roster. Loaded before
+     classroom-forms.js, which reads its globals at call time. -->
+<script src="pi-interview-schema.js"></script>
 <script src="pi-forms.js"></script>
 <script src="child-forms.js"></script>
 <script src="sign-pad.js"></script>
@@ -501,7 +506,10 @@ function initForms() {
         getYear: function () { return activeYear || currentSchoolYear(); },
         apiFetch: function (url, opts) { return apiFetch(url, opts); },
         ChildForms: window.ChildForms,
-        refreshActiveView: function () { renderTeacher(); },
+        // Redraw whichever subset is on screen after a save, not only the Teacher one —
+        // the Parent Interview is now opened from the Administrative tab too, and its
+        // save must flip the Administrative cell to "on file".
+        refreshActiveView: function () { refreshActiveView(); },
         classroomRoster: function () { return activeRoom === 'all' ? activeRoster() : roomRoster(activeRoom); }
     });
     formsReady = true;
@@ -705,57 +713,27 @@ async function createWeightedEligibility(studentId, button) {
         starter). Upload-only: file the signed paper interview.
    Opening and the scan upload both go through the SAME endpoints the ISBE roster
    uses, so the two pages stay in step. */
+/* Parent Interview cell for the Administrative grid — the twin of the Weighted
+   Eligibility pill. Clicking it opens the SAME interactive, pre-filled, signable Parent
+   Interview form the ISBE PI admin roster opens (CofpForms.openInterview, rendered from
+   PI_INTERVIEW_SCHEMA). The modal itself carries the scan-upload row for a paper copy,
+   so there is no separate upload slot here.
+     • A signed scan on file, or a saved electronic interview, shows "✓ on file" and the
+       pill opens the scan (openInterview opens it directly) or reloads the saved form.
+     • Otherwise it is a faded "fill it out" pill that opens the blank, pre-filled form. */
 function parentInterviewAdminCell(s) {
     var scan = (window.ChildForms && ChildForms.fileFor) ? ChildForms.fileFor(s.Id, 'ParentInterview', 'interviewform') : null;
-    var gen = (window.ChildForms && ChildForms.fileFor) ? ChildForms.fileFor(s.Id, 'ParentInterview', 'generated') : null;
-    var uploadSlot = function (label, title) {
-        return '<label class="cfg-attach" style="font-weight:600;color:#64748b;" title="' + title + '">' + label
-            + '<input type="file" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"'
-            + ' onchange="uploadInterviewScanAdmin(' + s.Id + ',this)"></label>';
-    };
-    if (scan && scan.relPath) {
-        return '<td class="cfg-cell filed">'
-            + '<a href="#" class="cfg-pill on" title="Signed Parent Interview on file \u2014 click to open"'
-            + ' onclick="event.preventDefault();openDoc(\'' + String(scan.relPath).replace(/'/g, "\\'")
-            + '\',\'' + String(scan.name || 'Parent Interview').replace(/'/g, "\\'") + '\')">\u2713 on file</a>'
-            + ' ' + uploadSlot('\u21bb', 'Replace with a newer signed scan; the previous file is retained')
-            + '</td>';
-    }
-    if (gen && gen.relPath) {
-        return '<td class="cfg-cell">'
-            + '<a href="#" class="cfg-pill on" title="Pre-filled Parent Interview \u2014 click to open, print, and sign. Upload the signed copy to complete it."'
-            + ' onclick="event.preventDefault();openDoc(\'' + String(gen.relPath).replace(/'/g, "\\'")
-            + '\',\'' + String(gen.name || 'Parent Interview').replace(/'/g, "\\'") + '\')">\u2713 pre-filled</a>'
-            + ' ' + uploadSlot('\u2795 signed', 'Upload the signed Parent Interview to file it as complete')
-            + '</td>';
-    }
-    return '<td class="cfg-cell">'
-        + uploadSlot('\u2795 Upload', 'Upload the signed paper Parent Interview into this child\u2019s Administrative folder')
+    var ticked = !!(TRACKING[s.Id] || {}).ParentInterview;
+    var hasForm = (window.ChildForms && ChildForms.hasForm) ? ChildForms.hasForm(s.Id, 'ParentInterview') : false;
+    var on = !!(scan && scan.relPath) || hasForm || ticked;
+    var title = on
+        ? 'Parent Interview on file \u2014 click to open and review or update'
+        : 'Open the Parent Interview \u2014 pre-fills from pre-enrollment; fill, sign, and save';
+    return '<td class="cfg-cell' + (on ? ' filed' : '') + '">'
+        + '<a href="#" class="cfg-pill ' + (on ? 'on' : 'off') + '" title="' + title + '"'
+        + ' onclick="event.preventDefault();CofpForms.openInterview(' + s.Id + ')">'
+        + (on ? '\u2713 on file' : 'not on file') + '</a>'
         + '</td>';
-}
-async function uploadInterviewScanAdmin(studentId, input) {
-    var file = input && input.files && input.files[0];
-    if (!file) return;
-    var fd = new FormData();
-    fd.append('file', file);
-    try {
-        var res = await fetch('/api/child-file-upload?studentId=' + encodeURIComponent(studentId)
-            + '&field=ParentInterview&kind=interviewform'
-            + '&year=' + encodeURIComponent(activeYear),
-            Object.assign({ method: 'POST', body: fd },
-                (window.CofpAuth && CofpAuth.headers) ? { headers: CofpAuth.headers() } : {}));
-        var d = await res.json();
-        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
-        var rel = d.relPath || d.rel;
-        if (rel && window.ChildForms && ChildForms.markFile) {
-            ChildForms.markFile(studentId, 'ParentInterview', 'interviewform', rel, d.name || file.name);
-        }
-        renderAdmin();
-    } catch (e) {
-        alert('Could not upload the Parent Interview: ' + (e.message || e));
-    } finally {
-        if (input) input.value = '';
-    }
 }
 function renderAdmin() {
     var body = document.getElementById('afBody');
@@ -833,6 +811,9 @@ function renderAdmin() {
         + '<div style="font-size:0.7rem;color:#94a3b8;margin:10px 20px;">* Behavior and transition plans are only required where applicable.</div>';
 }
 async function loadAdmin() {
+    // The Administrative Parent Interview cell opens the shared CofpForms modal, so the
+    // forms engine must be initialised here too (not just on the Teacher tab).
+    initForms();
     document.getElementById('afBody').innerHTML = '<div class="cf-loading">Loading…</div>';
     var results = await Promise.all([
         loadChildDocChecklist(),
