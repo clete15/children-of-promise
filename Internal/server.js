@@ -2621,6 +2621,41 @@ function seedParentInterviewDoc(studentId, opts) {
     if (recs.error) { console.warn('[SEED] ' + recs.error); return { ok: false, error: recs.error }; }
     const { enroll, intake } = recs;
 
+    /* No pre-enrollment record to carry forward — skip, do NOT file a near-empty form.
+       The generated Parent Interview earns its place only by pre-filling from the
+       family's application. A child enrolled before the system existed (or entered
+       manually) has no PreEnrollment row to pull from, so a generated PDF would carry
+       only the two enrollment-derived fields (income, household size) and otherwise be
+       blank — which reads as if the interview were half-done when it was never started,
+       and clutters the Administrative folder with a document a monitor should not see.
+       For those children the real signed interview is uploaded as a scan instead; the
+       scan short-circuit at the top of this function then takes over. This runs AFTER
+       the existing-generated-PDF check so a form already on file is still recognized. */
+    if (!intake || intake.found === false) {
+        /* In refresh mode, clean up any near-empty generated PDF a previous (buggy)
+           run already filed for this child, so the folder is left tidy. We only
+           archive our OWN generated starters here — never a signed scan (which the
+           top-of-function short-circuit already handled) — and archiving preserves
+           the bytes under _Archive rather than deleting them. */
+        let archived = 0;
+        if (overwrite && priorForms.length) {
+            const r = archiveParentInterviewForms(priorForms, folder.path);
+            archived = r.archived;
+            if (r.errors.length) console.warn('[SEED] parent interview archive warnings for #' + id + ': ' + r.errors.join('; '));
+            if (archived) {
+                // Drop the now-dangling generated-doc pointer so the roster's
+                // [pre-filled PDF] link does not open an archived file. The roster's
+                // completion pill is unaffected — it only greens on a scan or a saved
+                // electronic record, never on a generated starter.
+                const del = runSQL(childFileEnsureSQL()
+                    + `DELETE FROM ChildFiles WHERE StudentId=${id} AND FormField='ParentInterview' AND Kind='generated';`);
+                if (!del.ok || del.sqlError) console.warn('[SEED] could not clear stale generated index for #' + id + ': ' + (del.error || del.sqlError));
+                invalidateDocCache();
+            }
+        }
+        return { ok: true, skipped: true, reason: 'no pre-enrollment record to pre-fill from', archived: archived };
+    }
+
     const programCode = String(enroll.PFA_PI_na || '').trim().toUpperCase();
     const programLabel = programCode === 'PFA' ? 'Preschool for All'
         : programCode === 'PI' ? 'Prevention Initiative'
@@ -2653,7 +2688,7 @@ function seedParentInterviewDoc(studentId, opts) {
           text: 'The answers below were carried forward from the pre-enrollment application, so '
               + 'the family is not asked again for what they already told us. Confirm or correct '
               + 'them at the interview, then capture signatures. Sections with no pre-enrollment '
-              + 'source \u2014 medical history, authorized pick-ups, insurance \u2014 are completed in person.' }
+              + 'source \u2014 the child\u2019s medical and social history and insurance \u2014 are completed in person.' }
     ];
 
     // A printed signature block at the foot of the document. buildFormPdf's signature
