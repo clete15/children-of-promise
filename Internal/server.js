@@ -2670,8 +2670,11 @@ function seedParentInterviewDoc(studentId, opts) {
     let pdf;
     try {
         pdf = buildFormPdf({
-            title: 'Prevention Initiative Parent Interview',
-            subtitle: 'Children of Promise LLC \u2014 ' + programLabel,
+            // One universal Parent Interview for every child (PFA and PI alike), so the
+            // title carries no program name. The child's actual program still appears in
+            // the Program row below as a data field, not in the heading.
+            title: 'Parent Interview',
+            subtitle: 'Children of Promise LLC',
             rows: rows,
             blocks: leadBlocks.concat(blocks, [signatureBlock]),
             signatures: [],
