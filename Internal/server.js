@@ -2477,14 +2477,25 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
         + `ISNULL(p.NoHSDiploma,'') AS NoHSDiploma,ISNULL(p.PriorEarlyLearning,'') AS PriorEarlyLearning,`
         + `ISNULL(p.BrightpointSubsidy,'') AS BrightpointSubsidy,ISNULL(p.ScreeningDelayNoEi,'') AS ScreeningDelayNoEi,`
         + `ISNULL(p.ParentEll,'') AS ParentEll,ISNULL(p.IncomeBelow50Fpl,'') AS IncomeBelow50Fpl`;
+    /* Match the intake the SAME three ways childRecordsForSeed does, best first, taking
+       the FIRST that hits — and crucially including tier 3 (exact name only). Dropping
+       tier 3 is what left most backfilled children with NO intake match, so the generated
+       interview filled only the enrollment-derived fields (income, household size) and
+       printed an almost-empty form. Name comparison is case- and whitespace-folded; the
+       whole union is TOP 1 again so only the single best match is used. */
+    const nameMatch = `LOWER(LTRIM(RTRIM(p.ChildName)))=LOWER(LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)))`;
     const iq = runSQLRows(
-        `SELECT cols.* FROM (
+        `SELECT TOP 1 * FROM (
             SELECT TOP 1 1 AS pri,${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${id} ORDER BY p.Id DESC
             UNION ALL
             SELECT TOP 1 2 AS pri,${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p
-                ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND TRY_CONVERT(date,p.ChildBirthDate)=TRY_CONVERT(date,e.Birth_date)
+                ON ${nameMatch} AND TRY_CONVERT(date,p.ChildBirthDate)=TRY_CONVERT(date,e.Birth_date)
                 WHERE e.Id=${id} ORDER BY p.Id DESC
-        ) cols ORDER BY pri`);
+            UNION ALL
+            SELECT TOP 1 3 AS pri,${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p
+                ON ${nameMatch}
+                WHERE e.Id=${id} ORDER BY p.Id DESC
+        ) matches ORDER BY pri`);
     const intake = (iq.ok && iq.rows.length) ? Object.assign({ found: true }, iq.rows[0]) : { found: false };
     return { enroll, intake };
 }
