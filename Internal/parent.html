@@ -107,12 +107,20 @@
         .pi-field input:focus, .pi-field textarea:focus, .pi-field select:focus {
             outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
         .pi-full { grid-column:1/-1; }
-        /* Yes/No and radio groups: readable, tappable options that wrap cleanly. */
+        /* Yes/No and radio/checkbox groups. Options lay out on an even grid rather
+           than flex-wrap: a long list (living situation has eight choices, household
+           structure six) wrapped into ragged rows that did not line up column to
+           column and read as a jumble. auto-fill with a min width keeps them in tidy
+           aligned columns, while a short two-option question still sits side by side.
+           The dot stays top-aligned so a label that wraps to two lines does not push
+           the control off-centre. (Mirrors the same fix in isbe.html's modal.) */
         .pi-yesno { display:flex; gap:18px; padding:4px 0; }
-        .pi-radio-row, .pi-check-grid { display:flex; flex-wrap:wrap; gap:8px 18px; padding:4px 0; }
-        .pi-check-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; }
-        .pi-opt { display:inline-flex; align-items:center; gap:7px; font-size:0.86rem; color:#1e293b; cursor:pointer; line-height:1.3; }
-        .pi-opt input { margin:0; width:16px; height:16px; accent-color:#2563eb; flex:0 0 auto; }
+        .pi-radio-row, .pi-check-grid {
+            display:grid; grid-template-columns:repeat(auto-fill, minmax(165px, 1fr));
+            gap:8px 18px; padding:4px 0;
+        }
+        .pi-opt { display:inline-flex; align-items:flex-start; gap:7px; font-size:0.86rem; color:#1e293b; cursor:pointer; line-height:1.3; }
+        .pi-opt input { margin:2px 0 0; width:16px; height:16px; accent-color:#2563eb; flex:0 0 auto; }
         /* A prefilled field gets a soft tint so the family sees what we already have. */
         .pi-prefilled input, .pi-prefilled textarea, .pi-prefilled select,
         .pi-prefilled .pi-radio-row, .pi-prefilled .pi-yesno, .pi-prefilled .pi-check-grid { background:#eff6ff; }
@@ -128,7 +136,9 @@
         .pi-repeat-add { margin-top:6px; font-size:0.78rem; font-weight:700; color:#2563eb; background:none;
             border:1px dashed #93c5fd; border-radius:6px; padding:7px 13px; cursor:pointer; }
         @media (max-width:480px) {
-            .pi-grid, .pi-grid.three, .pi-check-grid { grid-template-columns:1fr; }
+            /* One column on a phone — a parent fills this on their own device, so the
+               radio rows stack too, not just the checkbox grids. */
+            .pi-grid, .pi-grid.three, .pi-check-grid, .pi-radio-row { grid-template-columns:1fr; }
         }
     </style>
 </head>
