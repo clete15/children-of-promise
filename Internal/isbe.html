@@ -1854,7 +1854,7 @@ const COLUMNS = [
        Interview is therefore an ADMIN duty (no teacher flag) and opens/saves/prints from
        this page. It used to be a teacher column filled from the classroom card. */
     { field: 'WeightedEligibility', label: 'Weighted<br>Eligibility', title: 'One universal weighted-priority PDF, created when the child enrolls from the family\u2019s pre-enrollment answers. Both this roster and Child Files open the same saved document.' },
-    { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Pre-fills from the pre-enrollment record; print the pre-filled form for the family to complete at enrollment, then save. Completed by admin at enrollment.' },
+    { field: 'ParentInterview', label: 'Parent<br>Interview', title: 'Conduct a one-on-one interview with the parent to discuss goals, concerns, and child strengths. Both routes pre-fill from the pre-enrollment record: [form] fills and saves it electronically; [pre-filled PDF] opens the document filed at enrollment to print or sign. Medical history, pick-ups and insurance are completed at the interview. A signed scan, once uploaded, is authoritative. Completed by admin at enrollment.' },
     { field: 'ProofOfIncome', label: 'Proof of<br>Income', title: 'Collect and file proof of household income (pay stubs, tax return, or benefits letter) to verify Free/Reduced/Paid meal eligibility.' },
     { field: 'EnterSIS', label: 'Enter<br>into SIS', title: 'Enter student into the ISBE Student Information System (SIS) before beginning screenings.' },
     /* The screening columns state the completion rule the app actually enforces, which
@@ -2709,6 +2709,40 @@ async function createWeightedEligibility(studentId, button) {
     }
 }
 
+/* Open the child's pre-filled Parent Interview PDF to print or sign. This is the
+   generate-and-file document: it is created at enrollment from the family's
+   pre-enrollment answers (the weighted-eligibility twin). It is DISTINCT from the
+   electronic [form] modal — that edits/saves the interview record; this opens the
+   filed starter PDF the family signs. A signed scan, once uploaded, supersedes it.
+
+   The generated PDF usually already exists (seeded at enrollment), so open it straight
+   from the ChildFiles index. If the enrollment seed was deferred (library unreachable
+   that instant), create it on demand — the same create-only call the roster uses for
+   weighted eligibility — then open it. Mirrors createWeightedEligibility. */
+async function openGeneratedInterview(studentId, button) {
+    const existing = window.ChildForms && ChildForms.fileFor
+        ? ChildForms.fileFor(studentId, 'ParentInterview', 'generated') : null;
+    if (existing && existing.relPath) {
+        openDoc(existing.relPath, existing.name || 'Parent Interview', true);
+        return;
+    }
+    if (button && button.getAttribute('aria-disabled') === 'true') return;
+    const prev = button ? button.textContent : '';
+    if (button) { button.setAttribute('aria-disabled', 'true'); button.textContent = 'Preparing\u2026'; }
+    try {
+        const res = await apiFetch('/api/parent-interview-doc/' + encodeURIComponent(studentId), { method: 'POST' });
+        const d = await res.json();
+        if (!res.ok || !d.success || !d.relPath) throw new Error(d.error || ('HTTP ' + res.status));
+        ChildForms.markFile(studentId, 'ParentInterview', 'generated', d.relPath,
+            d.name || 'Parent Interview');
+        if (button) { button.removeAttribute('aria-disabled'); button.textContent = prev; }
+        openDoc(d.relPath, d.name || 'Parent Interview', true);
+    } catch (e) {
+        if (button) { button.removeAttribute('aria-disabled'); button.textContent = prev; }
+        alert('Could not open the pre-filled Parent Interview: ' + (e.message || e));
+    }
+}
+
 /* PI6 wants each assessment within 6 months of enrollment, so "what is missing" for an
    empty Initial ASQ/ASE cell includes BY WHEN. Returns a sentence, or '' when the start
    date is unusable — never a guess. 182 days matches the window in DOC_FORM_SPECS. */
@@ -2991,10 +3025,20 @@ function renderRoster() {
                         + ' onclick="event.preventDefault();openInterview(' + s.Id + ')">\u2713 on file</a>'
                         + '</td>';
                 }
+                /* Not done yet. Two ways in, both pre-filled from the family's
+                   pre-enrollment answers:
+                     [form]          the electronic modal — fill, sign, and save here;
+                     [pre-filled PDF] the generated document filed at enrollment — open
+                                      it to print or sign on paper / the IdeaTab.
+                   The interview-only compliance sections (medical history, pick-ups,
+                   insurance) have no pre-enrollment source and are completed at the
+                   interview either way. A signed scan, once uploaded, supersedes both. */
                 return '<td class="' + tdc + '">'
                     + checkBox(s, f)
                     + formLink('openInterview(' + s.Id + ')',
-                        'Open the Parent Interview \u2014 pre-fills from pre-enrollment; print it blank for the family, or fill and save')
+                        'Open the electronic Parent Interview \u2014 pre-fills from pre-enrollment; fill, sign, and save')
+                    + '<a href="#" style="' + LINK_STYLE + '" title="Open the pre-filled Parent Interview PDF (filed at enrollment from the family\u2019s pre-enrollment answers) to print or sign"'
+                    + ' onclick="event.preventDefault();openGeneratedInterview(' + s.Id + ',this)">[pre-filled PDF]</a>'
                     + '</td>';
             }
 

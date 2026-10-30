@@ -11,6 +11,13 @@ const crypto = require('crypto');
    trade is worth it here. */
 const { buildFormPdf } = require('./pdf-form.js');
 
+/* The Parent Interview schema, crosswalk and printable-blocks builder, shared with
+   the admin roster and parent portal (loaded there via <script src>). The server uses
+   the DOM-free pieces to generate the pre-filled Parent Interview PDF it files at
+   enrollment, so the document the family signs is built from the SAME crosswalk the
+   two pages render — not a second, drifting copy. */
+const { interviewFormDataFromRecords, interviewFormBlocks } = require('./pi-interview-schema.js');
+
 /* Prevent crashes from unhandled errors.
 
    With one exception: a port conflict is not a crash to recover from, it means
@@ -2397,6 +2404,307 @@ function seedWeightedEligibilityDoc(studentId, opts) {
     return {
         ok: true, path: target, rel: indexed.rel, name: indexed.name,
         archived: archived.archived, archiveWarnings: archived.errors
+    };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   The pre-filled Parent Interview, generated and filed exactly like the Weighted
+   Eligibility form above.
+
+   WHY THIS SHAPE (and not a merge). The state Parent Interview is a ~100-field form.
+   Most of what it asks, the family already answered at pre-enrollment, so re-asking it
+   is wasted effort and a source of transcription error. The call the user made is to
+   GENERATE the interview pre-filled from the intake and FILE it in the child's folder
+   at enrollment — the same thing weighted eligibility does — then open that document
+   from the PI Roster to collect signatures. The three forms (pre-enrollment, weighted
+   eligibility, parent interview) stay separate documents; this only carries answers
+   forward, it does not fuse them.
+
+   The pre-fill uses the ONE crosswalk shared with the two pages (interviewFormDataFromRecords
+   in pi-interview-schema.js), so the filed PDF, the admin roster and the parent portal
+   can never disagree about what fills what. Interview-only compliance fields that have
+   no pre-enrollment source — medical history, authorized pick-ups, insurance — are left
+   blank here on purpose; they are filled at the interview.
+
+   Indexed as ChildFiles Kind='generated', deliberately NOT 'interviewform'. A scanned
+   signed sheet is 'interviewform' and is authoritative: its presence makes the save
+   endpoint 409 and the roster open the scan instead. A generated starter must never
+   masquerade as that scan, so it gets its own kind and always yields to one. */
+function parentInterviewRecordsForSeed(studentId) {
+    const id = parseInt(studentId, 10);
+    if (!id) return { error: 'Invalid student id' };
+    // Late-added language columns, defended the same way every other reader does.
+    runSQL(`IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE rptMasterEnrollment ADD HomeLanguage NVARCHAR(60);
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE PreEnrollment ADD HomeLanguage NVARCHAR(60)`);
+
+    // The enrollment row — the c.enr half of the crosswalk, plus the child's name and
+    // dates for the document header. Same columns the parent-portal login builds.
+    const e = runSQLRows(
+        `SELECT ISNULL(First_Name,'') AS First_Name,ISNULL(Last_Name,'') AS Last_Name,
+                ISNULL(Birth_date,'') AS Birth_date,ISNULL(Start_Date,'') AS Start_Date,
+                ISNULL(PFA_PI_na,'') AS PFA_PI_na,ISNULL(Category,'') AS Category,
+                ISNULL(IEP,'') AS IEP,ISNULL(Military,'') AS Military,
+                ISNULL(HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
+                ISNULL(PublicBenefits,'') AS PublicBenefits,ISNULL(City_Town,'') AS City_Town,
+                ISNULL(HomeLanguage,'') AS HomeLanguage
+         FROM rptMasterEnrollment WHERE Id=${id}`);
+    if (!e.ok || !e.rows.length) return { error: e.error || 'Child record not found.' };
+    const enroll = e.rows[0];
+
+    /* The intake record — the c.pe half — with the contact and language columns the
+       interview prefill needs but the weighted-eligibility seed does not (parent name,
+       phone, email, address, language, application date, days requested, …). Matched
+       the SAME way /api/student-intake and the parent portal match: the stored
+       PreEnrollmentId link first, then an exact child name + DOB match for a child
+       enrolled before that link existed. Column order and keys must stay in step. */
+    const flat = col => `REPLACE(REPLACE(ISNULL(${col},''),CHAR(13),' '),CHAR(10),' ')`;
+    const peCols = `ISNULL(p.FirstName,'') AS ParentFirst,ISNULL(p.LastName,'') AS ParentLast,`
+        + `ISNULL(p.Phone,'') AS Phone,ISNULL(p.Email,'') AS Email,ISNULL(p.Address,'') AS Address,`
+        + `ISNULL(p.City,'') AS City,ISNULL(p.Zip,'') AS Zip,`
+        + `ISNULL(p.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(p.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,`
+        + `ISNULL(p.PublicBenefits,'') AS PublicBenefits,ISNULL(p.HomeLanguage,'') AS HomeLanguage,`
+        + `ISNULL(p.Homeless,'') AS Homeless,ISNULL(p.FosterAdopted,'') AS FosterAdopted,ISNULL(p.IEP,'') AS IEP,`
+        + `ISNULL(p.EarlyIntervention,'') AS EarlyIntervention,ISNULL(p.AbuseHistory,'') AS AbuseHistory,`
+        + `ISNULL(p.MentalIllness,'') AS MentalIllness,ISNULL(p.DcfsInvolvement,'') AS DcfsInvolvement,`
+        + `ISNULL(p.SubstanceAbuse,'') AS SubstanceAbuse,ISNULL(p.FamilyDeath,'') AS FamilyDeath,`
+        + `ISNULL(p.ParentIncarcerated,'') AS ParentIncarcerated,ISNULL(p.TeenParent,'') AS TeenParent,`
+        + `ISNULL(p.BornOutsideUS,'') AS BornOutsideUS,ISNULL(p.NonEnglishHome,'') AS NonEnglishHome,`
+        + `ISNULL(p.ActiveMilitary,'') AS ActiveMilitary,${flat('p.LivingSituation')} AS LivingSituation,`
+        + `${flat('p.Notes')} AS Notes,ISNULL(p.ChildName,'') AS ChildName,ISNULL(p.ChildBirthDate,'') AS ChildBirthDate,`
+        + `ISNULL(CONVERT(NVARCHAR(10),p.SubmittedAt,120),'') AS SubmittedAt,`
+        + `ISNULL(p.AgeGroup,'') AS AgeGroup,ISNULL(p.DaysRequested,'') AS DaysRequested,`
+        + `ISNULL(p.CaregiverOther,'') AS CaregiverOther,ISNULL(p.LowBirthWeight,'') AS LowBirthWeight,`
+        + `ISNULL(p.NoHSDiploma,'') AS NoHSDiploma,ISNULL(p.PriorEarlyLearning,'') AS PriorEarlyLearning,`
+        + `ISNULL(p.BrightpointSubsidy,'') AS BrightpointSubsidy,ISNULL(p.ScreeningDelayNoEi,'') AS ScreeningDelayNoEi,`
+        + `ISNULL(p.ParentEll,'') AS ParentEll,ISNULL(p.IncomeBelow50Fpl,'') AS IncomeBelow50Fpl`;
+    const iq = runSQLRows(
+        `SELECT cols.* FROM (
+            SELECT TOP 1 1 AS pri,${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p ON p.Id = e.PreEnrollmentId WHERE e.Id=${id} ORDER BY p.Id DESC
+            UNION ALL
+            SELECT TOP 1 2 AS pri,${peCols} FROM rptMasterEnrollment e INNER JOIN PreEnrollment p
+                ON LTRIM(RTRIM(p.ChildName))=LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)) AND TRY_CONVERT(date,p.ChildBirthDate)=TRY_CONVERT(date,e.Birth_date)
+                WHERE e.Id=${id} ORDER BY p.Id DESC
+        ) cols ORDER BY pri`);
+    const intake = (iq.ok && iq.rows.length) ? Object.assign({ found: true }, iq.rows[0]) : { found: false };
+    return { enroll, intake };
+}
+
+/* The ChildFiles/ISBETracking index for the generated Parent Interview, mirroring
+   indexWeightedEligibilityDoc. FormField 'ParentInterview', Kind 'generated' — the
+   generated starter, kept distinct from an uploaded signed 'interviewform' scan.
+   Re-indexing replaces the single canonical generated row and ticks the roster. */
+function indexParentInterviewDoc(studentId, fullPath) {
+    const id = parseInt(studentId, 10);
+    const root = findDocRoot();
+    if (!id || !root || !fullPath) return { ok: false, error: 'Could not index the parent interview form.' };
+    const rel = path.relative(root, fullPath).replace(/\\/g, '/');
+    if (!rel || rel.startsWith('..')) return { ok: false, error: 'Parent interview file is outside the document library.' };
+    const year = currentSchoolYear();
+    const fileName = path.basename(fullPath);
+    const field = 'ParentInterview';
+    const kind = 'generated';
+    const sql = childFileEnsureSQL() + isbeTrackingEnsureSQL()
+        + `DELETE FROM ChildFiles
+WHERE StudentId=${id} AND FormField=${esc(field)} AND Kind=${esc(kind)};
+INSERT INTO ChildFiles (StudentId,SchoolYear,FormField,Kind,FileName,RelPath,UploadedBy,UploadedAt)
+VALUES (${id},${esc(year)},${esc(field)},${esc(kind)},${esc(fileName)},${esc(rel)},${esc('system-generated')},GETDATE());
+`
+        + trackingTickSQL(id, year, field);
+    const r = runSQL(sql);
+    if (!r.ok || r.sqlError) return { ok: false, error: r.error || r.sqlError || 'Could not index the generated form.' };
+    return { ok: true, rel: rel, name: fileName, year: year };
+}
+
+/* Archive superseded generated Parent Interview PDFs, mirroring
+   archiveWeightedEligibilityForms. Never destroys bytes; moves them under
+   _Archive/Parent Interview so a refresh leaves exactly one active generated copy. */
+function archiveParentInterviewForms(files, administrativeFolder) {
+    const list = Array.isArray(files) ? files.filter(Boolean) : [];
+    if (!list.length) return { archived: 0, errors: [] };
+    const archiveDir = path.join(administrativeFolder, DOC_ARCHIVE_DIR, 'Parent Interview');
+    const errors = [];
+    let archived = 0;
+    try { fs.mkdirSync(archiveDir, { recursive: true }); }
+    catch (e) { return { archived: 0, errors: ['Could not create archive: ' + e.message] }; }
+
+    list.forEach(full => {
+        try {
+            if (!fs.existsSync(full)) return;
+            const base = path.basename(full);
+            const ext = path.extname(base);
+            const stem = base.slice(0, base.length - ext.length);
+            let target = path.join(archiveDir, base);
+            let n = 2;
+            while (fs.existsSync(target)) {
+                target = path.join(archiveDir, stem + ' (archived ' + n + ')' + ext);
+                n++;
+            }
+            try { fs.renameSync(full, target); }
+            catch (e) {
+                fs.copyFileSync(full, target);
+                if (!fs.existsSync(target) || fs.statSync(target).size !== fs.statSync(full).size) {
+                    throw new Error('archive copy did not verify');
+                }
+                fs.unlinkSync(full);
+            }
+            archived++;
+        } catch (e) {
+            errors.push(path.basename(full) + ': ' + e.message);
+        }
+    });
+    return { archived: archived, errors: errors };
+}
+
+/* Writes the child's one active, pre-filled Parent Interview PDF into the permanent
+   Administrative folder, mirroring seedWeightedEligibilityDoc:
+     - normal creation is idempotent (an existing generated PDF is indexed and returned);
+     - refresh mode (opts.overwrite) builds + indexes a replacement, then archives the
+       prior generated copies so nothing is destroyed and one canonical document remains;
+     - a signed 'interviewform' scan, if present, SHORT-CIRCUITS everything: the scan is
+       authoritative, so no generated starter is created or refreshed over it.
+
+   Best-effort and non-fatal for its callers (enrollment, backfill): a failure here must
+   never turn a successful enrollment into an error. */
+function seedParentInterviewDoc(studentId, opts) {
+    const id = parseInt(studentId, 10);
+    if (!id) return { ok: false, error: 'Invalid student id' };
+
+    // A signed scan is the authoritative interview. If one exists, do nothing — a
+    // generated starter must never sit alongside (or over) the real signed document.
+    const scan = latestParentInterviewScan(id);
+    if (scan.ok && scan.row) {
+        return { ok: true, skipped: true, reason: 'signed scan on file', name: scan.row.FileName };
+    }
+
+    // Parent Interview is an administrative, required-for-everyone document, so it
+    // lives beside weighted eligibility in the Administrative subfolder.
+    const folder = childSubFolder(id, 'Administrative');
+    if (folder.error) { console.warn('[SEED] ' + folder.error); return { ok: false, error: folder.error }; }
+
+    const overwrite = !!(opts && opts.overwrite);
+    let existing = [];
+    try { existing = fs.readdirSync(folder.path); } catch (e) { /* new folder */ }
+    const parent = path.dirname(folder.path);
+    const isInterview = n => /parent interview/i.test(n) && /\.pdf$/i.test(n);
+    const priorForms = existing.filter(isInterview).map(n => path.join(folder.path, n));
+    // Recognize a legacy copy that predates the Teacher/Administrative split instead
+    // of creating a second, exactly as the weighted seed does.
+    try {
+        fs.readdirSync(parent).filter(isInterview).forEach(n => priorForms.push(path.join(parent, n)));
+    } catch (e) { /* parent unreadable — no legacy copy to consider */ }
+    if (priorForms.length) {
+        if (!overwrite) {
+            const prior = priorForms.sort((a, b) => {
+                try { return fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs; } catch (e) { return 0; }
+            })[0];
+            const indexed = indexParentInterviewDoc(id, prior);
+            if (!indexed.ok) return { ok: false, error: indexed.error, rel: path.relative(findDocRoot() || '', prior).replace(/\\/g, '/') };
+            invalidateDocCache();
+            return { ok: true, skipped: true, path: prior, rel: indexed.rel, name: indexed.name };
+        }
+        // Refresh mode keeps priorForms in place until the replacement is written and
+        // indexed; they are archived only at the end.
+    }
+
+    const recs = parentInterviewRecordsForSeed(id);
+    if (recs.error) { console.warn('[SEED] ' + recs.error); return { ok: false, error: recs.error }; }
+    const { enroll, intake } = recs;
+
+    const programCode = String(enroll.PFA_PI_na || '').trim().toUpperCase();
+    const programLabel = programCode === 'PFA' ? 'Preschool for All'
+        : programCode === 'PI' ? 'Prevention Initiative'
+        : (String(enroll.PFA_PI_na || '').trim() || 'Other / not assigned');
+    const childName = (enroll.First_Name + ' ' + enroll.Last_Name).trim();
+
+    // Build the pre-filled answers through the ONE shared crosswalk, then its printable
+    // blocks. enroll is the c.enr half, intake the c.pe half.
+    let prefill, blocks;
+    try {
+        prefill = interviewFormDataFromRecords(enroll, intake);
+        blocks = interviewFormBlocks(prefill.formData);
+    } catch (e) {
+        console.error('[SEED] could not build parent interview content: ' + e.message);
+        return { ok: false, error: e.message };
+    }
+
+    const rows = [
+        { label: 'Child', value: childName || ('Student ' + id) },
+        { label: 'Date of birth', value: enroll.Birth_date || '\u2014' },
+        { label: 'Enrollment date', value: enroll.Start_Date || '\u2014' },
+        { label: 'Program', value: programLabel },
+        { label: 'Preferred language', value: prefill.preferredLanguage || '\u2014' }
+    ];
+
+    // A short note so the reader knows what the blank fields mean: pre-enrollment
+    // answers are carried; the interview-only compliance sections are filled in person.
+    const leadBlocks = [
+        { heading: 'Pre-filled from the family\u2019s pre-enrollment application',
+          text: 'The answers below were carried forward from the pre-enrollment application, so '
+              + 'the family is not asked again for what they already told us. Confirm or correct '
+              + 'them at the interview, then capture signatures. Sections with no pre-enrollment '
+              + 'source \u2014 medical history, authorized pick-ups, insurance \u2014 are completed in person.' }
+    ];
+
+    // A printed signature block at the foot of the document. buildFormPdf's signature
+    // renderer only draws an entry that carries an embedded JPEG, so an unsigned
+    // generated starter passes signatures:[] (like the weighted form) and prints these
+    // ruled lines for a wet signature instead. Electronic signatures are captured on the
+    // roster into the saved record; a signed scan, once filed, supersedes this copy.
+    const signatureBlock = {
+        heading: 'Signatures',
+        text: 'Parent / Guardian: ______________________________   Date: ______________\n\n'
+            + 'Staff: __________________________________________   Date: ______________'
+    };
+
+    let pdf;
+    try {
+        pdf = buildFormPdf({
+            title: 'Prevention Initiative Parent Interview',
+            subtitle: 'Children of Promise LLC \u2014 ' + programLabel,
+            rows: rows,
+            blocks: leadBlocks.concat(blocks, [signatureBlock]),
+            signatures: [],
+            footer: 'Children of Promise LLC \u2014 ' + new Date().toLocaleString('en-US')
+        });
+    } catch (e) {
+        console.error('[SEED] could not build parent interview PDF: ' + e.message);
+        return { ok: false, error: e.message };
+    }
+
+    const stamp = new Date().toISOString().slice(0, 10);
+    const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
+    const base = (safe(childName) || ('Student ' + id)) + ' - Parent Interview - ' + stamp;
+    let target = path.join(folder.path, base + '.pdf');
+    let n = 2;
+    while (fs.existsSync(target) && n < 50) { target = path.join(folder.path, base + ' (' + n + ').pdf'); n++; }
+    try {
+        fs.writeFileSync(target, pdf);
+        console.log('[SEED] parent interview -> ' + path.relative(findDocRoot() || '', target));
+    } catch (e) {
+        console.error('[SEED] could not write parent interview PDF: ' + e.message);
+        return { ok: false, error: e.message };
+    }
+    invalidateDocCache();
+    const indexed = indexParentInterviewDoc(id, target);
+    if (!indexed.ok) {
+        // The canonical pointer did not switch, so remove only the new unindexed attempt;
+        // every prior copy is untouched.
+        try { fs.unlinkSync(target); } catch (e) { /* best-effort cleanup */ }
+        return {
+            ok: false,
+            error: 'The replacement PDF could not be recorded; the previous form was left unchanged: ' + indexed.error
+        };
+    }
+    const archived = overwrite
+        ? archiveParentInterviewForms(priorForms, folder.path)
+        : { archived: 0, errors: [] };
+    if (archived.errors.length) {
+        console.warn('[SEED] parent interview archive warnings for #' + id + ': ' + archived.errors.join('; '));
+    }
+    invalidateDocCache();
+    return {
+        ok: true, path: target, rel: indexed.rel, name: indexed.name,
+        filled: prefill.filled, archived: archived.archived, archiveWarnings: archived.errors
     };
 }
 
@@ -5203,6 +5511,11 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
                 if (newId) {
                     const seeded = seedWeightedEligibilityDoc(newId);
                     if (!seeded.ok) console.warn('[ENROLL] child folder/seed deferred: ' + (seeded.error || 'unknown'));
+                    // The pre-filled Parent Interview is filed at enrollment too, the same
+                    // best-effort way — a failure must not fail the enrollment, and the
+                    // document is created lazily on first open if it is deferred here.
+                    const piSeeded = seedParentInterviewDoc(newId);
+                    if (!piSeeded.ok) console.warn('[ENROLL] parent interview seed deferred: ' + (piSeeded.error || 'unknown'));
                 } else {
                     console.warn('[ENROLL] could not read new student id; folder will be created on first filing');
                 }
@@ -9564,6 +9877,38 @@ ELSE
         });
     }
 
+    /* POST one child's pre-filled Parent Interview PDF — the Parent Interview twin of
+       /api/weighted-eligibility/:id above. The PI Roster calls this to generate the
+       starter in place for a child who does not yet have one.
+
+       Create-only by default (seedParentInterviewDoc indexes an existing generated copy
+       rather than replacing it, and yields entirely to a signed scan). ?overwrite=1
+       refreshes with the current pre-enrollment answers, archiving the prior generated
+       copy. The 'skipped' flag distinguishes "already existed / scan on file" from
+       "newly created" for the caller's toast. */
+    const piDocOne = url.match(/^\/api\/parent-interview-doc\/(\d+)$/);
+    if (req.method === 'POST' && piDocOne) {
+        if (!checkClassroomAuth(req, res)) return;
+        const studentId = parseInt(piDocOne[1], 10);
+        const overwrite = new URLSearchParams(req.url.split('?')[1] || '').get('overwrite') === '1';
+        let out;
+        try { out = seedParentInterviewDoc(studentId, { overwrite: overwrite }); }
+        catch (e) { out = { ok: false, error: e.message }; }
+        if (!out || !out.ok) {
+            return sendJSON(res, 500, {
+                error: (out && out.error) || 'Could not create the parent interview form.',
+                relPath: out && out.rel || undefined
+            });
+        }
+        return sendJSON(res, 200, {
+            success: true,
+            created: !out.skipped,
+            reason: out.reason,
+            relPath: out.rel,
+            name: out.name || path.basename(out.path || out.rel || 'Parent Interview.pdf')
+        });
+    }
+
     /* POST one-time backfill: a folder for every currently-enrolled child, each with a
        pre-filled weighted-eligibility form in it (internal - protected).
 
@@ -9584,6 +9929,10 @@ ELSE
         if (!list.ok) return sendJSON(res, 500, { error: list.error });
         const ids = list.rows.map(r => parseInt(r.Id)).filter(Boolean);
         let created = 0, skipped = 0, failed = 0, archived = 0;
+        // The Parent Interview is now filed at enrollment the same way, so the one-off
+        // backfill catches up both documents for children already enrolled. Counted
+        // separately so the summary says what happened to each.
+        let piCreated = 0, piSkipped = 0, piFailed = 0, piArchived = 0;
         const errors = [], archiveWarnings = [];
         for (const id of ids) {
             let out;
@@ -9596,14 +9945,30 @@ ELSE
                 if (out.archiveWarnings && out.archiveWarnings.length && archiveWarnings.length < 10) {
                     archiveWarnings.push('#' + id + ': ' + out.archiveWarnings.join('; '));
                 }
-            } else { failed++; if (errors.length < 10) errors.push('#' + id + ': ' + (out && out.error || 'unknown')); }
+            } else { failed++; if (errors.length < 10) errors.push('WE #' + id + ': ' + (out && out.error || 'unknown')); }
+
+            let piOut;
+            try { piOut = seedParentInterviewDoc(id, { overwrite: overwrite }); }
+            catch (e) { piOut = { ok: false, error: e.message }; }
+            if (piOut && piOut.ok && piOut.skipped) piSkipped++;
+            else if (piOut && piOut.ok) {
+                piCreated++;
+                piArchived += parseInt(piOut.archived, 10) || 0;
+                if (piOut.archiveWarnings && piOut.archiveWarnings.length && archiveWarnings.length < 10) {
+                    archiveWarnings.push('PI #' + id + ': ' + piOut.archiveWarnings.join('; '));
+                }
+            } else { piFailed++; if (errors.length < 10) errors.push('PI #' + id + ': ' + (piOut && piOut.error || 'unknown')); }
         }
-        console.log(`[BACKFILL] overwrite=${overwrite} children=${ids.length} created=${created} skipped=${skipped} archived=${archived} failed=${failed}`);
+        console.log(`[BACKFILL] overwrite=${overwrite} children=${ids.length} WE(created=${created} skipped=${skipped} archived=${archived} failed=${failed}) PI(created=${piCreated} skipped=${piSkipped} archived=${piArchived} failed=${piFailed})`);
         return sendJSON(res, 200, {
-            success: true, total: ids.length, created, skipped, archived, failed,
+            success: true, total: ids.length,
+            created, skipped, archived, failed,
+            parentInterview: { created: piCreated, skipped: piSkipped, archived: piArchived, failed: piFailed },
             errors: errors.length ? errors : undefined,
             archiveWarnings: archiveWarnings.length ? archiveWarnings : undefined,
-            message: `${ids.length} enrolled children: ${created} ${overwrite ? 'universal form(s) rebuilt' : 'new form(s)'}, ${skipped} already current, ${archived} superseded file(s) archived, ${failed} failed.`
+            message: `${ids.length} enrolled children. `
+                + `Weighted Eligibility: ${created} ${overwrite ? 'rebuilt' : 'new'}, ${skipped} already current, ${archived} archived, ${failed} failed. `
+                + `Parent Interview: ${piCreated} ${overwrite ? 'rebuilt' : 'new'}, ${piSkipped} already current/scan on file, ${piArchived} archived, ${piFailed} failed.`
         });
     }
 

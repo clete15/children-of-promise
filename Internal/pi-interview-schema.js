@@ -208,6 +208,7 @@ const PI_INTERVIEW_SCHEMA = [
         { id: 'peCaregiverOther', label: 'Child is being raised by a caregiver other than a parent (grandparent, relative, guardian)', type: 'yesno', full: true },
         { id: 'peNoHSDiploma', label: 'Primary caregiver has not completed high school or a GED', type: 'yesno', full: true },
         { id: 'peNonEnglishHome', label: 'A language other than English is primarily spoken at home', type: 'yesno', full: true },
+        { id: 'peBornOutsideUS', label: 'Child or a parent was born outside the United States', type: 'yesno', full: true },
         { id: 'peParentEll', label: 'Parent or primary caregiver is still learning English (PI5.F)', type: 'yesno', full: true },
         { id: 'pePriorEarlyLearning', label: 'Child has previously attended a formal early learning program', type: 'yesno', full: true },
         { id: 'peBrightpointSubsidy', label: 'Family receives Brightpoint childcare subsidies', type: 'yesno', full: true },
@@ -467,6 +468,7 @@ const PI_INTERVIEW_PREFILL = [
     ['peCaregiverOther', c => piYesNo(c.pe.CaregiverOther)],
     ['peNoHSDiploma', c => piYesNo(c.pe.NoHSDiploma)],
     ['peNonEnglishHome', c => piYesNo(c.pe.NonEnglishHome)],
+    ['peBornOutsideUS', c => piYesNo(c.pe.BornOutsideUS)],
     ['peParentEll', c => piYesNo(c.pe.ParentEll)],
     ['pePriorEarlyLearning', c => piYesNo(c.pe.PriorEarlyLearning)],
     ['peBrightpointSubsidy', c => piYesNo(c.pe.BrightpointSubsidy)],
@@ -590,4 +592,91 @@ function interviewFormBlocks(fd) {
         if (lines.length) blocks.push({ heading: sec.title, text: lines.join('\n') });
     });
     return blocks;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DOM-free prefill  (server side)
+
+   applyInterviewPrefill() above writes straight into rendered inputs, so it only
+   runs in a browser. The server needs the SAME crosswalk to produce the pre-filled
+   Parent Interview PDF it files at enrollment — and it must be the same crosswalk,
+   not a second copy, or the two drift exactly the way isbe.html and parent.html once
+   did. So the context-building and rule-application are factored out here and shared:
+   the browser path tints DOM fields, this path fills a plain object, both walk the one
+   PI_INTERVIEW_PREFILL table.
+
+   Takes the enrollment row and the intake record in the SAME shapes the browser gets:
+     student  the rptMasterEnrollment row (c.enr in the rules)
+     intake   the /api/student-intake record (c.pe); found:false or null = none
+   Returns { formData, preferredLanguage, filled } where formData is keyed by schema id
+   and is exactly what loadInterviewForm()/interviewFormBlocks()/serializeInterviewForm()
+   expect. Nothing is written for a blank value, so an unanswered question stays absent
+   from formData rather than becoming an empty string — the same "never a blank" rule
+   piPrefill enforces in the browser. */
+function buildInterviewPrefillContext(student, intake) {
+    const enr = student || {};
+    // Mirror applyInterviewPrefill: accept any intake-shaped object, reject only an
+    // explicit found:false (the two historical callers pass different shapes).
+    const pe = (intake && typeof intake === 'object' && intake.found !== false) ? intake : {};
+    return {
+        enr: enr,
+        pe: pe,
+        parentName: [pe.ParentFirst, pe.ParentLast].filter(Boolean).join(' '),
+        language: pe.HomeLanguage || enr.HomeLanguage || '',
+        isFoster: String(enr.Category || '').trim().toLowerCase() === 'foster'
+    };
+}
+
+function interviewFormDataFromRecords(student, intake) {
+    const ctx = buildInterviewPrefillContext(student, intake);
+    const formData = {};
+    let filled = 0;
+    PI_INTERVIEW_PREFILL.forEach(rule => {
+        const id = rule[0];
+        let v;
+        // One bad value must not abandon the rest of the prefill (same as the DOM path).
+        try { v = rule[1](ctx); } catch (e) { v = ''; }
+        if (v == null || v === '') return;
+        if (Array.isArray(v)) {
+            if (!v.length) return;
+            formData[id] = v;
+        } else {
+            formData[id] = v;
+        }
+        filled++;
+    });
+    // PI5.L preferred language lives outside the schema (in the admin modal's own
+    // Language & Translation block), so it is returned separately for the caller to
+    // store on the ParentInterviews row rather than in the form blob.
+    return { formData: formData, preferredLanguage: ctx.language, filled: filled };
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Node export guard
+
+   In the browser this file is loaded via <script src> and every name above is a
+   global, which is what the admin roster and parent portal call. Under Node (the
+   server's document seeder, and the pre-enrollment → interview cross-check script)
+   the same definitions are reached through require(). `module` is undefined in the
+   browser, so the guard keeps the one file serving both without a bundler.
+
+   Only the DOM-free pieces are exported: the schema, the crosswalk table, the pure
+   helpers, the printable-blocks builder, and the server-side transform. The
+   DOM-bound functions (renderInterviewForm, serializeInterviewForm, piPrefill, …)
+   are intentionally left out — they do nothing useful without a document. */
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        PI_INTERVIEW_SCHEMA: PI_INTERVIEW_SCHEMA,
+        PI_FIELD_BY_ID: PI_FIELD_BY_ID,
+        PI_INTERVIEW_PREFILL: PI_INTERVIEW_PREFILL,
+        PI_PROGRAM_LABELS: PI_PROGRAM_LABELS,
+        piIsYes: piIsYes,
+        piIsNo: piIsNo,
+        piYesNo: piYesNo,
+        piYesNoUnsure: piYesNoUnsure,
+        piBenefitList: piBenefitList,
+        interviewFormBlocks: interviewFormBlocks,
+        buildInterviewPrefillContext: buildInterviewPrefillContext,
+        interviewFormDataFromRecords: interviewFormDataFromRecords
+    };
 }
