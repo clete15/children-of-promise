@@ -352,19 +352,24 @@
         .pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
         /* Parent Interview schema-rendered controls.
 
-           Options lay out on an even grid, not flex-wrap. A long option list
-           (living situation has eight, household structure six) wrapped into ragged
-           rows that did not line up column to column and read as a jumble. A grid of
-           equal columns keeps them aligned; auto-fill with a min width means a short
-           two-option question (Easy/Difficult) still sits side by side while a long
-           one fills the modal's width in tidy columns. Each option's label wraps
-           inside its own cell rather than pushing the next option out of line. */
+           Options lay out on an even grid, not flex-wrap. The long lists (living
+           situation has eight, household structure six) wrapped raggedly, and each
+           option was squeezed to one word per line with far columns clipped off the
+           edge. Fixed by: the group spanning both grid columns; auto-fit with a 220px
+           minimum so tracks fill the width and are wide enough for a phrase to wrap
+           over two lines; and min-width:0 on .pi-opt so the label can shrink to its
+           track instead of its longest word forcing an overflow. Kept identical to
+           parent.html, which renders the same schema. */
         .pi-radio-row, .pi-check-grid {
+            grid-column:1 / -1;
             display:grid;
-            grid-template-columns:repeat(auto-fill, minmax(150px, 1fr));
+            grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
             gap:6px 16px;padding:4px 0;
         }
-        .pi-opt { display:inline-flex;align-items:flex-start;gap:6px;font-size:0.82rem;color:#111;cursor:pointer;line-height:1.3; }
+        /* A two/three-option radio (Easy/Difficult) packs to content width rather than
+           stretching across the modal. .pi-short is set by the schema renderer. */
+        .pi-radio-row.pi-short { grid-template-columns:repeat(auto-fit, minmax(0, max-content)); gap:6px 26px; }
+        .pi-opt { display:flex;align-items:flex-start;gap:6px;min-width:0;font-size:0.82rem;color:#111;cursor:pointer;line-height:1.3;overflow-wrap:break-word; }
         /* flex:0 0 auto so the control keeps its size as the label wraps beside it. */
         .pi-opt input { flex:0 0 auto;margin:2px 0 0;accent-color:#2563eb; }
         .pi-yesno { display:inline-flex;gap:14px; }

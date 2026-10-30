@@ -256,7 +256,11 @@ function piRenderField(f) {
             + ['Yes', 'No'].map(v => '<label class="pi-opt"><input type="radio" name="pf_' + f.id + '" value="' + v + '">' + v + '</label>').join('')
             + '</div>';
     } else if (f.type === 'radio') {
-        ctrl = '<div class="pi-radio-row">'
+        /* A short list (2-3 options, e.g. Easy/Difficult) gets .pi-short so the CSS
+           packs it to content width rather than stretching each choice across a wide
+           column. Long lists (living situation, household structure) keep the full
+           even-column grid. */
+        ctrl = '<div class="pi-radio-row' + (f.opts.length <= 3 ? ' pi-short' : '') + '">'
             + f.opts.map(o => '<label class="pi-opt"><input type="radio" name="pf_' + f.id + '" value="' + piEsc(o[0]) + '">' + piEsc(o[1]) + '</label>').join('')
             + '</div>';
     } else if (f.type === 'checks') {

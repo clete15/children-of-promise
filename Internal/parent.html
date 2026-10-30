@@ -107,20 +107,37 @@
         .pi-field input:focus, .pi-field textarea:focus, .pi-field select:focus {
             outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
         .pi-full { grid-column:1/-1; }
-        /* Yes/No and radio/checkbox groups. Options lay out on an even grid rather
-           than flex-wrap: a long list (living situation has eight choices, household
-           structure six) wrapped into ragged rows that did not line up column to
-           column and read as a jumble. auto-fill with a min width keeps them in tidy
-           aligned columns, while a short two-option question still sits side by side.
-           The dot stays top-aligned so a label that wraps to two lines does not push
-           the control off-centre. (Mirrors the same fix in isbe.html's modal.) */
+        /* Yes/No and radio/checkbox groups.
+
+           Options lay out on an even grid instead of flex-wrap. The long lists
+           (living situation has eight choices, household structure six) wrapped into
+           ragged rows that did not line up, and before this each option was also
+           being squeezed to one word per line with the far columns clipped off the
+           right edge. Three things fix that together:
+             - grid-column:1/-1 so the group spans the whole modal, not one half;
+             - auto-fit + a 220px minimum so tracks stretch to fill the width (no
+               phantom empty column) and are wide enough for a phrase like "Shares
+               housing due to loss of housing / hardship" to wrap over two lines;
+             - min-width:0 on .pi-opt (below) so the label can actually shrink to its
+               track — without it the longest word set a floor that overflowed.
+           The dot is top-aligned so a two-line label keeps it level with the first
+           line. (Mirrors the same fix in isbe.html's modal.) */
         .pi-yesno { display:flex; gap:18px; padding:4px 0; }
         .pi-radio-row, .pi-check-grid {
-            display:grid; grid-template-columns:repeat(auto-fill, minmax(165px, 1fr));
+            grid-column:1 / -1;
+            display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
             gap:8px 18px; padding:4px 0;
         }
-        .pi-opt { display:inline-flex; align-items:flex-start; gap:7px; font-size:0.86rem; color:#1e293b; cursor:pointer; line-height:1.3; }
+        /* A two-option radio (Easy / Difficult) should sit compactly, not stretch each
+           choice across half the modal. Packs them to content width instead. */
+        .pi-radio-row.pi-short { grid-template-columns:repeat(auto-fit, minmax(0, max-content)); gap:8px 28px; }
+        /* min-width:0 is the load-bearing line: without it the flex text child refuses
+           to shrink below its longest word, which is what forced each option wider than
+           its track and pushed columns off the right edge. */
+        .pi-opt { display:flex; align-items:flex-start; gap:7px; min-width:0;
+            font-size:0.86rem; color:#1e293b; cursor:pointer; line-height:1.3; }
         .pi-opt input { margin:2px 0 0; width:16px; height:16px; accent-color:#2563eb; flex:0 0 auto; }
+        .pi-opt > span, .pi-opt { word-break:normal; overflow-wrap:break-word; }
         /* A prefilled field gets a soft tint so the family sees what we already have. */
         .pi-prefilled input, .pi-prefilled textarea, .pi-prefilled select,
         .pi-prefilled .pi-radio-row, .pi-prefilled .pi-yesno, .pi-prefilled .pi-check-grid { background:#eff6ff; }
