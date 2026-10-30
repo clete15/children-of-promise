@@ -431,7 +431,25 @@ const PI_INTERVIEW_PREFILL = [
     ['incarcerated', c => piIsYes(c.pe.ParentIncarcerated) ? 'Yes' : ''],
     ['immigrated', c => piIsYes(c.pe.BornOutsideUS) ? 'Yes' : ''],
     ['livingSituation', c => piIsYes(c.pe.Homeless) ? 'shares' : ''],
-    ['householdStructure', c => piIsYes(c.pe.TeenParent) ? 'teenParent' : ''],
+    /* Household structure. The application asks two things that both land here:
+       whether the family is single- or two-parent (LivingSituation), and whether a
+       teen parent lives with their own parents (TeenParent). A teen-parent household
+       is the more specific fact, so it wins; otherwise the both/single answer maps
+       straight across. Left blank when the application said neither, so the
+       interviewer still chooses among the options the intake cannot express
+       (other adult in home, shared custody). */
+    ['householdStructure', c => {
+        if (piIsYes(c.pe.TeenParent)) return 'teenParent';
+        const ls = String(c.pe.LivingSituation || '').trim().toLowerCase();
+        if (ls === 'single parent' || ls === 'single') return 'singleParent';
+        if (ls === 'both parents' || ls === 'both') return 'bothParents';
+        return '';
+    }],
+    /* Non-English home → the Parent/Guardian 1 "translator needed?" question. The
+       family told us at intake they primarily speak another language, so flag that a
+       translator is worth arranging rather than leaving the interviewer to rediscover
+       it. Only a Yes is carried; a No or blank leaves it open. */
+    ['parent1Translator', c => piIsYes(c.pe.NonEnglishHome) ? 'Yes' : ''],
     ['additionalNotes', c => c.pe.Notes],
 
     // ── The appendix: answers with no equivalent question on the state form,
