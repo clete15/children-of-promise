@@ -691,6 +691,72 @@ async function createWeightedEligibility(studentId, button) {
         alert('Could not create the weighted eligibility form: ' + (e.message || e));
     }
 }
+
+/* Parent Interview cell for the Administrative grid — the twin of the Weighted
+   Eligibility pill, a universal document every child needs.
+
+   What it shows, in priority order (the first that applies wins):
+     1. A signed SCAN on file (kind 'interviewform') is the authoritative interview.
+        Green "✓ on file", opens the scan. A small [replace] re-uploads.
+     2. No scan, but a pre-filled PDF was generated at enrollment (kind 'generated').
+        A "✓ pre-filled" pill opens it to print/sign, and an "upload signed" slot
+        files the completed scan.
+     3. Nothing yet (a legacy child with no pre-enrollment record, so no generated
+        starter). Upload-only: file the signed paper interview.
+   Opening and the scan upload both go through the SAME endpoints the ISBE roster
+   uses, so the two pages stay in step. */
+function parentInterviewAdminCell(s) {
+    var scan = (window.ChildForms && ChildForms.fileFor) ? ChildForms.fileFor(s.Id, 'ParentInterview', 'interviewform') : null;
+    var gen = (window.ChildForms && ChildForms.fileFor) ? ChildForms.fileFor(s.Id, 'ParentInterview', 'generated') : null;
+    var uploadSlot = function (label, title) {
+        return '<label class="cfg-attach" style="font-weight:600;color:#64748b;" title="' + title + '">' + label
+            + '<input type="file" style="display:none;" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"'
+            + ' onchange="uploadInterviewScanAdmin(' + s.Id + ',this)"></label>';
+    };
+    if (scan && scan.relPath) {
+        return '<td class="cfg-cell filed">'
+            + '<a href="#" class="cfg-pill on" title="Signed Parent Interview on file \u2014 click to open"'
+            + ' onclick="event.preventDefault();openDoc(\'' + String(scan.relPath).replace(/'/g, "\\'")
+            + '\',\'' + String(scan.name || 'Parent Interview').replace(/'/g, "\\'") + '\')">\u2713 on file</a>'
+            + ' ' + uploadSlot('\u21bb', 'Replace with a newer signed scan; the previous file is retained')
+            + '</td>';
+    }
+    if (gen && gen.relPath) {
+        return '<td class="cfg-cell">'
+            + '<a href="#" class="cfg-pill on" title="Pre-filled Parent Interview \u2014 click to open, print, and sign. Upload the signed copy to complete it."'
+            + ' onclick="event.preventDefault();openDoc(\'' + String(gen.relPath).replace(/'/g, "\\'")
+            + '\',\'' + String(gen.name || 'Parent Interview').replace(/'/g, "\\'") + '\')">\u2713 pre-filled</a>'
+            + ' ' + uploadSlot('\u2795 signed', 'Upload the signed Parent Interview to file it as complete')
+            + '</td>';
+    }
+    return '<td class="cfg-cell">'
+        + uploadSlot('\u2795 Upload', 'Upload the signed paper Parent Interview into this child\u2019s Administrative folder')
+        + '</td>';
+}
+async function uploadInterviewScanAdmin(studentId, input) {
+    var file = input && input.files && input.files[0];
+    if (!file) return;
+    var fd = new FormData();
+    fd.append('file', file);
+    try {
+        var res = await fetch('/api/child-file-upload?studentId=' + encodeURIComponent(studentId)
+            + '&field=ParentInterview&kind=interviewform'
+            + '&year=' + encodeURIComponent(activeYear),
+            Object.assign({ method: 'POST', body: fd },
+                (window.CofpAuth && CofpAuth.headers) ? { headers: CofpAuth.headers() } : {}));
+        var d = await res.json();
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        var rel = d.relPath || d.rel;
+        if (rel && window.ChildForms && ChildForms.markFile) {
+            ChildForms.markFile(studentId, 'ParentInterview', 'interviewform', rel, d.name || file.name);
+        }
+        renderAdmin();
+    } catch (e) {
+        alert('Could not upload the Parent Interview: ' + (e.message || e));
+    } finally {
+        if (input) input.value = '';
+    }
+}
 function renderAdmin() {
     var body = document.getElementById('afBody');
     var roster = (activeRoom === 'all' ? activeRoster() : roomRoster(activeRoom)).slice().sort(sortByRoomThenName);
@@ -700,6 +766,7 @@ function renderAdmin() {
     }
     var head = '<tr><th class="cfg-name">Child</th>'
         + '<th>Weighted<br>Eligibility</th>'
+        + '<th>Parent<br>Interview</th>'
         + CHILD_DOCS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
         + DOC_FORM_COLS.map(function (d) { return '<th>' + escapeHtml(d.label) + '</th>'; }).join('')
         + '</tr>';
@@ -760,7 +827,7 @@ function renderAdmin() {
         }).join('');
         var prog = (s.PFA_PI_na === 'PFA' || s.PFA_PI_na === 'PI') ? '<span class="cfg-prog">' + s.PFA_PI_na + '</span>' : '';
         return '<tr><td class="cfg-name">' + escapeHtml(s.Last_Name + ', ' + s.First_Name) + prog + '</td>'
-            + weightedAdminCell(s) + cells + formCells + '</tr>';
+            + weightedAdminCell(s) + parentInterviewAdminCell(s) + cells + formCells + '</tr>';
     }).join('');
     body.innerHTML = '<table class="cfg"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table>'
         + '<div style="font-size:0.7rem;color:#94a3b8;margin:10px 20px;">* Behavior and transition plans are only required where applicable.</div>';
