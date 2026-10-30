@@ -319,20 +319,24 @@
         .pi-modal-header .pi-close { background:none;border:none;font-size:1.5rem;cursor:pointer;color:#6b7280;padding:4px 8px;border-radius:4px; }
         .pi-modal-header .pi-close:hover { background:#f3f4f6;color:#111; }
         .pi-modal-body { padding:24px; }
-        .pi-section { margin-bottom:20px; }
-        .pi-section h4 { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin:0 0 10px 0;padding-bottom:6px;border-bottom:1px solid #f3f4f6; }
-        .pi-grid { display:grid;grid-template-columns:1fr 1fr;gap:10px 16px; }
+        /* Each section reads as a distinct block in the ~100-field form. Kept in step
+           with the shared copy in classroom-forms.js (child-files / parent portal). */
+        .pi-section { margin:0 0 18px;padding:0 0 16px;border-bottom:1px solid #f1f5f9; }
+        .pi-section:last-child { border-bottom:none;margin-bottom:0;padding-bottom:0; }
+        .pi-section h4 { font-size:0.74rem;font-weight:800;text-transform:uppercase;letter-spacing:0.07em;color:#1e3a8a;margin:0 0 12px 0;padding-bottom:7px;border-bottom:2px solid #eef2f7;display:flex;align-items:center;gap:8px; }
+        .pi-grid { display:grid;grid-template-columns:1fr 1fr;gap:11px 18px;align-items:start;min-width:0; }
         .pi-grid.three { grid-template-columns:1fr 1fr 1fr; }
-        .pi-field { display:flex;flex-direction:column;gap:3px; }
-        .pi-field label { font-size:0.7rem;font-weight:600;color:#6b7280; }
-        .pi-field .pi-value { font-size:0.82rem;font-weight:500;color:#111;padding:6px 10px;background:#f8fafc;border-radius:6px;min-height:28px;display:flex;align-items:center; }
+        .pi-field { display:flex;flex-direction:column;gap:5px;min-width:0; }
+        .pi-field label { font-size:0.72rem;font-weight:600;color:#475569;line-height:1.35; }
+        .pi-field .pi-value { font-size:0.85rem;font-weight:600;color:#0f172a;padding:7px 11px;background:#f8fafc;border:1px solid #eef2f7;border-radius:7px;min-height:26px;display:flex;align-items:center; }
+        .pi-field input, .pi-field textarea, .pi-field select { max-width:100%;box-sizing:border-box; }
         /* The interview modal is always a white card, so its controls are explicitly
            light (white bg, dark text) regardless of the page's light/dark theme. Without
            the explicit color/background, dark-mode inherited these tokens and rendered
            dark-text-on-dark inputs and an unreadable Translator dropdown. */
-        .pi-field textarea, .pi-field input[type=text], .pi-field input[type=date] { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;resize:vertical;background:#fff;color:#111; }
-        .pi-field textarea { min-height:60px; }
-        .pi-field textarea:focus, .pi-field input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .pi-field textarea, .pi-field input[type=text], .pi-field input[type=date] { font-size:0.85rem;padding:8px 11px;border:1px solid #d1d5db;border-radius:8px;font-family:inherit;resize:vertical;background:#fff;color:#111;transition:border-color .12s, box-shadow .12s; }
+        .pi-field textarea { min-height:60px;line-height:1.45; }
+        .pi-field textarea:focus, .pi-field input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
         .pi-full { grid-column:1/-1; }
         .pi-modal-footer { padding:16px 24px;border-top:1px solid #e5e7eb;display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:white;border-radius:0 0 12px 12px; }
         .pi-btn { padding:8px 18px;border-radius:6px;font-size:0.82rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all 0.15s; }
@@ -347,39 +351,42 @@
         .pi-flag { padding:3px 9px;border-radius:12px;background:#fef2f2;color:#b91c1c;font-size:0.7rem;font-weight:700;white-space:nowrap; }
 
         /* PICC document forms (rendered from pi-forms.js) */
-        .pi-field select { font-size:0.82rem;padding:8px 10px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit;background:#fff;color:#111; }
+        .pi-field select { font-size:0.85rem;padding:8px 11px;border:1px solid #d1d5db;border-radius:8px;font-family:inherit;background:#fff;color:#111;transition:border-color .12s, box-shadow .12s;max-width:100%;box-sizing:border-box; }
         .pi-field select option { color:#111;background:#fff; }
-        .pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
-        /* Parent Interview schema-rendered controls.
-
-           Options lay out on an even grid, not flex-wrap. The long lists (living
-           situation has eight, household structure six) wrapped raggedly, and each
-           option was squeezed to one word per line with far columns clipped off the
-           edge. Fixed by: the group spanning both grid columns; auto-fit with a 220px
-           minimum so tracks fill the width and are wide enough for a phrase to wrap
-           over two lines; and min-width:0 on .pi-opt so the label can shrink to its
-           track instead of its longest word forcing an overflow. Kept identical to
-           parent.html, which renders the same schema. */
-        .pi-radio-row, .pi-check-grid {
-            grid-column:1 / -1;
-            display:grid;
-            grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
-            gap:6px 16px;padding:4px 0;
-        }
-        /* A two/three-option radio (Easy/Difficult) packs to content width rather than
-           stretching across the modal. .pi-short is set by the schema renderer. */
-        .pi-radio-row.pi-short { grid-template-columns:repeat(auto-fit, minmax(0, max-content)); gap:6px 26px; }
-        .pi-opt { display:flex;align-items:flex-start;gap:6px;min-width:0;font-size:0.82rem;color:#111;cursor:pointer;line-height:1.3;overflow-wrap:break-word; }
-        /* flex:0 0 auto so the control keeps its size as the label wraps beside it. */
-        .pi-opt input { flex:0 0 auto;margin:2px 0 0;accent-color:#2563eb; }
-        .pi-yesno { display:inline-flex;gap:14px; }
-        .pi-repeat table { width:100%;border-collapse:collapse;font-size:0.8rem; }
-        .pi-repeat th { text-align:left;font-size:0.68rem;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.04em;padding:2px 6px; }
-        .pi-repeat td { padding:2px 6px; }
-        .pi-repeat td input { width:100%;box-sizing:border-box;font-size:0.8rem;padding:6px 8px;border:1px solid #d1d5db;border-radius:6px;font-family:inherit; }
-        .pi-repeat .pi-rowdel { background:none;border:none;color:#b91c1c;cursor:pointer;font-size:1rem;padding:0 6px;line-height:1; }
-        .pi-repeat-add { margin-top:6px;font-size:0.76rem;font-weight:600;color:#2563eb;background:none;border:1px dashed #93c5fd;border-radius:6px;padding:6px 12px;cursor:pointer; }
-        .pi-prefilled input, .pi-prefilled textarea, .pi-prefilled select { background:#f0f7ff; }
+        .pi-field select:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.12); }
+        /* ── Parent Interview schema-rendered controls ──────────────────────────
+           Redesigned so multi-option questions read cleanly and NOTHING overflows the
+           modal (the old minmax(220px) auto-fit packed too many narrow columns, wrapped
+           labels one word per line and clipped the last column off the right edge).
+           Options are selectable cards: a comfortable track that collapses to one column
+           before it can overflow, the label flowing beside the control, and a clear
+           selected state. Kept byte-for-byte in step with classroom-forms.js, which
+           renders the same schema on child-files and the parent portal. */
+        .pi-modal-body, .pi-section, .pi-grid, .pi-field { min-width:0; }
+        .pi-radio-row, .pi-check-grid { grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fill, minmax(min(100%, 230px), 1fr));gap:8px;padding:2px 0; }
+        .pi-radio-row.pi-short { display:flex;flex-wrap:wrap;gap:8px; }
+        .pi-radio-row.pi-short .pi-opt { flex:0 1 auto;min-width:120px; }
+        .pi-opt { display:flex;align-items:flex-start;gap:9px;min-width:0;font-size:0.82rem;color:#1f2937;cursor:pointer;line-height:1.35;overflow-wrap:anywhere;border:1px solid #e5e7eb;border-radius:9px;background:#fff;padding:9px 12px;transition:border-color .12s, background .12s, box-shadow .12s; }
+        .pi-opt:hover { border-color:#bfd4fb;background:#f8faff; }
+        .pi-opt input { flex:0 0 auto;margin:1px 0 0;width:16px;height:16px;accent-color:#2563eb;cursor:pointer; }
+        .pi-opt:has(input:checked) { border-color:#2563eb;background:#eff4ff;box-shadow:inset 0 0 0 1px #2563eb;color:#1e3a8a;font-weight:600; }
+        .pi-yesno { display:flex;gap:8px;flex-wrap:wrap; }
+        .pi-yesno .pi-opt { flex:0 1 auto;min-width:92px;justify-content:flex-start; }
+        .pi-repeat { grid-column:1 / -1;overflow-x:auto;border:1px solid #eef2f7;border-radius:10px;padding:4px; }
+        .pi-repeat table { width:100%;border-collapse:separate;border-spacing:0;font-size:0.8rem;min-width:360px; }
+        .pi-repeat th { text-align:left;font-size:0.64rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:6px 8px 7px;background:#f8fafc;border-bottom:1px solid #eef2f7; }
+        .pi-repeat th:first-child { border-top-left-radius:7px; }
+        .pi-repeat th:last-child { border-top-right-radius:7px; }
+        .pi-repeat td { padding:4px 6px;vertical-align:middle; }
+        .pi-repeat td input { width:100%;box-sizing:border-box;font-size:0.8rem;padding:7px 9px;border:1px solid #d1d5db;border-radius:7px;font-family:inherit; }
+        .pi-repeat td input:focus { outline:none;border-color:#2563eb;box-shadow:0 0 0 2px rgba(37,99,235,0.1); }
+        .pi-repeat .pi-rowdel { background:none;border:none;color:#b91c1c;cursor:pointer;font-size:1.05rem;padding:0 6px;line-height:1;border-radius:5px; }
+        .pi-repeat .pi-rowdel:hover { background:#fef2f2; }
+        .pi-repeat-add { margin:8px 2px 2px;font-size:0.76rem;font-weight:600;color:#2563eb;background:#f5f8ff;border:1px dashed #93c5fd;border-radius:8px;padding:7px 14px;cursor:pointer;transition:background .12s; }
+        .pi-repeat-add:hover { background:#e9f1ff; }
+        .pi-prefilled input, .pi-prefilled textarea, .pi-prefilled select { background:#f0f7ff;border-color:#bfd4fb; }
+        .pi-prefilled > label { color:#1d4ed8; }
+        .pi-prefilled > label::after { content:" \00b7 from record";font-weight:600;font-size:0.66rem;color:#60a5fa;letter-spacing:0.02em; }
         /* Which checklist item this form satisfies, so staff can trace it back to the PICC */
         .doc-picc { font-size:0.74rem;color:#374151;background:#f8fafc;border-left:3px solid #2563eb;padding:10px 12px;border-radius:0 6px 6px 0;margin-bottom:16px;line-height:1.5; }
         .doc-picc strong { color:#1d4ed8; }
@@ -598,8 +605,9 @@
                for the family to complete. Prefilled selects keep their chosen value. */
             #piOverlay[data-printing] .pi-field select { color:transparent; }
             #piOverlay[data-printing] .pi-prefilled select { color:#000; }
-            /* Radios / checkboxes stay as tick boxes — fine on paper. Keep them black. */
-            #piOverlay[data-printing] .pi-opt { color:#000;font-size:0.8rem; }
+            /* Radios / checkboxes stay as tick boxes — fine on paper. Strip the on-screen
+               card chrome (border/fill/shadow) so printed options read as plain ticks. */
+            #piOverlay[data-printing] .pi-opt { color:#000;font-size:0.8rem;border:none;background:none;box-shadow:none;padding:2px 0;font-weight:400; }
             #piOverlay[data-printing] .pi-opt input { -webkit-appearance:auto;appearance:auto; }
             /* Repeat tables (siblings, doctors, pick-up list) print their column rules. */
             #piOverlay[data-printing] .pi-repeat th { color:#000; }
