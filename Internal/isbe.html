@@ -2732,10 +2732,21 @@ async function openGeneratedInterview(studentId, button) {
     try {
         const res = await apiFetch('/api/parent-interview-doc/' + encodeURIComponent(studentId), { method: 'POST' });
         const d = await res.json();
-        if (!res.ok || !d.success || !d.relPath) throw new Error(d.error || ('HTTP ' + res.status));
+        if (button) { button.removeAttribute('aria-disabled'); button.textContent = prev; }
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        /* The server succeeds but declines to produce a PDF (no relPath) when there is
+           no pre-enrollment record to pre-fill from — a legacy child enrolled before
+           the system, or entered manually. That is a correct outcome, not an error, so
+           explain it plainly instead of raising an alarm. The roster normally hides
+           this link for such children; this guard covers a stale in-session cell. */
+        if (!d.relPath) {
+            alert('There is no pre-enrollment application on file for this child, so there is '
+                + 'nothing to pre-fill. Complete the interview with the [form] button, or upload '
+                + 'the signed paper interview.');
+            return;
+        }
         ChildForms.markFile(studentId, 'ParentInterview', 'generated', d.relPath,
             d.name || 'Parent Interview');
-        if (button) { button.removeAttribute('aria-disabled'); button.textContent = prev; }
         openDoc(d.relPath, d.name || 'Parent Interview', true);
     } catch (e) {
         if (button) { button.removeAttribute('aria-disabled'); button.textContent = prev; }
@@ -3025,20 +3036,33 @@ function renderRoster() {
                         + ' onclick="event.preventDefault();openInterview(' + s.Id + ')">\u2713 on file</a>'
                         + '</td>';
                 }
-                /* Not done yet. Two ways in, both pre-filled from the family's
-                   pre-enrollment answers:
-                     [form]          the electronic modal — fill, sign, and save here;
-                     [pre-filled PDF] the generated document filed at enrollment — open
-                                      it to print or sign on paper / the IdeaTab.
-                   The interview-only compliance sections (medical history, pick-ups,
-                   insurance) have no pre-enrollment source and are completed at the
-                   interview either way. A signed scan, once uploaded, supersedes both. */
+                /* Not done yet.
+                     [form]           the electronic modal — fill, sign, and save here.
+                     [pre-filled PDF] the generated starter filed at enrollment — but
+                                      ONLY offered when one actually exists. It is filed
+                                      only for a child who came through online
+                                      pre-enrollment (there is something to pre-fill);
+                                      a legacy child enrolled before the system, or one
+                                      entered manually, has no pre-enrollment record and
+                                      so no generated PDF — for them we show no PDF link
+                                      and the signed paper interview is uploaded as a
+                                      scan instead. (Showing the link anyway produced a
+                                      "Could not open ... HTTP 200" error, because the
+                                      server correctly declines to generate one.)
+                   The interview-only sections (medical/social history, insurance) have
+                   no pre-enrollment source and are completed in person. A signed scan,
+                   once uploaded, supersedes everything here. */
+                const genDoc = window.ChildForms && ChildForms.fileFor
+                    ? ChildForms.fileFor(s.Id, f, 'generated') : null;
+                const pdfLink = (genDoc && genDoc.relPath)
+                    ? '<a href="#" style="' + LINK_STYLE + '" title="Open the pre-filled Parent Interview PDF (filed at enrollment from the family\u2019s pre-enrollment answers) to print or sign"'
+                        + ' onclick="event.preventDefault();openGeneratedInterview(' + s.Id + ',this)">[pre-filled PDF]</a>'
+                    : '';
                 return '<td class="' + tdc + '">'
                     + checkBox(s, f)
                     + formLink('openInterview(' + s.Id + ')',
                         'Open the electronic Parent Interview \u2014 pre-fills from pre-enrollment; fill, sign, and save')
-                    + '<a href="#" style="' + LINK_STYLE + '" title="Open the pre-filled Parent Interview PDF (filed at enrollment from the family\u2019s pre-enrollment answers) to print or sign"'
-                    + ' onclick="event.preventDefault();openGeneratedInterview(' + s.Id + ',this)">[pre-filled PDF]</a>'
+                    + pdfLink
                     + '</td>';
             }
 
