@@ -2674,7 +2674,7 @@ function seedParentInterviewDoc(studentId, opts) {
             // title carries no program name. The child's actual program still appears in
             // the Program row below as a data field, not in the heading.
             title: 'Parent Interview',
-            subtitle: 'Children of Promise LLC',
+            subtitle: 'Children of Promise',
             rows: rows,
             blocks: leadBlocks.concat(blocks, [signatureBlock]),
             signatures: [],
