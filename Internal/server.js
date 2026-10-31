@@ -2027,6 +2027,83 @@ function foodProgramFolder() {
     return { path: dir, rel: path.relative(DOC_ROOT, dir).replace(/\\/g, '/') };
 }
 
+/* The full CACFP annual-training manual, as printable blocks for the filed PDF, so the
+   saved document is the WHOLE training material (all mandatory topics) followed by the
+   signature sheet — not just a summary. One source of truth, kept in step with the
+   on-screen handout (Handouts/CACFP-Annual-Training.html). Each block is a heading plus
+   wrapped paragraph text (the PDF writer has no tables, so the meal-pattern amounts are
+   written out in lines). Summarised from the ISBE Administrative Handbook for CACFP
+   Centers, chapters 4, 6, 7 and 8. */
+const CACFP_TRAINING_MANUAL = [
+    { heading: '1. Meal Pattern Requirements', text:
+        'CACFP reimburses meals that meet the pattern for the child\u2019s age group \u2014 not individual foods. '
+        + 'A meal is reimbursable only when it contains every required component in at least the minimum amount; '
+        + 'extra foods are fine.\n'
+        + 'Child meal pattern, ages 1\u20132 / 3\u20135 / 6\u201312:\n'
+        + 'Breakfast \u2014 fluid milk 4 / 6 / 8 fl oz; vegetables or fruits \u00bc / \u00bd / \u00bd cup; grains \u00bd / \u00bd / 1 oz eq.\n'
+        + 'Lunch & supper \u2014 fluid milk 4 / 6 / 8 fl oz; meat/meat alternate 1 / 1\u00bd / 2 oz eq; vegetables \u215b / \u00bc / \u00bd cup; '
+        + 'fruits \u215b / \u00bc / \u00bc cup; grains \u00bd / \u00bd / 1 oz eq.\n'
+        + 'Snack (any 2 of 5) \u2014 fluid milk 4 / 4 / 8 fl oz; meat/meat alternate \u00bd / \u00bd / 1 oz eq; vegetables \u00bd / \u00bd / \u00be cup; '
+        + 'fruits \u00bd / \u00bd / \u00be cup; grains \u00bd / \u00bd / 1 oz eq.\n'
+        + 'Key rules: milk is unflavored whole for age 1; unflavored whole/reduced-fat/low-fat/fat-free for ages 2\u20135; '
+        + 'those plus flavored for age 6+; breastmilk substitutes for milk at any age. A whole grain-rich item must be '
+        + 'served and marked on the menu at least once a day. Juice only once per day, 100% pasteurized. No grain-based '
+        + 'desserts. Breakfast cereal no more than 6 g added sugar per dry oz; yogurt no more than 12 g per 6 oz. Snack '
+        + 'needs 2 of 5 components and only one may be a beverage. For combination/processed foods keep a CN label, '
+        + 'product formulation statement, or standardized recipe on file.' },
+    { heading: '2. Infant Meal Pattern', text:
+        'Offer all infant components appropriate to the infant\u2019s age, in two ranges: birth\u20135 months and 6\u201311 '
+        + 'months. Breastmilk or iron-fortified formula is the base at every feeding; breastmilk is recommended through '
+        + '11 months, and a mother nursing on site is a creditable, reimbursable meal. Formula and dry infant cereal must '
+        + 'be iron-fortified. At 6\u201311 months, solid components (cereal, meat/alternate, vegetable/fruit) are added '
+        + '\u201cwhen developmentally ready\u201d \u2014 once the infant regularly eats solids, all required components must be '
+        + 'offered. Readiness, not just age, decides what and how to feed. No fruit or vegetable juice for infants. Keep '
+        + 'a signed Infant Formula/Food Waiver Notification on file for every infant.' },
+    { heading: '3. Taking & Recording Meal Counts', text:
+        'The meal count is the daily record of which enrolled children ate which meals \u2014 it is what the claim is built '
+        + 'from, so it must be right. Record the count while the children are eating (point of service), not from memory. '
+        + 'Use the Meal Participation Record (ISBE Form 68-75D, or 68-75 for a pre-dated month), children listed by class '
+        + 'alphabetically, first and last name. Take a count for every meal service claimed. Post current, dated menus for '
+        + 'all age groups where parents can see them, showing the required components, the whole grain-rich item, and the '
+        + 'type/fat content of milk. Record any substitution when it happens. The chain must match: menu \u2192 what was '
+        + 'served \u2192 the count taken at the table \u2192 the numbers on the monthly claim.' },
+    { heading: '4. Submitting the Monthly Claim', text:
+        'Claims are filed online in WINS via IWAS, in two steps: submit the site claim first, then the sponsor claim. '
+        + 'Enter daily meal counts by eligibility category (free, reduced, paid), backed by the meal participation records. '
+        + 'Claims are due by the 10th of the following month. The hard federal deadline is 60 days after the last day of the '
+        + 'claim month for original claims and upward revisions; after that a claim goes to \u201cwaiting for approval\u201d and a '
+        + 'one-time-in-three-years exception may be granted, or it may be denied. Downward revisions can be filed any time.' },
+    { heading: '5. How CACFP Reimburses for Meals', text:
+        'Reimbursement depends on the eligibility of the enrolled children (free / reduced / paid), the type of meal '
+        + '(breakfast, lunch, snack, supper), and the program. You may claim at most two meals and one snack, OR two '
+        + 'snacks and one meal, per child per day; a second helping of the same meal is not reimbursable. You cannot claim '
+        + 'a meal under CACFP that is already claimed under the School Breakfast Program, NSLP, or SFSP. Rates are set by '
+        + 'the federal government and change every July 1. CACFP money is a nonprofit food service account: restricted to '
+        + 'allowable food-service costs, with any surplus going back into the food service.' },
+    { heading: '6. Recordkeeping', text:
+        'Keep all CACFP records for three years plus the current program year (longer if a review or audit finding is open). '
+        + 'Enrollment & eligibility: the master list of eligible children, daily attendance, Household Eligibility '
+        + 'Applications (or direct certification), and a current CACFP Annual Enrollment Form for every child \u2014 meals for '
+        + 'a child with no current enrollment form on file cannot be claimed. Meal service: daily meal participation '
+        + 'records, the Total Meal Recap (Form 67-22), menus for all age groups for the whole month, and CN labels / '
+        + 'product formulation statements / standardized recipes as needed. Expenditures: itemized food and non-food '
+        + 'receipts, proof of payment, the Cash Disbursement Journal (67-24), Personnel Activity Reports (67-54), and the '
+        + 'Monthly Profit or Loss Summary (67-93). Training: Form 67-25 with dates, topics, and attendee signatures. Labor '
+        + 'is tracked daily on Personnel Activity Reports, split administrative vs. operational \u2014 not on the Cash '
+        + 'Disbursement Journal.' },
+    { heading: '7. Civil Rights Requirements', text:
+        'As a USDA-funded program we must not discriminate on the basis of race, color, national origin, sex, age, or '
+        + 'disability. The annual civil rights training covers: collection and use of data; effective public notification '
+        + 'systems; complaint procedures; compliance review techniques and resolution of noncompliance; reasonable '
+        + 'accommodation for persons with disabilities; language assistance; and conflict resolution and customer service. '
+        + 'At the center we: collect ethnic and racial data on participants every year (Section 5 of the Annual Enrollment '
+        + 'Form, self-identification preferred); display the USDA \u201cAnd Justice for All\u201d poster; provide/post the '
+        + 'Building for the Future brochure and the WIC flyer; put the nondiscrimination statement and complaint procedure '
+        + 'on public materials that mention USDA programs; and make disability meal modifications on a signed statement '
+        + 'from a licensed healthcare professional, working with families on non-medical substitutions within the meal '
+        + 'pattern.' }
+];
+
 /* One row per filed CACFP annual-training session, so the Food Program page can list
    and reopen them. The signed PDF itself lives in the Food Program folder; this points
    at it (RelPath) and keeps the human facts — date, instructor, attendee names — for a
@@ -6121,14 +6198,11 @@ DROP TABLE #cf;`;
             const folder = foodProgramFolder();
             if (folder.error) return sendJSON(res, 400, { error: folder.error });
 
-            // Topics covered, as a printed block, so the filed PDF stands on its own as
-            // the Form 67-25 training material (the agenda a monitor expects to see).
-            const topicBlocks = [
-                { heading: 'Topics covered', text:
-                    'Meal pattern requirements (including the Infant Meal Pattern); taking and recording meal counts; '
-                    + 'submitting the monthly Claim for Reimbursement; how CACFP reimburses for meals; recordkeeping '
-                    + 'requirements; and civil rights requirements and nondiscrimination.' }
-            ];
+            // The filed PDF is the WHOLE training material, not a summary: the full
+            // manual (all seven mandatory sections) prints first, then the attendee
+            // roster, then the signatures below. This is the document attached to Form
+            // 67-25, so it stands on its own as both the material and the attestation.
+            const topicBlocks = CACFP_TRAINING_MANUAL.slice();
             if (attendees.length) {
                 topicBlocks.push({ heading: 'Attendees', text: attendees.join(', ') });
             }
