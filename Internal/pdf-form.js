@@ -83,6 +83,17 @@ function pdfString(s) {
         else if (code === 8217 || code === 8216) out += "'";     // curly quotes
         else if (code === 8220 || code === 8221) out += '"';
         else if (code === 8211 || code === 8212) out += '-';     // dashes
+        // Common fractions and symbols spelled out in ASCII, so they render in every
+        // viewer rather than dropping to "?" (the meal-pattern amounts use these).
+        else if (code === 188) out += '1/4';                     // ¼
+        else if (code === 189) out += '1/2';                     // ½
+        else if (code === 190) out += '3/4';                     // ¾
+        else if (code === 8531) out += '1/3';                    // ⅓
+        else if (code === 8532) out += '2/3';                    // ⅔
+        else if (code === 8539) out += '1/8';                    // ⅛
+        else if (code === 8540) out += '3/8';                    // ⅜
+        else if (code === 8541) out += '5/8';                    // ⅝
+        else if (code === 8542) out += '7/8';                    // ⅞
         else if (code > 126) out += '?';
     }
     return out;
