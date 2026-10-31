@@ -1952,6 +1952,18 @@
         '.pi-prefilled input, .pi-prefilled textarea, .pi-prefilled select { background:#f0f7ff;border-color:#bfd4fb; }',
         '.pi-prefilled > label { color:#1d4ed8; }',
         '.pi-prefilled > label::after { content:" \\00b7 from record";font-weight:600;font-size:0.66rem;color:#60a5fa;letter-spacing:0.02em; }',
+        // Section header with an inline N/A toggle (Parent/Guardian 2): the title and the
+        // toggle sit on one row, the toggle right-aligned and in normal case.
+        '.pi-section h4.pi-section-head { justify-content:space-between; }',
+        '.pi-section-na, .pi-sameaddr { display:inline-flex;align-items:center;gap:7px;cursor:pointer;'
+            + 'font-weight:600;letter-spacing:0;text-transform:none; }',
+        '.pi-section-na { font-size:0.72rem;color:#475569;background:#f8fafc;border:1px solid #e5e7eb;border-radius:999px;padding:5px 12px; }',
+        '.pi-section-na:hover { border-color:#bfd4fb;background:#f8faff; }',
+        '.pi-section-na input, .pi-sameaddr input { width:15px;height:15px;accent-color:#2563eb;cursor:pointer;margin:0; }',
+        // "Same address as Parent/Guardian 1" sits just above the Address field.
+        '.pi-sameaddr { font-size:0.72rem;color:#1d4ed8;margin-bottom:2px; }',
+        // A mirrored (locked) address field reads as filled-from-elsewhere, not editable.
+        '.pi-field input.pi-mirrored { background:#f1f5f9;color:#475569;cursor:not-allowed; }',
         '@media print { .cls-upload-row { display:none !important; } }',
         /* Parent Interview printed as a fillable PAPER form: prefilled values print as
            text on a line, everything else as a blank writing line. Mirrors isbe.html. */

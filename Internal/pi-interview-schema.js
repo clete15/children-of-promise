@@ -47,10 +47,19 @@ const PI_INTERVIEW_SCHEMA = [
         { id: 'parent1Employer', label: 'Place of employment', type: 'text' },
         { id: 'parent1WorkPhone', label: 'Work phone', type: 'text' },
     ] },
-    { title: 'Parent / Guardian 2', fields: [
+    /* collapseField: a boolean field whose checkbox lives in the section header; when
+       checked it hides and clears the rest of the section (a one-parent household has
+       no second guardian to record). */
+    { title: 'Parent / Guardian 2', collapseField: 'parent2NA', fields: [
+        { id: 'parent2NA', label: 'No second parent / guardian (not applicable)', type: 'sectionToggle' },
         { id: 'parent2Name', label: 'Name', type: 'text' },
         { id: 'parent2Dob', label: 'Date of birth', type: 'date' },
-        { id: 'parent2Address', label: 'Address', type: 'text', full: true },
+        // sameAddrFrom: shows a "same as Parent/Guardian 1" checkbox above this field
+        // that copies + mirrors PG1's address block into PG2 and locks these fields.
+        { id: 'parent2Address', label: 'Address', type: 'text', full: true,
+          sameAddr: { toggleId: 'parent2SameAddr', toggleLabel: 'Same address as Parent / Guardian 1',
+                      pairs: [['parent1Address', 'parent2Address'], ['parent1City', 'parent2City'],
+                              ['parent1State', 'parent2State'], ['parent1Zip', 'parent2Zip']] } },
         { id: 'parent2City', label: 'City', type: 'text' },
         { id: 'parent2State', label: 'State', type: 'text' },
         { id: 'parent2Zip', label: 'ZIP', type: 'text' },
@@ -205,6 +214,16 @@ const PI_FIELD_BY_ID = (function () {
     return m;
 })();
 
+// toggleId -> { pairs } for every field carrying a sameAddr spec, so the sync/toggle
+// handlers can find the copy map by the checkbox id alone.
+const PI_SAMEADDR_BY_TOGGLE = (function () {
+    const m = {};
+    PI_INTERVIEW_SCHEMA.forEach(sec => sec.fields.forEach(f => {
+        if (f.sameAddr) m[f.sameAddr.toggleId] = f.sameAddr;
+    }));
+    return m;
+})();
+
 function piEsc(s) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -213,8 +232,17 @@ function piEsc(s) {
 /* Render one field to HTML. Values are set after render by loadInterviewForm/prefill,
    so this only builds empty controls. */
 function piRenderField(f) {
+    // A sectionToggle renders in the section header (see renderInterviewForm), not in
+    // the field grid, so skip it here.
+    if (f.type === 'sectionToggle') return '';
     const cls = 'pi-field' + (f.full ? ' pi-full' : '');
-    const lbl = '<label>' + piEsc(f.label) + '</label>';
+    // A field with a sameAddr spec gets a "same as ..." checkbox above its label.
+    const sameAddrToggle = f.sameAddr
+        ? '<label class="pi-sameaddr"><input type="checkbox" id="pf_' + f.sameAddr.toggleId + '"'
+          + ' onchange="piToggleSameAddr(\'' + f.sameAddr.toggleId + '\')">'
+          + piEsc(f.sameAddr.toggleLabel) + '</label>'
+        : '';
+    const lbl = sameAddrToggle + '<label>' + piEsc(f.label) + '</label>';
     let ctrl = '';
     if (f.type === 'textarea') {
         ctrl = '<textarea id="pf_' + f.id + '" placeholder="' + piEsc(f.ph || '') + '"></textarea>';
@@ -255,10 +283,78 @@ function piRenderField(f) {
 function renderInterviewForm() {
     const host = document.getElementById('piFormSections');
     if (!host) return;
-    host.innerHTML = PI_INTERVIEW_SCHEMA.map(sec =>
-        '<div class="pi-section"><h4>' + piEsc(sec.title) + '</h4>'
-        + '<div class="pi-grid">' + sec.fields.map(piRenderField).join('') + '</div></div>'
-    ).join('');
+    host.innerHTML = PI_INTERVIEW_SCHEMA.map(sec => {
+        // A collapsible section (Parent/Guardian 2) puts its N/A toggle in the header
+        // and wraps the fields in a body that the toggle can hide. The sectionToggle
+        // field itself is rendered IN the header, not in the grid.
+        if (sec.collapseField) {
+            const header = '<h4 class="pi-section-head">' + piEsc(sec.title)
+                + '<label class="pi-section-na"><input type="checkbox" id="pf_' + sec.collapseField + '"'
+                + ' onchange="piToggleSection(\'' + sec.collapseField + '\')">'
+                + piEsc(sectionToggleLabel(sec)) + '</label></h4>';
+            const bodyFields = sec.fields.filter(f => f.type !== 'sectionToggle');
+            return '<div class="pi-section" data-collapse="' + piEsc(sec.collapseField) + '">' + header
+                + '<div class="pi-grid pi-section-body" data-collapse-body="' + piEsc(sec.collapseField) + '">'
+                + bodyFields.map(piRenderField).join('') + '</div></div>';
+        }
+        return '<div class="pi-section"><h4>' + piEsc(sec.title) + '</h4>'
+            + '<div class="pi-grid">' + sec.fields.map(piRenderField).join('') + '</div></div>';
+    }).join('');
+
+    // Live-sync: while a "same address" box is ticked, editing a Parent/Guardian 1
+    // address field mirrors into Parent/Guardian 2. Attached once per source field.
+    Object.keys(PI_SAMEADDR_BY_TOGGLE).forEach(toggleId => {
+        PI_SAMEADDR_BY_TOGGLE[toggleId].pairs.forEach(([src]) => {
+            const el = document.getElementById('pf_' + src);
+            if (el) el.addEventListener('input', () => piSyncSameAddr(toggleId));
+        });
+    });
+}
+
+// The label for a section's collapse toggle comes from its sectionToggle field.
+function sectionToggleLabel(sec) {
+    const t = sec.fields.find(f => f.type === 'sectionToggle');
+    return t ? t.label : 'Not applicable';
+}
+
+/* Collapse/expand a section from its header N/A checkbox. Collapsing hides the body
+   and clears every field in it, so a "not applicable" section never saves stale data
+   left over from before the box was ticked. */
+function piToggleSection(fieldId) {
+    const cb = document.getElementById('pf_' + fieldId);
+    const body = document.querySelector('[data-collapse-body="' + fieldId + '"]');
+    if (!cb || !body) return;
+    const off = cb.checked;
+    body.style.display = off ? 'none' : '';
+    if (off) {
+        const sec = PI_INTERVIEW_SCHEMA.find(s => s.collapseField === fieldId);
+        if (sec) sec.fields.forEach(f => { if (f.type !== 'sectionToggle') piSetFieldValue(f.id, f.type === 'checks' || f.type === 'repeat' ? [] : ''); });
+    }
+}
+
+/* Mirror the Parent/Guardian 1 address into Parent/Guardian 2 when the "same address"
+   box is ticked: copy the values, keep them in sync as PG1 is edited, and disable the
+   PG2 address fields so it reads as mirrored. Unticking re-enables them, leaving the
+   copied values in place to edit. */
+function piToggleSameAddr(fieldId) {
+    const spec = PI_SAMEADDR_BY_TOGGLE[fieldId];
+    if (!spec) return;
+    const cb = document.getElementById('pf_' + fieldId);
+    const on = !!(cb && cb.checked);
+    spec.pairs.forEach(([src, dst]) => {
+        if (on) piSetFieldValue(dst, (document.getElementById('pf_' + src) || {}).value || '');
+        const dstEl = document.getElementById('pf_' + dst);
+        if (dstEl) { dstEl.disabled = on; dstEl.classList.toggle('pi-mirrored', on); }
+    });
+}
+
+// Keep PG2 address live-synced to PG1 while "same address" is on. Attached to the PG1
+// address inputs after render.
+function piSyncSameAddr(fieldId) {
+    const spec = PI_SAMEADDR_BY_TOGGLE[fieldId];
+    const cb = document.getElementById('pf_' + fieldId);
+    if (!spec || !cb || !cb.checked) return;
+    spec.pairs.forEach(([src, dst]) => piSetFieldValue(dst, (document.getElementById('pf_' + src) || {}).value || ''));
 }
 
 /* Append one blank row to a repeat table, or a row pre-filled from `values` (object
@@ -279,7 +375,10 @@ function piAddRepeatRow(fieldId, values) {
 function piSetFieldValue(id, value) {
     const f = PI_FIELD_BY_ID[id];
     if (!f) return;
-    if (f.type === 'yesno' || f.type === 'radio') {
+    if (f.type === 'sectionToggle') {
+        const cb = document.getElementById('pf_' + id);
+        if (cb) cb.checked = value === true || value === 'true' || value === 1 || value === '1';
+    } else if (f.type === 'yesno' || f.type === 'radio') {
         const els = document.getElementsByName('pf_' + id);
         els.forEach(el => { el.checked = (el.value === String(value)); });
     } else if (f.type === 'checks') {
@@ -499,7 +598,10 @@ function applyInterviewPrefill(student, intake) {
 function serializeInterviewForm() {
     const out = {};
     PI_INTERVIEW_SCHEMA.forEach(sec => sec.fields.forEach(f => {
-        if (f.type === 'yesno' || f.type === 'radio') {
+        if (f.type === 'sectionToggle') {
+            const cb = document.getElementById('pf_' + f.id);
+            out[f.id] = !!(cb && cb.checked);
+        } else if (f.type === 'yesno' || f.type === 'radio') {
             const checked = Array.prototype.filter.call(document.getElementsByName('pf_' + f.id), el => el.checked)[0];
             out[f.id] = checked ? checked.value : '';
         } else if (f.type === 'checks') {
@@ -519,6 +621,11 @@ function serializeInterviewForm() {
             out[f.id] = el ? el.value : '';
         }
     }));
+    // The "same address" toggles are inline on a field, not schema fields of their own.
+    Object.keys(PI_SAMEADDR_BY_TOGGLE).forEach(toggleId => {
+        const cb = document.getElementById('pf_' + toggleId);
+        out[toggleId] = !!(cb && cb.checked);
+    });
     return out;
 }
 
@@ -528,6 +635,14 @@ function loadInterviewForm(fd) {
     PI_INTERVIEW_SCHEMA.forEach(sec => sec.fields.forEach(f => {
         if (Object.prototype.hasOwnProperty.call(fd, f.id)) piSetFieldValue(f.id, fd[f.id]);
     }));
+    // Restore the inline "same address" toggles (not schema fields), then re-apply the
+    // collapse/mirror side-effects so a reopened form looks exactly as it was saved.
+    Object.keys(PI_SAMEADDR_BY_TOGGLE).forEach(toggleId => {
+        const cb = document.getElementById('pf_' + toggleId);
+        if (cb) cb.checked = fd[toggleId] === true || fd[toggleId] === 'true' || fd[toggleId] === 1 || fd[toggleId] === '1';
+        piToggleSameAddr(toggleId);
+    });
+    PI_INTERVIEW_SCHEMA.forEach(sec => { if (sec.collapseField) piToggleSection(sec.collapseField); });
 }
 
 /* Turn the serialized form into printable blocks (one per section, answered fields
