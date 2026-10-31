@@ -306,10 +306,11 @@ function showPanel(panel) {
     }
 }
 
-/* Filed CACFP annual-training sessions. Each is a signed PDF in the Food Program
-   folder; the list comes from /api/cacfp-training and each row opens its PDF through
-   the shared /api/doc-file endpoint. A new session is run and signed on the training
-   sheet (the "New Training" link in the sidebar). */
+/* Filed CACFP annual-training sessions. Each is stored as training DATA (date,
+   instructor, attendee names and the signature images) rather than a PDF; the list
+   comes from /api/cacfp-training and each row reopens the pretty HTML handout by id,
+   fully populated with its signatures, to print from the browser. A new session is run
+   and signed on that same handout (the "New Training" link in the sidebar). */
 async function renderTrainings() {
     const body = document.getElementById('fpBody');
     let rows = [];
@@ -324,28 +325,27 @@ async function renderTrainings() {
     }
     const intro = '<section class="fp-section"><div class="fp-section-head">'
         + '<h2>Filed CACFP annual trainings</h2>'
-        + '<p>Each is a signed PDF filed in the Food Program folder &mdash; the documentation that satisfies ISBE '
-        + 'Form 67-25. To run a new session, open <strong>New Training</strong> in the sidebar, present it, have '
-        + 'everyone sign, and Save.</p></div>';
+        + '<p>Each is a signed session that satisfies ISBE Form 67-25. <strong>Open</strong> re-renders the '
+        + 'training sheet with its signatures so you can print it straight from the browser, or reopen it to '
+        + 'finish signing later. To run a new session, open <strong>New Training</strong> in the sidebar, present '
+        + 'it, have everyone sign, and Save.</p></div>';
     if (!rows.length) {
         body.innerHTML = intro
             + '<div class="fp-empty">No trainings filed yet. Open <strong>New Training</strong> to record one.</div>'
             + '</section>';
         return;
     }
-    const openFn = 'openTrainingDoc';
     const list = rows.map(function (t) {
         const date = fpEsc(t.TrainingDate || '');
         const who = fpEsc(t.Instructor || '\u2014');
         const count = parseInt(t.AttendeeCount, 10) || 0;
-        const rel = String(t.RelPath || '');
-        const name = fpEsc(t.FileName || 'Training.pdf');
-        const open = rel
-            ? '<a href="#" class="fp-train-open" onclick="event.preventDefault();' + openFn + '(\''
-              + rel.replace(/'/g, "\\'") + '\',\'' + name.replace(/'/g, "\\'") + '\')">Open PDF</a>'
-            : '<span class="fp-train-missing">file missing</span>';
-        const remove = '<button type="button" class="fp-train-remove" title="Remove this training (the PDF is archived, not deleted)"'
-            + ' onclick="removeTraining(' + (parseInt(t.Id, 10) || 0) + ',\'' + date.replace(/'/g, "\\'") + '\')">Remove</button>';
+        const id = parseInt(t.Id, 10) || 0;
+        const open = id
+            ? '<a href="#" class="fp-train-open" title="Open the training sheet with its signatures to print or finish signing"'
+              + ' onclick="event.preventDefault();openTraining(' + id + ')">Open</a>'
+            : '<span class="fp-train-missing">unavailable</span>';
+        const remove = '<button type="button" class="fp-train-remove" title="Remove this training (the signatures are archived, not deleted)"'
+            + ' onclick="removeTraining(' + id + ',\'' + date.replace(/'/g, "\\'") + '\')">Remove</button>';
         return '<div class="fp-train-row">'
             + '<div class="fp-train-main"><span class="fp-train-date">' + date + '</span>'
             + '<span class="fp-train-meta">Instructor: ' + who + ' &middot; ' + count + ' attendee'
@@ -355,27 +355,23 @@ async function renderTrainings() {
     body.innerHTML = intro + '<div class="fp-train-list">' + list + '</div></section>';
 }
 
-/* Open a filed training PDF through the authenticated library endpoint (a bare
-   <a href> would be an unauthenticated GET and come back 401). */
-function openTrainingDoc(rel, name) {
-    apiFetch('/api/doc-file?path=' + encodeURIComponent(rel))
-        .then(function (res) {
-            if (!res.ok) throw new Error(res.status === 401 ? 'Not signed in' : ('HTTP ' + res.status));
-            return res.blob();
-        })
-        .then(function (blob) {
-            const url = URL.createObjectURL(blob);
-            window.open(url, '_blank', 'noopener');
-            setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
-        })
-        .catch(function (e) { alert('Could not open "' + (name || 'file') + '": ' + e.message); });
+/* Open a filed training as the pretty HTML handout, reopened by id so it loads with its
+   date, instructor and signatures and can be printed from the browser (or finished).
+   The handout inherits the staff session on load; a token handoff before the open keeps
+   that working even when the browser does not carry it across a window.open. */
+function openTraining(id) {
+    if (!id) return;
+    const target = '/staff/handouts/CACFP-Annual-Training.html?id=' + id;
+    try { if (window.CofpAuth && CofpAuth.handoffToken) CofpAuth.handoffToken(); } catch (ignore) {}
+    window.open(target, '_blank', 'noopener');
 }
 
-/* Remove a filed training. The server archives the PDF (never deletes it) and drops
-   the record so it leaves the list. Confirm first — it is a filed compliance document. */
+/* Remove a filed training. The server archives the signature images (never deletes them)
+   and drops the record so it leaves the list. Confirm first — it is a filed compliance
+   document. */
 async function removeTraining(id, date) {
     if (!id) return;
-    if (!confirm('Remove the ' + (date || 'selected') + ' training?\n\nThe signed PDF is moved to the Food '
+    if (!confirm('Remove the ' + (date || 'selected') + ' training?\n\nIts signatures are moved to the Food '
         + 'Program archive (not deleted), and the entry is removed from this list.')) return;
     try {
         const res = await apiFetch('/api/cacfp-training/' + id, { method: 'DELETE' });

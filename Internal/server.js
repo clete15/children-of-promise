@@ -2105,10 +2105,11 @@ const CACFP_TRAINING_MANUAL = [
 ];
 
 /* One row per filed CACFP annual-training session, so the Food Program page can list
-   and reopen them. The signed PDF itself lives in the Food Program folder; this points
-   at it (RelPath) and keeps the human facts — date, instructor, attendee names — for a
-   quick list without reading every PDF. Never overwritten: each save is a new row and
-   a new dated PDF, so prior trainings stay on record. */
+   and reopen them. Signatures holds a JSON array of { role, name, relPath } — each
+   signature image is a JPEG under Food Program/Signatures, and the handout re-renders
+   the pretty page from this row (date, instructor, attendee names) plus those images.
+   A session can be reopened by id and re-saved to finish signing (prior signatures are
+   kept), so a row is updated in place rather than always appended. */
 function cacfpTrainingEnsureSQL() {
     return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='CacfpTraining')
     CREATE TABLE CacfpTraining (
@@ -2119,8 +2120,10 @@ function cacfpTrainingEnsureSQL() {
         AttendeeCount INT DEFAULT 0,
         FileName NVARCHAR(300),
         RelPath NVARCHAR(500),
+        Signatures NVARCHAR(MAX),
         CreatedAt DATETIME DEFAULT GETDATE()
     );
+IF COL_LENGTH('CacfpTraining','Signatures') IS NULL ALTER TABLE CacfpTraining ADD Signatures NVARCHAR(MAX);
 `;
 }
 
@@ -6157,12 +6160,12 @@ DROP TABLE #cf;`;
 
        The Food Program's annual CACFP + civil-rights training (ISBE Form 67-25) is a
        CENTRE-level document, not a child's. Staff sign the training sheet on screen —
-       the instructor and each attendee — and this builds the same kind of signed PDF
-       the child forms produce (via buildFormPdf), files it into a centre-level
-       "Food Program" folder in the library, and records the session so it can be
-       listed and opened later. No printing: the filed PDF is the record. Modelled on
-       /api/monitoring-signed-form, but with its own folder and a CacfpTraining table
-       (the Food Program folder is not auto-indexed, so a row is how we find it again). */
+       the instructor and each attendee — and this stores the training DATA: the date,
+       instructor, attendee names, and each signature as a JPEG under a centre-level
+       "Food Program" folder, plus a CacfpTraining row. No PDF is built. The handout
+       reopens the session by id and re-renders the SAME pretty page (signatures shown)
+       to print from the browser, so the HTML is the record and the row is how we find
+       it again (the Food Program folder is not auto-indexed). */
     if (req.method === 'POST' && url === '/api/cacfp-training') {
         // Any signed-in staff member may record a training (teachers included) — a
         // training session is ordinary programme paperwork, not a centre-admin control.
@@ -6170,17 +6173,25 @@ DROP TABLE #cf;`;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
 
+            /* No PDF is built. We store the training DATA — date, instructor, attendee
+               names, and each signature as a JPEG on disk — so the handout can reopen
+               the session and re-render the SAME pretty page (signatures shown) to print
+               from the browser. An optional id UPDATES an existing session (to finish
+               signing later): prior signatures are kept and newly-drawn ones appended. */
+            const id = parseInt(d.id, 10) || 0;
             const trainingDate = String(d.trainingDate || '').trim() || new Date().toISOString().slice(0, 10);
             const instructor = String(d.instructor || '').trim();
-            const title = String(d.formTitle || 'CACFP Annual Staff Training').trim();
-            // Attendee printed names, for the record row and a roster block on the PDF.
-            const attendees = (Array.isArray(d.attendees) ? d.attendees : [])
-                .map(a => String(a || '').trim()).filter(Boolean);
 
-            // Same JPEG-dataUrl signature contract as the child / monitoring forms.
+            // Incoming signatures: a dataUrl means a freshly-drawn image to save; an
+            // { existing:true } entry (with no dataUrl) means "keep the one already on
+            // file", carried by role+name so a reopen+resave does not lose it.
             const incoming = Array.isArray(d.signatures) ? d.signatures : [];
-            const signatures = [];
+            const fresh = [];      // { role, name, jpeg }
+            const keepExisting = [];  // { role, name } to preserve from the prior record
             for (const s of incoming) {
+                const role = String(s.role || 'attendee');
+                const name = String(s.name || '').trim();
+                if (s.existing) { keepExisting.push({ role: role, name: name }); continue; }
                 const m = String(s.dataUrl || '').match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
                 if (!m) return sendJSON(res, 400, { error: 'Expected a JPEG signature' });
                 const bytes = Buffer.from(m[1], 'base64');
@@ -6188,99 +6199,140 @@ DROP TABLE #cf;`;
                 if (bytes.length > 2 * 1024 * 1024) {
                     return sendJSON(res, 413, { error: 'A signature image is unreasonably large' });
                 }
-                signatures.push({ role: String(s.role || 'attendee'), label: String(s.label || ''),
-                                  name: String(s.name || ''), date: String(s.date || ''), jpeg: bytes });
-            }
-            if (!signatures.length) {
-                return sendJSON(res, 400, { error: 'Nothing was signed, so there is nothing to file.' });
+                fresh.push({ role: role, name: name, jpeg: bytes });
             }
 
+            const DR = findDocRoot();
+            if (!DR) return sendJSON(res, 400, { error: 'The document library is not reachable from the server.' });
             const folder = foodProgramFolder();
             if (folder.error) return sendJSON(res, 400, { error: folder.error });
 
-            // The filed PDF is the WHOLE training material, not a summary: the full
-            // manual (all seven mandatory sections) prints first, then the attendee
-            // roster, then the signatures below. This is the document attached to Form
-            // 67-25, so it stands on its own as both the material and the attestation.
-            const topicBlocks = CACFP_TRAINING_MANUAL.slice();
-            if (attendees.length) {
-                topicBlocks.push({ heading: 'Attendees', text: attendees.join(', ') });
+            /* Prior signatures, when updating an existing session. Kept so a reopen that
+               adds one more attendee does not drop the ones already captured. */
+            let priorSigs = [];
+            if (id) {
+                const prev = runSQLRows(
+                    `SELECT TOP 1 ISNULL(Signatures,'') AS Signatures FROM CacfpTraining WHERE Id=${id}`,
+                    cacfpTrainingEnsureSQL());
+                if (prev.ok && prev.rows.length && prev.rows[0].Signatures) {
+                    try { priorSigs = JSON.parse(prev.rows[0].Signatures) || []; } catch (e) { priorSigs = []; }
+                }
             }
 
-            let pdf;
-            try {
-                pdf = buildFormPdf({
-                    title: title,
-                    subtitle: 'Children of Promise \u2014 Child and Adult Care Food Program \u2014 ' + trainingDate,
-                    rows: [
-                        { label: 'Training date', value: trainingDate },
-                        { label: 'Instructor', value: instructor || '\u2014' },
-                        { label: 'Attendees', value: String(attendees.length) }
-                    ],
-                    blocks: topicBlocks,
-                    signatures: signatures,
-                    footer: 'Signed electronically in the Children of Promise portal on '
-                        + new Date().toLocaleString('en-US')
-                });
-            } catch (e) {
-                return sendJSON(res, 400, { error: 'Could not build the document: ' + e.message });
-            }
-
+            // Signature images live in a per-session folder under Food Program/Signatures.
             const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
-            const base = 'CACFP Annual Training - ' + safe(trainingDate)
-                + (instructor ? ' - ' + safe(instructor) : '');
-            let target = path.join(folder.path, base + '.pdf');
-            let n = 2;
-            while (fs.existsSync(target) && n < 50) { target = path.join(folder.path, base + ' (' + n + ').pdf'); n++; }
-            try {
-                fs.writeFileSync(target, pdf);
-            } catch (e) {
-                console.error('[CACFP TRAINING]', e.message);
-                return sendJSON(res, 500, { error: 'Could not write the signed document' });
-            }
-            invalidateDocCache();
-            const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
-            console.log('[CACFP TRAINING] ' + pdf.length + ' bytes -> ' + rel);
+            const sigRoot = path.join(folder.path, 'Signatures');
+            try { fs.mkdirSync(sigRoot, { recursive: true }); } catch (e) { /* created on first write below */ }
 
-            const sql = cacfpTrainingEnsureSQL()
-                + `INSERT INTO CacfpTraining (TrainingDate,Instructor,Attendees,AttendeeCount,FileName,RelPath,CreatedAt)
-VALUES (${esc(trainingDate)},${esc(instructor)},${esc(attendees.join('; '))},${attendees.length},${esc(path.basename(target))},${esc(rel)},GETDATE());`;
+            /* Build the final signature set: prior ones that are either kept-by-reference
+               or not superseded by a fresh draw of the same role+name, plus the fresh
+               draws (written to disk now). Matching is by role+lowercased name. */
+            const key = (role, name) => role + '|' + String(name || '').toLowerCase();
+            const freshKeys = new Set(fresh.map(f => key(f.role, f.name)));
+            const finalSigs = [];
+            // Keep prior signatures not replaced by a fresh draw.
+            priorSigs.forEach(p => { if (!freshKeys.has(key(p.role, p.name))) finalSigs.push({ role: p.role, name: p.name, relPath: p.relPath }); });
+
+            if (!finalSigs.length && !fresh.length) {
+                return sendJSON(res, 400, { error: 'Nothing was signed, so there is nothing to save.' });
+            }
+
+            // Write fresh signature images. A per-session subfolder keyed by date + a
+            // short stamp keeps one training's signatures together and avoids collisions.
+            const sessionTag = safe(trainingDate) + ' - ' + Date.now().toString(36);
+            const sessionDir = path.join(sigRoot, sessionTag);
+            if (fresh.length) {
+                try { fs.mkdirSync(sessionDir, { recursive: true }); }
+                catch (e) { return sendJSON(res, 500, { error: 'Could not create the signatures folder: ' + e.message }); }
+            }
+            let wi = 0;
+            for (const f of fresh) {
+                wi += 1;
+                const fname = (safe(f.role) || 'sig') + ' - ' + (safe(f.name) || wi) + '.jpg';
+                const abs = path.join(sessionDir, fname);
+                try { fs.writeFileSync(abs, f.jpeg); }
+                catch (e) { return sendJSON(res, 500, { error: 'Could not save a signature image: ' + e.message }); }
+                finalSigs.push({ role: f.role, name: f.name, relPath: path.relative(DR, abs).replace(/\\/g, '/') });
+            }
+
+            // Attendee names = every non-instructor signer, plus any typed names passed
+            // explicitly (so a name with no signature yet is still remembered).
+            const typed = (Array.isArray(d.attendees) ? d.attendees : []).map(a => String(a || '').trim()).filter(Boolean);
+            const attendeeNames = [];
+            finalSigs.forEach(s => { if (s.role !== 'instructor' && s.name && attendeeNames.indexOf(s.name) === -1) attendeeNames.push(s.name); });
+            typed.forEach(nm => { if (attendeeNames.indexOf(nm) === -1) attendeeNames.push(nm); });
+
+            const sigsJson = JSON.stringify(finalSigs);
+            const attendeesCol = attendeeNames.join('; ');
+            invalidateDocCache();
+
+            let sql = cacfpTrainingEnsureSQL();
+            if (id) {
+                sql += `UPDATE CacfpTraining SET TrainingDate=${esc(trainingDate)},Instructor=${esc(instructor)},`
+                    + `Attendees=${esc(attendeesCol)},AttendeeCount=${attendeeNames.length},Signatures=${esc(sigsJson)} `
+                    + `WHERE Id=${id}; SELECT ${id} AS Id;`;
+            } else {
+                sql += `INSERT INTO CacfpTraining (TrainingDate,Instructor,Attendees,AttendeeCount,Signatures,CreatedAt)
+VALUES (${esc(trainingDate)},${esc(instructor)},${esc(attendeesCol)},${attendeeNames.length},${esc(sigsJson)},GETDATE());
+SELECT CAST(SCOPE_IDENTITY() AS INT) AS Id;`;
+            }
             const r = runSQL(sql);
             if (!r.ok || r.sqlError) {
-                return sendJSON(res, 500, {
-                    error: 'The training was filed as "' + path.basename(target)
-                         + '" but could not be recorded: ' + (r.error || r.sqlError) });
+                return sendJSON(res, 500, { error: 'Could not save the training: ' + (r.error || r.sqlError) });
             }
+            // SCOPE_IDENTITY / the echoed id comes back as the first standalone integer.
+            const idLine = String(r.data || '').split('\n').map(l => l.trim()).find(l => /^\d+$/.test(l));
+            const savedId = idLine ? parseInt(idLine, 10) : (id || 0);
+            console.log('[CACFP TRAINING] saved #' + savedId + ' (' + finalSigs.length + ' signatures)');
             return sendJSON(res, 200, {
-                success: true, relPath: rel, name: path.basename(target), bytes: pdf.length
+                success: true, id: savedId, attendeeCount: attendeeNames.length, signatureCount: finalSigs.length
             });
         });
         return;
     }
 
-    /* GET /api/cacfp-training — the filed CACFP training sessions, newest first, so
-       the Food Program page can list them and open each filed PDF via /api/doc-file. */
+    /* GET /api/cacfp-training/:id — one session's full data, so the handout can reopen
+       it and re-render the pretty page (instructor + attendee names, signatures shown).
+       Signature images are fetched by the page via /api/doc-file?path=relPath. */
+    const cacfpOne = url.match(/^\/api\/cacfp-training\/(\d+)$/);
+    if (req.method === 'GET' && cacfpOne) {
+        if (!checkClassroomAuth(req, res)) return;
+        const id = parseInt(cacfpOne[1], 10);
+        const r = runSQLRows(
+            `SELECT TOP 1 Id, ISNULL(CONVERT(NVARCHAR(10),TrainingDate,120),'') AS TrainingDate,
+                    ISNULL(Instructor,'') AS Instructor, ISNULL(Signatures,'') AS Signatures
+             FROM CacfpTraining WHERE Id=${id}`, cacfpTrainingEnsureSQL());
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        if (!r.rows.length) return sendJSON(res, 404, { error: 'That training is not on file.' });
+        const row = r.rows[0];
+        let sigs = [];
+        try { sigs = row.Signatures ? JSON.parse(row.Signatures) : []; } catch (e) { sigs = []; }
+        return sendJSON(res, 200, {
+            id: id,
+            trainingDate: row.TrainingDate || '',
+            instructor: row.Instructor || '',
+            signatures: sigs      // [{ role, name, relPath }]
+        });
+    }
+
+    /* GET /api/cacfp-training — the filed CACFP training sessions, newest first, so the
+       Food Program page can list them; each opens as the HTML handout (?id=<n>). */
     if (req.method === 'GET' && url === '/api/cacfp-training') {
-        // Same tier as the save and as /api/doc-file: any signed-in staff member may
-        // see the filed trainings (and open them), so a teacher who saves one can find it.
+        // Same tier as save / doc-file: any signed-in staff member may see the trainings.
         if (!checkClassroomAuth(req, res)) return;
         const r = runSQLRows(
             `SELECT Id, ISNULL(CONVERT(NVARCHAR(10),TrainingDate,120),'') AS TrainingDate,
                     ISNULL(Instructor,'') AS Instructor, ISNULL(Attendees,'') AS Attendees,
-                    ISNULL(AttendeeCount,0) AS AttendeeCount, ISNULL(FileName,'') AS FileName,
-                    ISNULL(RelPath,'') AS RelPath, ISNULL(CONVERT(NVARCHAR(20),CreatedAt,120),'') AS CreatedAt
+                    ISNULL(AttendeeCount,0) AS AttendeeCount, ISNULL(CONVERT(NVARCHAR(20),CreatedAt,120),'') AS CreatedAt
              FROM CacfpTraining ORDER BY TrainingDate DESC, Id DESC`,
             cacfpTrainingEnsureSQL());
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         return sendJSON(res, 200, { trainings: r.rows });
     }
 
-    /* DELETE /api/cacfp-training/:id — remove a filed training from the list.
-       Following the library's never-destroy rule, the PDF is ARCHIVED (moved into the
-       Food Program _Archive folder), not deleted, so a mistaken removal is recoverable;
-       only the CacfpTraining row is dropped so it leaves the list. Centre-admin only:
-       any teacher may file a training, but removing a filed compliance document is an
-       administrative action. */
+    /* DELETE /api/cacfp-training/:id — remove a session. Its signature images are
+       archived (moved under Food Program/_Archive, never deleted), and the record is
+       dropped so it leaves the list. Centre-admin only. */
     const cacfpDel = url.match(/^\/api\/cacfp-training\/(\d+)$/);
     if (req.method === 'DELETE' && cacfpDel) {
         if (!checkAuth(req, res)) return;
@@ -6288,43 +6340,39 @@ VALUES (${esc(trainingDate)},${esc(instructor)},${esc(attendees.join('; '))},${a
         if (!id) return sendJSON(res, 400, { error: 'Which training?' });
 
         const row = runSQLRows(
-            `SELECT TOP 1 Id, ISNULL(RelPath,'') AS RelPath, ISNULL(FileName,'') AS FileName
-             FROM CacfpTraining WHERE Id=${id}`, cacfpTrainingEnsureSQL());
+            `SELECT TOP 1 Id, ISNULL(Signatures,'') AS Signatures FROM CacfpTraining WHERE Id=${id}`,
+            cacfpTrainingEnsureSQL());
         if (!row.ok) return sendJSON(res, 500, { error: row.error });
         if (!row.rows.length) return sendJSON(res, 404, { error: 'That training is not on file.' });
-        const rel = String(row.rows[0].RelPath || '');
+        let sigs = [];
+        try { sigs = row.rows[0].Signatures ? JSON.parse(row.rows[0].Signatures) : []; } catch (e) { sigs = []; }
 
-        // Archive the PDF (move, do not delete) when it is present on disk.
-        let archived = false;
+        // Archive each signature image (move, never delete).
+        let archived = 0;
         const DR = findDocRoot();
-        if (DR && rel) {
-            const full = resolveDocPath(rel);
-            if (full && fs.existsSync(full) && fs.statSync(full).isFile()) {
+        if (DR) {
+            const archiveDir = path.join(DR, FOOD_PROGRAM_ROOT_FOLDER, DOC_ARCHIVE_DIR, 'Signatures ' + id);
+            sigs.forEach(s => {
+                const full = s.relPath ? resolveDocPath(s.relPath) : null;
+                if (!full || !fs.existsSync(full) || !fs.statSync(full).isFile()) return;
                 try {
-                    const archiveDir = path.join(DR, FOOD_PROGRAM_ROOT_FOLDER, DOC_ARCHIVE_DIR);
                     fs.mkdirSync(archiveDir, { recursive: true });
-                    const base = path.basename(full);
-                    let target = path.join(archiveDir, base);
+                    let target = path.join(archiveDir, path.basename(full));
                     if (fs.existsSync(target)) {
-                        const ext = path.extname(base);
-                        const stem = base.slice(0, base.length - ext.length);
-                        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
-                        target = path.join(archiveDir, stem + ' (removed ' + stamp + ')' + ext);
+                        const ext = path.extname(target);
+                        target = target.slice(0, -ext.length) + ' (' + Date.now().toString(36) + ')' + ext;
                     }
                     try { fs.renameSync(full, target); }
-                    catch (e) {
-                        fs.copyFileSync(full, target);
-                        if (fs.existsSync(target) && fs.statSync(target).size === fs.statSync(full).size) fs.unlinkSync(full);
-                    }
-                    archived = true;
+                    catch (e) { fs.copyFileSync(full, target); fs.unlinkSync(full); }
+                    archived += 1;
                 } catch (e) { console.warn('[CACFP TRAINING] archive failed for #' + id + ': ' + e.message); }
-            }
+            });
         }
 
         const del = runSQL(`DELETE FROM CacfpTraining WHERE Id=${id};`);
         if (!del.ok || del.sqlError) return sendJSON(res, 500, { error: del.error || del.sqlError });
         invalidateDocCache();
-        console.log('[CACFP TRAINING] removed #' + id + (archived ? ' (PDF archived)' : ' (no PDF on disk)'));
+        console.log('[CACFP TRAINING] removed #' + id + ' (' + archived + ' signatures archived)');
         return sendJSON(res, 200, { success: true, archived: archived });
     }
 

@@ -385,12 +385,22 @@
 
     // Keep a handle to every pad so Save can read its drawn signature. instructorPad is
     // the single instructor pad; attendeePads pairs each pad with its name input id.
+    // onFile marks a pad that was reopened holding an on-file signature, so an untouched
+    // reopen re-sends it as { existing:true } rather than dropping it.
     var instructorPad = null;
+    var instructorOnFile = false;
     var attendeePads = [];
     var attendeeCount = 0;
 
+    // Session id when this page was opened to reopen an existing training (?id=<n>).
+    // Null for a brand-new session. Save sends it so the server updates in place.
+    var currentId = (function () {
+        var m = String(location.search || '').match(/[?&]id=(\d+)/);
+        return m ? parseInt(m[1], 10) : null;
+    })();
+
     function addAttendee() {
-        if (!window.SignPad) return;
+        if (!window.SignPad) return null;
         attendeeCount += 1;
         var n = attendeeCount;
         var rows = document.getElementById('attendeeRows');
@@ -400,17 +410,88 @@
             + '<div id="attSig' + n + '" class="sig-pad-host"></div>';
         rows.appendChild(row);
         var pad = window.SignPad.create(document.getElementById('attSig' + n));
-        attendeePads.push({ pad: pad, nameId: 'attName' + n });
+        var entry = { pad: pad, nameId: 'attName' + n, onFile: false };
+        attendeePads.push(entry);
+        return entry;
     }
 
     (function mountPads() {
         if (!window.SignPad) { setTimeout(mountPads, 60); return; }
         var host = document.getElementById('sigInstructor');
         if (host) instructorPad = window.SignPad.create(host);
-        // Start with two attendee rows ready to sign; staff can add more.
-        addAttendee();
-        addAttendee();
+        if (currentId) {
+            // Reopening a saved session: pull its data and show the signatures on file.
+            reopenTraining(currentId);
+        } else {
+            // A fresh session: two attendee rows ready to sign; staff can add more.
+            addAttendee();
+            addAttendee();
+        }
     })();
+
+    /* Reopen a saved session: fill the date + instructor name, and for each signature
+       on file mount a pad showing that signature as a locked image (showExisting), with
+       the printed name prefilled. Untouched pads re-save as { existing:true }; a pad the
+       user Clears and redraws is sent as a fresh draw, superseding the stored one. */
+    async function reopenTraining(id) {
+        // Make sure the reopen is obvious and starts clean (mountPads may have left the
+        // two default attendee rows if the fetch is slow — it did not here, but be safe).
+        setSaveStatus('Loading saved training\u2026', '');
+        try {
+            if (!window.CofpAuth) throw new Error('Open this page from the Food Program tool in the staff portal.');
+            var res = await window.CofpAuth.apiFetch('/api/cacfp-training/' + id);
+            var raw = await res.text();
+            var d = null;
+            try { d = raw ? JSON.parse(raw) : null; } catch (ignore) { d = null; }
+            if (res.status === 401) throw new Error('Your staff session has expired. Sign in again at /me, then reopen.');
+            if (!res.ok || !d) throw new Error((d && d.error) || (raw && raw.slice(0, 120)) || ('HTTP ' + res.status));
+
+            var dateEl = document.getElementById('trainingDate');
+            if (dateEl && d.trainingDate) dateEl.value = d.trainingDate;
+            var instrEl = document.getElementById('instructorName');
+            if (instrEl) instrEl.value = d.instructor || '';
+
+            var sigs = Array.isArray(d.signatures) ? d.signatures : [];
+            var any = false;
+            sigs.forEach(function (s) {
+                var blobUrl = '/api/doc-file?path=' + encodeURIComponent(s.relPath || '');
+                if (s.role === 'instructor') {
+                    if (instrEl && s.name) instrEl.value = s.name;
+                    if (instructorPad && s.relPath) { showOnFile(instructorPad, blobUrl); instructorOnFile = true; any = true; }
+                } else {
+                    var entry = addAttendee();
+                    if (!entry) return;
+                    var nameInput = document.getElementById(entry.nameId);
+                    if (nameInput) nameInput.value = s.name || '';
+                    if (entry.pad && s.relPath) { showOnFile(entry.pad, blobUrl); entry.onFile = true; any = true; }
+                }
+            });
+            // Always leave at least one blank attendee row to add a late signer.
+            addAttendee();
+            setSaveStatus(any ? '\u2713 Loaded. Add or re-draw signatures, then Save to update.'
+                             : 'Loaded. No signatures were on file yet.', any ? 'ok' : '');
+        } catch (e) {
+            setSaveStatus('\u26a0 Could not load the saved training: ' + (e.message || e), 'err');
+            // Fall back to a usable blank form so the page is not stranded.
+            if (!attendeePads.length) { addAttendee(); addAttendee(); }
+        }
+    }
+
+    /* Load an on-file signature image into a pad. The image comes back from /api/doc-file
+       as a protected download, so we fetch it through CofpAuth (which carries the token)
+       and hand showExisting a blob URL rather than the bare path. */
+    function showOnFile(pad, url) {
+        if (!window.CofpAuth) { pad.showExisting(url, function () { pad.setStatus('Signature on file (could not preview).', '#b45309'); }); return; }
+        window.CofpAuth.apiFetch(url).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.blob();
+        }).then(function (blob) {
+            var objUrl = URL.createObjectURL(blob);
+            pad.showExisting(objUrl, function () { pad.setStatus('Signature on file (could not preview).', '#b45309'); });
+        }).catch(function () {
+            pad.setStatus('Signature on file (could not preview).', '#b45309');
+        });
+    }
 
     function setSaveStatus(msg, kind) {
         var el = document.getElementById('saveStatus');
@@ -419,9 +500,15 @@
         el.className = 'save-status' + (kind ? ' ' + kind : '');
     }
 
-    /* Collect every drawn signature and POST the session to /api/cacfp-training, which
-       builds the signed PDF, files it in the Food Program folder and records the session.
-       No printing — the filed PDF is the record. */
+    /* Collect every signature and POST the session to /api/cacfp-training, which stores
+       the training DATA (date, instructor, attendee names, and each signature as a JPEG)
+       so this same page can reopen and re-render it to print from the browser. No PDF.
+
+       Three kinds of signature go up:
+       - a freshly drawn pad  → { role, name, dataUrl } (a new image to save)
+       - a reopened on-file pad, untouched → { role, name, existing:true } (keep it)
+       - a reopened pad the user Cleared → sent as neither, so the server drops it.
+       When reopening, currentId is sent so the server updates that row in place. */
     async function saveTraining() {
         if (!window.CofpAuth) {
             setSaveStatus('Open this page from the Food Program tool in the staff portal to save.', 'err');
@@ -432,22 +519,28 @@
         var trainingDate = val('trainingDate') || new Date().toISOString().slice(0, 10);
         var instructor = val('instructorName');
 
-        // Instructor signature (required — someone led the training).
-        var instrUrl = instructorPad && instructorPad.drawn ? instructorPad.toDataUrl() : null;
-        if (instrUrl) {
+        // Instructor signature: a fresh draw wins; otherwise keep the one on file unless
+        // it was explicitly Cleared.
+        if (instructorPad && instructorPad.drawn) {
             sigs.push({ role: 'instructor', label: 'Instructor' + (instructor ? ' \u2014 ' + instructor : ''),
-                        name: instructor, date: trainingDate, dataUrl: instrUrl });
+                        name: instructor, date: trainingDate, dataUrl: instructorPad.toDataUrl() });
+        } else if (instructorOnFile && instructorPad && !instructorPad.cleared) {
+            sigs.push({ role: 'instructor', name: instructor, existing: true });
         }
 
-        // Each attendee who actually signed, with their printed name.
+        // Each attendee: same three-way rule as the instructor.
         var attendees = [];
         attendeePads.forEach(function (a) {
-            if (!a.pad || !a.pad.drawn) return;
-            var name = (document.getElementById(a.nameId) || {}).value || '';
-            name = String(name).trim();
-            attendees.push(name);
-            sigs.push({ role: 'attendee', label: 'Attendee' + (name ? ' \u2014 ' + name : ''),
-                        name: name, date: trainingDate, dataUrl: a.pad.toDataUrl() });
+            if (!a.pad) return;
+            var name = String((document.getElementById(a.nameId) || {}).value || '').trim();
+            if (a.pad.drawn) {
+                if (name) attendees.push(name);
+                sigs.push({ role: 'attendee', label: 'Attendee' + (name ? ' \u2014 ' + name : ''),
+                            name: name, date: trainingDate, dataUrl: a.pad.toDataUrl() });
+            } else if (a.onFile && !a.pad.cleared) {
+                if (name) attendees.push(name);
+                sigs.push({ role: 'attendee', name: name, existing: true });
+            }
         });
 
         if (!sigs.length) {
@@ -462,6 +555,7 @@
             var res = await window.CofpAuth.apiFetch('/api/cacfp-training', {
                 method: 'POST',
                 body: JSON.stringify({
+                    id: currentId || undefined,
                     trainingDate: trainingDate,
                     instructor: instructor,
                     formTitle: 'CACFP Annual Staff Training',
@@ -483,8 +577,16 @@
             if (!res.ok || !d || !d.success) {
                 throw new Error((d && d.error) || (raw && raw.slice(0, 120)) || ('HTTP ' + res.status));
             }
-            setSaveStatus('\u2713 Training saved and filed as ' + (d.name || 'a PDF') + '.', 'ok');
-            if (btn) { btn.textContent = 'Saved'; }
+            // Now we have (or keep) an id, so a further Save finishes signing this same
+            // session instead of creating a duplicate, and the URL reflects the id too.
+            if (d.id) {
+                currentId = d.id;
+                instructorOnFile = instructorOnFile || (instructorPad && instructorPad.drawn);
+                try { history.replaceState(null, '', location.pathname + '?id=' + d.id); } catch (ignore) {}
+            }
+            setSaveStatus('\u2713 Training saved (' + (d.signatureCount || sigs.length) + ' signature'
+                + ((d.signatureCount || sigs.length) === 1 ? '' : 's') + '). Use your browser\u2019s Print to print it.', 'ok');
+            if (btn) { btn.disabled = false; btn.textContent = 'Save training'; }
         } catch (e) {
             setSaveStatus('\u26a0 Could not save: ' + (e.message || e), 'err');
             if (btn) { btn.disabled = false; btn.textContent = 'Save training'; }
