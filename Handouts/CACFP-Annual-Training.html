@@ -106,12 +106,27 @@
     .present-bar button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
         padding: 8px 16px; border-radius: 7px; cursor: pointer; }
 
+    /* Date field in the sign-off: a small inline "Date" label beside the input. */
+    .date-field { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 180px; }
+    .date-lbl { font-size: 0.72rem; font-weight: 600; color: var(--muted); }
+    .date-field input { flex: 1 1 auto; }
+
     @media print {
         body { background: #fff; }
         .sheet { box-shadow: none; margin: 0; max-width: none; border-radius: 0; padding: 0 8mm; }
         .noprint { display: none; }
         @page { margin: 12mm; }
         h2, table, .callout, .signoff { break-inside: avoid; page-break-inside: avoid; }
+        /* Printed blank form: the instructor-name and training-date fields become plain
+           write-on lines (no input box, no "mm/dd/yyyy" placeholder), so the sheet is a
+           clean, date-agnostic form someone completes by hand. */
+        .sig-fields input[type=text], .date-field input[type=date] {
+            border: none; border-bottom: 1px solid #6b7280; border-radius: 0; background: none;
+            padding: 2px 2px; min-height: 20px; -webkit-appearance: none; appearance: none;
+            color: #000; font-weight: 600;
+        }
+        .sig-fields input::placeholder { color: transparent !important; }
+        .date-lbl { color: #000; }
     }
 </style>
 </head>
@@ -128,7 +143,7 @@
     </header>
 
     <div class="present-bar noprint">
-        <span id="todayLine">Training session &mdash; <span id="today"></span></span>
+        <span>Present, sign, and save &mdash; or print a blank copy to run on paper.</span>
         <button onclick="window.print()">&#x1F5A8;&#xFE0F; Print this sheet</button>
     </div>
 
@@ -324,7 +339,8 @@
                 <div id="sigInstructor" class="sig-pad-host"></div>
                 <div class="sig-fields">
                     <input type="text" id="instructorName" placeholder="Instructor printed name" aria-label="Instructor printed name">
-                    <input type="date" id="trainingDate" aria-label="Training date" title="Training date">
+                    <label class="date-field"><span class="date-lbl">Date</span>
+                        <input type="date" id="trainingDate" aria-label="Training date" title="Training date"></label>
                 </div>
             </div>
         </div>
@@ -362,15 +378,10 @@
 <script src="/staff/sign-pad.js" onerror="var s=document.createElement('script');s.src='../Internal/sign-pad.js';document.head.appendChild(s);"></script>
 <script src="/staff/auth.js"></script>
 <script>
-    // Fill today's date into the present bar and default the training date to today.
-    (function () {
-        var now = new Date();
-        var el = document.getElementById('today');
-        if (el) el.textContent = now.toLocaleDateString(undefined,
-            { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        var td = document.getElementById('trainingDate');
-        if (td) td.value = now.toISOString().slice(0, 10);
-    })();
+    // The training-date field is left BLANK by default so the sheet prints with no date
+    // baked in — it is a reusable, date-agnostic form. Whoever runs the session fills the
+    // date in (on screen before saving, or by hand on a printed copy). On save, an empty
+    // field falls back to today on the server so the filed record still carries a date.
 
     // Keep a handle to every pad so Save can read its drawn signature. instructorPad is
     // the single instructor pad; attendeePads pairs each pad with its name input id.
