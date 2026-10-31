@@ -65,10 +65,29 @@
     /* Instructor sign-off / attach-to-67-25 block */
     .signoff { margin-top: 26px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; background: #faf9fd; }
     .signoff h3 { margin-top: 0; color: var(--accent); }
-    .sig-row { display: flex; gap: 24px; margin-top: 18px; flex-wrap: wrap; }
-    .sig-row .fld { flex: 1 1 220px; }
-    .sig-line { border-bottom: 1px solid #000; height: 26px; }
     .sig-lbl { font-size: 0.74rem; color: var(--muted); margin-top: 4px; }
+    .sig-inline-line { display:inline-block; min-width:140px; border-bottom:1px solid #000; }
+
+    /* On-screen signature blocks (stylus or mouse), using the shared sign-pad.js. */
+    .sig-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 16px; }
+    .sig-block { }
+    .sig-cap { font-size: 0.74rem; font-weight: 700; color: var(--accent); text-transform: uppercase;
+        letter-spacing: 0.04em; margin-bottom: 6px; }
+    .sig-pad-host { max-width: 420px; }
+    .sig-fields { display: flex; gap: 10px; margin-top: 8px; max-width: 420px; }
+    .sig-fields input { flex: 1 1 auto; font: inherit; font-size: 0.85rem; padding: 7px 10px;
+        border: 1px solid var(--line); border-radius: 7px; }
+    .sig-fields input[type=date] { flex: 0 0 150px; }
+
+    .attendees { margin-top: 22px; }
+    .attendees-note { font-size: 0.8rem; color: var(--muted); margin: 2px 0 10px; }
+    .attendee-row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; align-items: start;
+        margin-bottom: 12px; max-width: 620px; }
+    .attendee-row input { font: inherit; font-size: 0.85rem; padding: 7px 10px; border: 1px solid var(--line);
+        border-radius: 7px; width: 100%; box-sizing: border-box; }
+    .attendee-add { margin-top: 4px; font: inherit; font-size: 0.78rem; font-weight: 700; color: var(--accent);
+        background: #f5f2fc; border: 1px dashed #cbbdf0; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
+    .attendee-add:hover { background: #ece5fa; }
 
     .noprint { text-align: center; margin: 18px; }
     .noprint button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
@@ -290,11 +309,29 @@
         <p>After presenting, fill out Form 67-25 (Documentation of Training): date, location, start/end time,
         instructor, the agenda topics above, and have <strong>every attendee sign</strong>. Attach this handout as the
         training material. File it with the CACFP records (kept 3 years + current year).</p>
-        <div class="sig-row">
-            <div class="fld"><div class="sig-line"></div><div class="sig-lbl">Instructor name &amp; signature</div></div>
-            <div class="fld"><div class="sig-line"></div><div class="sig-lbl">Training date</div></div>
-            <div class="fld"><div class="sig-line"></div><div class="sig-lbl">Form 67-25 completed &amp; filed (initials)</div></div>
+        <!-- Sign on screen with a stylus or mouse (same pad as the staff forms). The
+             drawn signature prints with the sheet; file the printed copy with Form 67-25.
+             Signatures are not saved to a record — this is a print-and-file document. -->
+        <div class="sig-grid">
+            <div class="sig-block">
+                <div class="sig-cap">Instructor signature</div>
+                <div id="sigInstructor" class="sig-pad-host"></div>
+                <div class="sig-fields">
+                    <input type="text" id="instructorName" placeholder="Printed name" aria-label="Instructor printed name">
+                    <input type="date" id="trainingDate" aria-label="Training date" title="Training date">
+                </div>
+            </div>
         </div>
+
+        <div class="attendees">
+            <div class="sig-cap">Attendees</div>
+            <p class="attendees-note noprint">Each attendee can sign below on the tablet, or sign the participant
+            list on Form 67-25. Use <strong>+ Add attendee</strong> for more rows.</p>
+            <div id="attendeeRows"></div>
+            <button type="button" class="attendee-add noprint" onclick="addAttendee()">+ Add attendee</button>
+        </div>
+
+        <p class="sig-lbl" style="margin-top:14px;">Form 67-25 completed &amp; filed: <span class="sig-inline-line"></span> (initials)</p>
     </div>
 
     <footer>
@@ -308,12 +345,44 @@
         <button onclick="window.print()">Print this training sheet</button>
     </div>
 </div>
+<!-- Shared signature pad (stylus / mouse / finger). Served under /staff/ when this
+     page is opened from the Food Program link; the relative fallback lets it also work
+     when the file is opened directly off disk. -->
+<script src="/staff/sign-pad.js" onerror="var s=document.createElement('script');s.src='../Internal/sign-pad.js';document.head.appendChild(s);"></script>
 <script>
-    // Fill today's date into the present bar so a printed copy is dated for this session.
+    // Fill today's date into the present bar and default the training date to today.
     (function () {
+        var now = new Date();
         var el = document.getElementById('today');
-        if (el) el.textContent = new Date().toLocaleDateString(undefined,
+        if (el) el.textContent = now.toLocaleDateString(undefined,
             { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        var td = document.getElementById('trainingDate');
+        if (td) td.value = now.toISOString().slice(0, 10);
+    })();
+
+    // Mount the signature pads once sign-pad.js has defined window.SignPad. It may load
+    // a tick after this inline script (async fallback), so poll briefly for it.
+    var attendeeCount = 0;
+    function addAttendee() {
+        if (!window.SignPad) return;
+        attendeeCount += 1;
+        var n = attendeeCount;
+        var rows = document.getElementById('attendeeRows');
+        var row = document.createElement('div');
+        row.className = 'attendee-row';
+        row.innerHTML = '<input type="text" id="attName' + n + '" placeholder="Attendee printed name" aria-label="Attendee printed name">'
+            + '<div id="attSig' + n + '" class="sig-pad-host"></div>';
+        rows.appendChild(row);
+        window.SignPad.create(document.getElementById('attSig' + n));
+    }
+
+    (function mountPads() {
+        if (!window.SignPad) { setTimeout(mountPads, 60); return; }
+        var host = document.getElementById('sigInstructor');
+        if (host) window.SignPad.create(host);
+        // Start with two attendee rows ready to sign; staff can add more.
+        addAttendee();
+        addAttendee();
     })();
 </script>
 </body>
