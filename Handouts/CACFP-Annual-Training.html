@@ -458,8 +458,20 @@
                     signatures: sigs
                 })
             });
-            var d = await res.json();
-            if (!res.ok || !d.success) throw new Error((d && d.error) || ('HTTP ' + res.status));
+            // Read as text first: an auth failure returns the plain word "Unauthorized",
+            // not JSON, and blindly calling res.json() on it threw the confusing
+            // "Unexpected token 'U'... is not valid JSON". Parse only if it looks like JSON.
+            var raw = await res.text();
+            var d = null;
+            try { d = raw ? JSON.parse(raw) : null; } catch (ignore) { d = null; }
+
+            if (res.status === 401) {
+                throw new Error('Your staff session has expired or this page was not opened from the '
+                    + 'portal. Sign in again at /me, then reopen the training from the Food Program page.');
+            }
+            if (!res.ok || !d || !d.success) {
+                throw new Error((d && d.error) || (raw && raw.slice(0, 120)) || ('HTTP ' + res.status));
+            }
             setSaveStatus('\u2713 Training saved and filed as ' + (d.name || 'a PDF') + '.', 'ok');
             if (btn) { btn.textContent = 'Saved'; }
         } catch (e) {

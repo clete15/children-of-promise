@@ -385,7 +385,11 @@
             var u;
             try { u = new URL(href, location.href); } catch (e) { return; }
             if (u.origin !== location.origin) return;
-            if (!/^\/pas\//i.test(u.pathname)) return;   // absolute path; URL() resolved it
+            // Same-origin new-tab targets that need the signed-in token carried in:
+            //   /pas/...               the PAS documentation app
+            //   /staff/handouts/...    staff handouts that save to the server (the CACFP
+            //                          training sheet signs and files via the API)
+            if (!/^\/pas\//i.test(u.pathname) && !/^\/staff\/handouts\//i.test(u.pathname)) return;
             window.CofpAuth.handoffToken();
         }, true);
     } catch (e) { /* no document (shouldn't happen for a page script) — skip */ }
