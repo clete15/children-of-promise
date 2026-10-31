@@ -214,11 +214,24 @@ async function init() {
             apiFetch('/api/students'),
             apiFetch('/api/classrooms')
         ]);
+        // A signed-out / expired session returns 401 with the plain word
+        // "Unauthorized", not JSON. Calling .json() on that throws the confusing
+        // "Unexpected token 'U'... is not valid JSON" — so check status first and
+        // tell staff what actually happened (sign in again) rather than a parse error.
+        if (sRes.status === 401 || cRes.status === 401) {
+            document.getElementById('fpBody').innerHTML =
+                '<div class="fp-error">Your staff session has expired or you are not signed in. '
+                + '<a href="/me">Sign in again</a>, then reopen the Food Program page.</div>';
+            return;
+        }
+        if (!sRes.ok || !cRes.ok) {
+            throw new Error('HTTP ' + (sRes.ok ? cRes.status : sRes.status));
+        }
         students = await sRes.json();
         classrooms = await cRes.json();
         showPanel('food');
     } catch (e) {
-        document.getElementById('fpBody').innerHTML = '<div class="fp-error">Could not load food program data: ' + e.message + '</div>';
+        document.getElementById('fpBody').innerHTML = '<div class="fp-error">Could not load food program data: ' + fpEsc(e.message) + '</div>';
     }
 }
 
