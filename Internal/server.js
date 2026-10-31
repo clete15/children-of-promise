@@ -2007,6 +2007,46 @@ function childSubFolder(studentId, sub) {
     return { path: dir, rel: path.relative(findDocRoot() || '', dir).replace(/\\/g, '/') };
 }
 
+/* A centre-level folder for Food Program (CACFP) documents — the annual training
+   sheets staff sign live here. Sits beside "Staff" and "Child Files" directly under
+   the library root: a Food Program document belongs to the programme, not to any one
+   child. Created on first use, like childFolder(). Returns { path, rel } or { error }. */
+const FOOD_PROGRAM_ROOT_FOLDER = 'Food Program';
+function foodProgramFolder() {
+    const DOC_ROOT = findDocRoot();
+    if (!DOC_ROOT) return { error: 'The document library is not reachable from the server.' };
+    const dir = path.join(DOC_ROOT, FOOD_PROGRAM_ROOT_FOLDER);
+    try {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+            console.log('[DOC] created ' + path.relative(DOC_ROOT, dir));
+        }
+    } catch (e) {
+        return { error: 'Could not create the "' + FOOD_PROGRAM_ROOT_FOLDER + '" folder: ' + e.message };
+    }
+    return { path: dir, rel: path.relative(DOC_ROOT, dir).replace(/\\/g, '/') };
+}
+
+/* One row per filed CACFP annual-training session, so the Food Program page can list
+   and reopen them. The signed PDF itself lives in the Food Program folder; this points
+   at it (RelPath) and keeps the human facts — date, instructor, attendee names — for a
+   quick list without reading every PDF. Never overwritten: each save is a new row and
+   a new dated PDF, so prior trainings stay on record. */
+function cacfpTrainingEnsureSQL() {
+    return `IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME='CacfpTraining')
+    CREATE TABLE CacfpTraining (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        TrainingDate DATE,
+        Instructor NVARCHAR(200),
+        Attendees NVARCHAR(MAX),
+        AttendeeCount INT DEFAULT 0,
+        FileName NVARCHAR(300),
+        RelPath NVARCHAR(500),
+        CreatedAt DATETIME DEFAULT GETDATE()
+    );
+`;
+}
+
 /* The weighted-eligibility criteria, server side, kept in step with the client copy
    in pi-forms.js (WEIGHTED_CRITERIA) and the public form's scoring. Only what the
    seeded starter document needs: the printed label, the points, and how to read a
@@ -6033,6 +6073,128 @@ DROP TABLE #cf;`;
             });
         });
         return;
+    }
+
+    /* ── CACFP annual training: file a signed session, and list filed sessions ──
+       POST /api/cacfp-training
+
+       The Food Program's annual CACFP + civil-rights training (ISBE Form 67-25) is a
+       CENTRE-level document, not a child's. Staff sign the training sheet on screen —
+       the instructor and each attendee — and this builds the same kind of signed PDF
+       the child forms produce (via buildFormPdf), files it into a centre-level
+       "Food Program" folder in the library, and records the session so it can be
+       listed and opened later. No printing: the filed PDF is the record. Modelled on
+       /api/monitoring-signed-form, but with its own folder and a CacfpTraining table
+       (the Food Program folder is not auto-indexed, so a row is how we find it again). */
+    if (req.method === 'POST' && url === '/api/cacfp-training') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+
+            const trainingDate = String(d.trainingDate || '').trim() || new Date().toISOString().slice(0, 10);
+            const instructor = String(d.instructor || '').trim();
+            const title = String(d.formTitle || 'CACFP Annual Staff Training').trim();
+            // Attendee printed names, for the record row and a roster block on the PDF.
+            const attendees = (Array.isArray(d.attendees) ? d.attendees : [])
+                .map(a => String(a || '').trim()).filter(Boolean);
+
+            // Same JPEG-dataUrl signature contract as the child / monitoring forms.
+            const incoming = Array.isArray(d.signatures) ? d.signatures : [];
+            const signatures = [];
+            for (const s of incoming) {
+                const m = String(s.dataUrl || '').match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
+                if (!m) return sendJSON(res, 400, { error: 'Expected a JPEG signature' });
+                const bytes = Buffer.from(m[1], 'base64');
+                if (!bytes.length) return sendJSON(res, 400, { error: 'A signature was empty' });
+                if (bytes.length > 2 * 1024 * 1024) {
+                    return sendJSON(res, 413, { error: 'A signature image is unreasonably large' });
+                }
+                signatures.push({ role: String(s.role || 'attendee'), label: String(s.label || ''),
+                                  name: String(s.name || ''), date: String(s.date || ''), jpeg: bytes });
+            }
+            if (!signatures.length) {
+                return sendJSON(res, 400, { error: 'Nothing was signed, so there is nothing to file.' });
+            }
+
+            const folder = foodProgramFolder();
+            if (folder.error) return sendJSON(res, 400, { error: folder.error });
+
+            // Topics covered, as a printed block, so the filed PDF stands on its own as
+            // the Form 67-25 training material (the agenda a monitor expects to see).
+            const topicBlocks = [
+                { heading: 'Topics covered', text:
+                    'Meal pattern requirements (including the Infant Meal Pattern); taking and recording meal counts; '
+                    + 'submitting the monthly Claim for Reimbursement; how CACFP reimburses for meals; recordkeeping '
+                    + 'requirements; and civil rights requirements and nondiscrimination.' }
+            ];
+            if (attendees.length) {
+                topicBlocks.push({ heading: 'Attendees', text: attendees.join(', ') });
+            }
+
+            let pdf;
+            try {
+                pdf = buildFormPdf({
+                    title: title,
+                    subtitle: 'Children of Promise \u2014 Child and Adult Care Food Program \u2014 ' + trainingDate,
+                    rows: [
+                        { label: 'Training date', value: trainingDate },
+                        { label: 'Instructor', value: instructor || '\u2014' },
+                        { label: 'Attendees', value: String(attendees.length) }
+                    ],
+                    blocks: topicBlocks,
+                    signatures: signatures,
+                    footer: 'Signed electronically in the Children of Promise portal on '
+                        + new Date().toLocaleString('en-US')
+                });
+            } catch (e) {
+                return sendJSON(res, 400, { error: 'Could not build the document: ' + e.message });
+            }
+
+            const safe = s => String(s || '').replace(/[\\/:*?"<>|]/g, '_').replace(/^\.+/, '').trim();
+            const base = 'CACFP Annual Training - ' + safe(trainingDate)
+                + (instructor ? ' - ' + safe(instructor) : '');
+            let target = path.join(folder.path, base + '.pdf');
+            let n = 2;
+            while (fs.existsSync(target) && n < 50) { target = path.join(folder.path, base + ' (' + n + ').pdf'); n++; }
+            try {
+                fs.writeFileSync(target, pdf);
+            } catch (e) {
+                console.error('[CACFP TRAINING]', e.message);
+                return sendJSON(res, 500, { error: 'Could not write the signed document' });
+            }
+            invalidateDocCache();
+            const rel = path.relative(findDocRoot(), target).replace(/\\/g, '/');
+            console.log('[CACFP TRAINING] ' + pdf.length + ' bytes -> ' + rel);
+
+            const sql = cacfpTrainingEnsureSQL()
+                + `INSERT INTO CacfpTraining (TrainingDate,Instructor,Attendees,AttendeeCount,FileName,RelPath,CreatedAt)
+VALUES (${esc(trainingDate)},${esc(instructor)},${esc(attendees.join('; '))},${attendees.length},${esc(path.basename(target))},${esc(rel)},GETDATE());`;
+            const r = runSQL(sql);
+            if (!r.ok || r.sqlError) {
+                return sendJSON(res, 500, {
+                    error: 'The training was filed as "' + path.basename(target)
+                         + '" but could not be recorded: ' + (r.error || r.sqlError) });
+            }
+            return sendJSON(res, 200, {
+                success: true, relPath: rel, name: path.basename(target), bytes: pdf.length
+            });
+        });
+        return;
+    }
+
+    /* GET /api/cacfp-training — the filed CACFP training sessions, newest first, so
+       the Food Program page can list them and open each filed PDF via /api/doc-file. */
+    if (req.method === 'GET' && url === '/api/cacfp-training') {
+        if (!checkAuth(req, res)) return;
+        const r = runSQLRows(
+            `SELECT Id, ISNULL(CONVERT(NVARCHAR(10),TrainingDate,120),'') AS TrainingDate,
+                    ISNULL(Instructor,'') AS Instructor, ISNULL(Attendees,'') AS Attendees,
+                    ISNULL(AttendeeCount,0) AS AttendeeCount, ISNULL(FileName,'') AS FileName,
+                    ISNULL(RelPath,'') AS RelPath, ISNULL(CONVERT(NVARCHAR(20),CreatedAt,120),'') AS CreatedAt
+             FROM CacfpTraining ORDER BY TrainingDate DESC, Id DESC`,
+            cacfpTrainingEnsureSQL());
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        return sendJSON(res, 200, { trainings: r.rows });
     }
 
     /* Every captured signature for a year, without the images: the roster needs to

@@ -53,6 +53,17 @@
         .fp-stat-label { font-size:0.7rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--sp-muted); }
         .fp-stat-value { margin-top:4px;font-size:1.45rem;line-height:1;font-weight:800;color:var(--sp-text); }
         .fp-section { border:1px solid var(--sp-border);border-radius:10px;padding:15px 16px;background:var(--sp-surface); }
+        /* Filed CACFP training list */
+        .fp-train-list { margin-top:12px;display:flex;flex-direction:column;gap:8px; }
+        .fp-train-row { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+            border:1px solid var(--sp-border);border-radius:9px;padding:11px 14px;background:var(--sp-surface-2); }
+        .fp-train-main { display:flex;flex-direction:column;gap:2px;min-width:0; }
+        .fp-train-date { font-size:0.9rem;font-weight:800;color:var(--sp-text); }
+        .fp-train-meta { font-size:0.76rem;color:var(--sp-muted); }
+        .fp-train-open { font-size:0.82rem;font-weight:700;color:var(--sp-accent);text-decoration:none;
+            border:1px solid var(--sp-accent);border-radius:7px;padding:6px 14px;white-space:nowrap; }
+        .fp-train-open:hover { background:var(--sp-accent);color:#fff; }
+        .fp-train-missing { font-size:0.76rem;color:var(--sp-bad-fg);font-weight:700; }
         .fp-section-head { margin-bottom:14px; }
         .fp-section-head h2 { margin:0;font-size:0.96rem;color:var(--sp-text); }
         .fp-section-head p { margin:4px 0 0;font-size:0.8rem;line-height:1.5;color:var(--sp-muted); }
@@ -159,11 +170,15 @@
             <button role="tab" aria-selected="false" id="navRecap" onclick="showPanel('recapPicker')">
                 <span class="nav-sub">Total Meal Recap</span>
             </button>
-            <!-- Opens the in-house CACFP annual training sheet in a new tab. Not a tab
+            <!-- Filed CACFP annual-training sessions (signed PDFs). A real tab panel. -->
+            <button role="tab" aria-selected="false" id="navTrainings" onclick="showPanel('trainings')">
+                <span class="nav-sub">Annual Training</span>
+            </button>
+            <!-- Opens the blank training sheet to run + sign a NEW session. Not a tab
                  panel (it is a standalone handout served from the Handouts folder), so
                  it is an anchor styled like the nav buttons rather than a showPanel tab. -->
             <a class="fp-nav-link" href="/staff/handouts/CACFP-Annual-Training.html" target="_blank" rel="noopener">
-                <span class="nav-sub">📋 Annual Training</span>
+                <span class="nav-sub">📋 New Training</span>
             </a>
         </nav>
         <main class="fp-card">
@@ -277,7 +292,76 @@ function showPanel(panel) {
                     }).join('')}
                 </div>
             </div>`;
+    } else if (panel === 'trainings') {
+        document.getElementById('navTrainings').classList.add('active');
+        document.getElementById('navTrainings').setAttribute('aria-selected', 'true');
+        document.getElementById('fpTitle').textContent = 'Annual Training';
+        document.getElementById('fpBody').innerHTML = '<div class="fp-loading">Loading filed trainings&hellip;</div>';
+        renderTrainings();
     }
+}
+
+/* Filed CACFP annual-training sessions. Each is a signed PDF in the Food Program
+   folder; the list comes from /api/cacfp-training and each row opens its PDF through
+   the shared /api/doc-file endpoint. A new session is run and signed on the training
+   sheet (the "New Training" link in the sidebar). */
+async function renderTrainings() {
+    const body = document.getElementById('fpBody');
+    let rows = [];
+    try {
+        const res = await apiFetch('/api/cacfp-training');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+        rows = Array.isArray(d.trainings) ? d.trainings : [];
+    } catch (e) {
+        body.innerHTML = '<div class="fp-error">Could not load filed trainings: ' + fpEsc(e.message) + '</div>';
+        return;
+    }
+    const intro = '<section class="fp-section"><div class="fp-section-head">'
+        + '<h2>Filed CACFP annual trainings</h2>'
+        + '<p>Each is a signed PDF filed in the Food Program folder &mdash; the documentation that satisfies ISBE '
+        + 'Form 67-25. To run a new session, open <strong>New Training</strong> in the sidebar, present it, have '
+        + 'everyone sign, and Save.</p></div>';
+    if (!rows.length) {
+        body.innerHTML = intro
+            + '<div class="fp-empty">No trainings filed yet. Open <strong>New Training</strong> to record one.</div>'
+            + '</section>';
+        return;
+    }
+    const openFn = 'openTrainingDoc';
+    const list = rows.map(function (t) {
+        const date = fpEsc(t.TrainingDate || '');
+        const who = fpEsc(t.Instructor || '\u2014');
+        const count = parseInt(t.AttendeeCount, 10) || 0;
+        const rel = String(t.RelPath || '');
+        const name = fpEsc(t.FileName || 'Training.pdf');
+        const open = rel
+            ? '<a href="#" class="fp-train-open" onclick="event.preventDefault();' + openFn + '(\''
+              + rel.replace(/'/g, "\\'") + '\',\'' + name.replace(/'/g, "\\'") + '\')">Open PDF</a>'
+            : '<span class="fp-train-missing">file missing</span>';
+        return '<div class="fp-train-row">'
+            + '<div class="fp-train-main"><span class="fp-train-date">' + date + '</span>'
+            + '<span class="fp-train-meta">Instructor: ' + who + ' &middot; ' + count + ' attendee'
+            + (count === 1 ? '' : 's') + '</span></div>'
+            + open + '</div>';
+    }).join('');
+    body.innerHTML = intro + '<div class="fp-train-list">' + list + '</div></section>';
+}
+
+/* Open a filed training PDF through the authenticated library endpoint (a bare
+   <a href> would be an unauthenticated GET and come back 401). */
+function openTrainingDoc(rel, name) {
+    apiFetch('/api/doc-file?path=' + encodeURIComponent(rel))
+        .then(function (res) {
+            if (!res.ok) throw new Error(res.status === 401 ? 'Not signed in' : ('HTTP ' + res.status));
+            return res.blob();
+        })
+        .then(function (blob) {
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank', 'noopener');
+            setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+        })
+        .catch(function (e) { alert('Could not open "' + (name || 'file') + '": ' + e.message); });
 }
 
 function renderFoodReport() {

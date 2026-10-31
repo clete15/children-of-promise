@@ -88,6 +88,14 @@
     .attendee-add { margin-top: 4px; font: inherit; font-size: 0.78rem; font-weight: 700; color: var(--accent);
         background: #f5f2fc; border: 1px dashed #cbbdf0; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
     .attendee-add:hover { background: #ece5fa; }
+    .save-row { display: flex; align-items: center; gap: 14px; margin-top: 20px; flex-wrap: wrap; }
+    .save-btn { font: inherit; font-weight: 700; font-size: 0.9rem; background: var(--accent); color: #fff;
+        border: none; padding: 11px 24px; border-radius: 8px; cursor: pointer; }
+    .save-btn:hover { background: #3c2569; }
+    .save-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .save-status { font-size: 0.84rem; font-weight: 600; }
+    .save-status.ok { color: var(--green); }
+    .save-status.err { color: #b91c1c; }
 
     .noprint { text-align: center; margin: 18px; }
     .noprint button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
@@ -305,19 +313,17 @@
 
     <!-- ───────────────────────── Sign-off ───────────────────────── -->
     <div class="signoff">
-        <h3>Document this session on ISBE Form 67-25</h3>
-        <p>After presenting, fill out Form 67-25 (Documentation of Training): date, location, start/end time,
-        instructor, the agenda topics above, and have <strong>every attendee sign</strong>. Attach this handout as the
-        training material. File it with the CACFP records (kept 3 years + current year).</p>
-        <!-- Sign on screen with a stylus or mouse (same pad as the staff forms). The
-             drawn signature prints with the sheet; file the printed copy with Form 67-25.
-             Signatures are not saved to a record — this is a print-and-file document. -->
+        <h3>Sign &amp; file this training session</h3>
+        <p>Sign on screen with a stylus or mouse &mdash; the instructor and every attendee. When you
+        <strong>Save training</strong>, a signed PDF is filed in the Food Program folder and the session is
+        recorded, so there is nothing to print. This filed PDF is the documentation that satisfies ISBE Form 67-25,
+        kept with the CACFP records (3 years + current year).</p>
         <div class="sig-grid">
             <div class="sig-block">
                 <div class="sig-cap">Instructor signature</div>
                 <div id="sigInstructor" class="sig-pad-host"></div>
                 <div class="sig-fields">
-                    <input type="text" id="instructorName" placeholder="Printed name" aria-label="Instructor printed name">
+                    <input type="text" id="instructorName" placeholder="Instructor printed name" aria-label="Instructor printed name">
                     <input type="date" id="trainingDate" aria-label="Training date" title="Training date">
                 </div>
             </div>
@@ -325,13 +331,16 @@
 
         <div class="attendees">
             <div class="sig-cap">Attendees</div>
-            <p class="attendees-note noprint">Each attendee can sign below on the tablet, or sign the participant
-            list on Form 67-25. Use <strong>+ Add attendee</strong> for more rows.</p>
+            <p class="attendees-note noprint">Each attendee signs below on the tablet. Use
+            <strong>+ Add attendee</strong> for more rows.</p>
             <div id="attendeeRows"></div>
             <button type="button" class="attendee-add noprint" onclick="addAttendee()">+ Add attendee</button>
         </div>
 
-        <p class="sig-lbl" style="margin-top:14px;">Form 67-25 completed &amp; filed: <span class="sig-inline-line"></span> (initials)</p>
+        <div class="save-row noprint">
+            <button type="button" id="saveTrainingBtn" class="save-btn" onclick="saveTraining()">Save training</button>
+            <span id="saveStatus" class="save-status"></span>
+        </div>
     </div>
 
     <footer>
@@ -345,10 +354,13 @@
         <button onclick="window.print()">Print this training sheet</button>
     </div>
 </div>
-<!-- Shared signature pad (stylus / mouse / finger). Served under /staff/ when this
-     page is opened from the Food Program link; the relative fallback lets it also work
-     when the file is opened directly off disk. -->
+<!-- Shared signature pad (stylus / mouse / finger) and the staff auth helper, so the
+     signed session can be saved to the server. Both are served under /staff/ when this
+     page is opened from the Food Program link; the relative fallback lets the pad still
+     draw when the file is opened directly off disk (saving needs the server, so it only
+     works when opened through the portal). -->
 <script src="/staff/sign-pad.js" onerror="var s=document.createElement('script');s.src='../Internal/sign-pad.js';document.head.appendChild(s);"></script>
+<script src="/staff/auth.js"></script>
 <script>
     // Fill today's date into the present bar and default the training date to today.
     (function () {
@@ -360,9 +372,12 @@
         if (td) td.value = now.toISOString().slice(0, 10);
     })();
 
-    // Mount the signature pads once sign-pad.js has defined window.SignPad. It may load
-    // a tick after this inline script (async fallback), so poll briefly for it.
+    // Keep a handle to every pad so Save can read its drawn signature. instructorPad is
+    // the single instructor pad; attendeePads pairs each pad with its name input id.
+    var instructorPad = null;
+    var attendeePads = [];
     var attendeeCount = 0;
+
     function addAttendee() {
         if (!window.SignPad) return;
         attendeeCount += 1;
@@ -373,17 +388,85 @@
         row.innerHTML = '<input type="text" id="attName' + n + '" placeholder="Attendee printed name" aria-label="Attendee printed name">'
             + '<div id="attSig' + n + '" class="sig-pad-host"></div>';
         rows.appendChild(row);
-        window.SignPad.create(document.getElementById('attSig' + n));
+        var pad = window.SignPad.create(document.getElementById('attSig' + n));
+        attendeePads.push({ pad: pad, nameId: 'attName' + n });
     }
 
     (function mountPads() {
         if (!window.SignPad) { setTimeout(mountPads, 60); return; }
         var host = document.getElementById('sigInstructor');
-        if (host) window.SignPad.create(host);
+        if (host) instructorPad = window.SignPad.create(host);
         // Start with two attendee rows ready to sign; staff can add more.
         addAttendee();
         addAttendee();
     })();
+
+    function setSaveStatus(msg, kind) {
+        var el = document.getElementById('saveStatus');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.className = 'save-status' + (kind ? ' ' + kind : '');
+    }
+
+    /* Collect every drawn signature and POST the session to /api/cacfp-training, which
+       builds the signed PDF, files it in the Food Program folder and records the session.
+       No printing — the filed PDF is the record. */
+    async function saveTraining() {
+        if (!window.CofpAuth) {
+            setSaveStatus('Open this page from the Food Program tool in the staff portal to save.', 'err');
+            return;
+        }
+        var sigs = [];
+        var val = function (id) { var e = document.getElementById(id); return e ? e.value.trim() : ''; };
+        var trainingDate = val('trainingDate') || new Date().toISOString().slice(0, 10);
+        var instructor = val('instructorName');
+
+        // Instructor signature (required — someone led the training).
+        var instrUrl = instructorPad && instructorPad.drawn ? instructorPad.toDataUrl() : null;
+        if (instrUrl) {
+            sigs.push({ role: 'instructor', label: 'Instructor' + (instructor ? ' \u2014 ' + instructor : ''),
+                        name: instructor, date: trainingDate, dataUrl: instrUrl });
+        }
+
+        // Each attendee who actually signed, with their printed name.
+        var attendees = [];
+        attendeePads.forEach(function (a) {
+            if (!a.pad || !a.pad.drawn) return;
+            var name = (document.getElementById(a.nameId) || {}).value || '';
+            name = String(name).trim();
+            attendees.push(name);
+            sigs.push({ role: 'attendee', label: 'Attendee' + (name ? ' \u2014 ' + name : ''),
+                        name: name, date: trainingDate, dataUrl: a.pad.toDataUrl() });
+        });
+
+        if (!sigs.length) {
+            setSaveStatus('Add at least one signature before saving.', 'err');
+            return;
+        }
+
+        var btn = document.getElementById('saveTrainingBtn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Saving\u2026'; }
+        setSaveStatus('Saving\u2026', '');
+        try {
+            var res = await window.CofpAuth.apiFetch('/api/cacfp-training', {
+                method: 'POST',
+                body: JSON.stringify({
+                    trainingDate: trainingDate,
+                    instructor: instructor,
+                    formTitle: 'CACFP Annual Staff Training',
+                    attendees: attendees,
+                    signatures: sigs
+                })
+            });
+            var d = await res.json();
+            if (!res.ok || !d.success) throw new Error((d && d.error) || ('HTTP ' + res.status));
+            setSaveStatus('\u2713 Training saved and filed as ' + (d.name || 'a PDF') + '.', 'ok');
+            if (btn) { btn.textContent = 'Saved'; }
+        } catch (e) {
+            setSaveStatus('\u26a0 Could not save: ' + (e.message || e), 'err');
+            if (btn) { btn.disabled = false; btn.textContent = 'Save training'; }
+        }
+    }
 </script>
 </body>
 </html>
