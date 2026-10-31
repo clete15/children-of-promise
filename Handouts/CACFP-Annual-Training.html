@@ -399,6 +399,43 @@
         return m ? parseInt(m[1], 10) : null;
     })();
 
+    /* Sign-in is required to save (the save endpoint is staff-only). On a shared tablet
+       this page is often opened in a tab that never carried a token, so the save came
+       back 401 and the person was stranded mid-signing. These two helpers let the page
+       send them to /me and bring them straight back to THIS training afterwards. */
+
+    // Where /me should return to: this exact page, keeping the training id so a reopened
+    // session lands back on its signatures. Encoded whole, because the ?id= inside it
+    // would otherwise be read as a separate query param and dropped.
+    function returnHere() {
+        var here = location.pathname + (currentId ? '?id=' + currentId : '');
+        return '/me?next=' + encodeURIComponent(here);
+    }
+
+    // True when this tab is carrying a personal staff session (a token). A shared-password
+    // director has no token but can still save, so "no token" is not conclusive on its own
+    // — we only force a sign-in when a save actually comes back 401.
+    function hasSession() {
+        try { return !!(window.CofpAuth && CofpAuth.token && CofpAuth.token()); }
+        catch (e) { return false; }
+    }
+
+    // Offer a one-tap trip to /me that returns here. For a reopened session nothing is
+    // lost (the signatures are on file). For a brand-new, never-saved session, signing in
+    // reloads the page and the just-drawn signatures would be lost, so warn first.
+    function goSignIn(msgPrefix) {
+        var lose = !currentId;   // a fresh session has nothing saved yet
+        var note = lose
+            ? '\n\nHeads up: this training has not been saved yet, so the signatures on screen '
+              + 'will be cleared when you sign in. If you can, Save first — otherwise you will '
+              + 're-sign after signing in.'
+            : '';
+        if (confirm((msgPrefix || 'You need to sign in to save this training.') + note
+                + '\n\nGo to the sign-in page now?')) {
+            location.href = returnHere();
+        }
+    }
+
     function addAttendee() {
         if (!window.SignPad) return null;
         attendeeCount += 1;
@@ -426,6 +463,16 @@
             // A fresh session: two attendee rows ready to sign; staff can add more.
             addAttendee();
             addAttendee();
+            // If this tab has no staff session, saving will fail at the end — and on a
+            // tablet that means re-signing. Catch it BEFORE anyone signs: offer to sign
+            // in first (no work to lose yet), rather than after. Only nudges when there
+            // is clearly no token; a shared-password director (no token) can still save,
+            // so a declined prompt leaves the form fully usable and the save attempt
+            // still runs its own 401 check.
+            if (window.CofpAuth && !hasSession()) {
+                setSaveStatus('This device may not be signed in. Sign in before you start so your signatures save.', 'err');
+                setTimeout(function () { goSignIn('This device does not appear to be signed in.'); }, 400);
+            }
         }
     })();
 
@@ -511,7 +558,8 @@
        When reopening, currentId is sent so the server updates that row in place. */
     async function saveTraining() {
         if (!window.CofpAuth) {
-            setSaveStatus('Open this page from the Food Program tool in the staff portal to save.', 'err');
+            setSaveStatus('This page was opened outside the staff portal (no sign-in available), so it cannot save. '
+                + 'Open it from the Food Program page.', 'err');
             return;
         }
         var sigs = [];
@@ -571,8 +619,13 @@
             try { d = raw ? JSON.parse(raw) : null; } catch (ignore) { d = null; }
 
             if (res.status === 401) {
-                throw new Error('Your staff session has expired or this page was not opened from the '
-                    + 'portal. Sign in again at /me, then reopen the training from the Food Program page.');
+                // Not signed in on this tab (common on a shared tablet). Don't dead-end
+                // with a "go to /me yourself" message — offer to take them there and
+                // bring them right back to this training.
+                if (btn) { btn.disabled = false; btn.textContent = 'Save training'; }
+                setSaveStatus('\u26a0 You are not signed in on this device. Tap to sign in, then you will come back here.', 'err');
+                goSignIn('This device is not signed in, so the training could not be saved.');
+                return;
             }
             if (!res.ok || !d || !d.success) {
                 throw new Error((d && d.error) || (raw && raw.slice(0, 120)) || ('HTTP ' + res.status));
