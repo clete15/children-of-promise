@@ -6087,7 +6087,9 @@ DROP TABLE #cf;`;
        /api/monitoring-signed-form, but with its own folder and a CacfpTraining table
        (the Food Program folder is not auto-indexed, so a row is how we find it again). */
     if (req.method === 'POST' && url === '/api/cacfp-training') {
-        if (!checkAuth(req, res)) return;
+        // Any signed-in staff member may record a training (teachers included) — a
+        // training session is ordinary programme paperwork, not a centre-admin control.
+        if (!checkClassroomAuth(req, res)) return;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
 
@@ -6185,7 +6187,9 @@ VALUES (${esc(trainingDate)},${esc(instructor)},${esc(attendees.join('; '))},${a
     /* GET /api/cacfp-training — the filed CACFP training sessions, newest first, so
        the Food Program page can list them and open each filed PDF via /api/doc-file. */
     if (req.method === 'GET' && url === '/api/cacfp-training') {
-        if (!checkAuth(req, res)) return;
+        // Same tier as the save and as /api/doc-file: any signed-in staff member may
+        // see the filed trainings (and open them), so a teacher who saves one can find it.
+        if (!checkClassroomAuth(req, res)) return;
         const r = runSQLRows(
             `SELECT Id, ISNULL(CONVERT(NVARCHAR(10),TrainingDate,120),'') AS TrainingDate,
                     ISNULL(Instructor,'') AS Instructor, ISNULL(Attendees,'') AS Attendees,
