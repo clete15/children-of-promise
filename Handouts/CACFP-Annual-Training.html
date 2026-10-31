@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CACFP Annual Staff Training — Children of Promise</title>
+<style>
+    :root { --ink:#2b1e3d; --muted:#5b5570; --line:#d9d4e4; --accent:#4b2e83; --accent-soft:#efeafb;
+            --green:#15803d; --green-soft:#e8f6ec; --amber:#92400e; --amber-soft:#fef3e2; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+        font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+        color: var(--ink); line-height: 1.5; background: #f3f1f7;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .sheet {
+        max-width: 820px; margin: 24px auto; background: #fff; padding: 40px 48px 48px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.10); border-radius: 10px;
+    }
+    header { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid var(--accent); padding-bottom: 16px; }
+    header img { width: 86px; height: auto; flex-shrink: 0; }
+    header .ht h1 { margin: 0; font-size: 1.5rem; color: var(--accent); letter-spacing: -0.01em; }
+    header .ht .sub { margin: 3px 0 0; font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+    header .ht .center { margin: 2px 0 0; font-size: 0.82rem; color: var(--muted); }
+
+    h2 {
+        margin: 30px 0 10px; font-size: 1.12rem; color: var(--accent);
+        border-bottom: 2px solid var(--accent-soft); padding-bottom: 6px;
+        display: flex; align-items: center; gap: 10px;
+    }
+    h2 .n {
+        width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff;
+        font-weight: 800; font-size: 0.9rem; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    h3 { margin: 18px 0 6px; font-size: 0.98rem; color: var(--ink); }
+    p { margin: 8px 0; font-size: 0.92rem; }
+    ul, ol { margin: 8px 0 8px; padding-left: 22px; font-size: 0.92rem; }
+    li { margin: 4px 0; }
+
+    .lead { font-size: 0.95rem; color: var(--muted); margin: 14px 0 0; }
+
+    .callout {
+        margin: 18px 0; padding: 14px 18px; background: var(--accent-soft); border: 1px solid #cbbdf0;
+        border-left: 5px solid var(--accent); border-radius: 6px; color: var(--ink); font-size: 0.9rem;
+    }
+    .callout strong { color: var(--accent); }
+
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.86rem; }
+    th, td { border: 1px solid var(--line); padding: 7px 9px; text-align: left; vertical-align: top; }
+    th { background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 0.78rem;
+         text-transform: uppercase; letter-spacing: 0.03em; }
+    td.c, th.c { text-align: center; }
+    caption { caption-side: top; text-align: left; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+
+    .topics { list-style: none; padding: 0; margin: 10px 0; }
+    .topics li { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); }
+    .topics li::before { content: "\2713"; color: var(--green); font-weight: 800; }
+
+    .src { font-size: 0.74rem; color: var(--muted); font-style: italic; margin: 4px 0 0; }
+
+    footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 0.78rem; color: var(--muted); }
+    footer a { color: var(--accent); }
+
+    /* Instructor sign-off / attach-to-67-25 block */
+    .signoff { margin-top: 26px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 8px; background: #faf9fd; }
+    .signoff h3 { margin-top: 0; color: var(--accent); }
+    .sig-row { display: flex; gap: 24px; margin-top: 18px; flex-wrap: wrap; }
+    .sig-row .fld { flex: 1 1 220px; }
+    .sig-line { border-bottom: 1px solid #000; height: 26px; }
+    .sig-lbl { font-size: 0.74rem; color: var(--muted); margin-top: 4px; }
+
+    .noprint { text-align: center; margin: 18px; }
+    .noprint button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
+        padding: 10px 22px; border-radius: 8px; cursor: pointer; }
+    .present-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        margin: 14px 0 0; padding: 10px 14px; background: var(--accent-soft); border: 1px solid #cbbdf0;
+        border-radius: 8px; font-size: 0.86rem; font-weight: 600; color: var(--accent); }
+    .present-bar button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
+        padding: 8px 16px; border-radius: 7px; cursor: pointer; }
+
+    @media print {
+        body { background: #fff; }
+        .sheet { box-shadow: none; margin: 0; max-width: none; border-radius: 0; padding: 0 8mm; }
+        .noprint { display: none; }
+        @page { margin: 12mm; }
+        h2, table, .callout, .signoff { break-inside: avoid; page-break-inside: avoid; }
+    }
+</style>
+</head>
+<body>
+<div class="sheet">
+    <header>
+        <img src="/staff/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool"
+             onerror="this.onerror=null;this.src='../Internal/ChildrenOfPromise.png';">
+        <div class="ht">
+            <h1>CACFP Annual Staff Training</h1>
+            <p class="sub">Child and Adult Care Food Program &mdash; mandatory annual training</p>
+            <p class="center">Children of Promise &nbsp;&middot;&nbsp; Millstadt, IL</p>
+        </div>
+    </header>
+
+    <div class="present-bar noprint">
+        <span id="todayLine">Training session &mdash; <span id="today"></span></span>
+        <button onclick="window.print()">&#x1F5A8;&#xFE0F; Print this sheet</button>
+    </div>
+
+    <p class="lead">This is our in-house script for the annual CACFP training ISBE requires of all key staff.
+    Work through each section with the team, then complete and sign ISBE Form 67-25 (Documentation of Training)
+    and attach this document as the training material.</p>
+
+    <div class="callout">
+        <strong>Source:</strong> this handout summarizes the ISBE <em>Administrative Handbook for CACFP Centers</em>
+        (chapters 4, 6, 7, and 8). It is our standing training material &mdash; present it, then document the session
+        on Form 67-25 and attach this sheet.
+    </div>
+
+    <div class="callout">
+        <strong>Who must attend &amp; how often.</strong> CACFP training is required <strong>annually</strong> for
+        key staff with food-program responsibilities (director, cook, and anyone handling CACFP recordkeeping),
+        and for <strong>new staff before they begin CACFP duties</strong>. Civil rights training is required
+        annually for frontline staff who interact with children and families, and for those who supervise them.
+        Record it all on Form 67-25 with dates, topics, and attendee signatures.
+    </div>
+
+    <h3>Topics this session covers (the mandatory minimum)</h3>
+    <ul class="topics">
+        <li>Meal pattern requirements (including the Infant Meal Pattern)</li>
+        <li>Taking and recording meal counts</li>
+        <li>Submitting the monthly Claim for Reimbursement</li>
+        <li>How CACFP reimburses for meals</li>
+        <li>Recordkeeping requirements</li>
+        <li>Civil rights requirements and nondiscrimination</li>
+    </ul>
+
+    <!-- ───────────────────────── 1. Meal patterns ───────────────────────── -->
+    <h2><span class="n">1</span> Meal Pattern Requirements</h2>
+    <p>CACFP reimburses for <strong>meals that meet the pattern for the child&rsquo;s age group</strong> &mdash; not
+    for individual foods. A meal is reimbursable only when it contains every required component in at least the
+    minimum amount. Serving extra foods beyond the pattern is fine and still reimbursable.</p>
+
+    <h3>Child Meal Pattern, ages 1&ndash;12</h3>
+    <table>
+        <caption>Minimum serving sizes. Select ALL components for breakfast/lunch/supper; select 2 of 5 for snack.</caption>
+        <thead><tr><th>Component</th><th class="c">Ages 1&ndash;2</th><th class="c">Ages 3&ndash;5</th><th class="c">Ages 6&ndash;12</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Breakfast</strong> &mdash; fluid milk</td><td class="c">4 fl oz</td><td class="c">6 fl oz</td><td class="c">8 fl oz</td></tr>
+            <tr><td>&nbsp;&nbsp;vegetables / fruits (or both)</td><td class="c">&frac14; cup</td><td class="c">&frac12; cup</td><td class="c">&frac12; cup</td></tr>
+            <tr><td>&nbsp;&nbsp;grains</td><td class="c">&frac12; oz eq</td><td class="c">&frac12; oz eq</td><td class="c">1 oz eq</td></tr>
+            <tr><td><strong>Lunch / Supper</strong> &mdash; fluid milk</td><td class="c">4 fl oz</td><td class="c">6 fl oz</td><td class="c">8 fl oz</td></tr>
+            <tr><td>&nbsp;&nbsp;meat / meat alternate</td><td class="c">1 oz eq</td><td class="c">1&frac12; oz eq</td><td class="c">2 oz eq</td></tr>
+            <tr><td>&nbsp;&nbsp;vegetables</td><td class="c">&frac18; cup</td><td class="c">&frac14; cup</td><td class="c">&frac12; cup</td></tr>
+            <tr><td>&nbsp;&nbsp;fruits</td><td class="c">&frac18; cup</td><td class="c">&frac14; cup</td><td class="c">&frac14; cup</td></tr>
+            <tr><td>&nbsp;&nbsp;grains</td><td class="c">&frac12; oz eq</td><td class="c">&frac12; oz eq</td><td class="c">1 oz eq</td></tr>
+            <tr><td><strong>Snack</strong> (any 2 of 5) &mdash; fluid milk</td><td class="c">4 fl oz</td><td class="c">4 fl oz</td><td class="c">8 fl oz</td></tr>
+            <tr><td>&nbsp;&nbsp;meat / meat alternate</td><td class="c">&frac12; oz eq</td><td class="c">&frac12; oz eq</td><td class="c">1 oz eq</td></tr>
+            <tr><td>&nbsp;&nbsp;vegetables</td><td class="c">&frac12; cup</td><td class="c">&frac12; cup</td><td class="c">&frac34; cup</td></tr>
+            <tr><td>&nbsp;&nbsp;fruits</td><td class="c">&frac12; cup</td><td class="c">&frac12; cup</td><td class="c">&frac34; cup</td></tr>
+            <tr><td>&nbsp;&nbsp;grains</td><td class="c">&frac12; oz eq</td><td class="c">&frac12; oz eq</td><td class="c">1 oz eq</td></tr>
+        </tbody>
+    </table>
+    <p>Key rules to say out loud:</p>
+    <ul>
+        <li><strong>Milk by age.</strong> Age 1: unflavored whole milk. Ages 2&ndash;5: unflavored whole, reduced-fat,
+            low-fat (1%), or fat-free. Age 6+: those plus flavored. Breastmilk substitutes for milk at any age.</li>
+        <li><strong>Whole grain-rich</strong> must be served and marked on the menu at least once per day.</li>
+        <li><strong>Juice</strong> only once per meal/snack per day, must be 100% pasteurized juice.</li>
+        <li><strong>Grain-based desserts do not count.</strong> Breakfast cereal: no more than 6 g added sugar per dry oz.
+            Yogurt: no more than 12 g added sugar per 6 oz.</li>
+        <li><strong>Snack</strong> needs 2 of the 5 components, and only one of the two may be a beverage.</li>
+    </ul>
+    <p>For combination/processed foods (pizza, chicken nuggets), keep a <strong>CN label, product formulation
+    statement, or standardized recipe</strong> on file to prove how it credits.</p>
+    <p class="src">Source: ISBE Administrative Handbook for CACFP Centers, Chapter 4 (Meal Requirements).</p>
+
+    <!-- ───────────────────────── 2. Infant meal pattern ───────────────────────── -->
+    <h2><span class="n">2</span> Infant Meal Pattern</h2>
+    <p>Every center must offer all infant components appropriate to the infant&rsquo;s age. There are two age ranges:
+    <strong>birth&ndash;5 months</strong> and <strong>6&ndash;11 months</strong>.</p>
+    <ul>
+        <li><strong>Breastmilk or iron-fortified infant formula</strong> is the base at every feeding; breastmilk is
+            recommended birth through 11 months. A mother nursing on site is a creditable, reimbursable meal.</li>
+        <li>Infant formula and dry infant cereal must be <strong>iron-fortified</strong>.</li>
+        <li>At 6&ndash;11 months, solid components (cereal, meat/alternate, vegetable/fruit) are added
+            <strong>&ldquo;when developmentally ready&rdquo;</strong> &mdash; once the infant is regularly eating solids,
+            all required components must be offered. Readiness, not just age, decides what and how to feed.</li>
+        <li><strong>No fruit or vegetable juice</strong> for infants.</li>
+        <li>Keep a signed <strong>Infant Formula/Food Waiver Notification</strong> on file for every infant &mdash; it
+            records the brand of formula and baby food offered and the parent&rsquo;s choice to accept or decline.</li>
+    </ul>
+    <p class="src">Source: ISBE Administrative Handbook, &sect;4.2 (Infant Meal Pattern Requirements).</p>
+
+    <!-- ───────────────────────── 3. Meal counts ───────────────────────── -->
+    <h2><span class="n">3</span> Taking &amp; Recording Meal Counts</h2>
+    <p>The meal count is the daily record of which enrolled children ate which meals &mdash; it is what the claim is
+    built from, so it has to be right.</p>
+    <ul>
+        <li><strong>Record the count while the children are eating</strong> (point of service), not from memory later.</li>
+        <li>Use the Meal Participation Record (<strong>ISBE Form 68-75D</strong>, or 68-75 for a pre-dated month).
+            List children by class, alphabetically, first and last name.</li>
+        <li>Take a count for <strong>every meal service you claim</strong>.</li>
+        <li>Post current, dated <strong>menus for all age groups</strong> where parents can see them; menus must show
+            the required components, the whole grain-rich item, and the type/fat content of milk served.</li>
+        <li>Record any menu substitution when it happens.</li>
+    </ul>
+    <div class="callout"><strong>The chain that must match:</strong> what&rsquo;s on the menu &rarr; what was served
+    &rarr; the meal count taken at the table &rarr; the numbers on the monthly claim. A review checks that these line up.</div>
+    <p class="src">Source: ISBE Administrative Handbook, &sect;6.3 (Meal Counts and Menus).</p>
+
+    <!-- ───────────────────────── 4. Claims ───────────────────────── -->
+    <h2><span class="n">4</span> Submitting the Monthly Claim</h2>
+    <ul>
+        <li>Claims are filed <strong>online in WINS via IWAS</strong>, in two steps: submit the site claim first, then the
+            sponsor claim.</li>
+        <li>Enter <strong>daily meal counts by eligibility category</strong> (free, reduced, paid). Those counts must be
+            backed by the meal participation records.</li>
+        <li><strong>Due by the 10th</strong> of the following month (August&rsquo;s claim is due Sept. 10).</li>
+        <li>The <strong>hard federal deadline is 60 days</strong> after the last day of the claim month for original claims
+            and upward revisions. After the deadline a claim goes to &ldquo;waiting for approval&rdquo; &mdash; a
+            one-time-in-three-years exception may be granted, or it may be denied. Downward revisions can be filed any time.</li>
+    </ul>
+    <p class="src">Source: ISBE Administrative Handbook, &sect;7.3 (Submitting Claims for Reimbursement).</p>
+
+    <!-- ───────────────────────── 5. How reimbursement works ───────────────────────── -->
+    <h2><span class="n">5</span> How CACFP Reimburses for Meals</h2>
+    <ul>
+        <li>Reimbursement depends on the <strong>eligibility of the enrolled children</strong> (free / reduced / paid),
+            the <strong>type of meal</strong> (breakfast, lunch, snack, supper), and the program.</li>
+        <li>You may claim at most <strong>two meals and one snack, OR two snacks and one meal, per child per day</strong>.
+            A second helping of the same meal is not reimbursable.</li>
+        <li>You cannot claim a meal under CACFP that is already claimed under the School Breakfast Program, NSLP, or SFSP.</li>
+        <li>Rates are set by the federal government and <strong>change every July 1</strong> &mdash; look them up on ISBE&rsquo;s
+            Eligibility, Income and Reimbursement Information page.</li>
+        <li>CACFP money is a <strong>nonprofit food service account</strong>: it is restricted to allowable food-service costs,
+            and any surplus must go back into maintaining or improving the food service.</li>
+    </ul>
+    <p class="src">Source: ISBE Administrative Handbook, Chapter 7 (Reimbursement System) and &sect;6.2.</p>
+
+    <!-- ───────────────────────── 6. Recordkeeping ───────────────────────── -->
+    <h2><span class="n">6</span> Recordkeeping</h2>
+    <p>Keep all CACFP records for <strong>three years plus the current program year</strong> (longer if a review or audit
+    finding is still open). The records a review expects to find:</p>
+    <ul>
+        <li><strong>Enrollment &amp; eligibility:</strong> the master list of eligible children, daily attendance,
+            Household Eligibility Applications (or direct certification), and a current CACFP Annual Enrollment Form for
+            every child &mdash; <em>meals for a child with no current enrollment form on file cannot be claimed.</em></li>
+        <li><strong>Meal service:</strong> daily meal participation records, the Total Meal Recap (Form 67-22), menus for
+            all age groups for the whole month, and CN labels / product formulation statements / standardized recipes as needed.</li>
+        <li><strong>Expenditures:</strong> itemized food and non-food receipts, proof of payment (canceled checks / bank
+            statements), the Cash Disbursement Journal (67-24), Personnel Activity Reports (67-54), and the Monthly Profit
+            or Loss Summary (67-93).</li>
+        <li><strong>Training:</strong> this Form 67-25, with dates, topics, and attendee signatures for CACFP and civil
+            rights training.</li>
+    </ul>
+    <p>Labor is tracked on <strong>Personnel Activity Reports</strong>, completed daily by each employee, split into
+    administrative vs. operational food-program hours &mdash; not on the Cash Disbursement Journal.</p>
+    <p class="src">Source: ISBE Administrative Handbook, Chapter 6 (Recordkeeping).</p>
+
+    <!-- ───────────────────────── 7. Civil rights ───────────────────────── -->
+    <h2><span class="n">7</span> Civil Rights Requirements</h2>
+    <p>As a USDA-funded program we must not discriminate on the basis of <strong>race, color, national origin, sex, age,
+    or disability</strong>. The goals: equal treatment for everyone, people knowing their rights, and removing any
+    barrier that keeps a family from benefits.</p>
+    <h3>What the annual civil rights training must cover</h3>
+    <ul>
+        <li>Collection and use of data</li>
+        <li>Effective public notification systems</li>
+        <li>Complaint procedures</li>
+        <li>Compliance review techniques and resolution of noncompliance</li>
+        <li>Reasonable accommodation for persons with disabilities</li>
+        <li>Language assistance</li>
+        <li>Conflict resolution and customer service</li>
+    </ul>
+    <h3>What we must do at the center</h3>
+    <ul>
+        <li>Collect <strong>ethnic and racial data</strong> on participants every year (Section 5 of the Annual Enrollment
+            Form; parent self-identification preferred, aggregate data if declined).</li>
+        <li>Display the USDA <strong>&ldquo;And Justice for All&rdquo; poster</strong> in a prominent place (free from ISBE).</li>
+        <li>Provide/post the <strong>Building for the Future</strong> brochure and the <strong>WIC flyer</strong>.</li>
+        <li>Put the <strong>nondiscrimination statement and complaint procedure</strong> on any public materials that
+            mention USDA programs.</li>
+        <li>Make meal modifications for a disability on a signed statement from a licensed healthcare professional; work
+            with families on non-medical (preference, religious, vegetarian) substitutions within the meal pattern.</li>
+    </ul>
+    <p class="src">Source: ISBE Administrative Handbook, Chapter 8 (Civil Rights Requirements) and USDA FNS Instruction 113-1.</p>
+
+    <!-- ───────────────────────── Sign-off ───────────────────────── -->
+    <div class="signoff">
+        <h3>Document this session on ISBE Form 67-25</h3>
+        <p>After presenting, fill out Form 67-25 (Documentation of Training): date, location, start/end time,
+        instructor, the agenda topics above, and have <strong>every attendee sign</strong>. Attach this handout as the
+        training material. File it with the CACFP records (kept 3 years + current year).</p>
+        <div class="sig-row">
+            <div class="fld"><div class="sig-line"></div><div class="sig-lbl">Instructor name &amp; signature</div></div>
+            <div class="fld"><div class="sig-line"></div><div class="sig-lbl">Training date</div></div>
+            <div class="fld"><div class="sig-line"></div><div class="sig-lbl">Form 67-25 completed &amp; filed (initials)</div></div>
+        </div>
+    </div>
+
+    <footer>
+        Children of Promise &mdash; internal CACFP annual training material. Summarized from the ISBE
+        <a href="https://www.isbe.net/Documents/CACFP-AllChapters.pdf">Administrative Handbook for CACFP Centers</a>;
+        documented on <a href="https://www.isbe.net/Documents/67-25_training_form.pdf">ISBE Form 67-25</a>.
+        Content rephrased from ISBE source documents for compliance.
+    </footer>
+
+    <div class="noprint">
+        <button onclick="window.print()">Print this training sheet</button>
+    </div>
+</div>
+<script>
+    // Fill today's date into the present bar so a printed copy is dated for this session.
+    (function () {
+        var el = document.getElementById('today');
+        if (el) el.textContent = new Date().toLocaleDateString(undefined,
+            { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    })();
+</script>
+</body>
+</html>

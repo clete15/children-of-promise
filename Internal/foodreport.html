@@ -33,7 +33,12 @@
         .fp-sidebar button { appearance:none;background:transparent;border:0;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;color:var(--sp-muted);cursor:pointer;font-family:inherit;font-size:0.88rem;font-weight:700;padding:10px 14px 11px;margin-bottom:-1.5px;white-space:nowrap;transition:color 0.12s,background 0.12s,border-color 0.12s; }
         .fp-sidebar button:hover { color:var(--sp-text);background:var(--sp-surface-2); }
         .fp-sidebar button.active { color:var(--sp-accent);border-bottom-color:var(--sp-accent); }
-        .fp-sidebar button:focus-visible,.fp-theme:focus-visible,.fp-back:focus-visible,.fp-btn:focus-visible,.fp-filter:focus-visible,.fp-month-btn:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
+        /* The Annual Training resource link: styled like the nav buttons but pushed to
+           the right of the row and tinted as the accent, since it opens a handout in a
+           new tab rather than switching a tab panel. */
+        .fp-nav-link { margin-left:auto;display:inline-flex;align-items:center;text-decoration:none;border-bottom:3px solid transparent;border-radius:8px 8px 0 0;color:var(--sp-accent);font-family:inherit;font-size:0.88rem;font-weight:700;padding:10px 14px 11px;margin-bottom:-1.5px;white-space:nowrap;transition:color 0.12s,background 0.12s; }
+        .fp-nav-link:hover { background:var(--sp-surface-2);text-decoration:underline; }
+        .fp-sidebar button:focus-visible,.fp-nav-link:focus-visible,.fp-theme:focus-visible,.fp-back:focus-visible,.fp-btn:focus-visible,.fp-filter:focus-visible,.fp-month-btn:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
         .fp-sidebar .nav-label,.fp-sidebar .nav-sub { font:inherit;color:inherit; }
         .fp-card { background:var(--sp-surface);border:1.5px solid var(--sp-border);border-radius:10px;overflow:hidden; }
         .fp-header { padding:17px 20px 15px;border-bottom:1px solid var(--sp-border); }
@@ -154,6 +159,12 @@
             <button role="tab" aria-selected="false" id="navRecap" onclick="showPanel('recapPicker')">
                 <span class="nav-sub">Total Meal Recap</span>
             </button>
+            <!-- Opens the in-house CACFP annual training sheet in a new tab. Not a tab
+                 panel (it is a standalone handout served from the Handouts folder), so
+                 it is an anchor styled like the nav buttons rather than a showPanel tab. -->
+            <a class="fp-nav-link" href="/staff/handouts/CACFP-Annual-Training.html" target="_blank" rel="noopener">
+                <span class="nav-sub">📋 Annual Training</span>
+            </a>
         </nav>
         <main class="fp-card">
             <div class="fp-header">

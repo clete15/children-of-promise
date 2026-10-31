@@ -10099,6 +10099,25 @@ ELSE
         });
         return;
     }
+    /* Staff-facing handouts (training sheets, parent/staff guides). These live in the
+       Handouts/ folder, a SIBLING of Internal/, not under it — so they are served by
+       their own route rather than the generic /staff handler below (which maps into
+       Internal/). Read-only, and constrained to within the Handouts folder so a
+       ../ cannot escape it. */
+    if (url.startsWith('/staff/handouts/')) {
+        const HANDOUTS_DIR = path.join(__dirname, '..', 'Handouts');
+        const rel = decodeURIComponent(url.replace('/staff/handouts/', ''));
+        const filePath = path.join(HANDOUTS_DIR, rel);
+        if (!filePath.startsWith(HANDOUTS_DIR)) { res.writeHead(403); return res.end('Forbidden'); }
+        fs.readFile(filePath, (err, data) => {
+            if (err) { res.writeHead(404); return res.end('Not found'); }
+            res.writeHead(200, Object.assign(
+                { 'Content-Type': MIME[path.extname(filePath)] || 'text/plain' },
+                noStoreFor(filePath)));
+            res.end(data);
+        });
+        return;
+    }
     if (url.startsWith('/staff')) {
         // Serve staff HTML files without Basic Auth popup - the portal has its own password gate
         const subPath = url === '/staff' || url === '/staff/' ? '/index.html' : url.replace('/staff', '');
