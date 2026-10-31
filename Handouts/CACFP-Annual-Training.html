@@ -88,6 +88,19 @@
     .attendee-add { margin-top: 4px; font: inherit; font-size: 0.78rem; font-weight: 700; color: var(--accent);
         background: #f5f2fc; border: 1px dashed #cbbdf0; border-radius: 8px; padding: 7px 14px; cursor: pointer; }
     .attendee-add:hover { background: #ece5fa; }
+
+    /* The name column of an attendee row: the input, with a status chip beneath it. */
+    .att-name { display: flex; flex-direction: column; gap: 6px; }
+
+    /* Signed / awaiting status chip. Green when a signature is on file, amber while a
+       name is on the roster but not yet signed. Hidden on print — the printed sheet
+       shows the actual signatures, not the workflow state. */
+    .sig-chip { display: inline-block; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.02em;
+        padding: 2px 9px; border-radius: 999px; vertical-align: middle; }
+    .sig-chip.signed { background: #e4f6ea; color: #166534; border: 1px solid #b7e3c4; }
+    .sig-chip.awaiting { background: #fef3e2; color: #92540d; border: 1px solid #f3d6a8; }
+    .sig-cap .sig-chip { margin-left: 8px; text-transform: none; letter-spacing: 0; }
+    @media print { .sig-chip { display: none !important; } }
     .save-row { display: flex; align-items: center; gap: 14px; margin-top: 20px; flex-wrap: wrap; }
     .save-btn { font: inherit; font-weight: 700; font-size: 0.9rem; background: var(--accent); color: #fff;
         border: none; padding: 11px 24px; border-radius: 8px; cursor: pointer; }
@@ -329,13 +342,13 @@
     <!-- ───────────────────────── Sign-off ───────────────────────── -->
     <div class="signoff">
         <h3>Sign &amp; file this training session</h3>
-        <p>Sign on screen with a stylus or mouse &mdash; the instructor and every attendee. When you
-        <strong>Save training</strong>, a signed PDF is filed in the Food Program folder and the session is
-        recorded, so there is nothing to print. This filed PDF is the documentation that satisfies ISBE Form 67-25,
-        kept with the CACFP records (3 years + current year).</p>
+        <p class="noprint">You can do this in one sitting or over time. Type everyone&rsquo;s name and
+        <strong>Save</strong> &mdash; the roster is kept even before anyone signs. Then each person signs on whatever
+        device they&rsquo;re on: reopen the training, sign the rows still marked <em>awaiting signature</em>, and Save
+        again. Your place is never lost, and the record satisfies ISBE Form 67-25 (kept 3 years + the current year).</p>
         <div class="sig-grid">
             <div class="sig-block">
-                <div class="sig-cap">Instructor signature</div>
+                <div class="sig-cap">Instructor signature <span id="instrStatus" class="sig-chip" hidden></span></div>
                 <div id="sigInstructor" class="sig-pad-host"></div>
                 <div class="sig-fields">
                     <input type="text" id="instructorName" placeholder="Instructor printed name" aria-label="Instructor printed name">
@@ -347,7 +360,7 @@
 
         <div class="attendees">
             <div class="sig-cap">Attendees</div>
-            <p class="attendees-note noprint">Each attendee signs below on the tablet. Use
+            <p class="attendees-note noprint">Type each name now; they can sign later from any device. Use
             <strong>+ Add attendee</strong> for more rows.</p>
             <div id="attendeeRows"></div>
             <button type="button" class="attendee-add noprint" onclick="addAttendee()">+ Add attendee</button>
@@ -443,19 +456,74 @@
         var rows = document.getElementById('attendeeRows');
         var row = document.createElement('div');
         row.className = 'attendee-row';
-        row.innerHTML = '<input type="text" id="attName' + n + '" placeholder="Attendee printed name" aria-label="Attendee printed name">'
+        row.innerHTML = '<div class="att-name">'
+            + '<input type="text" id="attName' + n + '" placeholder="Attendee printed name" aria-label="Attendee printed name">'
+            + '<span id="attChip' + n + '" class="sig-chip" hidden></span>'
+            + '</div>'
             + '<div id="attSig' + n + '" class="sig-pad-host"></div>';
         rows.appendChild(row);
-        var pad = window.SignPad.create(document.getElementById('attSig' + n));
-        var entry = { pad: pad, nameId: 'attName' + n, onFile: false };
+        var chipId = 'attChip' + n;
+        var entry = { pad: null, nameId: 'attName' + n, chipId: chipId, onFile: false };
+        // Keep the chip honest as the person signs or clears: drawn → Signed, an on-file
+        // signature that gets Cleared → back to Awaiting, an empty untouched row → no chip.
+        entry.pad = window.SignPad.create(document.getElementById('attSig' + n), {
+            onChange: function () {
+                if (entry.pad && entry.pad.drawn) setChip(chipId, 'signed');
+                else if (entry.onFile && !(entry.pad && entry.pad.cleared)) setChip(chipId, 'signed');
+                else setChip(chipId, (document.getElementById(entry.nameId) || {}).value ? 'awaiting' : '');
+            }
+        });
+        // Typing a name on an unsigned row shows the amber "awaiting signature" chip, so
+        // a set-up-ahead roster reads as intended before anyone has signed.
+        var nameEl = document.getElementById(entry.nameId);
+        if (nameEl) nameEl.addEventListener('input', function () {
+            var hasSig = (entry.pad && entry.pad.drawn) || (entry.onFile && !(entry.pad && entry.pad.cleared));
+            if (hasSig) return;
+            setChip(chipId, nameEl.value.trim() ? 'awaiting' : '');
+        });
         attendeePads.push(entry);
         return entry;
+    }
+
+    /* Set a status chip: 'signed' (green), 'awaiting' (amber), or '' to hide it. Used on
+       the instructor and each attendee so the sign/collect progress is obvious at a glance. */
+    function setChip(chipId, state) {
+        var el = document.getElementById(chipId);
+        if (!el) return;
+        if (!state) { el.hidden = true; el.className = 'sig-chip'; el.textContent = ''; return; }
+        el.hidden = false;
+        el.className = 'sig-chip ' + state;
+        el.textContent = state === 'signed' ? '\u2713 Signed' : 'Awaiting signature';
+    }
+
+    /* Reset the whole form to empty before re-rendering from the server, so reopen (and
+       the reload after a save) never stacks duplicate rows or leaves a stale signature. */
+    function resetForm() {
+        var rows = document.getElementById('attendeeRows');
+        if (rows) rows.innerHTML = '';
+        attendeePads = [];
+        attendeeCount = 0;
+        instructorOnFile = false;
+        if (instructorPad && instructorPad.clear) instructorPad.clear();
+        setChip('instrStatus', '');
     }
 
     (function mountPads() {
         if (!window.SignPad) { setTimeout(mountPads, 60); return; }
         var host = document.getElementById('sigInstructor');
-        if (host) instructorPad = window.SignPad.create(host);
+        if (host) instructorPad = window.SignPad.create(host, {
+            onChange: function () {
+                if (instructorPad && instructorPad.drawn) setChip('instrStatus', 'signed');
+                else if (instructorOnFile && !(instructorPad && instructorPad.cleared)) setChip('instrStatus', 'signed');
+                else setChip('instrStatus', (document.getElementById('instructorName') || {}).value ? 'awaiting' : '');
+            }
+        });
+        var instrNameEl = document.getElementById('instructorName');
+        if (instrNameEl) instrNameEl.addEventListener('input', function () {
+            var hasSig = (instructorPad && instructorPad.drawn) || (instructorOnFile && !(instructorPad && instructorPad.cleared));
+            if (hasSig) return;
+            setChip('instrStatus', instrNameEl.value.trim() ? 'awaiting' : '');
+        });
         if (currentId) {
             // Reopening a saved session: pull its data and show the signatures on file.
             reopenTraining(currentId);
@@ -476,13 +544,15 @@
         }
     })();
 
-    /* Reopen a saved session: fill the date + instructor name, and for each signature
-       on file mount a pad showing that signature as a locked image (showExisting), with
-       the printed name prefilled. Untouched pads re-save as { existing:true }; a pad the
-       user Clears and redraws is sent as a fresh draw, superseding the stored one. */
+    /* Reopen a saved session and render the roster exactly as it stands on the server:
+         - a signed entry (relPath) → a pad showing the locked signature + a green "Signed"
+           chip; untouched, it re-saves as { existing:true };
+         - an unsigned entry (relPath null) → the name prefilled on an empty, ready-to-sign
+           pad + an amber "Awaiting signature" chip; signing it and saving attaches the
+           signature to that same person.
+       Called both when opening by ?id and after each save, so every device that reopens
+       the training sees the same, current picture. */
     async function reopenTraining(id) {
-        // Make sure the reopen is obvious and starts clean (mountPads may have left the
-        // two default attendee rows if the fetch is slow — it did not here, but be safe).
         setSaveStatus('Loading saved training\u2026', '');
         try {
             if (!window.CofpAuth) throw new Error('Open this page from the Food Program tool in the staff portal.');
@@ -493,30 +563,44 @@
             if (res.status === 401) throw new Error('Your staff session has expired. Sign in again at /me, then reopen.');
             if (!res.ok || !d) throw new Error((d && d.error) || (raw && raw.slice(0, 120)) || ('HTTP ' + res.status));
 
+            // Start from a clean form so a reload after save never duplicates rows.
+            resetForm();
+
             var dateEl = document.getElementById('trainingDate');
             if (dateEl && d.trainingDate) dateEl.value = d.trainingDate;
             var instrEl = document.getElementById('instructorName');
             if (instrEl) instrEl.value = d.instructor || '';
 
             var sigs = Array.isArray(d.signatures) ? d.signatures : [];
-            var any = false;
+            var rosterCount = 0, signedCount = 0;
             sigs.forEach(function (s) {
-                var blobUrl = '/api/doc-file?path=' + encodeURIComponent(s.relPath || '');
+                var signed = !!s.relPath;
+                var blobUrl = signed ? '/api/doc-file?path=' + encodeURIComponent(s.relPath) : null;
                 if (s.role === 'instructor') {
                     if (instrEl && s.name) instrEl.value = s.name;
-                    if (instructorPad && s.relPath) { showOnFile(instructorPad, blobUrl); instructorOnFile = true; any = true; }
+                    if (signed && instructorPad) { showOnFile(instructorPad, blobUrl); instructorOnFile = true; signedCount++; }
+                    setChip('instrStatus', signed ? 'signed' : (s.name ? 'awaiting' : ''));
                 } else {
+                    rosterCount++;
                     var entry = addAttendee();
                     if (!entry) return;
                     var nameInput = document.getElementById(entry.nameId);
                     if (nameInput) nameInput.value = s.name || '';
-                    if (entry.pad && s.relPath) { showOnFile(entry.pad, blobUrl); entry.onFile = true; any = true; }
+                    if (signed && entry.pad) { showOnFile(entry.pad, blobUrl); entry.onFile = true; signedCount++; }
+                    setChip(entry.chipId, signed ? 'signed' : 'awaiting');
                 }
             });
-            // Always leave at least one blank attendee row to add a late signer.
+            // Always leave one blank row to add a late addition.
             addAttendee();
-            setSaveStatus(any ? '\u2713 Loaded. Add or re-draw signatures, then Save to update.'
-                             : 'Loaded. No signatures were on file yet.', any ? 'ok' : '');
+
+            var attendeeSigned = sigs.filter(function (s) { return s.role !== 'instructor' && s.relPath; }).length;
+            if (rosterCount) {
+                setSaveStatus('\u2713 Loaded. ' + attendeeSigned + ' of ' + rosterCount + ' attendee'
+                    + (rosterCount === 1 ? '' : 's') + ' signed. Sign the rows marked '
+                    + '\u201cawaiting signature\u201d, then Save.', attendeeSigned < rosterCount ? '' : 'ok');
+            } else {
+                setSaveStatus('Loaded. Type attendee names and sign, then Save.', '');
+            }
         } catch (e) {
             setSaveStatus('\u26a0 Could not load the saved training: ' + (e.message || e), 'err');
             // Fall back to a usable blank form so the page is not stranded.
@@ -567,16 +651,23 @@
         var trainingDate = val('trainingDate') || new Date().toISOString().slice(0, 10);
         var instructor = val('instructorName');
 
-        // Instructor signature: a fresh draw wins; otherwise keep the one on file unless
-        // it was explicitly Cleared.
+        /* Four states per person, same for the instructor and every attendee:
+             - drawn now           → { dataUrl } a new signature to save
+             - on file, untouched  → { existing:true } keep the one already stored
+             - on file, Cleared    → sent as nothing, so the server drops it
+             - a name, not signed  → { unsigned:true } on the roster, awaiting a signature
+           The last case is the one that was being lost: a name typed ahead of signing is
+           first-class data now, so you can set up the roster and collect signatures later
+           from any device. */
         if (instructorPad && instructorPad.drawn) {
             sigs.push({ role: 'instructor', label: 'Instructor' + (instructor ? ' \u2014 ' + instructor : ''),
                         name: instructor, date: trainingDate, dataUrl: instructorPad.toDataUrl() });
         } else if (instructorOnFile && instructorPad && !instructorPad.cleared) {
             sigs.push({ role: 'instructor', name: instructor, existing: true });
+        } else if (instructor) {
+            sigs.push({ role: 'instructor', name: instructor, unsigned: true });
         }
 
-        // Each attendee: same three-way rule as the instructor.
         var attendees = [];
         attendeePads.forEach(function (a) {
             if (!a.pad) return;
@@ -588,11 +679,17 @@
             } else if (a.onFile && !a.pad.cleared) {
                 if (name) attendees.push(name);
                 sigs.push({ role: 'attendee', name: name, existing: true });
+            } else if (name) {
+                // Typed but not signed yet — keep the name on the roster.
+                attendees.push(name);
+                sigs.push({ role: 'attendee', name: name, unsigned: true });
             }
         });
 
+        // A names-only roster IS worth saving (that is the setup-ahead case). Only a truly
+        // empty form — no instructor, no attendee names, no signatures — has nothing to save.
         if (!sigs.length) {
-            setSaveStatus('Add at least one signature before saving.', 'err');
+            setSaveStatus('Add the instructor or at least one attendee name before saving.', 'err');
             return;
         }
 
@@ -634,12 +731,27 @@
             // session instead of creating a duplicate, and the URL reflects the id too.
             if (d.id) {
                 currentId = d.id;
-                instructorOnFile = instructorOnFile || (instructorPad && instructorPad.drawn);
                 try { history.replaceState(null, '', location.pathname + '?id=' + d.id); } catch (ignore) {}
             }
-            setSaveStatus('\u2713 Training saved (' + (d.signatureCount || sigs.length) + ' signature'
-                + ((d.signatureCount || sigs.length) === 1 ? '' : 's') + '). Use your browser\u2019s Print to print it.', 'ok');
+
+            var roster = (typeof d.attendeeCount === 'number') ? d.attendeeCount : attendees.length;
+            var signed = (typeof d.signedCount === 'number') ? d.signedCount : (typeof d.signatureCount === 'number' ? d.signatureCount : 0);
+            var msg = roster
+                ? ('\u2713 Saved. ' + signed + ' of ' + roster + ' attendee' + (roster === 1 ? '' : 's')
+                   + ' signed' + (signed < roster ? ' \u2014 reopen any time to collect the rest.' : '.'))
+                : '\u2713 Saved.';
+
             if (btn) { btn.disabled = false; btn.textContent = 'Save training'; }
+
+            /* Reload the saved session from the server so the screen reflects exactly what
+               is on file: drawn signatures become locked "on file" rows, unsigned names
+               stay as ready-to-sign rows, and a later Save sends the right thing for each.
+               This is what makes save → keep signing → save seamless, and keeps every
+               device that reopens this training showing the same picture. */
+            if (currentId) {
+                await reopenTraining(currentId);
+            }
+            setSaveStatus(msg, 'ok');
         } catch (e) {
             setSaveStatus('\u26a0 Could not save: ' + (e.message || e), 'err');
             if (btn) { btn.disabled = false; btn.textContent = 'Save training'; }

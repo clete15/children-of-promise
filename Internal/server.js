@@ -6185,13 +6185,27 @@ DROP TABLE #cf;`;
             // Incoming signatures: a dataUrl means a freshly-drawn image to save; an
             // { existing:true } entry (with no dataUrl) means "keep the one already on
             // file", carried by role+name so a reopen+resave does not lose it.
+            /* The roster is the unit of data, and a signature is an OPTIONAL attribute of
+               a roster member. Each incoming entry is one of three things:
+                 - fresh    : has a dataUrl → a newly drawn signature to write to disk
+                 - existing : { existing:true } → keep the signature already on file
+                 - unsigned : a name only (no dataUrl, not existing) → on the roster but
+                              not yet signed. This is the case that was being dropped and
+                              is exactly how a name typed ahead of signing is remembered. */
             const incoming = Array.isArray(d.signatures) ? d.signatures : [];
-            const fresh = [];      // { role, name, jpeg }
-            const keepExisting = [];  // { role, name } to preserve from the prior record
+            const fresh = [];        // { role, name, jpeg }
+            const keepExisting = []; // { role, name } to preserve from the prior record
+            const unsigned = [];     // { role, name } on the roster, no signature yet
             for (const s of incoming) {
                 const role = String(s.role || 'attendee');
                 const name = String(s.name || '').trim();
                 if (s.existing) { keepExisting.push({ role: role, name: name }); continue; }
+                if (s.unsigned || !s.dataUrl) {
+                    // A roster member with no signature. Only meaningful if it has a name;
+                    // a blank, unsigned row is nothing and is ignored.
+                    if (name) unsigned.push({ role: role, name: name });
+                    continue;
+                }
                 const m = String(s.dataUrl || '').match(/^data:image\/jpeg;base64,([A-Za-z0-9+/=]+)$/);
                 if (!m) return sendJSON(res, 400, { error: 'Expected a JPEG signature' });
                 const bytes = Buffer.from(m[1], 'base64');
@@ -6224,21 +6238,23 @@ DROP TABLE #cf;`;
             const sigRoot = path.join(folder.path, 'Signatures');
             try { fs.mkdirSync(sigRoot, { recursive: true }); } catch (e) { /* created on first write below */ }
 
-            /* Build the final signature set: prior ones that are either kept-by-reference
-               or not superseded by a fresh draw of the same role+name, plus the fresh
-               draws (written to disk now). Matching is by role+lowercased name. */
+            /* Build the final ROSTER. Each entry is { role, name, relPath } where relPath
+               is the signature image, or null for a roster member not yet signed. Order
+               of precedence for a given role+name:
+                 1. a fresh draw (written to disk below) — a new signature always wins;
+                 2. an existing signature kept by reference (reopened, untouched);
+                 3. an unsigned roster member (name typed, no signature yet).
+               Matching is by role + lowercased name, so a person is one roster row whether
+               or not they have signed. This is what makes "type the names, sign later,
+               from any device" work: an unsigned name is first-class data, not discarded. */
             const key = (role, name) => role + '|' + String(name || '').toLowerCase();
             const freshKeys = new Set(fresh.map(f => key(f.role, f.name)));
+            const keepKeys = new Set(keepExisting.map(k => key(k.role, k.name)));
+            const seen = new Set();
             const finalSigs = [];
-            // Keep prior signatures not replaced by a fresh draw.
-            priorSigs.forEach(p => { if (!freshKeys.has(key(p.role, p.name))) finalSigs.push({ role: p.role, name: p.name, relPath: p.relPath }); });
 
-            if (!finalSigs.length && !fresh.length) {
-                return sendJSON(res, 400, { error: 'Nothing was signed, so there is nothing to save.' });
-            }
-
-            // Write fresh signature images. A per-session subfolder keyed by date + a
-            // short stamp keeps one training's signatures together and avoids collisions.
+            // 1) Fresh draws — write the image and record its path. Written first so their
+            //    keys are reserved and nothing below can duplicate the person.
             const sessionTag = safe(trainingDate) + ' - ' + Date.now().toString(36);
             const sessionDir = path.join(sigRoot, sessionTag);
             if (fresh.length) {
@@ -6252,15 +6268,58 @@ DROP TABLE #cf;`;
                 const abs = path.join(sessionDir, fname);
                 try { fs.writeFileSync(abs, f.jpeg); }
                 catch (e) { return sendJSON(res, 500, { error: 'Could not save a signature image: ' + e.message }); }
+                const k = key(f.role, f.name);
+                if (seen.has(k)) continue;
+                seen.add(k);
                 finalSigs.push({ role: f.role, name: f.name, relPath: path.relative(DR, abs).replace(/\\/g, '/') });
             }
 
-            // Attendee names = every non-instructor signer, plus any typed names passed
-            // explicitly (so a name with no signature yet is still remembered).
-            const typed = (Array.isArray(d.attendees) ? d.attendees : []).map(a => String(a || '').trim()).filter(Boolean);
+            // 2) Prior signatures the client asked to keep (reopened + untouched), as long
+            //    as a fresh draw did not already supersede the same person.
+            priorSigs.forEach(p => {
+                const k = key(p.role, p.name);
+                if (seen.has(k)) return;
+                // Only carry forward a prior SIGNED entry here; prior unsigned names are
+                // re-sent by the client as unsigned entries and handled in step 3.
+                if (!p.relPath) return;
+                if (freshKeys.has(k)) return;
+                // Keep by reference if the client sent it as existing, OR unconditionally
+                // when updating (a reopen that just adds a name must not drop a signature).
+                if (keepKeys.has(k) || id) { seen.add(k); finalSigs.push({ role: p.role, name: p.name, relPath: p.relPath }); }
+            });
+
+            // 3) Unsigned roster members — a name with no signature yet. relPath null.
+            unsigned.forEach(u => {
+                const k = key(u.role, u.name);
+                if (seen.has(k)) return;
+                seen.add(k);
+                finalSigs.push({ role: u.role, name: u.name, relPath: null });
+            });
+
+            // Also fold in any plainly typed attendee names passed in d.attendees (a belt
+            // to the unsigned braces above, so a name can never be lost on the way in).
+            (Array.isArray(d.attendees) ? d.attendees : []).forEach(nm => {
+                const name = String(nm || '').trim();
+                if (!name) return;
+                const k = key('attendee', name);
+                if (seen.has(k)) return;
+                seen.add(k);
+                finalSigs.push({ role: 'attendee', name: name, relPath: null });
+            });
+
+            // A completely empty form (no instructor, no names, no signatures) is nothing
+            // to save. A names-only roster IS worth saving — that is the setup-ahead case.
+            const hasAnything = finalSigs.length > 0 || String(instructor || '').trim();
+            if (!hasAnything) {
+                return sendJSON(res, 400, { error: 'Add the instructor or at least one attendee name before saving.' });
+            }
+
+            // Derived columns for the list view: every attendee on the roster (signed or
+            // not), and how many of them have actually signed so the list can show "X of Y".
+            const attendeeEntries = finalSigs.filter(s => s.role !== 'instructor' && s.name);
             const attendeeNames = [];
-            finalSigs.forEach(s => { if (s.role !== 'instructor' && s.name && attendeeNames.indexOf(s.name) === -1) attendeeNames.push(s.name); });
-            typed.forEach(nm => { if (attendeeNames.indexOf(nm) === -1) attendeeNames.push(nm); });
+            attendeeEntries.forEach(s => { if (attendeeNames.indexOf(s.name) === -1) attendeeNames.push(s.name); });
+            const signedCount = finalSigs.filter(s => s.relPath).length;
 
             const sigsJson = JSON.stringify(finalSigs);
             const attendeesCol = attendeeNames.join('; ');
@@ -6283,9 +6342,12 @@ SELECT CAST(SCOPE_IDENTITY() AS INT) AS Id;`;
             // SCOPE_IDENTITY / the echoed id comes back as the first standalone integer.
             const idLine = String(r.data || '').split('\n').map(l => l.trim()).find(l => /^\d+$/.test(l));
             const savedId = idLine ? parseInt(idLine, 10) : (id || 0);
-            console.log('[CACFP TRAINING] saved #' + savedId + ' (' + finalSigs.length + ' signatures)');
+            console.log('[CACFP TRAINING] saved #' + savedId + ' (' + attendeeNames.length + ' on roster, ' + signedCount + ' signed)');
             return sendJSON(res, 200, {
-                success: true, id: savedId, attendeeCount: attendeeNames.length, signatureCount: finalSigs.length
+                success: true, id: savedId,
+                attendeeCount: attendeeNames.length,
+                signedCount: signedCount,
+                signatureCount: signedCount
             });
         });
         return;
@@ -6323,11 +6385,24 @@ SELECT CAST(SCOPE_IDENTITY() AS INT) AS Id;`;
         const r = runSQLRows(
             `SELECT Id, ISNULL(CONVERT(NVARCHAR(10),TrainingDate,120),'') AS TrainingDate,
                     ISNULL(Instructor,'') AS Instructor, ISNULL(Attendees,'') AS Attendees,
-                    ISNULL(AttendeeCount,0) AS AttendeeCount, ISNULL(CONVERT(NVARCHAR(20),CreatedAt,120),'') AS CreatedAt
+                    ISNULL(AttendeeCount,0) AS AttendeeCount, ISNULL(Signatures,'') AS Signatures,
+                    ISNULL(CONVERT(NVARCHAR(20),CreatedAt,120),'') AS CreatedAt
              FROM CacfpTraining ORDER BY TrainingDate DESC, Id DESC`,
             cacfpTrainingEnsureSQL());
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        return sendJSON(res, 200, { trainings: r.rows });
+        // Derive how many attendees have actually signed, so the list can show "X of Y
+        // signed" progress. Then drop the (large) Signatures blob from the list payload.
+        const trainings = r.rows.map(t => {
+            let signed = 0;
+            try {
+                const arr = t.Signatures ? JSON.parse(t.Signatures) : [];
+                signed = arr.filter(s => s.role !== 'instructor' && s.relPath).length;
+            } catch (e) { signed = 0; }
+            const out = Object.assign({}, t, { SignedCount: signed });
+            delete out.Signatures;
+            return out;
+        });
+        return sendJSON(res, 200, { trainings: trainings });
     }
 
     /* DELETE /api/cacfp-training/:id — remove a session. Its signature images are

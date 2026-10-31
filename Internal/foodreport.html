@@ -69,6 +69,11 @@
             cursor:pointer;white-space:nowrap; }
         .fp-train-remove:hover { background:var(--sp-bad-bg, #fef2f2); }
         .fp-train-missing { font-size:0.76rem;color:var(--sp-bad-fg);font-weight:700; }
+        /* Signing-progress chip in each training row. */
+        .fp-train-chip { display:inline-block;font-size:0.68rem;font-weight:800;letter-spacing:0.02em;
+            padding:1px 8px;border-radius:999px;margin-left:6px;vertical-align:middle; }
+        .fp-train-chip.done { background:#e4f6ea;color:#166534;border:1px solid #b7e3c4; }
+        .fp-train-chip.awaiting { background:#fef3e2;color:#92540d;border:1px solid #f3d6a8; }
         .fp-section-head { margin-bottom:14px; }
         .fp-section-head h2 { margin:0;font-size:0.96rem;color:var(--sp-text); }
         .fp-section-head p { margin:4px 0 0;font-size:0.8rem;line-height:1.5;color:var(--sp-muted); }
@@ -338,10 +343,10 @@ async function renderTrainings() {
     }
     const intro = '<section class="fp-section"><div class="fp-section-head">'
         + '<h2>Filed CACFP annual trainings</h2>'
-        + '<p>Each is a signed session that satisfies ISBE Form 67-25. <strong>Open</strong> re-renders the '
-        + 'training sheet with its signatures so you can print it straight from the browser, or reopen it to '
-        + 'finish signing later. To run a new session, open <strong>New Training</strong> in the sidebar, present '
-        + 'it, have everyone sign, and Save.</p></div>';
+        + '<p>A session satisfies ISBE Form 67-25. You can set up the roster of names first and collect '
+        + 'signatures over time &mdash; each person signs from whatever device they&rsquo;re on. <strong>Open</strong> '
+        + 'a session to sign the names still awaiting a signature, or to print the sheet once everyone has signed. '
+        + 'Start a new one with <strong>New Training</strong> in the sidebar.</p></div>';
     if (!rows.length) {
         body.innerHTML = intro
             + '<div class="fp-empty">No trainings filed yet. Open <strong>New Training</strong> to record one.</div>'
@@ -352,17 +357,26 @@ async function renderTrainings() {
         const date = fpEsc(t.TrainingDate || '');
         const who = fpEsc(t.Instructor || '\u2014');
         const count = parseInt(t.AttendeeCount, 10) || 0;
+        const signed = parseInt(t.SignedCount, 10) || 0;
         const id = parseInt(t.Id, 10) || 0;
         const open = id
-            ? '<a href="#" class="fp-train-open" title="Open the training sheet with its signatures to print or finish signing"'
+            ? '<a href="#" class="fp-train-open" title="Open the training sheet to sign the remaining names or print it"'
               + ' onclick="event.preventDefault();openTraining(' + id + ')">Open</a>'
             : '<span class="fp-train-missing">unavailable</span>';
         const remove = '<button type="button" class="fp-train-remove" title="Remove this training (the signatures are archived, not deleted)"'
             + ' onclick="removeTraining(' + id + ',\'' + date.replace(/'/g, "\\'") + '\')">Remove</button>';
+        // Signing progress: a green "all signed" chip once every name is signed, otherwise
+        // an amber "X of Y signed" so a session still collecting signatures is obvious.
+        const complete = count > 0 && signed >= count;
+        const progress = count === 0
+            ? '<span class="fp-train-chip awaiting">No attendees yet</span>'
+            : (complete
+                ? '<span class="fp-train-chip done">\u2713 All ' + count + ' signed</span>'
+                : '<span class="fp-train-chip awaiting">' + signed + ' of ' + count + ' signed</span>');
         return '<div class="fp-train-row">'
             + '<div class="fp-train-main"><span class="fp-train-date">' + date + '</span>'
             + '<span class="fp-train-meta">Instructor: ' + who + ' &middot; ' + count + ' attendee'
-            + (count === 1 ? '' : 's') + '</span></div>'
+            + (count === 1 ? '' : 's') + ' ' + progress + '</span></div>'
             + '<div class="fp-train-actions">' + open + remove + '</div></div>';
     }).join('');
     body.innerHTML = intro + '<div class="fp-train-list">' + list + '</div></section>';
