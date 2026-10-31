@@ -60,9 +60,14 @@
         .fp-train-main { display:flex;flex-direction:column;gap:2px;min-width:0; }
         .fp-train-date { font-size:0.9rem;font-weight:800;color:var(--sp-text); }
         .fp-train-meta { font-size:0.76rem;color:var(--sp-muted); }
+        .fp-train-actions { display:flex;align-items:center;gap:8px;flex-shrink:0; }
         .fp-train-open { font-size:0.82rem;font-weight:700;color:var(--sp-accent);text-decoration:none;
             border:1px solid var(--sp-accent);border-radius:7px;padding:6px 14px;white-space:nowrap; }
         .fp-train-open:hover { background:var(--sp-accent);color:#fff; }
+        .fp-train-remove { font:inherit;font-size:0.8rem;font-weight:700;color:var(--sp-bad-fg);
+            background:none;border:1px solid var(--sp-bad-br, #e3b4b4);border-radius:7px;padding:6px 12px;
+            cursor:pointer;white-space:nowrap; }
+        .fp-train-remove:hover { background:var(--sp-bad-bg, #fef2f2); }
         .fp-train-missing { font-size:0.76rem;color:var(--sp-bad-fg);font-weight:700; }
         .fp-section-head { margin-bottom:14px; }
         .fp-section-head h2 { margin:0;font-size:0.96rem;color:var(--sp-text); }
@@ -339,11 +344,13 @@ async function renderTrainings() {
             ? '<a href="#" class="fp-train-open" onclick="event.preventDefault();' + openFn + '(\''
               + rel.replace(/'/g, "\\'") + '\',\'' + name.replace(/'/g, "\\'") + '\')">Open PDF</a>'
             : '<span class="fp-train-missing">file missing</span>';
+        const remove = '<button type="button" class="fp-train-remove" title="Remove this training (the PDF is archived, not deleted)"'
+            + ' onclick="removeTraining(' + (parseInt(t.Id, 10) || 0) + ',\'' + date.replace(/'/g, "\\'") + '\')">Remove</button>';
         return '<div class="fp-train-row">'
             + '<div class="fp-train-main"><span class="fp-train-date">' + date + '</span>'
             + '<span class="fp-train-meta">Instructor: ' + who + ' &middot; ' + count + ' attendee'
             + (count === 1 ? '' : 's') + '</span></div>'
-            + open + '</div>';
+            + '<div class="fp-train-actions">' + open + remove + '</div></div>';
     }).join('');
     body.innerHTML = intro + '<div class="fp-train-list">' + list + '</div></section>';
 }
@@ -362,6 +369,24 @@ function openTrainingDoc(rel, name) {
             setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
         })
         .catch(function (e) { alert('Could not open "' + (name || 'file') + '": ' + e.message); });
+}
+
+/* Remove a filed training. The server archives the PDF (never deletes it) and drops
+   the record so it leaves the list. Confirm first — it is a filed compliance document. */
+async function removeTraining(id, date) {
+    if (!id) return;
+    if (!confirm('Remove the ' + (date || 'selected') + ' training?\n\nThe signed PDF is moved to the Food '
+        + 'Program archive (not deleted), and the entry is removed from this list.')) return;
+    try {
+        const res = await apiFetch('/api/cacfp-training/' + id, { method: 'DELETE' });
+        const raw = await res.text();
+        let d = null; try { d = raw ? JSON.parse(raw) : null; } catch (ignore) { d = null; }
+        if (res.status === 401) throw new Error('Only a centre administrator can remove a training.');
+        if (!res.ok || !d || !d.success) throw new Error((d && d.error) || ('HTTP ' + res.status));
+        renderTrainings();
+    } catch (e) {
+        alert('Could not remove that training: ' + (e.message || e));
+    }
 }
 
 function renderFoodReport() {

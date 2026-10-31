@@ -6201,6 +6201,59 @@ VALUES (${esc(trainingDate)},${esc(instructor)},${esc(attendees.join('; '))},${a
         return sendJSON(res, 200, { trainings: r.rows });
     }
 
+    /* DELETE /api/cacfp-training/:id — remove a filed training from the list.
+       Following the library's never-destroy rule, the PDF is ARCHIVED (moved into the
+       Food Program _Archive folder), not deleted, so a mistaken removal is recoverable;
+       only the CacfpTraining row is dropped so it leaves the list. Centre-admin only:
+       any teacher may file a training, but removing a filed compliance document is an
+       administrative action. */
+    const cacfpDel = url.match(/^\/api\/cacfp-training\/(\d+)$/);
+    if (req.method === 'DELETE' && cacfpDel) {
+        if (!checkAuth(req, res)) return;
+        const id = parseInt(cacfpDel[1], 10);
+        if (!id) return sendJSON(res, 400, { error: 'Which training?' });
+
+        const row = runSQLRows(
+            `SELECT TOP 1 Id, ISNULL(RelPath,'') AS RelPath, ISNULL(FileName,'') AS FileName
+             FROM CacfpTraining WHERE Id=${id}`, cacfpTrainingEnsureSQL());
+        if (!row.ok) return sendJSON(res, 500, { error: row.error });
+        if (!row.rows.length) return sendJSON(res, 404, { error: 'That training is not on file.' });
+        const rel = String(row.rows[0].RelPath || '');
+
+        // Archive the PDF (move, do not delete) when it is present on disk.
+        let archived = false;
+        const DR = findDocRoot();
+        if (DR && rel) {
+            const full = resolveDocPath(rel);
+            if (full && fs.existsSync(full) && fs.statSync(full).isFile()) {
+                try {
+                    const archiveDir = path.join(DR, FOOD_PROGRAM_ROOT_FOLDER, DOC_ARCHIVE_DIR);
+                    fs.mkdirSync(archiveDir, { recursive: true });
+                    const base = path.basename(full);
+                    let target = path.join(archiveDir, base);
+                    if (fs.existsSync(target)) {
+                        const ext = path.extname(base);
+                        const stem = base.slice(0, base.length - ext.length);
+                        const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+                        target = path.join(archiveDir, stem + ' (removed ' + stamp + ')' + ext);
+                    }
+                    try { fs.renameSync(full, target); }
+                    catch (e) {
+                        fs.copyFileSync(full, target);
+                        if (fs.existsSync(target) && fs.statSync(target).size === fs.statSync(full).size) fs.unlinkSync(full);
+                    }
+                    archived = true;
+                } catch (e) { console.warn('[CACFP TRAINING] archive failed for #' + id + ': ' + e.message); }
+            }
+        }
+
+        const del = runSQL(`DELETE FROM CacfpTraining WHERE Id=${id};`);
+        if (!del.ok || del.sqlError) return sendJSON(res, 500, { error: del.error || del.sqlError });
+        invalidateDocCache();
+        console.log('[CACFP TRAINING] removed #' + id + (archived ? ' (PDF archived)' : ' (no PDF on disk)'));
+        return sendJSON(res, 200, { success: true, archived: archived });
+    }
+
     /* Every captured signature for a year, without the images: the roster needs to
        know which forms are signed, not what the signatures look like. */
     if (req.method === 'GET' && url === '/api/child-signatures') {
