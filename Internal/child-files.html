@@ -198,6 +198,11 @@
         <div class="cf-controls">
             <span><label for="cfYear">School year</label>
                 <select id="cfYear" onchange="setYear(this.value)"></select></span>
+            <button type="button" class="btn-secondary" id="brcOpenBtn" onclick="openBatchReportCards()"
+                style="font-size:0.75rem;padding:7px 14px;margin-left:auto;"
+                title="Upload one Teaching Strategies batch PDF holding many children; it is split per child and filed to each child's folder.">
+                &#128228; Batch Report Cards
+            </button>
         </div>
 
       <div class="cf-wrap">
@@ -261,6 +266,80 @@
         </div>
     </div>
 </div>
+
+<!-- Batch Report Card upload. Drop one Teaching Strategies batch PDF (many children),
+     pick the term + year; the page splits it per child in the browser (pdf.js reads each
+     page's name, pdf-lib cuts the pages), matches each child to the roster, shows a
+     confirmation table to review/fix, then files each via /api/child-file-upload. No
+     server change — the upload is the same endpoint the per-cell Upload button uses. -->
+<div class="pi-overlay" id="brcOverlay">
+    <div class="pi-modal" style="max-width:1000px;">
+        <div class="pi-modal-header">
+            <h3>&#128228; Batch Report Cards</h3>
+            <button class="pi-close" onclick="closeBatchReportCards()" aria-label="Close">&times;</button>
+        </div>
+        <div class="pi-modal-body">
+            <div class="pi-section">
+                <p style="font-size:0.85rem;color:#4b5563;margin:0 0 12px;">
+                    Export the report cards from Teaching Strategies as <strong>one PDF</strong> (a whole class or
+                    several classes together is fine). Choose the term and school year, drop the file, and review the
+                    matches before filing. Each child&rsquo;s card is split out and filed to that child &mdash; the
+                    term&rsquo;s report-card box turns green. Children with no ratings on the export are skipped, and
+                    any name that does not match cleanly waits for you to pick the right child.
+                </p>
+                <div class="pi-grid" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;">
+                    <div class="pi-field">
+                        <label for="brcTerm" style="display:block;font-size:0.72rem;font-weight:700;color:#374151;">Report card</label>
+                        <select id="brcTerm" style="font:inherit;padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px;"></select>
+                    </div>
+                    <div class="pi-field">
+                        <label for="brcYear" style="display:block;font-size:0.72rem;font-weight:700;color:#374151;">School year</label>
+                        <select id="brcYear" style="font:inherit;padding:7px 10px;border:1px solid #cbd5e1;border-radius:7px;"></select>
+                    </div>
+                    <div class="pi-field" style="flex:1 1 260px;">
+                        <label for="brcFile" style="display:block;font-size:0.72rem;font-weight:700;color:#374151;">Batch PDF from Teaching Strategies</label>
+                        <input type="file" id="brcFile" accept="application/pdf,.pdf" onchange="brcReadFile()"
+                            style="font:inherit;font-size:0.82rem;">
+                    </div>
+                </div>
+                <div id="brcReadStatus" style="font-size:0.8rem;color:#6b7280;margin-top:10px;"></div>
+            </div>
+
+            <div id="brcResultsWrap" style="display:none;">
+                <div class="pi-section">
+                    <div id="brcSummary" style="font-size:0.82rem;font-weight:700;margin-bottom:8px;"></div>
+                    <div style="overflow:auto;max-height:46vh;border:1px solid #e5e7eb;border-radius:8px;">
+                        <table id="brcTable" style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+                            <thead>
+                                <tr style="background:#f8fafc;text-align:left;position:sticky;top:0;">
+                                    <th style="padding:7px 10px;">File?</th>
+                                    <th style="padding:7px 10px;">Name on report</th>
+                                    <th style="padding:7px 10px;">Matched child</th>
+                                    <th style="padding:7px 10px;">Status</th>
+                                    <th style="padding:7px 10px;">Preview</th>
+                                </tr>
+                            </thead>
+                            <tbody id="brcTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="brcProgress" style="display:none;font-size:0.82rem;margin-top:6px;"></div>
+        </div>
+        <div class="pi-modal-footer">
+            <span id="brcFooterStatus" style="font-size:0.75rem;color:#6b7280;margin-right:auto;"></span>
+            <button class="pi-btn pi-btn-secondary" onclick="closeBatchReportCards()">Close</button>
+            <button class="pi-btn pi-btn-primary" id="brcFileBtn" onclick="brcFileAll()" disabled>File report cards</button>
+        </div>
+    </div>
+</div>
+
+<!-- Browser PDF libraries (vendored, pinned): pdf.js 3.11.174 reads each page's text to
+     find the child name; pdf-lib 1.17.1 cuts the batch into one PDF per child. Loaded
+     only on this page; the server merely serves them as static files. -->
+<script src="/staff/pdf.min.js"></script>
+<script src="/staff/pdf-lib.min.js"></script>
 
 <!-- Shared per-child form machinery for both subsets. pi-interview-schema.js defines
      the Parent Interview form schema + render/prefill engine; classroom-forms.js renders
@@ -886,6 +965,309 @@ async function uploadChildDoc(studentId, docKey, input) {
         renderAdmin();
     } catch (e) { alert('Upload failed: ' + e.message); }
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   BATCH REPORT CARD UPLOAD
+
+   One Teaching Strategies batch PDF holds many children, one child's report per
+   run of pages. We split it per child in the browser, match each to the roster,
+   let the user confirm/fix, then file each via the same upload endpoint the
+   per-cell button uses. The term dropdown maps to the historical field names via
+   ChildForms.REPORT_CARDS (Fall->FallReport, Winter->MidYearReport, Spring->EndYearReport).
+
+   Format tolerance: a child's report starts on a "title page", detected by the
+   name line sitting just above the "Report Created:" block. We read the name off
+   that line rather than a fixed header string, and ANY name we cannot match
+   cleanly becomes a dropdown the user resolves — a layout change degrades to more
+   rows needing confirmation, never a silent misfile.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+var brcRows = [];   // one per detected child: { name, pages:[idx], bytes, matchId, status }
+
+function brcNorm(s) { return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase(); }
+function brcCollapse(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+function openBatchReportCards() {
+    // Term dropdown from the single source of truth for term->field.
+    var termSel = document.getElementById('brcTerm');
+    var cards = (window.ChildForms && ChildForms.REPORT_CARDS) ? ChildForms.REPORT_CARDS : [];
+    termSel.innerHTML = cards.map(function (c) {
+        return '<option value="' + c.field + '">' + escapeHtml(c.term) + ' (' + escapeHtml(c.label) + ')</option>';
+    }).join('');
+    // Year dropdown mirrors the page picker, defaulting to the active year.
+    var yearSel = document.getElementById('brcYear');
+    var picker = document.getElementById('cfYear');
+    yearSel.innerHTML = picker ? picker.innerHTML : ('<option>' + activeYear + '</option>');
+    yearSel.value = activeYear;
+    // Reset state.
+    brcRows = [];
+    document.getElementById('brcFile').value = '';
+    document.getElementById('brcReadStatus').textContent = '';
+    document.getElementById('brcResultsWrap').style.display = 'none';
+    document.getElementById('brcProgress').style.display = 'none';
+    document.getElementById('brcFooterStatus').textContent = '';
+    document.getElementById('brcFileBtn').disabled = true;
+    document.getElementById('brcTableBody').innerHTML = '';
+    document.getElementById('brcOverlay').classList.add('open');
+}
+function closeBatchReportCards() {
+    document.getElementById('brcOverlay').classList.remove('open');
+}
+
+/* Read the dropped PDF: extract each page's text (pdf.js), find the title pages,
+   cut per-child PDFs (pdf-lib), match each to the roster, render the table. */
+async function brcReadFile() {
+    var input = document.getElementById('brcFile');
+    var file = input.files && input.files[0];
+    var status = document.getElementById('brcReadStatus');
+    document.getElementById('brcResultsWrap').style.display = 'none';
+    document.getElementById('brcFileBtn').disabled = true;
+    if (!file) { status.textContent = ''; return; }
+    if (!window.pdfjsLib || !window.PDFLib) {
+        status.textContent = '\u26a0 PDF tools did not load. Refresh the page and try again.';
+        status.style.color = '#b91c1c';
+        return;
+    }
+    status.style.color = '#6b7280';
+    status.textContent = 'Reading the PDF\u2026';
+    try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/staff/pdf.worker.min.js';
+        var buf = await file.arrayBuffer();
+
+        // 1) page texts via pdf.js
+        var doc = await pdfjsLib.getDocument({ data: buf.slice(0) }).promise;
+        var n = doc.numPages;
+        var pageText = [];
+        for (var i = 1; i <= n; i++) {
+            var pg = await doc.getPage(i);
+            var tc = await pg.getTextContent();
+            pageText.push(tc.items.map(function (it) { return it.str; }).join('\n'));
+        }
+
+        // 2) detect title pages + the child name on each
+        var titles = [];   // { page: idx0, name }
+        for (var p = 0; p < n; p++) {
+            var t = pageText[p];
+            if (t.indexOf('Report Created:') === -1) continue;   // only title pages carry this
+            titles.push({ page: p, name: brcNameFromTitle(t) });
+        }
+        if (!titles.length) {
+            status.textContent = '\u26a0 No report cards were found in that PDF. Is it a Teaching Strategies report export?';
+            status.style.color = '#b91c1c';
+            return;
+        }
+
+        // 3) build per-child page ranges + skip no-data children
+        var src = await PDFLib.PDFDocument.load(buf.slice(0));
+        brcRows = [];
+        for (var ti = 0; ti < titles.length; ti++) {
+            var start = titles[ti].page;
+            var end = (ti + 1 < titles.length) ? titles[ti + 1].page : n;   // exclusive
+            var noData = false;
+            for (var q = start; q < end; q++) {
+                if (pageText[q].indexOf('do not have data in the selected checkpoint periods') !== -1) noData = true;
+            }
+            var row = { name: titles[ti].name || ('Child ' + (ti + 1)), pages: [], bytes: null, matchId: '', status: '' };
+            for (var r = start; r < end; r++) row.pages.push(r);
+            if (noData) {
+                row.status = 'skip-nodata';
+            } else {
+                // cut this child's pages into a standalone PDF
+                var out = await PDFLib.PDFDocument.create();
+                var copied = await out.copyPages(src, row.pages);
+                copied.forEach(function (ppg) { out.addPage(ppg); });
+                row.bytes = await out.save();
+            }
+            brcRows.push(row);
+        }
+
+        // 4) match each to the roster
+        brcRows.forEach(function (row) {
+            if (row.status === 'skip-nodata') return;
+            var m = brcMatch(row.name);
+            row.matchId = m.id || '';
+            row.status = m.kind;   // 'exact' | 'fuzzy' | 'none'
+        });
+
+        brcRenderTable();
+        var filed = brcRows.filter(function (r) { return r.status !== 'skip-nodata'; }).length;
+        status.textContent = 'Found ' + titles.length + ' report' + (titles.length === 1 ? '' : 's') + ' in ' + n + ' pages.';
+        document.getElementById('brcResultsWrap').style.display = '';
+    } catch (e) {
+        status.textContent = '\u26a0 Could not read that PDF: ' + (e && e.message ? e.message : e);
+        status.style.color = '#b91c1c';
+    }
+}
+
+/* The child name is the first substantial line above "Report Created:". We skip a
+   leading SmartTeach/TeachingStrategies banner line if the extractor emitted it. */
+function brcNameFromTitle(text) {
+    var lines = text.split('\n').map(function (l) { return l.trim(); }).filter(Boolean);
+    for (var i = 0; i < lines.length; i++) {
+        if (lines[i].indexOf('Report Created:') === 0) break;
+        if (/smartteach|teachingstrategies/i.test(lines[i])) continue;
+        // a plausible name line: has a letter, not a label
+        if (/[a-z]/i.test(lines[i]) && lines[i].indexOf(':') === -1) return lines[i];
+    }
+    return '';
+}
+
+/* Match a report name to the active roster: exact full name, then punctuation/space
+   -insensitive, then fuzzy first-name + surname-prefix. Returns {id, kind}. */
+function brcMatch(name) {
+    var roster = activeRoster();
+    var full = brcNorm(name), coll = brcCollapse(name);
+    var exact = roster.filter(function (s) { return brcNorm((s.First_Name || '') + ' ' + (s.Last_Name || '')) === full; });
+    if (exact.length === 1) return { id: exact[0].Id, kind: 'exact' };
+    var collm = roster.filter(function (s) { return brcCollapse((s.First_Name || '') + ' ' + (s.Last_Name || '')) === coll; });
+    if (collm.length === 1) return { id: collm[0].Id, kind: 'fuzzy' };
+    var parts = String(name).split(/\s+/).filter(Boolean);
+    var pf = brcCollapse(parts[0] || ''), pl = brcCollapse(parts.slice(1).join(''));
+    var fuzzy = roster.filter(function (s) {
+        var rf = brcCollapse(s.First_Name || ''), rl = brcCollapse(s.Last_Name || '');
+        if (!pf || !rf) return false;
+        var firstOk = rf === pf || rf.indexOf(pf) === 0 || pf.indexOf(rf) === 0;
+        var lastOk = rl && pl && (rl.indexOf(pl) === 0 || pl.indexOf(rl) === 0);
+        return firstOk && lastOk;
+    });
+    if (fuzzy.length === 1) return { id: fuzzy[0].Id, kind: 'fuzzy' };
+    return { id: '', kind: 'none' };
+}
+
+function brcRosterOptions(selectedId) {
+    var roster = activeRoster().slice().sort(sortByRoomThenName);
+    var opts = ['<option value="">\u2014 pick a child \u2014</option>'];
+    roster.forEach(function (s) {
+        var label = (s.Last_Name || '') + ', ' + (s.First_Name || '') + '  (' + getRoomName(s.RoomNumber) + ')';
+        opts.push('<option value="' + s.Id + '"' + (String(s.Id) === String(selectedId) ? ' selected' : '') + '>'
+            + escapeHtml(label) + '</option>');
+    });
+    return opts.join('');
+}
+
+function brcRenderTable() {
+    var body = document.getElementById('brcTableBody');
+    var html = '';
+    brcRows.forEach(function (row, idx) {
+        var skip = row.status === 'skip-nodata';
+        var statusCell, matchCell, checkCell, previewCell;
+        if (skip) {
+            statusCell = '<span style="color:#92540d;font-weight:700;">Skipped &mdash; no ratings on export</span>';
+            matchCell = '<span style="color:#9ca3af;">\u2014</span>';
+            checkCell = '<span style="color:#9ca3af;">\u2014</span>';
+            previewCell = '<span style="color:#9ca3af;">\u2014</span>';
+        } else {
+            var canFile = !!row.matchId;
+            var isOn = canFile && row._file !== false;
+            checkCell = '<input type="checkbox" ' + (isOn ? 'checked' : '') + (canFile ? '' : ' disabled')
+                + ' onchange="brcToggle(' + idx + ', this.checked)" id="brcChk' + idx + '">';
+            matchCell = '<select onchange="brcPick(' + idx + ', this.value)" style="font:inherit;font-size:0.78rem;max-width:280px;">'
+                + brcRosterOptions(row.matchId) + '</select>';
+            if (row.status === 'exact') statusCell = '<span style="color:#166534;font-weight:700;">\u2713 Matched</span>';
+            else if (row.status === 'fuzzy') statusCell = '<span style="color:#166534;font-weight:700;">\u2713 Matched</span>'
+                + ' <span style="color:#92540d;">(name differs &mdash; check)</span>';
+            else statusCell = '<span style="color:#b91c1c;font-weight:700;">No match &mdash; pick the child</span>';
+            previewCell = '<a href="#" onclick="brcPreview(' + idx + ');return false;" style="color:#4338ca;">open</a>';
+        }
+        html += '<tr style="border-top:1px solid #eef2f7;">'
+            + '<td style="padding:6px 10px;text-align:center;">' + checkCell + '</td>'
+            + '<td style="padding:6px 10px;">' + escapeHtml(row.name) + '</td>'
+            + '<td style="padding:6px 10px;">' + matchCell + '</td>'
+            + '<td style="padding:6px 10px;">' + statusCell + '</td>'
+            + '<td style="padding:6px 10px;">' + previewCell + '</td>'
+            + '</tr>';
+    });
+    body.innerHTML = html;
+    brcUpdateSummary();
+}
+
+function brcToggle(idx, checked) { brcRows[idx]._file = checked; brcUpdateSummary(); }
+function brcPick(idx, id) {
+    brcRows[idx].matchId = id;
+    brcRows[idx].status = id ? 'picked' : 'none';
+    // refresh just the status + checkbox for this row by re-rendering the table
+    brcRenderTable();
+}
+function brcPreview(idx) {
+    var row = brcRows[idx];
+    if (!row || !row.bytes) return;
+    var blob = new Blob([row.bytes], { type: 'application/pdf' });
+    var url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+}
+
+/* How many rows are both matched and ticked — the count we will file. */
+function brcChosen() {
+    return brcRows.filter(function (r) {
+        if (r.status === 'skip-nodata' || !r.matchId || !r.bytes) return false;
+        return r._file !== false;   // default on when matched
+    });
+}
+function brcUpdateSummary() {
+    var chosen = brcChosen().length;
+    var skipped = brcRows.filter(function (r) { return r.status === 'skip-nodata'; }).length;
+    var nomatch = brcRows.filter(function (r) { return r.status === 'none'; }).length;
+    var parts = [chosen + ' ready to file'];
+    if (nomatch) parts.push(nomatch + ' need a child picked');
+    if (skipped) parts.push(skipped + ' skipped (no ratings)');
+    document.getElementById('brcSummary').textContent = parts.join('  \u00b7  ');
+    document.getElementById('brcFileBtn').disabled = chosen === 0;
+    document.getElementById('brcFileBtn').textContent = chosen ? ('File ' + chosen + ' report card' + (chosen === 1 ? '' : 's')) : 'File report cards';
+}
+
+/* Upload each chosen row through the existing endpoint, same shape as uploadChildDoc. */
+async function brcFileAll() {
+    var chosen = brcChosen();
+    if (!chosen.length) return;
+    var field = document.getElementById('brcTerm').value;
+    var year = document.getElementById('brcYear').value || activeYear;
+    var btn = document.getElementById('brcFileBtn');
+    var prog = document.getElementById('brcProgress');
+    btn.disabled = true;
+    prog.style.display = '';
+    prog.innerHTML = '';
+    var ok = 0, fail = 0;
+    for (var i = 0; i < chosen.length; i++) {
+        var row = chosen[i];
+        var line = document.createElement('div');
+        var who = row.name;
+        line.textContent = 'Filing ' + who + '\u2026';
+        prog.appendChild(line);
+        try {
+            var fd = new FormData();
+            var fname = String(row.name).replace(/[\\/:*?"<>|]/g, '_') + ' - Report Card.pdf';
+            fd.append('file', new File([row.bytes], fname, { type: 'application/pdf' }));
+            var headers = (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {};
+            var h = {};
+            Object.keys(headers).forEach(function (k) { if (k.toLowerCase() !== 'content-type') h[k] = headers[k]; });
+            var url = '/api/child-file-upload?studentId=' + encodeURIComponent(row.matchId)
+                + '&field=' + encodeURIComponent(field) + '&kind=report&year=' + encodeURIComponent(year);
+            var res = await fetch(url, { method: 'POST', headers: h, body: fd });
+            var d = await res.json();
+            if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+            if (window.ChildForms && ChildForms.markFile) ChildForms.markFile(row.matchId, field, 'report', d.relPath, d.name);
+            if (!TRACKING[row.matchId]) TRACKING[row.matchId] = {};
+            TRACKING[row.matchId][field] = 1;
+            line.innerHTML = '\u2713 ' + escapeHtml(who);
+            line.style.color = '#166534';
+            ok++;
+        } catch (e) {
+            line.innerHTML = '\u26a0 ' + escapeHtml(who) + ' \u2014 ' + escapeHtml(e.message || String(e));
+            line.style.color = '#b91c1c';
+            fail++;
+        }
+    }
+    var summary = document.createElement('div');
+    summary.style.fontWeight = '700';
+    summary.style.marginTop = '8px';
+    summary.textContent = 'Done. Filed ' + ok + (fail ? (', ' + fail + ' failed') : '') + '.';
+    prog.appendChild(summary);
+    document.getElementById('brcFooterStatus').textContent = 'Filed ' + ok + ' of ' + chosen.length + '.';
+    // Reflect the new greens on the roster behind the modal.
+    refreshActiveView();
+    btn.disabled = false;
+}
+
 async function carryForward() {
     var status = document.getElementById('cfActionStatus');
     if (!confirm('Copy last year\u2019s checked documents into ' + activeYear + ' for returning children?\n\n'
