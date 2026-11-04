@@ -28,8 +28,24 @@
             color: white;
             box-shadow: 0 2px 8px rgba(37,99,235,0.25);
         }
-        /* When a required question has not been answered yet and the user tries to submit. */
-        .yn-group.invalid .yn-btn { border-color: var(--danger); }
+        /* When a required question has not been answered yet and the user tries to submit.
+           A 2px border plus a soft red wash so an unanswered question is unmistakable. */
+        .yn-group.invalid .yn-btn { border-color: var(--danger); border-width: 2px; }
+        .yn-group.invalid { background: #fef2f2; border-radius: 8px; padding: 4px; }
+
+        /* Submit-time error, shown right at the button (not a corner toast, which parents
+           miss at the bottom of a long form). Red, bold, and impossible to overlook. */
+        .submit-error {
+            margin: 0 0 14px;
+            padding: 13px 16px;
+            background: #fef2f2;
+            border: 2px solid var(--danger);
+            border-radius: 8px;
+            color: #b91c1c;
+            font-weight: 700;
+            font-size: 0.95rem;
+            line-height: 1.4;
+        }
 
         .child-block {
             border: 1.5px solid var(--border);
@@ -482,6 +498,7 @@
     </div>
     </div><!-- end scoredQuestionsSection -->
 
+    <div id="submitError" class="submit-error" role="alert" style="display:none;"></div>
     <button type="submit" class="btn-submit" id="submitBtn">Submit Pre-Enrollment</button>
 </form>
 </div>
@@ -879,6 +896,9 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
        validation on hidden fields — so an unanswered required question is checked
        here instead. Only visible ones count (a hidden scored section is not
        required). Marks the first unanswered group and stops. */
+    var errBox = document.getElementById('submitError');
+    if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
+
     const missing = [...document.querySelectorAll('select[data-yn][required]')]
         .filter(sel => sel.value === '' && sel.offsetParent !== null);
     if (missing.length) {
@@ -886,9 +906,16 @@ document.getElementById('preEnrollForm').addEventListener('submit', async e => {
             const g = sel.nextElementSibling;
             if (g && g.classList.contains('yn-group')) g.classList.add('invalid');
         });
+        // Show the error right where the eye is — at the Submit button — because the
+        // corner toast is easy to miss at the bottom of a long form. Also scroll to the
+        // first unanswered question so it is obvious what still needs an answer.
+        var msg = missing.length === 1
+            ? 'One question still needs an answer. It is highlighted in red above \u2014 please answer it and submit again.'
+            : (missing.length + ' questions still need an answer. They are highlighted in red above \u2014 please answer them and submit again.');
+        if (errBox) { errBox.textContent = '\u26a0 ' + msg; errBox.style.display = 'block'; }
+        notify(msg, 'error');
         const g = missing[0].nextElementSibling;
         if (g) g.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        notify('Please answer the highlighted question' + (missing.length > 1 ? 's' : '') + '.', 'error');
         return;
     }
 
