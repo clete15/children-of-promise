@@ -169,18 +169,47 @@ function folderRow(f) {
 }
 
 function fileRow(f) {
-    const href = '/api/doc-file?path=' + encodeURIComponent(f.rel);
     const canEdit = officeEnabled && officeEditable.indexOf(f.ext) !== -1;
+    // Open is a BUTTON, not a bare <a href> to the API: a plain link opens a new tab
+    // navigated straight at /api/doc-file with no way to send the staff token, so it
+    // came back "Unauthorized". openFile() fetches it through apiFetch (which carries
+    // the token), then shows the downloaded blob. Edit goes to office.html — a real
+    // page that loads auth.js, so the token handoff covers it.
     return '<div class="gl-row">'
         + '<span class="gl-icon">' + extIcon(f.ext) + '</span>'
         + '<span class="gl-name" title="' + esc(f.name) + '">' + esc(f.name) + '</span>'
         + '<span class="gl-size">' + fmtSize(f.size) + '</span>'
-        + '<a class="gl-btn" href="' + href + '" target="_blank" rel="noopener">Open</a>'
+        + '<button type="button" class="gl-btn" data-open="' + esc(f.rel) + '" data-name="' + esc(f.name) + '">Open</button>'
         + (canEdit
             ? '<a class="gl-btn" href="office.html?path=' + encodeURIComponent(f.rel)
               + '" target="_blank" rel="noopener" title="Edit in the browser and save straight back">Edit</a>'
             : '')
         + '</div>';
+}
+
+/* Open a grant file through the authenticated endpoint. A bare <a href> to
+   /api/doc-file is an unauthenticated navigation (no token header possible), so it
+   returns "Unauthorized"; fetching through apiFetch sends the token, and we hand the
+   browser the downloaded bytes as a blob URL to open/preview. */
+async function openFile(rel, name) {
+    try {
+        const res = await apiFetch('/api/doc-file?path=' + encodeURIComponent(rel));
+        if (res.status === 401) throw new Error('Your staff session has expired — reopen the grant library from the INCCRA Grants page.');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const w = window.open(url, '_blank', 'noopener');
+        // A PDF/image previews in the new tab; other types download. If the popup was
+        // blocked, fall back to a direct download of the blob.
+        if (!w) {
+            const a = document.createElement('a');
+            a.href = url; a.download = name || 'document';
+            document.body.appendChild(a); a.click(); a.remove();
+        }
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+        alert('Could not open "' + (name || 'file') + '": ' + (e.message || e));
+    }
 }
 
 function render(data) {
@@ -211,6 +240,8 @@ function render(data) {
     body.innerHTML = folders.map(folderRow).join('') + files.map(fileRow).join('');
     body.querySelectorAll('.gl-folder[data-sub]').forEach(row =>
         row.addEventListener('click', () => go(row.getAttribute('data-sub'))));
+    body.querySelectorAll('button[data-open]').forEach(btn =>
+        btn.addEventListener('click', () => openFile(btn.getAttribute('data-open'), btn.getAttribute('data-name'))));
 }
 
 async function load() {

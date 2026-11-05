@@ -392,9 +392,12 @@
             //   /staff/grants-library.html    the INCCRA – SSWG grant library, opened in a new
             //                                 tab from the INCCRA card; it reads /api/grant-folder
             //                                 and without the token lands on an endless 401 → sign-in.
+            //   /staff/office.html            the OnlyOffice editor, opened in a new tab from the
+            //                                 grant library's Edit button; it reads /api/office-config.
             if (!/^\/pas\//i.test(u.pathname)
                 && !/^\/staff\/handouts\//i.test(u.pathname)
-                && !/^\/staff\/grants-library\.html$/i.test(u.pathname)) return;
+                && !/^\/staff\/grants-library\.html$/i.test(u.pathname)
+                && !/^\/staff\/office\.html$/i.test(u.pathname)) return;
             window.CofpAuth.handoffToken();
         }, true);
     } catch (e) { /* no document (shouldn't happen for a page script) — skip */ }
