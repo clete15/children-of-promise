@@ -8865,7 +8865,13 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
        the grant folder; omitted means the grant root. Files open and edit through
        /api/doc-file and office.html exactly as the rest of the library does. */
     if (req.method === 'GET' && url.startsWith('/api/grant-folder')) {
-        if (!checkAuth(req, res)) return;
+        // Document-library tier, NOT centre-admin: the grant files open through
+        // /api/doc-file, which is checkClassroomAuth (admin OR classroom password OR any
+        // signed-in staff token). The folder LISTING was left on checkAuth, so a staff
+        // member who could open a file still got 401 listing the folder, and the page
+        // showed 'Unexpected token U, "Unauthorized" is not valid JSON'. Same fix the
+        // doc-file endpoint already took: match the tier of the files it lists.
+        if (!checkClassroomAuth(req, res)) return;
         const sub = new URLSearchParams(req.url.split('?')[1] || '').get('path') || '';
         return sendJSON(res, 200, browseGrantFolder(sub));
     }
@@ -8874,7 +8880,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
        The page asks before offering an Edit button, so a server without
        OnlyOffice simply never shows one. */
     if (req.method === 'GET' && url === '/api/office-status') {
-        if (!checkAuth(req, res)) return;
+        // Document-library tier (same as /api/doc-file and /api/grant-folder): any
+        // signed-in staff member may see whether the editor is available.
+        if (!checkClassroomAuth(req, res)) return;
         return sendJSON(res, 200, {
             enabled: ONLYOFFICE_ON,
             editable: Object.keys(OFFICE_EDITABLE),
@@ -8890,7 +8898,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
        file, where to send it back, and a signature over the whole config so the
        document server will not act on a config we did not produce. */
     if (req.method === 'GET' && url === '/api/office-config') {
-        if (!checkAuth(req, res)) return;
+        // Document-library tier (same as /api/doc-file): a signed-in staff member who can
+        // open a grant document may also open it in the editor.
+        if (!checkClassroomAuth(req, res)) return;
         if (!ONLYOFFICE_ON) return sendJSON(res, 501, { error: 'Office editing is not configured on this server' });
 
         const rel = new URLSearchParams(req.url.split('?')[1] || '').get('path');
