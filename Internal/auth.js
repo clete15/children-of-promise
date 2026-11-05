@@ -386,10 +386,15 @@
             try { u = new URL(href, location.href); } catch (e) { return; }
             if (u.origin !== location.origin) return;
             // Same-origin new-tab targets that need the signed-in token carried in:
-            //   /pas/...               the PAS documentation app
-            //   /staff/handouts/...    staff handouts that save to the server (the CACFP
-            //                          training sheet signs and files via the API)
-            if (!/^\/pas\//i.test(u.pathname) && !/^\/staff\/handouts\//i.test(u.pathname)) return;
+            //   /pas/...                      the PAS documentation app
+            //   /staff/handouts/...           staff handouts that save to the server (the
+            //                                 CACFP training sheet signs and files via the API)
+            //   /staff/grants-library.html    the INCCRA – SSWG grant library, opened in a new
+            //                                 tab from the INCCRA card; it reads /api/grant-folder
+            //                                 and without the token lands on an endless 401 → sign-in.
+            if (!/^\/pas\//i.test(u.pathname)
+                && !/^\/staff\/handouts\//i.test(u.pathname)
+                && !/^\/staff\/grants-library\.html$/i.test(u.pathname)) return;
             window.CofpAuth.handoffToken();
         }, true);
     } catch (e) { /* no document (shouldn't happen for a page script) — skip */ }
