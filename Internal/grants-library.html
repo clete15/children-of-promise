@@ -219,6 +219,18 @@ async function load() {
     const sub = currentSub();
     try {
         const res = await apiFetch('/api/grant-folder?path=' + encodeURIComponent(sub));
+
+        // A signed-out / expired session returns 401 with the plain word "Unauthorized",
+        // not JSON. Calling res.json() on that throws the confusing "Unexpected token 'U'
+        // ... is not valid JSON" — so check the status first and tell the user plainly.
+        if (res.status === 401) {
+            document.getElementById('glBody').innerHTML =
+                '<div class="gl-empty">Your staff session has expired or you are not signed in. '
+                + '<a href="/me" style="color:#2563eb;font-weight:700;">Sign in again</a>, then reopen '
+                + 'the grant library from the INCCRA Grants page.</div>';
+            msg.textContent = '';
+            return;
+        }
         const data = await res.json();
 
         /* First visit lands at the root, then hops straight to the newest round so the
