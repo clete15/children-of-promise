@@ -341,10 +341,42 @@ function eceRelatedHoursQuestion() {
         + '</div>';
 }
 
+/* Manual reminder: the PI grant amendment for the Nov 2026 room swap. Room 1 (Infants)
+   went from PI to INCCRA and room 3 (Toddlers) from INCCRA to PI, so the teachers in
+   those rooms move off and onto the PI program and the grant must be amended to match.
+   The teacher names are read live from each room's staff links (primary or secondary
+   RoomNumber), so the reminder stays right if staffing changes before it is filed.
+   No auto-expiry — a to-do that is done when it is done. DELETE this function and its
+   call in renderAlerts once the amendment is submitted. */
+function piGrantRoomSwapReminder(staff) {
+    const inRoom = rn => (staff || [])
+        .filter(p => parseInt(p.RoomNumber, 10) === rn || parseInt(p.SecondaryRoomNumber, 10) === rn)
+        .map(p => p.Name).filter(Boolean);
+    const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const names = rn => {
+        const n = inRoom(rn);
+        return n.length ? n.map(esc).join(', ') : '<em>no teacher linked to this room yet</em>';
+    };
+    return '<div class="alert-item warning">'
+        + '<div class="alert-title">\uD83D\uDCDD Amend the PI grant: Infants and Toddlers rooms swapped programs</div>'
+        + '<div class="alert-detail">Infants is now <strong>INCCRA</strong> (was PI) and Toddlers is now '
+        + '<strong>PI</strong> (was INCCRA). Submit an amendment to the PI grant swapping these teachers:'
+        + '<ul style="margin:6px 0 0 18px;padding:0;">'
+        + '<li><strong>Off PI</strong> (Infants INCCRA): ' + names(1) + '</li>'
+        + '<li><strong>Onto PI</strong> (Toddlers PI): ' + names(3) + '</li>'
+        + '</ul>Remove this reminder once the amendment is submitted.</div>'
+        + '<a class="alert-action" href="/staff/rooms.html">Check room staffing \u2192</a>'
+        + '</div>';
+}
+
 function renderAlerts(students, waitlist, staff) {
     const body = document.getElementById('alertsBody');
     let html = '';
     let count = 0;
+
+    /* PI grant amendment for the Nov 2026 Infants/Toddlers program swap. */
+    const piSwap = piGrantRoomSwapReminder(staff || []);
+    if (piSwap) { count++; html += piSwap; }
 
     /* Manual reminder to sign Lindsey's work history once the tablet arrives. */
     const whSign = workHistorySignReminder();

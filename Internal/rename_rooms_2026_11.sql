@@ -18,9 +18,10 @@ USE CofPMillstadt;
    Roster and Attendance, and the Room Roster's order (INCCRA, then PI, then PFA).
 
      Room  Was                       Now                                Type
-     1     Infant                    Infants PI                         PI
+     1     Infant                    Infants INCCRA                     INCCRA
      2     Infants / Toddlers        Infants / Toddlers PI              PI
-     3     Toddlers                  Toddlers INCCRA                    INCCRA
+     3     Toddlers                  Toddlers PI                        PI
+   (Rooms 1 and 3 swapped programs; the PI grant amendment is tracked on the Alerts page.)
      4     Toddlers / 2 Year Olds    Toddlers / 2 Year Olds INCCRA      INCCRA
      5     2 Year Olds               2 Year Olds PI                     PI
      7     2 & 3 Year Olds           2 & 3 Year Olds INCCRA             INCCRA
@@ -35,9 +36,9 @@ USE CofPMillstadt;
 SET XACT_ABORT ON;
 BEGIN TRAN;
 
-UPDATE dimClassrooms SET Room = N'Infants PI',                    Type = N'PI'     WHERE RoomNumber = 1;
+UPDATE dimClassrooms SET Room = N'Infants INCCRA',                Type = N'INCCRA' WHERE RoomNumber = 1;
 UPDATE dimClassrooms SET Room = N'Infants / Toddlers PI',         Type = N'PI'     WHERE RoomNumber = 2;
-UPDATE dimClassrooms SET Room = N'Toddlers INCCRA',               Type = N'INCCRA' WHERE RoomNumber = 3;
+UPDATE dimClassrooms SET Room = N'Toddlers PI',                   Type = N'PI'     WHERE RoomNumber = 3;
 UPDATE dimClassrooms SET Room = N'2 Year Olds PI',                Type = N'PI'     WHERE RoomNumber = 5;
 UPDATE dimClassrooms SET Room = N'Toddlers / 2 Year Olds INCCRA', Type = N'INCCRA' WHERE RoomNumber = 4;
 UPDATE dimClassrooms SET Room = N'2 & 3 Year Olds INCCRA',        Type = N'INCCRA' WHERE RoomNumber = 7;
