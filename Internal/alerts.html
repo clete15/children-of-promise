@@ -217,10 +217,11 @@ function eceLevelTwoAlert(staff) {
 }
 
 function infantToddlerCredentialAlert(staff) {
-    const IT_ROOMS = ['Infant', 'Infants / Toddlers', 'Toddlers / 2 Year Olds'];
-    const norm = s => String(s || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
-        .map(w => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).join('/');
-    const serves = (p, room) => norm(p.Classroom) === norm(room) || norm(p.SecondaryClassroom) === norm(room);
+    /* The infant/toddler rooms, by RoomNumber (1, 2, 4), never by name: matching the names
+       "Infant" / "Infants / Toddlers" / "Toddlers / 2 Year Olds" would have silently counted
+       nobody once the rooms were renamed with " - PI" / " - INCCRA". Same set as before. */
+    const IT_ROOMS = [1, 2, 4];
+    const serves = (p, room) => parseInt(p.RoomNumber, 10) === room || parseInt(p.SecondaryRoomNumber, 10) === room;
     const itLv = p => { const m = (p.EceCredentials || '').match(/IT Level (\d)/i); return m ? +m[1] : 0; };
 
     const teaching = staff.filter(p => (p.StaffGroup || '') !== 'Ownership')

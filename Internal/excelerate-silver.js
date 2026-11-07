@@ -279,7 +279,9 @@ function reqPill(met, text) {
        of nine people is three people, not 2.7.
    ──────────────────────────────────────────────────────────────────────────── */
 
-const IT_ROOMS = ['Infant', 'Infants / Toddlers', 'Toddlers / 2 Year Olds'];
+/* Infant/toddler rooms by RoomNumber (1, 2, 4), not by name, so renaming a room (e.g. to
+   "... - PI" / "... - INCCRA") cannot silently drop its staff from the IT credential count. */
+const IT_ROOMS = [1, 2, 4];
 const PD_HOURS_REQUIRED = 20;
 const PD_YEAR = String(new Date().getFullYear());
 
@@ -287,11 +289,12 @@ function roomKey(v) {
     return String(v || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
         .map(w => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).join('/');
 }
+// `room` is a RoomNumber. Staff link to rooms by RoomNumber / SecondaryRoomNumber.
 function servesRoom(s, room) {
-    return roomKey(s.Classroom) === roomKey(room) || roomKey(s.SecondaryClassroom) === roomKey(room);
+    return parseInt(s.RoomNumber, 10) === room || parseInt(s.SecondaryRoomNumber, 10) === room;
 }
 function isPartTimeIn(s, room) {
-    return roomKey(s.SecondaryClassroom) === roomKey(room) && roomKey(s.Classroom) !== roomKey(room);
+    return parseInt(s.SecondaryRoomNumber, 10) === room && parseInt(s.RoomNumber, 10) !== room;
 }
 function credLevel(s, kind) {
     const src = [s.EceCredentials, s.Gateways].filter(Boolean).join(', ');

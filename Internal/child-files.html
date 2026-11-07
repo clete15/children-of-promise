@@ -460,15 +460,15 @@ function getRoomName(roomNumber) {
     return c ? (c.Room || ('Room ' + roomNumber)) : (roomNumber || '\u2014');
 }
 /* Vision & hearing screening (77 Ill. Adm. Code 685/675) are school-age rules. The
-   program applies them only to the "2 & 3 Year Olds" and "Pre-School" classrooms; every
-   other room (Infant, Infants/Toddlers, Toddlers, Toddlers/2 Year Olds, 2 Year Olds,
-   Before and Afterschool) shows n/a. Matched on the room NAME, normalised (lowercased,
-   non-alphanumerics stripped) so punctuation/spacing variants still match: "2 & 3 Year
-   Olds" -> "23yearolds"; any "Pre-School" -> contains "preschool". Plain "2 Year Olds"
-   -> "2yearolds" is deliberately excluded. */
+   program applies them only to the 2 & 3 Year Olds room (7) and Pre-School (6); every
+   other room shows n/a.
+
+   Matched on the room NUMBER, never the name. It used to match the name ("23yearolds"),
+   and renaming the room to "2 & 3 Year Olds - INCCRA" would have silently turned its
+   screenings into n/a. Room identity is the RoomNumber; names are labels. */
+var VISION_HEARING_ROOMS = [6, 7];
 function roomScreensVisionHearing(roomNumber) {
-    var norm = String(getRoomName(roomNumber) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    return norm.indexOf('preschool') !== -1 || norm === '23yearolds';
+    return VISION_HEARING_ROOMS.indexOf(parseInt(roomNumber, 10)) !== -1;
 }
 function activeRoster() {
     return students.filter(function (s) { return s.Active === 'Yes' || s.Active === 'YES'; });

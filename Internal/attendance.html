@@ -376,28 +376,47 @@ const excludedIds = new Set();
    2 Infants/Toddlers} and {4 Toddlers/2yr, 5 2 Year Olds}): the two rooms of a set share an
    age band and a child flexes between them. The director can view either room on its own OR
    combine the pair into one merged view (a "Combine" toggle in the room header). Keyed by
-   normalised room NAME (both views carry the name; only projected carries a number). */
+   RoomNumber, NEVER by name: room names are labels and get renamed (Nov 2026 added
+   " - PI" / " - INCCRA" to them), and a name-keyed table silently stops matching. */
 const ROOM_SETS = [
-    ['Infant', 'Infants / Toddlers'],
-    ['Toddlers / 2 Year Olds', '2 Year Olds'],
+    [1, 2],   // the two infant/toddler rooms
+    [4, 5],   // Toddlers / 2 Year Olds + 2 Year Olds
     // View-only combine (not a server seating pair): the director can look at 2 & 3 Year Olds
     // alongside Pre-School. Youngest-first order so the first room fills first in the split.
-    ['2 & 3 Year Olds', 'Pre-School'],
+    [7, 6],
 ];
-// Normalise a room name for matching: lowercase, collapse runs of spaces/slashes to one space.
-function roomKey(name) {
-    return String(name || '').toLowerCase().replace(/[\s/]+/g, ' ').trim();
-}
-// Build a lookup: normalised room name -> the normalised names of its full set (self first),
-// or null when the room is not in any set.
-const ROOM_SET_BY_KEY = (() => {
+// RoomNumber -> its full set (ladder order), or undefined when the room is in no set.
+const ROOM_SET_BY_NUM = (() => {
     const m = {};
-    ROOM_SETS.forEach(set => {
-        const keys = set.map(roomKey);
-        keys.forEach(k => { m[k] = keys; });
-    });
+    ROOM_SETS.forEach(set => set.forEach(n => { m[n] = set; }));
     return m;
 })();
+/* The Projected view carries each row's RoomNumber; the Actual view carries only the name,
+   so its number is looked up from the classroom list (exact name -> number, loaded once).
+   A row with no known number (e.g. the "(converted)" what-if room) gets null, so it simply
+   has no pairing and no age label, as before. */
+let ROOM_NUM_BY_NAME = null;
+async function ensureRoomNumbers() {
+    if (ROOM_NUM_BY_NAME) return;
+    const map = {};
+    try {
+        const res = await apiFetch('/api/classrooms');
+        const list = res.ok ? await res.json() : [];
+        (Array.isArray(list) ? list : []).forEach(c => {
+            const num = parseInt(c.RoomNumber, 10);
+            if (!isNaN(num)) map[String(c.Room || '').trim().toLowerCase()] = num;
+        });
+    } catch (e) { console.warn('[ATTENDANCE] room list unavailable; pairing and age labels off', e); }
+    ROOM_NUM_BY_NAME = map;
+}
+function roomNumOf(row) {
+    if (!row) return null;
+    if (/\(converted\)/i.test(row.room || '')) return null;
+    const direct = parseInt(row.roomNumber, 10);
+    if (!isNaN(direct)) return direct;
+    const n = ROOM_NUM_BY_NAME ? ROOM_NUM_BY_NAME[String(row.room || '').trim().toLowerCase()] : undefined;
+    return n == null ? null : n;
+}
 /* The sidebar-row indices that make up the set the room at `idx` belongs to, in age-ladder
    (youngest-first) order, filtered to rooms that actually exist in this view. A room in no
    set returns just [idx]. Combining a set means merging these rooms into one view, so the
@@ -406,37 +425,37 @@ function setIndices(idx) {
     const list = rows();
     const r = list[idx];
     if (!r) return [idx];
-    const setKeys = ROOM_SET_BY_KEY[roomKey(r.room)];
-    if (!setKeys) return [idx];
-    // Map each set member name to its row index in this view, kept in set (ladder) order.
-    const byKey = {};
-    list.forEach((row, i) => { byKey[roomKey(row.room)] = i; });
-    const ordered = setKeys.map(k => byKey[k]).filter(i => i != null);
+    const set = ROOM_SET_BY_NUM[roomNumOf(r)];
+    if (!set) return [idx];
+    // Map each set member's number to its row index in this view, kept in set (ladder) order.
+    const byNum = {};
+    list.forEach((row, i) => { const n = roomNumOf(row); if (n != null) byNum[n] = i; });
+    const ordered = set.map(n => byNum[n]).filter(i => i != null);
     return ordered.length ? ordered : [idx];
 }
 
 /* Each room's age range in MONTHS, mirroring dimClassrooms.AgeRange (see
-   Internal/setup_classrooms.sql / rename_rooms_2026.sql — the authoritative source). Keyed
-   by normalised room name. {lo,hi} are inclusive month bounds; the optional `text` is the
+   Internal/setup_classrooms.sql — the authoritative source). Keyed by RoomNumber (names
+   are labels and get renamed). {lo,hi} are inclusive month bounds; the optional `text` is the
    preferred label when the room is shown ON ITS OWN (so Pre-School reads "3 - 5 yrs" rather
    than "36 - 60 M"). When rooms are COMBINED, the month bounds drive one spanning label. */
 const ROOM_AGE_RANGE = {
-    [roomKey('Infant')]:                  { lo: 0,  hi: 12 },
-    [roomKey('Infants / Toddlers')]:      { lo: 8,  hi: 20 },
-    [roomKey('Toddlers')]:                { lo: 15, hi: 24 },
-    [roomKey('Toddlers / 2 Year Olds')]:  { lo: 15, hi: 36 },
-    [roomKey('2 Year Olds')]:             { lo: 24, hi: 36 },
-    [roomKey('2 & 3 Year Olds')]:         { lo: 24, hi: 48 },
-    [roomKey('Pre-School')]:              { lo: 36, hi: 60, text: '3 - 5 yrs' },
-    [roomKey('Before and Afterschool')]:  { lo: 60, hi: 144, text: '5 - 12 yrs' },
+    1: { lo: 0,  hi: 12 },
+    2: { lo: 8,  hi: 20 },
+    3: { lo: 15, hi: 24 },
+    4: { lo: 15, hi: 36 },
+    5: { lo: 24, hi: 36 },
+    7: { lo: 24, hi: 48 },
+    6: { lo: 36, hi: 60, text: '3 - 5 yrs' },
+    8: { lo: 60, hi: 144, text: '5 - 12 yrs' },
 };
 /* A display age range for one or more rooms.
    - ONE room: its own preferred label (text when set, else "N - M M").
    - COMBINED rooms: span the lowest low to the highest high across them. Expressed in YEARS
      ("P - Q yrs") when the top of the span reaches 3 years (36 months) — e.g. 2 & 3 Year Olds
      (24-48) + Pre-School (36-60) → "2 - 5 yrs" — otherwise in months ("N - M M"). */
-function ageRangeLabel(roomNames) {
-    const defs = roomNames.map(nm => ROOM_AGE_RANGE[roomKey(nm)]).filter(Boolean);
+function ageRangeLabel(roomRows) {
+    const defs = roomRows.map(r => ROOM_AGE_RANGE[roomNumOf(r)]).filter(Boolean);
     if (!defs.length) return '';
     // Single room: honour its own preferred label.
     if (defs.length === 1) return defs[0].text || (defs[0].lo + ' - ' + defs[0].hi + ' M');
@@ -519,6 +538,7 @@ function projectedRows(projectedAttendance) {
         const pfaPiDays = (r.pfaPi || [0, 0, 0, 0, 0]).map(n);
         return {
             room: r.room || 'Unknown',
+            roomNumber: r.roomNumber,
             capacity: n(r.capacity),
             counts: (r.occupancy || []).map(n),
             overflow: (r.overflow || [0, 0, 0, 0, 0]).map(n),
@@ -578,7 +598,7 @@ function renderSidebar() {
 /* Whether the room at `idx` belongs to a paired set (so a Combine toggle makes sense). */
 function isPairedRoom(idx) {
     const r = rows()[idx];
-    return !!(r && ROOM_SET_BY_KEY[roomKey(r.room)]);
+    return !!(r && ROOM_SET_BY_NUM[roomNumOf(r)]);
 }
 
 function showRoom(idx, keepCombined) {
@@ -682,7 +702,7 @@ function roomBlock(idxs) {
         ? '<div class="at-note"><span class="at-over-flag">Over capacity — the age ladder cannot seat everyone on the flagged days. This only shows on Pre-School, the last room; the overflow are the oldest children.</span></div>'
         : '';
 
-    const ageRange = ageRangeLabel(roomNames);
+    const ageRange = ageRangeLabel(sel);
     const ageLine = ageRange ? `<div class="at-room-age">${esc(ageRange)}</div>` : '';
 
     // Combine toggle — only for a paired room. "Combine with X" when viewing one room alone;
@@ -690,7 +710,7 @@ function roomBlock(idxs) {
     let combineToggle = '';
     if (isPairedRoom(activeRoom)) {
         const setIdx = setIndices(activeRoom);
-        const partnerName = setIdx.map(i => (list[i] || {}).room).filter(nm => nm && roomKey(nm) !== roomKey(list[activeRoom].room))[0];
+        const partnerName = setIdx.filter(i => i !== activeRoom).map(i => (list[i] || {}).room).filter(Boolean)[0];
         const label = combined ? 'Show separately' : ('Combine with ' + (partnerName || 'pair'));
         combineToggle = `<div class="at-combine"><button type="button" class="at-combine-btn${combined ? ' on' : ''}" onclick="toggleCombine()">${esc(label)}</button></div>`;
     }
@@ -1080,6 +1100,7 @@ async function reprojectAndRender() {
    roster; the projected rooms already carry their roster. */
 async function fetchView(which) {
     if (cache[which]) return;
+    await ensureRoomNumbers();   // pairing + age labels are keyed by RoomNumber
     if (which === 'actual') {
         const res = await apiFetch('/api/reports?only=byRoomDaily,actualRoster');
         const data = await res.json();
@@ -1093,6 +1114,7 @@ async function fetchView(which) {
    (not cached) so toggling a child re-seats the rooms. Also pulls the full waiting-list
    once, as the stable source for the filter list (so an unchecked child doesn't vanish). */
 async function fetchProjected() {
+    await ensureRoomNumbers();
     const ex = Array.from(excludedIds);
     const only = waitlistAll ? 'projectedAttendance' : 'projectedAttendance,waitlistChildren';
     const qs = '/api/reports?only=' + only

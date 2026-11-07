@@ -234,7 +234,7 @@ function roomNameOf(k) {
 }
 function asOfSorted() {
     const order = {};
-    classrooms.forEach((r, i) => { order[String(r.RoomNumber)] = i; });
+    rosterRooms().forEach((r, i) => { order[String(r.RoomNumber)] = i; });
     return asOfKids.slice().sort((a, b) =>
         ((order[String(a.RoomNumber)] ?? 999) - (order[String(b.RoomNumber)] ?? 999)) || sortByName(a, b));
 }
@@ -351,9 +351,24 @@ function roomProgramCount(rn) {
     return `<div class="rr-cnt ${ok ? 'ok' : 'bad'}" title="${why}" aria-label="${why}">${kids.length} ${label}</div>`;
 }
 
+/* Room order on this page: INCCRA rooms first, then PI, then PFA, then anything else
+   (Before and Afterschool), each group youngest to oldest. /api/classrooms already returns
+   the rooms youngest-first (the server's age ladder), and a stable sort keeps that order
+   inside each group. Grouped by the room's program TYPE, not its name. */
+const ROSTER_PROGRAM_ORDER = { INCCRA: 0, PI: 1, PFA: 2 };
+function rosterRooms() {
+    const grp = r => {
+        const t = String(r.Type || '').trim().toUpperCase();
+        return t in ROSTER_PROGRAM_ORDER ? ROSTER_PROGRAM_ORDER[t] : 3;
+    };
+    return classrooms.map((r, i) => ({ r, i }))
+        .sort((a, b) => (grp(a.r) - grp(b.r)) || (a.i - b.i))
+        .map(x => x.r);
+}
+
 function renderRosterSidebar() {
     const sidebar = document.getElementById('rosterSidebar');
-    const rooms = classrooms.map(r => r.RoomNumber);
+    const rooms = rosterRooms().map(r => r.RoomNumber);
     if (!activeRosterRoomNum && rooms.length) activeRosterRoomNum = rooms[0];
     sidebar.innerHTML = rooms.map(rn => {
         const cr = getClassroom(rn);
@@ -394,7 +409,7 @@ function renderRosterRoom() {
         return;
     }
 
-    const roomOpts = classrooms.map(r => `<option value="${r.RoomNumber}">${r.Room}</option>`).join('');
+    const roomOpts = rosterRooms().map(r => `<option value="${r.RoomNumber}">${r.Room}</option>`).join('');
     const dayKeys = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
     const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
 

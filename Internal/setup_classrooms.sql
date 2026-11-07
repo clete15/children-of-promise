@@ -18,13 +18,14 @@ DELETE FROM dimClassrooms;
 
 INSERT INTO dimClassrooms (RoomNumber, Building, Room, TeacherDescription, Type, RequiredSlots, AgeRange, DCFSCapacity)
 VALUES
-(1, 1, 'Infant',                  'Tara / Sue',          'PI',     '4',   '0 - 12 Months',  5),
-(2, 1, 'Infants / Toddlers',      'Paige / Sue',         'PI',     '5',   '8 - 20 Months',  7),
-(3, 1, 'Toddlers',                'Megan / New Teacher', 'INCCRA', '5',   '15 - 24 Months', 6),
-(4, 2, 'Toddlers / 2 Year Olds',  'Renee / Raquel',      'INCCRA', '5',   '18 - 36 Months', 8),
-(5, 2, '2 Year Olds',             'Janelle / Renee',     'PI',     '9',   '24 - 36 Months', 8),
-(6, 1, 'Pre-School',              'Keyona / Maddie',     'PFA',    '15',  '3 to 5 yrs',     18),
-(7, 1, '2 & 3 Year Olds',         'Janelle',             'INCCRA', '8',   '24 - 48 Months', 8),
+-- Names and types as renamed Nov 2026 (rename_rooms_2026_11.sql).
+(1, 1, 'Infants / Toddlers - INCCRA',     'Tara / Sue',          'INCCRA', '4',   '0 - 12 Months',  5),
+(2, 1, 'Infants / Toddlers - PI',         'Paige / Sue',         'PI',     '5',   '8 - 20 Months',  7),
+(3, 1, 'Toddlers / 2 Year Olds - PI',     'Megan / New Teacher', 'PI',     '5',   '15 - 24 Months', 6),
+(4, 2, 'Toddlers / 2 Year Olds - INCCRA', 'Renee / Raquel',      'INCCRA', '5',   '18 - 36 Months', 8),
+(5, 2, '2 Year Olds',                     'Janelle / Renee',     'PI',     '9',   '24 - 36 Months', 8),
+(6, 1, 'Pre-School - PFA',                'Keyona / Maddie',     'PFA',    '15',  '3 to 5 yrs',     18),
+(7, 1, '2 & 3 Year Olds - INCCRA',        'Janelle',             'INCCRA', '8',   '24 - 48 Months', 8),
 (8, 1, 'Before and Afterschool',  'Pam / Jeremy / Sara', 'n/a',    'n/a', '5 to 12 yrs',    20);
 
 PRINT 'dimClassrooms loaded successfully.';
