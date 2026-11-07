@@ -46,6 +46,10 @@
         .rr-total-label { padding:7px 12px;font-size:0.65rem;font-weight:700;color:var(--sp-accent);text-transform:uppercase;letter-spacing:0.05em; }
         .rr-total { padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--sp-accent); }
         .rr-empty { padding:24px;color:var(--sp-muted);font-size:0.88rem; }
+        /* Header Deploy button: same green as the deploy widget (copied from the Waiting List). */
+        .header-deploy { padding:7px 13px;border:none;border-radius:7px;font-size:0.82rem;font-weight:700;cursor:pointer;color:#fff;background:#16a34a;font-family:inherit;white-space:nowrap;transition:background 0.15s; }
+        .header-deploy:hover { background:#15803d; }
+        .header-deploy:focus-visible { outline:2px solid #fff;outline-offset:2px; }
 
         /* PI / PFA count under a room name, and the PI / PFA tag beside a child. Same rule
            and same colours as the attendance page: green = the child is in a PI or PFA room
@@ -85,6 +89,12 @@
     <div class="header-actions">
         <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
         <a class="header-back" href="/staff/">← Staff Portal</a>
+        <!-- Deploy in the header while the rooms are being reworked (same as the Waiting
+             List page). It just clicks the floating deploy widget's Deploy button, so the
+             tested confirm/pending/success logic is reused rather than duplicated. -->
+        <button type="button" class="header-deploy" id="hdrDeploy"
+            title="Pull the latest code from GitHub. Page/script changes take effect on reload; server.js changes need Restart (bottom-right widget)."
+            onclick="var b=document.getElementById('dwDeploy'); if(b) b.click();">🚀 Deploy</button>
     </div>
 </header>
 
@@ -578,5 +588,8 @@ async function saveRosterRow(i) {
 
 init();
 </script>
+<!-- Floating Deploy/Restart widget. The header 🚀 Deploy button delegates to this
+     widget's #dwDeploy, so it must be loaded for that button to work. -->
+<script src="deploy-widget.js"></script>
 </body>
 </html>
