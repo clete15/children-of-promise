@@ -18,16 +18,16 @@ USE CofPMillstadt;
    Roster and Attendance, and the Room Roster's order (INCCRA, then PI, then PFA).
 
      Room  Was                       Now                                Type
-     1     Infant                    Infants / Toddlers INCCRA          INCCRA
+     1     Infant                    Infants INCCRA                     INCCRA
      2     Infants / Toddlers        Infants / Toddlers PI              PI
-     3     Toddlers                  Toddlers / 2 Year Olds PI          PI
+     3     Toddlers                  Toddlers INCCRA                    INCCRA
      4     Toddlers / 2 Year Olds    Toddlers / 2 Year Olds INCCRA      INCCRA
+     5     2 Year Olds               2 Year Olds PI                     PI
      7     2 & 3 Year Olds           2 & 3 Year Olds INCCRA             INCCRA
      6     Pre-School                Pre-School PFA                     PFA
-   (First applied with " - " before the program; the dash was dropped the same day
-   to make the names shorter. Re-running sets the dash-free names.)
-     5     2 Year Olds               (unchanged)
      8     Before and Afterschool    (unchanged)
+   (Settled the same day after two passes: first with " - " before the program, then
+   without it; rooms 1, 3 and 5 renamed again. Re-running sets these final names.)
 
    Age ranges and capacities are NOT changed here.
    ───────────────────────────────────────────────────────────────────────────── */
@@ -35,9 +35,10 @@ USE CofPMillstadt;
 SET XACT_ABORT ON;
 BEGIN TRAN;
 
-UPDATE dimClassrooms SET Room = N'Infants / Toddlers INCCRA',     Type = N'INCCRA' WHERE RoomNumber = 1;
+UPDATE dimClassrooms SET Room = N'Infants INCCRA',                Type = N'INCCRA' WHERE RoomNumber = 1;
 UPDATE dimClassrooms SET Room = N'Infants / Toddlers PI',         Type = N'PI'     WHERE RoomNumber = 2;
-UPDATE dimClassrooms SET Room = N'Toddlers / 2 Year Olds PI',     Type = N'PI'     WHERE RoomNumber = 3;
+UPDATE dimClassrooms SET Room = N'Toddlers INCCRA',               Type = N'INCCRA' WHERE RoomNumber = 3;
+UPDATE dimClassrooms SET Room = N'2 Year Olds PI',                Type = N'PI'     WHERE RoomNumber = 5;
 UPDATE dimClassrooms SET Room = N'Toddlers / 2 Year Olds INCCRA', Type = N'INCCRA' WHERE RoomNumber = 4;
 UPDATE dimClassrooms SET Room = N'2 & 3 Year Olds INCCRA',        Type = N'INCCRA' WHERE RoomNumber = 7;
 UPDATE dimClassrooms SET Room = N'Pre-School PFA',                Type = N'PFA'    WHERE RoomNumber = 6;
