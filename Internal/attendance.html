@@ -274,9 +274,10 @@
 <style>
     .em-subnav {
         display: flex; gap: 4px; align-items: center; flex-wrap: wrap;
-        /* Small left inset, matching the content below, so the page uses the full width
-           on smaller screens. */
-        max-width: 1400px; margin: 0; padding: 10px 20px 0 2%;
+        /* Same 15% left inset as every other Enrollment page, so the menu does not jump
+           sideways when clicking between tabs. (The attendance content below keeps its
+           smaller inset so the chart still has the room.) */
+        max-width: 1400px; margin: 0; padding: 10px 20px 0 15%;
     }
     .em-subnav .em-subnav-label {
         font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;
