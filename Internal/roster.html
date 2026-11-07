@@ -362,19 +362,13 @@ function roomProgramCount(rn) {
     return `<div class="rr-cnt ${ok ? 'ok' : 'bad'}" title="${why}" aria-label="${why}">${kids.length} ${label}</div>`;
 }
 
-/* Room order on this page: PI rooms first, then INCCRA, then PFA (Pre-School), then
-   anything else (Before and Afterschool), each group youngest to oldest. /api/classrooms
-   already returns the rooms youngest-first (the server's age ladder), and a stable sort
-   keeps that order inside each group. Grouped by the room's program TYPE, not its name. */
-const ROSTER_PROGRAM_ORDER = { PI: 0, INCCRA: 1, PFA: 2 };
+/* Room order on this page: plain youngest to oldest, the server's age ladder (rooms
+   1, 2, 3, 4, 5, 7, 6, 8), which is the order /api/classrooms already returns. Tried
+   grouping by program (PI / INCCRA / PFA) first; with the Nov 2026 rooms the director
+   wanted strict age order instead. One function so the sidebar, the Room dropdown and
+   the as-of print/CSV all agree. */
 function rosterRooms() {
-    const grp = r => {
-        const t = String(r.Type || '').trim().toUpperCase();
-        return t in ROSTER_PROGRAM_ORDER ? ROSTER_PROGRAM_ORDER[t] : 3;
-    };
-    return classrooms.map((r, i) => ({ r, i }))
-        .sort((a, b) => (grp(a.r) - grp(b.r)) || (a.i - b.i))
-        .map(x => x.r);
+    return classrooms.slice();
 }
 
 function renderRosterSidebar() {
