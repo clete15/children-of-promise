@@ -19,7 +19,7 @@ DELETE FROM dimClassrooms;
 INSERT INTO dimClassrooms (RoomNumber, Building, Room, TeacherDescription, Type, RequiredSlots, AgeRange, DCFSCapacity)
 VALUES
 -- Names and types as renamed Nov 2026 (rename_rooms_2026_11.sql).
-(1, 1, 'Infants INCCRA',                  'Tara / Sue',          'INCCRA', '4',   '0 - 12 Months',  5),
+(1, 1, 'Infants PI',                      'Tara / Sue',          'PI',     '4',   '0 - 12 Months',  5),
 (2, 1, 'Infants / Toddlers PI',           'Paige / Sue',         'PI',     '5',   '8 - 20 Months',  7),
 (3, 1, 'Toddlers INCCRA',                 'Megan / New Teacher', 'INCCRA', '5',   '15 - 24 Months', 6),
 (4, 2, 'Toddlers / 2 Year Olds INCCRA',   'Renee / Raquel',      'INCCRA', '5',   '18 - 36 Months', 8),
