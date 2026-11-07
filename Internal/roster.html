@@ -10,13 +10,14 @@
         /* Themed to match the other Enrollment Management pages: 15% left inset, theme
            surfaces, dark-mode aware. (Was a fixed blue gradient with hardcoded white.) */
         .rr-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px 20px 20px 15%; }
-        .rr-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:960px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
-        .rr-sidebar { width:190px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
+        .rr-wrapper { display:flex;max-height:calc(100vh - 130px);width:100%;max-width:1100px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
+        /* Wide enough for the longest room name on ONE line ("Toddlers / 2 Year Olds INCCRA"). */
+        .rr-sidebar { width:250px;flex-shrink:0;background:var(--sp-surface-2);border:1px solid var(--sp-border);border-right:none;overflow-y:auto;padding:8px 0;border-radius:12px 0 0 12px; }
         .rr-sidebar button { display:block;width:100%;text-align:left;padding:10px 16px;border:none;border-left:3px solid transparent;cursor:pointer;background:transparent;transition:background 0.15s,border-color 0.15s; }
         .rr-sidebar button.active { background:var(--sp-accent-soft);border-left-color:var(--sp-accent); }
         .rr-sidebar button.active div { color:var(--sp-accent); }
         .rr-sidebar button:hover:not(.active) { background:var(--sp-surface); }
-        .rr-sidebar button div { font-size:0.82rem;font-weight:700;color:var(--sp-text); }
+        .rr-sidebar button div { font-size:0.82rem;font-weight:700;color:var(--sp-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
         .rr-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:0 12px 12px 0;max-height:calc(100vh - 130px); }
         .rr-header { padding:14px 20px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;gap:16px; }
         .rr-title { font-size:1rem;font-weight:800;color:var(--sp-text); }
@@ -427,7 +428,7 @@ function renderRosterRoom() {
         <table>
             <thead>
                 <tr>
-                    <th style="width:160px;">Room</th>
+                    <th style="width:225px;">Room</th>
                     <th class="student">Student</th>
                     ${dayLabels.map(d => `<th class="day">${d}</th>`).join('')}
                     <th style="width:80px;">Program</th>
