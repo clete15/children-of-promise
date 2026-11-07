@@ -7,11 +7,12 @@
     <link rel="stylesheet" href="styles.css">
     <style>
         body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; }
-        /* Left-aligned with only a small left inset, so the whole three-part layout
-           (rooms, Actual/Projected, waiting list) fits on smaller screens without being
-           pushed off the right edge. */
+        /* Same 15% left inset as every other Enrollment page, so the room list starts under
+           "Waiting List" and nothing jumps when clicking between tabs. The card flexes to fit,
+           and in the Projected view the waiting-list filter wraps below it on a narrow screen
+           (flex-wrap) rather than being pushed off the right edge. */
         /* Card on the left, the waiting-list filter (projected view only) to its right. */
-        .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;gap:18px;padding:20px 20px 20px 2%;flex-wrap:wrap; }
+        .at-layout { display:flex;align-items:flex-start;justify-content:flex-start;gap:18px;padding:20px 20px 20px 15%;flex-wrap:wrap; }
         .at-wrapper { display:flex;max-height:calc(100vh - 130px);flex:1 1 auto;min-width:0;max-width:1320px;box-shadow:0 4px 24px rgba(0,0,0,0.12);border-radius:12px; }
         /* The filter container beside the card; empty (and hidden) outside the projected view. */
         #atFilter:empty { display:none; }
