@@ -801,6 +801,12 @@ async function updateStudent() {
     // rides in the URL as a fallback for older servers that ignore the Id.
     const body = Object.assign(buildBody(), { id: s.Id });
     if (!validateStudentEntry(body)) return;   // internal controls — same checks as a new save
+    // Marking a child inactive: ask when they left, so a roster for any past day is right.
+    if (isTruthy(s.Active) && body.active === 'No') {
+        const lastDay = await askLastDay(`${s.First_Name} ${s.Last_Name}`);
+        if (!lastDay) return;                   // cancelled: nothing is saved
+        body.lastDayAttended = lastDay;
+    }
     const btn = document.getElementById('btnUpdate');
     btn.disabled = true; btn.textContent = 'Saving…';
     try {

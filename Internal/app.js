@@ -173,6 +173,61 @@ function normalizePayType(raw) {
     return cat;
 }
 
+/* Asks for a child's LAST DAY ATTENDED when they are being marked inactive, so the
+   enrollment history knows when they left (they drop off the roster the day after).
+   Resolves to 'YYYY-MM-DD', or null if cancelled — callers must not save on null.
+   A real <dialog> with a date picker, keyboard and screen-reader friendly. */
+function askLastDay(childName) {
+    const pad = n => String(n).padStart(2, '0');
+    const now = new Date();
+    const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    if (typeof HTMLDialogElement === 'undefined') {
+        // Very old browser: fall back to a typed date.
+        const v = prompt('Last day ' + childName + ' attended (YYYY-MM-DD):', today);
+        if (v === null) return Promise.resolve(null);
+        const t = String(v).trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(t) || t > today) { alert('Please enter a date that is not in the future, as YYYY-MM-DD.'); return Promise.resolve(null); }
+        return Promise.resolve(t);
+    }
+    return new Promise(resolve => {
+        const dlg = document.createElement('dialog');
+        dlg.setAttribute('aria-labelledby', 'ldTitle');
+        dlg.style.cssText = 'border:1px solid var(--sp-border,#cbd5e1);border-radius:10px;padding:18px 20px;max-width:360px;'
+            + 'background:var(--sp-surface,#fff);color:var(--sp-text,#0f172a);box-shadow:0 10px 30px rgba(0,0,0,0.25);';
+        dlg.innerHTML =
+            '<form method="dialog" style="margin:0;">'
+            + '<h3 id="ldTitle" style="margin:0 0 6px;font-size:1rem;"></h3>'
+            + '<p style="margin:0 0 12px;font-size:0.82rem;color:var(--sp-muted,#64748b);">They stay on the roster through this day and drop off the day after.</p>'
+            + '<label for="ldDate" style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Last day attended</label>'
+            + '<input type="date" id="ldDate" required style="width:100%;padding:6px 8px;font-size:0.9rem;box-sizing:border-box;">'
+            + '<p id="ldErr" role="alert" style="margin:6px 0 0;font-size:0.78rem;color:#dc2626;min-height:1em;"></p>'
+            + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">'
+            + '<button type="button" id="ldCancel" style="padding:6px 14px;">Cancel</button>'
+            + '<button type="submit" id="ldOk" style="padding:6px 14px;font-weight:700;">Mark inactive</button>'
+            + '</div></form>';
+        dlg.querySelector('#ldTitle').textContent = 'When did ' + childName + ' leave?';
+        const input = dlg.querySelector('#ldDate');
+        input.value = today;
+        input.max = today;
+        document.body.appendChild(dlg);
+        let result = null;
+        const done = () => { dlg.remove(); resolve(result); };
+        dlg.querySelector('#ldCancel').addEventListener('click', () => { result = null; dlg.close(); });
+        dlg.querySelector('form').addEventListener('submit', e => {
+            const v = input.value;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || v > today) {
+                e.preventDefault();
+                dlg.querySelector('#ldErr').textContent = 'Pick a date that is not in the future.';
+                return;
+            }
+            result = v;
+        });
+        dlg.addEventListener('close', done);
+        dlg.showModal();
+        input.focus();
+    });
+}
+
 function showNotification(msg, type = 'info') {
     const el = document.createElement('div');
     el.className = `notification ${type}`;

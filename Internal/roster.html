@@ -57,6 +57,22 @@
         .rr-prog { display:inline-block;margin-left:6px;font-size:0.6rem;font-weight:800;letter-spacing:0.03em;padding:1px 5px;border-radius:999px;vertical-align:middle; }
         .rr-prog.ok  { color:var(--sp-good-fg,#16a34a);background:var(--sp-good-bg,rgba(22,163,74,0.14));border:1px solid var(--sp-good-br,rgba(22,163,74,0.4)); }
         .rr-prog.bad { color:var(--sp-bad-fg,#dc2626);background:var(--sp-bad-bg,rgba(220,38,38,0.12));border:1px solid var(--sp-bad-br,rgba(220,38,38,0.4)); }
+
+        /* Roster as of a past date */
+        .rr-asof-pick { display:flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;color:var(--sp-muted);white-space:nowrap; }
+        .rr-asof-pick input { padding:3px 6px;border:1px solid var(--sp-border-in);border-radius:4px;font-size:0.75rem;color:var(--sp-text);background:var(--sp-field-bg); }
+        .rr-tool { padding:4px 10px;border:1.5px solid var(--sp-border);border-radius:6px;background:var(--sp-surface);color:var(--sp-text-2);font-size:0.72rem;font-weight:700;cursor:pointer;white-space:nowrap; }
+        .rr-tool:hover { border-color:var(--sp-accent);color:var(--sp-accent); }
+        .rr-tool:focus-visible, .rr-asof-pick input:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
+        .rr-tool.warn { border-color:#d97706;color:#b45309; }
+        .rr-asof-bar { display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 20px;border-bottom:1px solid var(--sp-border);background:var(--sp-accent-soft);font-size:0.78rem;color:var(--sp-text); }
+        .rr-asof-bar[hidden] { display:none; }
+        .rr-asof-bar.err { background:rgba(220,38,38,0.1);color:#b91c1c; }
+        .rr-asof-bar .sp { flex:1; }
+        .rr-check { text-align:center;font-weight:700; }
+        .rr-sr { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap; }
+        .rr-miss-table { border-collapse:collapse;width:100%;font-size:0.8rem;margin-top:8px; }
+        .rr-miss-table th, .rr-miss-table td { padding:6px 8px;border-bottom:1px solid var(--sp-border);text-align:left; }
     </style>
 </head>
 <body>
@@ -112,11 +128,18 @@
             <div class="rr-header">
                 <div class="rr-title" id="rosterRoomTitle"></div>
                 <div class="rr-teacher" id="rosterRoomTeacher"></div>
-                <label class="rr-toggle">
+                <label class="rr-toggle" id="rosterActiveOnlyWrap">
                     <input type="checkbox" id="rosterActiveOnly" checked onchange="renderRosterRoom()">
                     Active only
                 </label>
+                <label class="rr-asof-pick" for="rosterAsOf">Roster as of
+                    <input type="date" id="rosterAsOf" aria-describedby="rosterAsOfHelp">
+                </label>
+                <button type="button" class="rr-tool" id="rosterMissing" hidden></button>
             </div>
+            <span id="rosterAsOfHelp" class="rr-sr">Pick a past date to see who was enrolled that day, in the room and program they had then.</span>
+
+            <div class="rr-asof-bar" id="rosterAsOfBar" role="status" hidden></div>
 
             <div class="rr-grid" id="rosterStudentGrid"></div>
         </div>
@@ -131,7 +154,242 @@ let activeRosterRoomNum = null;
 
 async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
+    setupAsOf();
     buildRoster();
+    loadMissingEndDates();
+}
+
+// ── ROSTER AS OF A PAST DATE ──
+// asOfDate is null for today (the normal, editable roster). Otherwise asOfKids holds the
+// children enrolled on that day, with the room, days and program they had then.
+let asOfDate = null;
+let asOfKids = null;
+
+function localTodayIso() {
+    const d = new Date(), p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function escHtml(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function fmtDate(iso) {
+    const d = new Date(iso + 'T00:00:00');
+    return isNaN(d) ? iso : d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function setupAsOf() {
+    const input = document.getElementById('rosterAsOf');
+    input.max = localTodayIso();
+    input.value = localTodayIso();
+    input.addEventListener('change', () => setAsOf(input.value));
+}
+
+async function setAsOf(value) {
+    const bar = document.getElementById('rosterAsOfBar');
+    const today = localTodayIso();
+    if (!value || value >= today) {        // today (or cleared) = the normal live roster
+        asOfDate = null; asOfKids = null;
+        document.getElementById('rosterAsOf').value = today;
+        bar.hidden = true; bar.className = 'rr-asof-bar';
+        document.getElementById('rosterActiveOnlyWrap').hidden = false;
+        buildRoster();
+        return;
+    }
+    bar.hidden = false; bar.className = 'rr-asof-bar';
+    bar.textContent = 'Loading the roster for ' + fmtDate(value) + '…';
+    try {
+        const res = await apiFetch('/api/roster-as-of?date=' + encodeURIComponent(value));
+        if (res.status === 401) throw new Error('Your session has expired. Sign in again.');
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.ok) throw new Error(d.error || ('HTTP ' + res.status));
+        asOfDate = value;
+        asOfKids = (d.children || []).map(k => ({
+            Id: k.Id, First_Name: k.First_Name, Last_Name: k.Last_Name, Birth_date: k.Birth_date,
+            Start_Date: k.Start_Date, RoomNumber: k.RoomNumber, Room: k.Room, Active: 'Yes',
+            PFA_PI_na: k.Program, Monday: k.Monday, Tuesday: k.Tuesday, Wednesday: k.Wednesday,
+            Thursday: k.Thursday, Friday: k.Friday,
+        }));
+        document.getElementById('rosterActiveOnlyWrap').hidden = true;
+        bar.innerHTML = '<span class="sp"><strong>Roster as of ' + escHtml(fmtDate(value)) + '</strong> &middot; '
+            + asOfKids.length + ' enrolled. Read only. Each child is shown in the room and program they had that day.</span>'
+            + '<button type="button" class="rr-tool" id="asOfCsv">Download CSV (all rooms)</button>'
+            + '<button type="button" class="rr-tool" id="asOfPrint">Print (all rooms)</button>'
+            + '<button type="button" class="rr-tool" id="asOfBack">Back to today</button>';
+        document.getElementById('asOfCsv').addEventListener('click', downloadAsOfCsv);
+        document.getElementById('asOfPrint').addEventListener('click', printAsOf);
+        document.getElementById('asOfBack').addEventListener('click', () => setAsOf(''));
+        buildRoster();
+    } catch (e) {
+        // A failed read must never look like an empty roster.
+        asOfDate = null; asOfKids = null;
+        bar.className = 'rr-asof-bar err';
+        bar.textContent = 'Could not load the roster for ' + fmtDate(value) + ': ' + (e.message || e)
+            + '. Nothing is missing; this is a read problem. The roster below is today\u2019s.';
+        document.getElementById('rosterActiveOnlyWrap').hidden = false;
+        buildRoster();
+    }
+}
+
+// The children the sidebar counts and the table draw from: today's, or the as-of snapshot.
+function rosterSource() { return asOfKids || students; }
+
+function roomNameOf(k) {
+    const cr = getClassroom(k.RoomNumber);
+    return cr ? cr.Room : (k.Room || ('Room ' + (k.RoomNumber || '?')));
+}
+function asOfSorted() {
+    const order = {};
+    classrooms.forEach((r, i) => { order[String(r.RoomNumber)] = i; });
+    return asOfKids.slice().sort((a, b) =>
+        ((order[String(a.RoomNumber)] ?? 999) - (order[String(b.RoomNumber)] ?? 999)) || sortByName(a, b));
+}
+const DAY_KEYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+function downloadAsOfCsv() {
+    if (!asOfKids) return;
+    // Quote every cell, and defuse anything a spreadsheet would run as a formula.
+    const cell = v => {
+        let s = String(v == null ? '' : v);
+        if (/^[=+\-@]/.test(s)) s = "'" + s;
+        return '"' + s.replace(/"/g, '""') + '"';
+    };
+    const head = ['Room', 'Last name', 'First name', 'Birth date', 'Start date', 'Program', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    const lines = [head.map(cell).join(',')].concat(asOfSorted().map(k => [
+        roomNameOf(k), k.Last_Name, k.First_Name, k.Birth_date, k.Start_Date, k.PFA_PI_na || '',
+    ].concat(DAY_KEYS.map(d => isTruthy(k[d]) ? 'Y' : '')).map(cell).join(',')));
+    const blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Roster as of ' + asOfDate + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+}
+
+function printAsOf() {
+    if (!asOfKids) return;
+    const groups = [];
+    asOfSorted().forEach(k => {
+        const room = roomNameOf(k);
+        let g = groups.find(x => x.room === room);
+        if (!g) groups.push(g = { room, kids: [] });
+        g.kids.push(k);
+    });
+    const body = groups.map(g => '<h2>' + escHtml(g.room) + ' <small>(' + g.kids.length + ')</small></h2>'
+        + '<table><thead><tr><th>Child</th><th>Program</th>' + ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'].map(d => '<th>' + d + '</th>').join('')
+        + '</tr></thead><tbody>' + g.kids.map(k => '<tr><td>' + escHtml(k.Last_Name + ', ' + k.First_Name) + '</td><td>'
+            + escHtml(k.PFA_PI_na || '') + '</td>' + DAY_KEYS.map(d => '<td>' + (isTruthy(k[d]) ? '&#10003;' : '') + '</td>').join('')
+            + '</tr>').join('') + '</tbody></table>').join('');
+    const html = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Roster as of ' + escHtml(asOfDate) + '</title>'
+        + '<style>body{font-family:Arial,sans-serif;margin:24px;color:#000}h1{font-size:18px}h2{font-size:14px;margin:18px 0 6px}'
+        + 'small{font-weight:normal;color:#444}table{border-collapse:collapse;width:100%;font-size:12px}'
+        + 'th,td{border:1px solid #999;padding:4px 6px;text-align:left}th:nth-child(n+3),td:nth-child(n+3){text-align:center;width:40px}'
+        + 'h2{break-after:avoid}table{break-inside:auto}</style></head><body>'
+        + '<h1>Children Of Promise &mdash; roster as of ' + escHtml(fmtDate(asOfDate)) + ' (' + asOfKids.length + ' enrolled)</h1>'
+        + body + '</body></html>';
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const w = window.open(url, '_blank');
+    if (!w) showNotification('Allow pop-ups for this site to print the roster.', 'error');
+    else setTimeout(() => { try { w.print(); } catch (e) { /* user prints from the tab */ } }, 600);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// Read-only table for one room on the as-of date.
+function renderAsOfRoom(rn, cr) {
+    const grid = document.getElementById('rosterStudentGrid');
+    const kids = asOfKids.filter(k => String(k.RoomNumber) === String(rn)).sort(sortByName);
+    if (!kids.length) {
+        grid.innerHTML = '<div class="rr-empty">No children were enrolled in this room on ' + escHtml(fmtDate(asOfDate)) + '.</div>';
+        return;
+    }
+    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+    grid.innerHTML = '<table><caption class="rr-sr">' + escHtml((cr ? cr.Room : rn) + ' as of ' + fmtDate(asOfDate)) + '</caption>'
+        + '<thead><tr><th class="student" scope="col">Student</th>' + dayLabels.map(d => '<th class="day" scope="col">' + d + '</th>').join('')
+        + '<th scope="col" style="width:80px;">Program</th></tr></thead><tbody>'
+        + kids.map(k => '<tr><td class="student"><div class="rr-name">' + escHtml(k.Last_Name + ', ' + k.First_Name) + progTagHtml(k, cr) + '</div>'
+            + '<div class="rr-age">Started ' + escHtml(k.Start_Date || '?') + '</div></td>'
+            + DAY_KEYS.map(d => '<td class="day rr-check">' + (isTruthy(k[d]) ? '<span aria-label="attends">&#10003;</span>' : '<span class="rr-sr">no</span>') + '</td>').join('')
+            + '<td>' + escHtml(k.PFA_PI_na || '--') + '</td></tr>').join('')
+        + '</tbody><tfoot><tr><td class="rr-total-label">Daily Total</td>'
+        + DAY_KEYS.map(d => '<td class="rr-total">' + kids.filter(k => isTruthy(k[d])).length + '</td>').join('')
+        + '<td></td></tr></tfoot></table>';
+}
+
+// ── CHILDREN WHO LEFT BEFORE THE HISTORY BEGAN ──
+// They are inactive but have no leaving date, so a past roster cannot place them. The
+// button only appears for a centre admin, and only when there is something to fill in.
+let missingKids = [];
+async function loadMissingEndDates() {
+    const btn = document.getElementById('rosterMissing');
+    try {
+        const res = await apiFetch('/api/history/missing-end-dates');
+        if (res.status === 401) { btn.hidden = true; return; }   // not a centre admin
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.ok) throw new Error(d.error || ('HTTP ' + res.status));
+        missingKids = d.children || [];
+        btn.hidden = !missingKids.length;
+        btn.className = 'rr-tool warn';
+        btn.textContent = 'Missing leaving dates (' + missingKids.length + ')';
+        btn.title = 'Children marked inactive before the history began. Enter the last day each attended so past rosters are right.';
+        btn.onclick = openMissingDialog;
+    } catch (e) {
+        console.error('[ROSTER] could not check for missing leaving dates:', e);
+        btn.hidden = false;
+        btn.className = 'rr-tool';
+        btn.textContent = 'Leaving dates: could not check';
+        btn.title = String(e.message || e);
+        btn.onclick = loadMissingEndDates;
+    }
+}
+
+function openMissingDialog() {
+    const today = localTodayIso();
+    const dlg = document.createElement('dialog');
+    dlg.setAttribute('aria-labelledby', 'mdTitle');
+    dlg.style.cssText = 'border:1px solid var(--sp-border);border-radius:10px;padding:18px 20px;width:min(640px,92vw);max-height:80vh;overflow:auto;'
+        + 'background:var(--sp-surface);color:var(--sp-text);box-shadow:0 10px 30px rgba(0,0,0,0.25);';
+    dlg.innerHTML = '<h3 id="mdTitle" style="margin:0 0 6px;font-size:1rem;">Missing leaving dates</h3>'
+        + '<p style="margin:0;font-size:0.8rem;color:var(--sp-muted);">These children were already inactive when the history began, so a past roster '
+        + 'cannot tell when they left. Enter the <strong>last day each one attended</strong>. Until you do, they are left off past rosters entirely. '
+        + 'Each can be entered once.</p>'
+        + '<table class="rr-miss-table"><thead><tr><th scope="col">Child</th><th scope="col">Room</th><th scope="col">Started</th>'
+        + '<th scope="col">Last day attended</th><th scope="col"><span class="rr-sr">Save</span></th></tr></thead><tbody>'
+        + missingKids.map(k => '<tr data-id="' + escHtml(k.Id) + '"><td>' + escHtml(k.Last_Name + ', ' + k.First_Name) + '</td>'
+            + '<td>' + escHtml(k.Room) + '</td><td>' + escHtml(k.Start_Date) + '</td>'
+            + '<td><input type="date" max="' + today + '" aria-label="Last day ' + escHtml(k.First_Name + ' ' + k.Last_Name) + ' attended"></td>'
+            + '<td><button type="button" class="rr-tool">Save</button></td></tr>').join('')
+        + '</tbody></table>'
+        + '<p id="mdMsg" role="status" style="font-size:0.78rem;min-height:1em;margin:8px 0 0;"></p>'
+        + '<div style="display:flex;justify-content:flex-end;margin-top:10px;"><button type="button" class="rr-tool" id="mdClose">Close</button></div>';
+    document.body.appendChild(dlg);
+    const msg = dlg.querySelector('#mdMsg');
+    dlg.querySelectorAll('tbody tr').forEach(tr => {
+        tr.querySelector('button').addEventListener('click', async () => {
+            const input = tr.querySelector('input');
+            const lastDay = input.value;
+            const name = tr.cells[0].textContent;
+            if (!/^\d{4}-\d{2}-\d{2}$/.test(lastDay) || lastDay > today) {
+                msg.style.color = '#dc2626'; msg.textContent = 'Pick a date that is not in the future for ' + name + '.';
+                input.focus(); return;
+            }
+            try {
+                const res = await apiFetch('/api/history/end-date', { method: 'POST', body: JSON.stringify({ id: tr.dataset.id, lastDay }) });
+                const d = await res.json().catch(() => ({}));
+                if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+                missingKids = missingKids.filter(k => String(k.Id) !== tr.dataset.id);
+                tr.remove();
+                msg.style.color = ''; msg.textContent = 'Saved: ' + name + ' attended through ' + fmtDate(lastDay) + '.';
+            } catch (e) {
+                msg.style.color = '#dc2626'; msg.textContent = 'Could not save ' + name + ': ' + (e.message || e);
+            }
+        });
+    });
+    dlg.querySelector('#mdClose').addEventListener('click', () => dlg.close());
+    dlg.addEventListener('close', () => {
+        dlg.remove();
+        loadMissingEndDates();
+        if (asOfDate) setAsOf(asOfDate);   // a filled-in date can change the roster on screen
+    });
+    dlg.showModal();
 }
 
 // ── PI / PFA marking (same rule as the attendance page) ──
@@ -161,7 +419,7 @@ function progTagHtml(s, cr, tagId) {
 // "3 PFA", or "3 PI/PFA" for a mix), exactly as the attendance sidebar does. Rooms with
 // no PI/PFA children show nothing.
 function roomProgramCount(rn) {
-    const kids = students.filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active) && childProgram(s));
+    const kids = rosterSource().filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active) && childProgram(s));
     if (!kids.length) return '';
     const progs = new Set(kids.map(childProgram));
     const label = progs.size === 1 ? [...progs][0] : 'PI/PFA';
@@ -201,6 +459,7 @@ function renderRosterRoom() {
     const cr = getClassroom(rn);
     document.getElementById('rosterRoomTitle').textContent = cr ? cr.Room : (rn || '');
     document.getElementById('rosterRoomTeacher').textContent = cr ? cr.TeacherDescription : '';
+    if (asOfKids) return renderAsOfRoom(rn, cr);   // a past date: read-only snapshot
 
     const activeOnly = document.getElementById('rosterActiveOnly')?.checked !== false;
     rosterStudents = students
@@ -313,6 +572,12 @@ async function saveRosterRow(i) {
     const newPfaPiNa = document.getElementById(`rosterPfaPiNa${i}`)?.value || s.PFA_PI_na || '';
     const newActive  = document.getElementById(`rosterActive${i}`)?.value || s.Active || 'Yes';
     const btn = document.getElementById(`rosterSave${i}`);
+    // Marking a child inactive: ask when they left, so a roster for any past day is right.
+    let lastDayAttended = null;
+    if (isTruthy(s.Active) && newActive === 'No') {
+        lastDayAttended = await askLastDay(`${s.First_Name} ${s.Last_Name}`);
+        if (!lastDayAttended) return;           // cancelled: nothing is saved
+    }
     btn.disabled = true; btn.textContent = '…';
 
     const frpFood = computeFRP({
@@ -336,6 +601,8 @@ async function saveRosterRow(i) {
         thursday:  document.getElementById(`rDay${i}_3`)?.checked || false,
         friday:    document.getElementById(`rDay${i}_4`)?.checked || false,
         pfaPiNa: newPfaPiNa, frpFood: frpFood,
+        lastDayAttended: lastDayAttended,
+        id: s.Id,   // update exactly this child, not anyone who shares the name
         iep: isTruthy(s.IEP), military: isTruthy(s.Military),
         householdIncome: s.HouseholdIncome || '',
         householdSize: s.HouseholdSize || '',

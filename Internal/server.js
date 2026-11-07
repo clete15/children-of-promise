@@ -4914,6 +4914,35 @@ function sendJSON(res, status, body) {
     res.end(JSON.stringify(body));
 }
 
+/* ── Enrollment history (roster on any given day) — see enrollment-history.js ──
+   Each save that can change a child's Active flag, room, days or program takes a
+   snapshot before and writes the differences after. The save always happens first,
+   so a history failure can never block or undo it. */
+const EH = require('./enrollment-history.js');
+const history = EH({ runSQL, runSQLRows, esc });
+
+/* Who made this change, for ChangedBy. A signed-in staff member by login name; the
+   shared password as itself. Never throws. */
+function actorLabel(req) {
+    try {
+        const a = resolveActor(req);
+        if (!a) return 'unknown';
+        if (a.director) return 'shared password';
+        const id = parseInt(a.staffId, 10);
+        const r = runSQLRows(`SELECT ISNULL(LoginName,'') AS LoginName FROM Staff WHERE Id=${id}`);
+        return (r.ok && r.rows[0] && r.rows[0].LoginName) || ('staff #' + id);
+    } catch (e) { return 'unknown'; }
+}
+
+/* A "last day attended" sent with a save. Absent is fine (null); anything present must
+   be a real date that is not in the future. Returns { ok, value } or { ok:false, error }. */
+function readLastDay(v) {
+    if (v === undefined || v === null || v === '') return { ok: true, value: null };
+    if (!EH.isIsoDate(String(v))) return { ok: false, error: 'Last day attended must be a date (YYYY-MM-DD).' };
+    if (String(v) > EH.localToday()) return { ok: false, error: 'Last day attended cannot be in the future.' };
+    return { ok: true, value: String(v) };
+}
+
 function readBody(req, cb) {
     let b = '';
     req.on('data', c => b += c);
@@ -5322,6 +5351,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
                     .map(l => l.trim()).find(l => /^\d+$/.test(l));
                 const newId = idLine ? parseInt(idLine) : 0;
                 if (newId) {
+                    // Start the child's enrollment history from their start date.
+                    history.created(newId, d.startDate, actorLabel(req));
                     const seeded = seedWeightedEligibilityDoc(newId);
                     if (!seeded.ok) console.warn('[ENROLL] child folder/seed deferred: ' + (seeded.error || 'unknown'));
                 } else {
@@ -5529,6 +5560,12 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             const whereClause = idNum
                 ? `Id=${idNum}`
                 : `First_Name=${esc(origFirst)} AND Last_Name=${esc(origLast)}`;
+            const lastDay = readLastDay(d.lastDayAttended);
+            if (!lastDay.ok) return sendJSON(res, 400, { error: lastDay.error });
+            // Snapshot for the enrollment history (same row(s), aliased e).
+            const hTok = history.before(idNum
+                ? `e.Id=${idNum}`
+                : `e.First_Name=${esc(origFirst)} AND e.Last_Name=${esc(origLast)}`);
             const sql = `UPDATE rptMasterEnrollment SET ${fields.join(',')} WHERE ${whereClause}`;
             console.log('[PUT SQL]', sql);
             const r = runSQL(sql);
@@ -5539,6 +5576,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             // so a truncated/failed save can't report success.
             if (r.sqlError) return sendJSON(res, 500, { error: r.sqlError });
             if (!r.data.includes('rows affected')) return sendJSON(res, 500, { error: 'No rows updated: ' + r.data });
+            history.after(hTok, { by: actorLabel(req), lastDayAttended: lastDay.value });
             sendJSON(res, 200, { success: true });
         });
         return;
@@ -5569,12 +5607,16 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             if (d.pfaPiNa !== undefined)    fields.push(`PFA_PI_na=${esc(d.pfaPiNa)}`);
             if (d.active !== undefined)     fields.push(`Active=${esc(d.active)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
+            const lastDay = readLastDay(d.lastDayAttended);
+            if (!lastDay.ok) return sendJSON(res, 400, { error: lastDay.error });
+            const hTok = history.before(`e.Id=${sid}`);
             const sql = `UPDATE rptMasterEnrollment SET ${fields.join(',')} WHERE Id=${sid}`;
             console.log('[ROSTER PUT SQL]', sql);
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             if (r.sqlError) return sendJSON(res, 500, { error: r.sqlError });
             if (!r.data.includes('rows affected')) return sendJSON(res, 404, { error: 'No student with that id.' });
+            history.after(hTok, { by: actorLabel(req), lastDayAttended: lastDay.value });
             sendJSON(res, 200, { success: true });
         });
         return;
@@ -5687,6 +5729,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='TransferDate') ALTER TABLE rptMasterEnrollment ADD TransferDate NVARCHAR(20)`);
 
             const transferred = d.transferred === true || d.transferred === 'true' || d.transferred === 1;
+            const hTok = history.before(`e.Id=${sid}`);
             let sql;
             if (transferred) {
                 // Accept a supplied date, else stamp today. Kept as YYYY-MM-DD text to
@@ -5700,7 +5743,43 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             if (!r.data.includes('rows affected')) return sendJSON(res, 404, { error: 'No matching child.' });
+            // The transfer date is the last day attended, so they leave the roster the day after.
+            const xferDay = transferred && /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || '')) ? String(d.date) : null;
+            history.after(hTok, { by: actorLabel(req), lastDayAttended: readLastDay(xferDay).value });
             return sendJSON(res, 200, { success: true, transferred: transferred });
+        });
+    }
+
+    /* GET /api/roster-as-of?date=YYYY-MM-DD — the children enrolled on that day, with the
+       room, days and program they had THEN. Same tier as /api/students (it is the same
+       data, as of another day). A failed read is a 500, never an empty roster (see the
+       sql-reads steering: an empty answer here would read as "nobody was enrolled"). */
+    if (req.method === 'GET' && url.startsWith('/api/roster-as-of')) {
+        if (!checkClassroomAuth(req, res)) return;
+        const date = new URLSearchParams(req.url.split('?')[1] || '').get('date') || '';
+        if (!EH.isIsoDate(date)) return sendJSON(res, 400, { error: 'Give the date as YYYY-MM-DD.' });
+        const r = history.rosterAsOf(date);
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        return sendJSON(res, 200, { ok: true, date, children: r.rows });
+    }
+
+    /* GET /api/history/missing-end-dates — inactive children with no recorded leaving date
+       (they left before the history began). Centre admin. */
+    if (req.method === 'GET' && url === '/api/history/missing-end-dates') {
+        if (!checkAuth(req, res)) return;
+        const r = history.missingEndDates();
+        if (!r.ok) return sendJSON(res, 500, { error: r.error });
+        return sendJSON(res, 200, { ok: true, children: r.rows });
+    }
+
+    /* POST /api/history/end-date { id, lastDay } — enter that leaving date, once. */
+    if (req.method === 'POST' && url === '/api/history/end-date') {
+        if (!checkAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err || !d) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const r = history.setEndDate(d.id, d.lastDay, actorLabel(req));
+            if (!r.ok) return sendJSON(res, r.status || 500, { error: r.error });
+            return sendJSON(res, 200, { success: true });
         });
     }
 
@@ -10699,6 +10778,14 @@ ELSE
 server.listen(PORT, () => {
     console.log(`HTTP Server: http://localhost:${PORT}`);
     console.log(`DB: ${DB_SERVER} / ${DB_NAME}`);
+    // Set up the enrollment-history table shortly after boot, so the first save does not
+    // pay for it. If the database is not reachable yet, the first save retries.
+    setTimeout(() => {
+        try {
+            const e = history.ensure();
+            if (!e.ok) console.error('[HISTORY] setup deferred: ' + e.error);
+        } catch (err) { console.error('[HISTORY] setup deferred: ' + err.message); }
+    }, 3000);
 });
 
 if (httpsServer) {
