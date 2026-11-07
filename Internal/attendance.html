@@ -442,10 +442,10 @@ function setIndices(idx) {
    preferred label when the room is shown ON ITS OWN (so Pre-School reads "3 - 5 yrs" rather
    than "36 - 60 M"). When rooms are COMBINED, the month bounds drive one spanning label. */
 const ROOM_AGE_RANGE = {
-    1: { lo: 0,  hi: 12 },
+    1: { lo: 0,  hi: 15 },   // Infants: widened from 12 to 15 months, Nov 2026
     2: { lo: 8,  hi: 20 },
     3: { lo: 15, hi: 24 },
-    4: { lo: 15, hi: 36 },
+    4: { lo: 16, hi: 36 },   // Toddlers / 2 Year Olds: starts at 16 months (after Infants' 0-15), Nov 2026
     5: { lo: 24, hi: 36 },
     7: { lo: 24, hi: 48 },
     6: { lo: 36, hi: 60, text: '3 - 5 yrs' },
