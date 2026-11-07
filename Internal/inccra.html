@@ -100,7 +100,7 @@
                     <div class="link-card" onclick="exportInccraRoster()">
                         <div class="card-icon">📋</div>
                         <h3>Classroom Roster Report</h3>
-                        <p>Export an Excel roster of active INCCRA children (excludes school-age and summer program), plus inactive and waiting-list children 36 months and under, leaving out anyone under 6 weeks. Each child is placed in the INCCRA room their age fits, and a Status column tells them apart. Shows initials only.</p>
+                        <p>Export an Excel roster of active INCCRA children under 4 (excludes school-age and summer program), plus waiting-list children 36 months and under, leaving out anyone under 6 weeks. Each child is placed in the INCCRA room their age fits, and a Status column tells them apart. Shows initials only.</p>
                         <span class="badge badge-export">📥 Export Excel</span>
                     </div>
 
@@ -245,27 +245,30 @@ async function exportInccraRoster() {
         const rows = [];
         let skippedNoBirth = 0;
         let skippedUnderSixWeeks = 0;
+        let skippedFourPlus = 0;
+        // 4 or older today: on or after the 4th birthday.
+        const fourOrOlder = bd => {
+            const fourth = new Date(bd);
+            fourth.setFullYear(fourth.getFullYear() + 4);
+            return today >= fourth;
+        };
 
-        // 1. Active INCCRA children, as before (any age; school-age and summer rooms excluded).
+        /* 1. Active INCCRA children (school-age and summer rooms excluded), under 4 today.
+              Inactive children are NOT on this report. An active child with no birth date
+              cannot be aged, so stays on with "No birth date on file" in the Room column
+              rather than silently vanishing. */
         students.filter(s => isTruthy(s.Active) && s.PFA_PI_na === 'INCCRA' && !isSchoolAgeOrSummer(s.Room))
             .forEach(s => {
                 const bd = parseBirth(s.Birth_date);
+                if (bd && fourOrOlder(bd)) { skippedFourPlus++; return; }
                 const a = ageOf(bd, s.Days_Old);
+                // No birth date but a stored age in days: apply the same 4-and-over rule to it.
+                if (!bd && a.daysOld !== '' && a.daysOld >= 4 * 365.25) { skippedFourPlus++; return; }
                 rows.push({ Room: inccraRoomFor(bd), LastInitial: initial(s.Last_Name), FirstInitial: initial(s.First_Name),
                     AgeInYears: a.ageYears, DaysOld: a.daysOld, Status: 'Active' });
             });
 
-        // 2. Inactive children 36 months and under today (any program).
-        students.filter(s => !isTruthy(s.Active)).forEach(s => {
-            const bd = parseBirth(s.Birth_date);
-            if (!bd) { skippedNoBirth++; return; }
-            if (!thirtySixOrUnder(bd)) return;
-            const a = ageOf(bd);
-            rows.push({ Room: inccraRoomFor(bd), LastInitial: initial(s.Last_Name), FirstInitial: initial(s.First_Name),
-                AgeInYears: a.ageYears, DaysOld: a.daysOld, Status: 'Inactive' });
-        });
-
-        // 3. Waiting-list children 36 months and under today. Enrolled entries are already
+        // 2. Waiting-list children 36 months and under today. Enrolled entries are already
         //    counted above as children, and Declined families are no longer waiting.
         waitlist.filter(w => !/^(enrolled|declined)$/i.test(String(w.WaitlistStatus || '').trim()))
             .forEach(w => {
@@ -289,7 +292,7 @@ async function exportInccraRoster() {
 
         if (!rows.length) {
             status.className = 'export-status error';
-            status.textContent = 'No children to export (no active INCCRA children, and no inactive or waiting-list children 36 months and under).';
+            status.textContent = 'No children to export (no active INCCRA children under 4, and no waiting-list children 36 months and under).';
             return;
         }
 
@@ -350,9 +353,10 @@ async function exportInccraRoster() {
 
         const n = st => rows.filter(r => r.Status === st).length;
         status.className = 'export-status success';
-        status.textContent = `✓ Exported ${rows.length} children: ${n('Active')} active, ${n('Inactive')} inactive, ${n('Waiting List')} waiting list`
+        status.textContent = `✓ Exported ${rows.length} children: ${n('Active')} active, ${n('Waiting List')} waiting list`
+            + (skippedFourPlus ? `. ${skippedFourPlus} aged 4 or over left out` : '')
             + (skippedUnderSixWeeks ? `. ${skippedUnderSixWeeks} under 6 weeks old left out` : '')
-            + (skippedNoBirth ? `. ${skippedNoBirth} inactive/waiting-list left out: no birth date on file` : '')
+            + (skippedNoBirth ? `. ${skippedNoBirth} waiting-list left out: no birth date on file` : '')
             + (rows.some(r => /^No INCCRA room/.test(r.Room)) ? '. Some ages fit no INCCRA room (see the Room column)' : '');
         setTimeout(() => { status.style.display = 'none'; }, 10000);   // long enough to read the counts
 
