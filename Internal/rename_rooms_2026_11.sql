@@ -21,7 +21,7 @@ USE CofPMillstadt;
      1     Infant                    Infants PI                         PI
      2     Infants / Toddlers        Infants / Toddlers PI              PI
      3     Toddlers                  Toddlers INCCRA                    INCCRA
-     4     Toddlers / 2 Year Olds    Toddlers / 2 Year Olds Both        PI (mixed room)
+     4     Toddlers / 2 Year Olds    Toddlers / 2 Year Olds INCCRA      INCCRA
      5     2 Year Olds               2 Year Olds PI                     PI
      7     2 & 3 Year Olds           2 & 3 Year Olds INCCRA             INCCRA
      6     Pre-School                Pre-School PFA                     PFA
@@ -39,9 +39,7 @@ UPDATE dimClassrooms SET Room = N'Infants PI',                    Type = N'PI'  
 UPDATE dimClassrooms SET Room = N'Infants / Toddlers PI',         Type = N'PI'     WHERE RoomNumber = 2;
 UPDATE dimClassrooms SET Room = N'Toddlers INCCRA',               Type = N'INCCRA' WHERE RoomNumber = 3;
 UPDATE dimClassrooms SET Room = N'2 Year Olds PI',                Type = N'PI'     WHERE RoomNumber = 5;
--- Room 4 takes both PI and INCCRA children. Type PI so its PI children read green
--- (they belong); INCCRA children carry no badge either way.
-UPDATE dimClassrooms SET Room = N'Toddlers / 2 Year Olds Both',   Type = N'PI'     WHERE RoomNumber = 4;
+UPDATE dimClassrooms SET Room = N'Toddlers / 2 Year Olds INCCRA', Type = N'INCCRA' WHERE RoomNumber = 4;
 UPDATE dimClassrooms SET Room = N'2 & 3 Year Olds INCCRA',        Type = N'INCCRA' WHERE RoomNumber = 7;
 UPDATE dimClassrooms SET Room = N'Pre-School PFA',                Type = N'PFA'    WHERE RoomNumber = 6;
 
