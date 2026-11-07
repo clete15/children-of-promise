@@ -100,7 +100,7 @@
                     <div class="link-card" onclick="exportInccraRoster()">
                         <div class="card-icon">📋</div>
                         <h3>Classroom Roster Report</h3>
-                        <p>Export an Excel roster of INCCRA children (excludes school-age and summer program). Shows initials only.</p>
+                        <p>Export an Excel roster of active INCCRA children (excludes school-age and summer program), plus inactive and waiting-list children 36 months and under. A Status column tells them apart. Shows initials only.</p>
                         <span class="badge badge-export">📥 Export Excel</span>
                     </div>
 
@@ -157,50 +157,89 @@ async function exportInccraRoster() {
     status.style.color = '#1d4ed8';
 
     try {
-        const res = await apiFetch('/api/students');
-        const students = await res.json();
+        /* Both lists are needed. A failed read of either stops the export with the reason,
+           rather than quietly producing a roster with a whole group missing. */
+        const [sRes, wRes] = await Promise.all([apiFetch('/api/students'), apiFetch('/api/waitinglist')]);
+        if (sRes.status === 401 || wRes.status === 401) {
+            throw new Error('your session has expired, or the waiting list needs a centre-admin sign-in. Sign in again at /me.');
+        }
+        if (!sRes.ok) throw new Error('could not read enrolled children (HTTP ' + sRes.status + ')');
+        if (!wRes.ok) throw new Error('could not read the waiting list (HTTP ' + wRes.status + ')');
+        const students = await sRes.json();
+        const waitlist = await wRes.json();
+        if (!Array.isArray(students) || !Array.isArray(waitlist)) throw new Error('unexpected reply from the server');
 
-        // Filter: active, INCCRA program, not school-age/summer rooms
-        const inccra = students.filter(s =>
-            isTruthy(s.Active) &&
-            s.PFA_PI_na === 'INCCRA' &&
-            !isSchoolAgeOrSummer(s.Room)
-        );
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const parseBirth = v => {
+            if (!v) return null;
+            /* 'YYYY-MM-DD' is read as a LOCAL calendar date. new Date('2023-11-07') means
+               midnight UTC, which in Central time is the evening BEFORE, so every age came
+               out a day older and a child turning 3 today was wrongly left out. */
+            const m = String(v).trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(v);
+            if (isNaN(d.getTime())) return null;
+            d.setHours(0, 0, 0, 0);
+            return d;
+        };
+        // 36 months and under AS OF TODAY: today is on or before the 3rd birthday.
+        const thirtySixOrUnder = bd => {
+            if (!bd) return false;
+            const third = new Date(bd);
+            third.setFullYear(third.getFullYear() + 3);
+            return today <= third;
+        };
+        const initial = s => (String(s || '').trim().charAt(0) || '').toUpperCase();
+        const ageOf = (bd, daysOldFallback) => {
+            let daysOld = bd ? Math.floor((today - bd) / 86400000) : '';
+            if (daysOld === '' && daysOldFallback) daysOld = parseInt(daysOldFallback) || '';
+            return { daysOld, ageYears: daysOld === '' ? '' : (daysOld / 365.25).toFixed(1) };
+        };
 
-        if (!inccra.length) {
+        const rows = [];
+        let skippedNoBirth = 0;
+
+        // 1. Active INCCRA children, as before (any age; school-age and summer rooms excluded).
+        students.filter(s => isTruthy(s.Active) && s.PFA_PI_na === 'INCCRA' && !isSchoolAgeOrSummer(s.Room))
+            .forEach(s => {
+                const a = ageOf(parseBirth(s.Birth_date), s.Days_Old);
+                rows.push({ Room: s.Room || '', LastInitial: initial(s.Last_Name), FirstInitial: initial(s.First_Name),
+                    AgeInYears: a.ageYears, DaysOld: a.daysOld, Status: 'Active' });
+            });
+
+        // 2. Inactive children 36 months and under today (any program).
+        students.filter(s => !isTruthy(s.Active)).forEach(s => {
+            const bd = parseBirth(s.Birth_date);
+            if (!bd) { skippedNoBirth++; return; }
+            if (!thirtySixOrUnder(bd)) return;
+            const a = ageOf(bd);
+            rows.push({ Room: s.Room || '', LastInitial: initial(s.Last_Name), FirstInitial: initial(s.First_Name),
+                AgeInYears: a.ageYears, DaysOld: a.daysOld, Status: 'Inactive' });
+        });
+
+        // 3. Waiting-list children 36 months and under today. Enrolled entries are already
+        //    counted above as children, and Declined families are no longer waiting.
+        const AGE_GROUP = { '0-2': 'Waiting list: Infant / Toddler', '2-3': 'Waiting list: 2 Year Olds',
+            '3-5': 'Waiting list: Pre-School', 'ba': 'Waiting list: Before & After' };
+        waitlist.filter(w => !/^(enrolled|declined)$/i.test(String(w.WaitlistStatus || '').trim()))
+            .forEach(w => {
+                const bd = parseBirth(w.ChildBirthDate);
+                if (!bd) { skippedNoBirth++; return; }
+                if (!thirtySixOrUnder(bd)) return;
+                // ChildName is the child's full name: first word is the first name, last word the last.
+                const parts = String(w.ChildName || '').trim().split(/\s+/).filter(Boolean);
+                const a = ageOf(bd);
+                rows.push({ Room: AGE_GROUP[String(w.AgeGroup || '').trim()] || 'Waiting list',
+                    LastInitial: initial(parts.length > 1 ? parts[parts.length - 1] : (w.LastName || '')),
+                    FirstInitial: initial(parts[0] || ''),
+                    AgeInYears: a.ageYears, DaysOld: a.daysOld, Status: 'Waiting List' });
+            });
+
+        if (!rows.length) {
             status.className = 'export-status error';
-            status.textContent = 'No INCCRA students found (excluding school-age/summer).';
+            status.textContent = 'No children to export (no active INCCRA children, and no inactive or waiting-list children 36 months and under).';
             return;
         }
-
-        // Calculate age in years and days old
-        const today = new Date();
-        const rows = inccra.map(s => {
-            const lastInitial = s.Last_Name ? s.Last_Name.charAt(0).toUpperCase() : '';
-            const firstInitial = s.First_Name ? s.First_Name.charAt(0).toUpperCase() : '';
-            let ageYears = '';
-            let daysOld = '';
-            if (s.Birth_date) {
-                const bd = new Date(s.Birth_date);
-                if (!isNaN(bd.getTime())) {
-                    const diffMs = today - bd;
-                    daysOld = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                    ageYears = (daysOld / 365.25).toFixed(1);
-                }
-            }
-            // Fallback to Days_Old from DB if birth date calc fails
-            if (!daysOld && s.Days_Old) {
-                daysOld = parseInt(s.Days_Old) || '';
-                if (daysOld) ageYears = (daysOld / 365.25).toFixed(1);
-            }
-            return {
-                Room: s.Room || '',
-                LastInitial: lastInitial,
-                FirstInitial: firstInitial,
-                AgeInYears: ageYears,
-                DaysOld: daysOld
-            };
-        });
 
         // Sort by days old (youngest to oldest)
         rows.sort((a, b) => (parseInt(a.DaysOld) || 0) - (parseInt(b.DaysOld) || 0));
@@ -221,20 +260,30 @@ async function exportInccraRoster() {
         xml += '  <Column ss:Width="80"/>\n';
         xml += '  <Column ss:Width="90"/>\n';
         xml += '  <Column ss:Width="70"/>\n';
+        xml += '  <Column ss:Width="90"/>\n';
+        // Every text value is XML-escaped: a room name like "2 & 3 Year Olds INCCRA" carries
+        // a raw "&", which otherwise makes Excel refuse to open the file.
+        const x = v => String(v == null ? '' : v)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        // A blank age is written as an empty String cell; an empty Number cell is invalid.
+        const num = v => (v === '' || v == null)
+            ? '<Data ss:Type="String"></Data>'
+            : '<Data ss:Type="Number">' + x(v) + '</Data>';
         // Header row
         xml += '  <Row>\n';
-        ['Room', 'Last Initial', 'First Initial', 'Age in Years', 'Days Old'].forEach(h => {
+        ['Room', 'Last Initial', 'First Initial', 'Age in Years', 'Days Old', 'Status'].forEach(h => {
             xml += '    <Cell ss:StyleID="Header"><Data ss:Type="String">' + h + '</Data></Cell>\n';
         });
         xml += '  </Row>\n';
         // Data rows
         rows.forEach(r => {
             xml += '  <Row>\n';
-            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + r.Room + '</Data></Cell>\n';
-            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + r.LastInitial + '</Data></Cell>\n';
-            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + r.FirstInitial + '</Data></Cell>\n';
-            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="Number">' + (r.AgeInYears || '') + '</Data></Cell>\n';
-            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="Number">' + (r.DaysOld || '') + '</Data></Cell>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + x(r.Room) + '</Data></Cell>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + x(r.LastInitial) + '</Data></Cell>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + x(r.FirstInitial) + '</Data></Cell>\n';
+            xml += '    <Cell ss:StyleID="Default">' + num(r.AgeInYears) + '</Cell>\n';
+            xml += '    <Cell ss:StyleID="Default">' + num(r.DaysOld) + '</Cell>\n';
+            xml += '    <Cell ss:StyleID="Default"><Data ss:Type="String">' + x(r.Status) + '</Data></Cell>\n';
             xml += '  </Row>\n';
         });
         xml += '</Table>\n</Worksheet>\n</Workbook>';
@@ -247,9 +296,11 @@ async function exportInccraRoster() {
         a.click();
         URL.revokeObjectURL(a.href);
 
+        const n = st => rows.filter(r => r.Status === st).length;
         status.className = 'export-status success';
-        status.textContent = `✓ Exported ${rows.length} INCCRA students`;
-        setTimeout(() => { status.style.display = 'none'; }, 4000);
+        status.textContent = `✓ Exported ${rows.length} children: ${n('Active')} active, ${n('Inactive')} inactive, ${n('Waiting List')} waiting list`
+            + (skippedNoBirth ? ` (${skippedNoBirth} inactive/waiting-list left out: no birth date on file)` : '');
+        setTimeout(() => { status.style.display = 'none'; }, 10000);   // long enough to read the counts
 
     } catch (e) {
         status.className = 'export-status error';
