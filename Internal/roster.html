@@ -46,6 +46,17 @@
         .rr-total-label { padding:7px 12px;font-size:0.65rem;font-weight:700;color:var(--sp-accent);text-transform:uppercase;letter-spacing:0.05em; }
         .rr-total { padding:7px 8px;text-align:center;font-size:0.85rem;font-weight:800;color:var(--sp-accent); }
         .rr-empty { padding:24px;color:var(--sp-muted);font-size:0.88rem; }
+
+        /* PI / PFA count under a room name, and the PI / PFA tag beside a child. Same rule
+           and same colours as the attendance page: green = the child is in a PI or PFA room
+           (they belong there), red = a PI/PFA child sitting in a room that is not one.
+           Selectors are deliberately specific so the active-room blue does not recolour them. */
+        .rr-sidebar button .rr-cnt { font-size:0.7rem;font-weight:700;margin-top:2px; }
+        .rr-sidebar button .rr-cnt.ok  { color:var(--sp-good-fg,#16a34a); }
+        .rr-sidebar button .rr-cnt.bad { color:var(--sp-bad-fg,#dc2626); }
+        .rr-prog { display:inline-block;margin-left:6px;font-size:0.6rem;font-weight:800;letter-spacing:0.03em;padding:1px 5px;border-radius:999px;vertical-align:middle; }
+        .rr-prog.ok  { color:var(--sp-good-fg,#16a34a);background:var(--sp-good-bg,rgba(22,163,74,0.14));border:1px solid var(--sp-good-br,rgba(22,163,74,0.4)); }
+        .rr-prog.bad { color:var(--sp-bad-fg,#dc2626);background:var(--sp-bad-bg,rgba(220,38,38,0.12));border:1px solid var(--sp-bad-br,rgba(220,38,38,0.4)); }
     </style>
 </head>
 <body>
@@ -123,8 +134,44 @@ async function init() {
     buildRoster();
 }
 
+// ── PI / PFA marking (same rule as the attendance page) ──
+// A child's program is PFA_PI_na; only PI and PFA children are marked. A room is a
+// "program room" when its own Type is PI or PFA. Green = belongs, red = does not.
+function childProgram(s) {
+    const p = String(s.PFA_PI_na || '').trim().toUpperCase();
+    return (p === 'PI' || p === 'PFA') ? p : '';
+}
+function isProgramRoom(cr) {
+    const t = String((cr && cr.Type) || '').trim().toUpperCase();
+    return t === 'PI' || t === 'PFA';
+}
+// The small PI/PFA pill beside a child's name ('' for anyone who is neither).
+function progTagHtml(s, cr, tagId) {
+    const prog = childProgram(s);
+    if (!prog) return tagId ? `<span id="${tagId}"></span>` : '';
+    const ok = isProgramRoom(cr);
+    const why = ok ? `${prog} child in a PI or PFA room`
+                   : `${prog} child in a room that is not a PI or PFA room`;
+    return `<span${tagId ? ` id="${tagId}"` : ''} class="rr-prog ${ok ? 'ok' : 'bad'}" title="${why}" aria-label="${why}">${prog}</span>`;
+}
+
 // ── SIDEBAR ──
-function buildRoster() {
+// Under each room name: how many ACTIVE PI/PFA children are in it, green when the room is
+// a PI/PFA room and red when it is not. The label names what the children are ("3 PI",
+// "3 PFA", or "3 PI/PFA" for a mix), exactly as the attendance sidebar does. Rooms with
+// no PI/PFA children show nothing.
+function roomProgramCount(rn) {
+    const kids = students.filter(s => String(s.RoomNumber) === String(rn) && isTruthy(s.Active) && childProgram(s));
+    if (!kids.length) return '';
+    const progs = new Set(kids.map(childProgram));
+    const label = progs.size === 1 ? [...progs][0] : 'PI/PFA';
+    const ok = isProgramRoom(getClassroom(rn));
+    const why = ok ? `${kids.length} ${label} in a PI or PFA room`
+                   : `${kids.length} ${label} in a room that is not a PI or PFA room`;
+    return `<div class="rr-cnt ${ok ? 'ok' : 'bad'}" title="${why}" aria-label="${why}">${kids.length} ${label}</div>`;
+}
+
+function renderRosterSidebar() {
     const sidebar = document.getElementById('rosterSidebar');
     const rooms = classrooms.map(r => r.RoomNumber);
     if (!activeRosterRoomNum && rooms.length) activeRosterRoomNum = rooms[0];
@@ -133,8 +180,13 @@ function buildRoster() {
         const isActive = String(activeRosterRoomNum) === String(rn);
         return `<button class="${isActive ? 'active' : ''}" onclick="selectRosterRoom('${rn}')">
             <div>${cr ? cr.Room : rn}</div>
+            ${roomProgramCount(rn)}
         </button>`;
     }).join('');
+}
+
+function buildRoster() {
+    renderRosterSidebar();
     renderRosterRoom();
 }
 
@@ -186,7 +238,7 @@ function renderRosterRoom() {
                     return `<tr>
                         <td>${dd('rosterRoom' + i, roomOpts)}</td>
                         <td class="student">
-                            <div class="rr-name">${s.Last_Name}, ${s.First_Name}</div>
+                            <div class="rr-name">${s.Last_Name}, ${s.First_Name}${progTagHtml(s, cr, 'rosterTag' + i)}</div>
                             <div class="rr-age">${ageInMonthsDays(s.Birth_date)}</div>
                         </td>
                         ${dayChecks}
@@ -301,6 +353,12 @@ async function saveRosterRow(i) {
                 PFA_PI_na: newPfaPiNa, Active: newActive, F_R_P_Food: frpFood,
             });
             btn.style.opacity = '0.4';
+            // Refresh ONLY the room counts and this child's tag. Redrawing the table would
+            // throw away unsaved edits on the other rows, and a moved child's row stays
+            // put until the next load, as it always has.
+            renderRosterSidebar();
+            const tag = document.getElementById(`rosterTag${i}`);
+            if (tag) tag.outerHTML = progTagHtml(s, getClassroom(newRoom), `rosterTag${i}`);
             showNotification(`${s.First_Name} ${s.Last_Name} updated`, 'success');
         } else {
             showNotification('Update failed: ' + (data.error || ''), 'error');
