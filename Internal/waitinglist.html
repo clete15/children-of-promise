@@ -441,11 +441,26 @@ async function load() {
             apiFetch('/api/waitinglist'),
             loadGuidelines(),
         ]);
-        allRows = await wlRes.json();
+        // Check the status before parsing: a 401 is the plain word "Unauthorized", and a 500
+        // carries the real reason. Either used to surface only as "Failed to load".
+        if (wlRes.status === 401) throw new Error('Your session has expired or you are not signed in as a centre admin. Sign in again at /me.');
+        const body = await wlRes.json().catch(() => null);
+        if (!wlRes.ok) throw new Error((body && body.error) || ('HTTP ' + wlRes.status));
+        if (!Array.isArray(body)) throw new Error('Unexpected reply from the server.');
+        allRows = body;
         updateTabCounts();
         renderTable();
     } catch (e) {
-        document.getElementById('wlBody').innerHTML = `<tr><td colspan="10" class="wl-empty">Failed to load waiting list.</td></tr>`;
+        console.error('[WAITING LIST] load failed:', e);
+        const cell = document.createElement('td');
+        cell.colSpan = 10;
+        cell.className = 'wl-empty';
+        cell.textContent = 'Failed to load waiting list: ' + (e.message || e) + ' (this is a read problem; nothing has been deleted).';
+        const tr = document.createElement('tr');
+        tr.appendChild(cell);
+        const tb = document.getElementById('wlBody');
+        tb.innerHTML = '';
+        tb.appendChild(tr);
     }
 }
 
