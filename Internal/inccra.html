@@ -100,7 +100,7 @@
                     <div class="link-card" onclick="exportInccraRoster()">
                         <div class="card-icon">📋</div>
                         <h3>Classroom Roster Report</h3>
-                        <p>Export an Excel roster of active INCCRA children (excludes school-age and summer program), plus inactive and waiting-list children 36 months and under. A Status column tells them apart. Shows initials only.</p>
+                        <p>Export an Excel roster of active INCCRA children (excludes school-age and summer program), plus inactive and waiting-list children 36 months and under, leaving out anyone under 6 weeks. Each child is placed in the INCCRA room their age fits, and a Status column tells them apart. Shows initials only.</p>
                         <span class="badge badge-export">📥 Export Excel</span>
                     </div>
 
@@ -159,15 +159,37 @@ async function exportInccraRoster() {
     try {
         /* Both lists are needed. A failed read of either stops the export with the reason,
            rather than quietly producing a roster with a whole group missing. */
-        const [sRes, wRes] = await Promise.all([apiFetch('/api/students'), apiFetch('/api/waitinglist')]);
-        if (sRes.status === 401 || wRes.status === 401) {
+        const [sRes, wRes, cRes] = await Promise.all([
+            apiFetch('/api/students'), apiFetch('/api/waitinglist'), apiFetch('/api/classrooms')]);
+        if (sRes.status === 401 || wRes.status === 401 || cRes.status === 401) {
             throw new Error('your session has expired, or the waiting list needs a centre-admin sign-in. Sign in again at /me.');
         }
         if (!sRes.ok) throw new Error('could not read enrolled children (HTTP ' + sRes.status + ')');
         if (!wRes.ok) throw new Error('could not read the waiting list (HTTP ' + wRes.status + ')');
+        if (!cRes.ok) throw new Error('could not read the classrooms (HTTP ' + cRes.status + ')');
         const students = await sRes.json();
         const waitlist = await wRes.json();
-        if (!Array.isArray(students) || !Array.isArray(waitlist)) throw new Error('unexpected reply from the server');
+        const classrooms = await cRes.json();
+        if (!Array.isArray(students) || !Array.isArray(waitlist) || !Array.isArray(classrooms)) {
+            throw new Error('unexpected reply from the server');
+        }
+
+        /* The INCCRA rooms and their age ranges in MONTHS, read from each room's Age Range
+           on Classrooms & Staffing ("0 - 12 Months", "24 - 48 Months", "3 to 5 yrs"). Kept in
+           the server's youngest-first order, so when two ranges overlap a child goes to the
+           YOUNGER room. A room whose range cannot be read is left out, not guessed. */
+        const toMonths = txt => {
+            const t = String(txt || '').toLowerCase();
+            const nums = (t.match(/\d+(\.\d+)?/g) || []).map(Number);
+            if (nums.length < 2) return null;
+            const k = /yr|year/.test(t) ? 12 : 1;
+            return { lo: nums[0] * k, hi: nums[1] * k };
+        };
+        const inccraRooms = classrooms
+            .filter(c => String(c.Type || '').trim().toUpperCase() === 'INCCRA' && !isSchoolAgeOrSummer(c.Room))
+            .map(c => ({ name: c.Room, range: toMonths(c.AgeRange) }))
+            .filter(c => c.range);
+        if (!inccraRooms.length) throw new Error('no INCCRA room has a readable Age Range on Classrooms & Staffing');
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -196,14 +218,31 @@ async function exportInccraRoster() {
             return { daysOld, ageYears: daysOld === '' ? '' : (daysOld / 365.25).toFixed(1) };
         };
 
+        // Whole months of age completed today (a 12-month-old stays 12 until 13 months).
+        const monthsOld = bd => {
+            let m = (today.getFullYear() - bd.getFullYear()) * 12 + (today.getMonth() - bd.getMonth());
+            if (today.getDate() < bd.getDate()) m--;
+            return m;
+        };
+        // The INCCRA room a child of this age fits into, or a plain note when none does.
+        const inccraRoomFor = bd => {
+            if (!bd) return 'No birth date on file';
+            const m = monthsOld(bd);
+            const fit = inccraRooms.find(r => m >= r.range.lo && m <= r.range.hi);
+            return fit ? fit.name : 'No INCCRA room for ' + m + ' months';
+        };
+        const SIX_WEEKS_DAYS = 42;
+
         const rows = [];
         let skippedNoBirth = 0;
+        let skippedUnderSixWeeks = 0;
 
         // 1. Active INCCRA children, as before (any age; school-age and summer rooms excluded).
         students.filter(s => isTruthy(s.Active) && s.PFA_PI_na === 'INCCRA' && !isSchoolAgeOrSummer(s.Room))
             .forEach(s => {
-                const a = ageOf(parseBirth(s.Birth_date), s.Days_Old);
-                rows.push({ Room: s.Room || '', LastInitial: initial(s.Last_Name), FirstInitial: initial(s.First_Name),
+                const bd = parseBirth(s.Birth_date);
+                const a = ageOf(bd, s.Days_Old);
+                rows.push({ Room: inccraRoomFor(bd), LastInitial: initial(s.Last_Name), FirstInitial: initial(s.First_Name),
                     AgeInYears: a.ageYears, DaysOld: a.daysOld, Status: 'Active' });
             });
 
@@ -213,14 +252,12 @@ async function exportInccraRoster() {
             if (!bd) { skippedNoBirth++; return; }
             if (!thirtySixOrUnder(bd)) return;
             const a = ageOf(bd);
-            rows.push({ Room: s.Room || '', LastInitial: initial(s.Last_Name), FirstInitial: initial(s.First_Name),
+            rows.push({ Room: inccraRoomFor(bd), LastInitial: initial(s.Last_Name), FirstInitial: initial(s.First_Name),
                 AgeInYears: a.ageYears, DaysOld: a.daysOld, Status: 'Inactive' });
         });
 
         // 3. Waiting-list children 36 months and under today. Enrolled entries are already
         //    counted above as children, and Declined families are no longer waiting.
-        const AGE_GROUP = { '0-2': 'Waiting list: Infant / Toddler', '2-3': 'Waiting list: 2 Year Olds',
-            '3-5': 'Waiting list: Pre-School', 'ba': 'Waiting list: Before & After' };
         waitlist.filter(w => !/^(enrolled|declined)$/i.test(String(w.WaitlistStatus || '').trim()))
             .forEach(w => {
                 const bd = parseBirth(w.ChildBirthDate);
@@ -229,11 +266,17 @@ async function exportInccraRoster() {
                 // ChildName is the child's full name: first word is the first name, last word the last.
                 const parts = String(w.ChildName || '').trim().split(/\s+/).filter(Boolean);
                 const a = ageOf(bd);
-                rows.push({ Room: AGE_GROUP[String(w.AgeGroup || '').trim()] || 'Waiting list',
+                rows.push({ Room: inccraRoomFor(bd),
                     LastInitial: initial(parts.length > 1 ? parts[parts.length - 1] : (w.LastName || '')),
                     FirstInitial: initial(parts[0] || ''),
                     AgeInYears: a.ageYears, DaysOld: a.daysOld, Status: 'Waiting List' });
             });
+
+        // Anyone under 6 weeks old today is left off (all three groups).
+        for (let i = rows.length - 1; i >= 0; i--) {
+            const d = rows[i].DaysOld;
+            if (d !== '' && d != null && d < SIX_WEEKS_DAYS) { rows.splice(i, 1); skippedUnderSixWeeks++; }
+        }
 
         if (!rows.length) {
             status.className = 'export-status error';
@@ -299,7 +342,9 @@ async function exportInccraRoster() {
         const n = st => rows.filter(r => r.Status === st).length;
         status.className = 'export-status success';
         status.textContent = `✓ Exported ${rows.length} children: ${n('Active')} active, ${n('Inactive')} inactive, ${n('Waiting List')} waiting list`
-            + (skippedNoBirth ? ` (${skippedNoBirth} inactive/waiting-list left out: no birth date on file)` : '');
+            + (skippedUnderSixWeeks ? `. ${skippedUnderSixWeeks} under 6 weeks old left out` : '')
+            + (skippedNoBirth ? `. ${skippedNoBirth} inactive/waiting-list left out: no birth date on file` : '')
+            + (rows.some(r => /^No INCCRA room/.test(r.Room)) ? '. Some ages fit no INCCRA room (see the Room column)' : '');
         setTimeout(() => { status.style.display = 'none'; }, 10000);   // long enough to read the counts
 
     } catch (e) {
