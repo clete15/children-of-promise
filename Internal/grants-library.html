@@ -36,6 +36,21 @@
         .gl-crumb.here:hover { text-decoration:none; }
         .gl-sep { color:var(--sp-quiet);font-size:0.72rem; }
 
+        /* Upload / New folder toolbar, shown in every folder */
+        .gl-tools { display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 20px;border-bottom:1px solid var(--sp-border); }
+        .gl-tools[hidden] { display:none; }
+        .gl-tool {
+            padding:7px 14px;border:1.5px solid var(--sp-border);border-radius:6px;background:var(--sp-surface);
+            color:var(--sp-text-2);font-size:0.8rem;font-weight:700;cursor:pointer;white-space:nowrap;
+        }
+        .gl-tool:hover:not(:disabled) { border-color:var(--sp-accent);color:var(--sp-accent); }
+        .gl-tool.primary { background:var(--sp-accent);border-color:var(--sp-accent);color:#fff; }
+        .gl-tool.primary:hover:not(:disabled) { color:#fff;filter:brightness(1.1); }
+        .gl-tool:disabled { opacity:0.5;cursor:default; }
+        .gl-tool:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
+        .gl-toolnote { font-size:0.72rem;color:var(--sp-muted); }
+        .gl-toolnote.err { color:#dc2626;font-weight:700; }
+
         .gl-body { padding:8px 0 12px; }
         .gl-row {
             display:flex;align-items:center;gap:12px;padding:10px 20px;
@@ -86,6 +101,13 @@
                 <button type="button" class="gl-up" id="glUp" disabled>↑ Up</button>
                 <div class="gl-crumbs" id="glCrumbs"></div>
                 <a class="gl-ext" href="https://registry.ilgateways.com/login" target="_blank" rel="noopener noreferrer">Illinois Gateways Registry ↗</a>
+            </div>
+            <div class="gl-tools" id="glTools" hidden>
+                <button type="button" class="gl-tool primary" id="glUploadBtn">⬆ Upload files</button>
+                <button type="button" class="gl-tool" id="glNewFolderBtn">＋ New folder</button>
+                <input type="file" id="glFileInput" multiple hidden
+                       accept=".pdf,.png,.jpg,.jpeg,.docx,.xlsx,.doc,.xls,.txt,.csv">
+                <span class="gl-toolnote" id="glToolNote">Adds to the folder you are in. Existing files are never replaced.</span>
             </div>
             <div class="gl-body" id="glBody">
                 <div class="gl-empty">Reading the grant folder…</div>
@@ -223,6 +245,7 @@ function render(data) {
 
     if (!data || !data.ok) {
         document.getElementById('glCrumbs').innerHTML = '';
+        document.getElementById('glTools').hidden = true;
         up.disabled = true;
         const why = (data && data.error) ? esc(data.error) : 'The grant folder could not be read.';
         body.innerHTML = '<div class="gl-empty">' + why
@@ -231,6 +254,7 @@ function render(data) {
         return;
     }
 
+    document.getElementById('glTools').hidden = false;
     crumbRow(data.crumbs || [{ name: data.folder, sub: '' }]);
     const atRoot = !data.here;
     up.disabled = atRoot;
@@ -286,6 +310,97 @@ async function load() {
         msg.textContent = '';
     }
 }
+
+/* ── Upload files / New folder ─────────────────────────────────────────────
+   Both act on the folder currently shown (the URL hash). They are centre-admin
+   actions on the server; a signed-in teacher who tries gets a plain refusal rather
+   than a silent failure. The server never overwrites: a name already taken comes
+   back with a dated suffix, and we say so. */
+function toolNote(text, isErr) {
+    const n = document.getElementById('glToolNote');
+    n.textContent = text;
+    n.className = 'gl-toolnote' + (isErr ? ' err' : '');
+}
+const TOOL_DEFAULT_NOTE = 'Adds to the folder you are in. Existing files are never replaced.';
+
+function setToolsBusy(busy) {
+    ['glUploadBtn', 'glNewFolderBtn'].forEach(id => { document.getElementById(id).disabled = busy; });
+}
+
+function authHeaders() {
+    return (window.CofpAuth && CofpAuth.headers) ? CofpAuth.headers() : {};
+}
+
+async function readErr(res) {
+    if (res.status === 401) return 'Only a centre admin can change the grant library. Sign in again if your session expired.';
+    try { const j = await res.json(); if (j && j.error) return j.error; } catch (e) { /* not JSON */ }
+    return 'HTTP ' + res.status;
+}
+
+async function uploadFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    const sub = currentSub();
+    setToolsBusy(true);
+    const done = [], renamed = [], failed = [];
+    for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        toolNote('Uploading ' + (i + 1) + ' of ' + files.length + ': ' + f.name + '…');
+        try {
+            const fd = new FormData();
+            fd.append('file', f, f.name);   // FormData sets its own multipart boundary
+            const res = await fetch('/api/grant-upload?path=' + encodeURIComponent(sub),
+                { method: 'POST', headers: authHeaders(), body: fd });
+            if (!res.ok) { failed.push(f.name + ' — ' + await readErr(res)); continue; }
+            const d = await res.json();
+            done.push(d.name);
+            if (d.renamed) renamed.push(f.name + ' → ' + d.name);
+        } catch (e) {
+            failed.push(f.name + ' — ' + (e.message || 'upload failed'));
+        }
+    }
+    document.getElementById('glFileInput').value = '';
+    setToolsBusy(false);
+    await load();
+    if (failed.length) {
+        toolNote((done.length ? done.length + ' uploaded. ' : '') + 'Not uploaded: ' + failed.join('; '), true);
+    } else if (renamed.length) {
+        toolNote(done.length + ' uploaded. A file with that name already existed, so the new one was saved as: '
+            + renamed.join('; '));
+    } else {
+        toolNote(done.length + (done.length === 1 ? ' file uploaded.' : ' files uploaded.'));
+    }
+}
+
+async function newFolder() {
+    const name = (window.prompt('Name for the new folder (it will be created inside the folder you are viewing):') || '').trim();
+    if (!name) return;
+    setToolsBusy(true);
+    try {
+        const res = await fetch('/api/grant-mkdir', {
+            method: 'POST',
+            headers: Object.assign({ 'Content-Type': 'application/json' }, authHeaders()),
+            body: JSON.stringify({ path: currentSub(), name })
+        });
+        if (!res.ok) { toolNote(await readErr(res), true); return; }
+        const d = await res.json();
+        toolNote('Created "' + d.name + '".');
+        await load();
+    } catch (e) {
+        toolNote('Could not create the folder: ' + (e.message || e), true);
+    } finally {
+        setToolsBusy(false);
+    }
+}
+
+document.getElementById('glUploadBtn').addEventListener('click', () => {
+    toolNote(TOOL_DEFAULT_NOTE);
+    document.getElementById('glFileInput').click();
+});
+document.getElementById('glFileInput').addEventListener('change', e => uploadFiles(e.target.files));
+document.getElementById('glNewFolderBtn').addEventListener('click', newFolder);
+// Moving to another folder clears any leftover result message from the last one.
+window.addEventListener('hashchange', () => toolNote(TOOL_DEFAULT_NOTE));
 
 window.addEventListener('hashchange', load);
 

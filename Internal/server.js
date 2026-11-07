@@ -8876,6 +8876,134 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
         return sendJSON(res, 200, browseGrantFolder(sub));
     }
 
+    /* Adds a file to a folder INSIDE the grant folder. ?path= is the sub-path, confined
+       by resolveGrantPath so nothing can be written outside INCCRA - SSWG.
+
+       Same tier and same rules as /api/doc-upload (centre admin; allowed types; 40 MB;
+       NEVER overwrites — a taken name gets a dated suffix and both files survive). Grant
+       paperwork is submitted evidence, so a mistaken upload is undone by deleting the new
+       copy, not by recovering one that was replaced. One file per request; the page
+       sends several as several requests. */
+    if (req.method === 'POST' && url.startsWith('/api/grant-upload')) {
+        if (!checkAuth(req, res)) return;
+        const sub = new URLSearchParams(req.url.split('?')[1] || '').get('path') || '';
+        const r = resolveGrantPath(sub);
+        if (r.error || !fs.existsSync(r.full) || !fs.statSync(r.full).isDirectory()) {
+            return sendJSON(res, 400, { error: 'That folder is not in the grant library' });
+        }
+        const folder = r.full;
+
+        const MAX = 40 * 1024 * 1024;
+        let body = [], size = 0, aborted = false;
+        req.on('data', chunk => {
+            if (aborted) return;
+            size += chunk.length;
+            if (size > MAX) {
+                aborted = true;
+                sendJSON(res, 413, { error: 'File is larger than 40 MB' });
+                req.destroy();
+                return;
+            }
+            body.push(chunk);
+        });
+        req.on('end', () => {
+            if (aborted) return;
+            const ct = req.headers['content-type'] || '';
+            const boundary = ct.split('boundary=')[1];
+            if (!boundary) return sendJSON(res, 400, { error: 'Not a file upload' });
+
+            const parts = Buffer.concat(body).toString('binary').split('--' + boundary);
+            for (const part of parts) {
+                if (!part.includes('filename=')) continue;
+                const m = part.match(/filename="([^"]*)"/);
+                if (!m || !m[1]) continue;
+
+                let safe = path.basename(m[1].replace(/\0/g, ''))
+                    .replace(/[\\/:*?"<>|]/g, '_')
+                    .replace(/^\.+/, '')
+                    .trim();
+                if (!safe) safe = 'upload';
+
+                const ext = path.extname(safe).toLowerCase();
+                const ALLOWED = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.xlsx', '.doc', '.xls', '.txt', '.csv'];
+                if (!ALLOWED.includes(ext)) {
+                    return sendJSON(res, 400, { error: 'That file type is not accepted (' + (ext || 'no extension') + ')' });
+                }
+
+                const headerEnd = part.indexOf('\r\n\r\n');
+                if (headerEnd < 0) continue;
+                const data = Buffer.from(part.slice(headerEnd + 4, part.lastIndexOf('\r\n')), 'binary');
+                if (!data.length) return sendJSON(res, 400, { error: 'That file was empty' });
+
+                let target = path.join(folder, safe);
+                if (fs.existsSync(target)) {
+                    const stem = path.basename(safe, ext);
+                    const stamp = new Date().toISOString().slice(0, 10);
+                    let n = 1;
+                    do {
+                        target = path.join(folder, stem + ' (' + stamp + (n > 1 ? ' ' + n : '') + ')' + ext);
+                        n++;
+                    } while (fs.existsSync(target) && n < 50);
+                    if (fs.existsSync(target)) return sendJSON(res, 409, { error: 'Too many copies of that name already exist' });
+                }
+
+                try {
+                    fs.writeFileSync(target, data);
+                } catch (e) {
+                    console.error('[GRANT UPLOAD]', e.message);
+                    return sendJSON(res, 500, { error: 'Could not save the file' });
+                }
+                invalidateDocCache();
+                console.log('[GRANT UPLOAD] ' + data.length + ' bytes -> ' + path.relative(r.base, target).replace(/\\/g, '/'));
+                return sendJSON(res, 200, {
+                    success: true, name: path.basename(target), bytes: data.length,
+                    renamed: path.basename(target) !== safe
+                });
+            }
+            sendJSON(res, 400, { error: 'No file found in the upload' });
+        });
+        return;
+    }
+
+    /* Creates a sub-folder inside the grant folder (e.g. the next submission round).
+       Body: { path: <parent sub-path>, name: <new folder name> }. The name is VALIDATED,
+       not silently rewritten — a folder called "Round 3 / Draft" should be refused, not
+       quietly become something else. Existing folders are never touched (409). */
+    if (req.method === 'POST' && url === '/api/grant-mkdir') {
+        if (!checkAuth(req, res)) return;
+        return readBody(req, (err, d) => {
+            if (err || !d) return sendJSON(res, 400, { error: 'Bad request' });
+            const name = String(d.name == null ? '' : d.name).trim();
+            if (!name) return sendJSON(res, 400, { error: 'Give the folder a name' });
+            if (name.length > 120) return sendJSON(res, 400, { error: 'That name is too long (120 characters max)' });
+            if (/[\\/:*?"<>|\0]/.test(name) || /^\.+$/.test(name) || /[. ]$/.test(name)) {
+                return sendJSON(res, 400, { error: 'A folder name cannot contain  \\ / : * ? " < > |  or end in a dot or space' });
+            }
+            if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(\..*)?$/i.test(name)) {
+                return sendJSON(res, 400, { error: 'Windows does not allow that folder name' });
+            }
+            const parent = resolveGrantPath(d.path || '');
+            if (parent.error || !fs.existsSync(parent.full) || !fs.statSync(parent.full).isDirectory()) {
+                return sendJSON(res, 400, { error: 'The parent folder is not in the grant library' });
+            }
+            const target = path.join(parent.full, name);
+            // Re-check containment on the final path, not just the parent.
+            const chk = resolveGrantPath(path.relative(parent.base, target));
+            if (chk.error) return sendJSON(res, 400, { error: 'Invalid folder name' });
+            if (fs.existsSync(target)) return sendJSON(res, 409, { error: 'A folder or file named "' + name + '" already exists here' });
+            try {
+                fs.mkdirSync(target);   // not recursive: the parent must already exist
+            } catch (e) {
+                console.error('[GRANT MKDIR]', e.message);
+                return sendJSON(res, 500, { error: 'Could not create the folder' });
+            }
+            invalidateDocCache();
+            const sub = path.relative(parent.base, target).replace(/\\/g, '/');
+            console.log('[GRANT MKDIR] ' + sub);
+            sendJSON(res, 200, { success: true, name, sub });
+        });
+    }
+
     /* Is Office editing available, and can this file be edited?
        The page asks before offering an Edit button, so a server without
        OnlyOffice simply never shows one. */
