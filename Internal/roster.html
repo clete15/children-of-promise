@@ -351,11 +351,11 @@ function roomProgramCount(rn) {
     return `<div class="rr-cnt ${ok ? 'ok' : 'bad'}" title="${why}" aria-label="${why}">${kids.length} ${label}</div>`;
 }
 
-/* Room order on this page: INCCRA rooms first, then PI, then PFA, then anything else
-   (Before and Afterschool), each group youngest to oldest. /api/classrooms already returns
-   the rooms youngest-first (the server's age ladder), and a stable sort keeps that order
-   inside each group. Grouped by the room's program TYPE, not its name. */
-const ROSTER_PROGRAM_ORDER = { INCCRA: 0, PI: 1, PFA: 2 };
+/* Room order on this page: PI rooms first, then INCCRA, then PFA (Pre-School), then
+   anything else (Before and Afterschool), each group youngest to oldest. /api/classrooms
+   already returns the rooms youngest-first (the server's age ladder), and a stable sort
+   keeps that order inside each group. Grouped by the room's program TYPE, not its name. */
+const ROSTER_PROGRAM_ORDER = { PI: 0, INCCRA: 1, PFA: 2 };
 function rosterRooms() {
     const grp = r => {
         const t = String(r.Type || '').trim().toUpperCase();
