@@ -31,7 +31,7 @@ node server.js
 
 REM Exit code 1 is a deliberate refusal (bad config). Restarting cannot fix it,
 REM so stop and leave the message on screen instead of scrolling it away.
-if errorlevel 1 goto :refused
+if "%errorlevel%"=="1" goto :refused
 
 echo [%date% %time%] Server stopped unexpectedly. Restarting in 5 seconds...
 timeout /t 5 /nobreak >nul
