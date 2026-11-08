@@ -34,7 +34,12 @@
         '* Where do we buy our plates, napkins, plastic silver ware ? If amazon, can you put on single receipts with just those items. Once you, do record in this sheet.',
         '* Sara do receipts and amazon non food cost (Plates, napkins, plasticware)',
     ];
-    const DEFAULT_OVERHEAD = ['Overhead Costs - Monroe', 'Overhead Costs - WM', 'Overhead Costs - Mortgage', 'Overhead Costs'];
+    /* The overhead COST lines. The old workbook's 5th line ("Overhead Costs") was the food
+       program's share, typed in by hand; it is now calculated (OH_ALLOC_PCT of these lines),
+       so it is not a line anyone enters and it is never added into the cost total. */
+    const DEFAULT_OVERHEAD = ['Monroe County Electric', 'Aspen Waste', 'Shellpoint Mortgage'];
+    const OH_ALLOC_PCT = 17.75;   // share of overhead allocated to the Food Program (Nov 2026)
+    const round2 = n => Math.round(n * 100) / 100;
     const DEFAULT_OPERATIONAL = ['Sue', 'Tara', 'Raquel', 'Megan', 'Paige', 'Keyona', 'Janell', 'Lindsey', 'Renee', 'Jeremy', 'Sara Holliday- Operational'];
     const DEFAULT_ADMIN = ['Sara Holliday-Admin', 'Megan-Admin'];
 
@@ -80,7 +85,7 @@
     function blank(book) {
         if (book === 'revenue') return { years: [String(currentFy())], cells: {}, highlights: {}, note: '' };
         if (book === 'foodcosts') return { notes: DEFAULT_FOOD_NOTES.slice(), rows: [] };
-        if (book === 'overhead') return { rows: DEFAULT_OVERHEAD.map(l => ({ label: l, cells: {} })) };
+        if (book === 'overhead') return { rows: DEFAULT_OVERHEAD.map(l => ({ label: l, cells: {} })), allocPct: OH_ALLOC_PCT };
         return {
             operational: DEFAULT_OPERATIONAL.map(n => ({ name: n, cells: {} })),
             admin: DEFAULT_ADMIN.map(n => ({ name: n, cells: {} })),
@@ -94,7 +99,9 @@
         if (res.status === 401) throw Object.assign(new Error('This sheet needs a centre-admin sign-in.'), { auth: true });
         const d = await res.json().catch(() => ({}));
         if (!res.ok || !d.ok) throw new Error(d.error || ('HTTP ' + res.status));
-        MR.docs[k] = { book, fy, data: d.data || blank(book), version: d.version || 0,
+        const data = d.data || blank(book);
+        if (book === 'overhead') upgradeOverhead(data);
+        MR.docs[k] = { book, fy, data, version: d.version || 0,
             updatedAt: d.updatedAt || '', updatedBy: d.updatedBy || '', dirty: false, isNew: !d.data };
         return MR.docs[k];
     }
@@ -371,12 +378,32 @@
         },
     };
 
+    /* A sheet saved before the allocation was calculated may still carry the hand-typed 5th
+       line ("Overhead Costs"). If it is empty it is dropped, since the page now calculates
+       it; if it holds figures it is kept for the user to review and remove, never deleted
+       silently. */
+    function upgradeOverhead(d) {
+        if (d.allocPct == null) d.allocPct = OH_ALLOC_PCT;
+        d.rows = (d.rows || []).filter(r => {
+            const isOldAlloc = String(r.label || '').trim() === 'Overhead Costs';
+            const empty = !Object.values(r.cells || {}).some(v => String(v || '').trim());
+            return !(isOldAlloc && empty);
+        });
+    }
+    // Overhead for one month: the cost lines, and the food program's share (to the cent).
+    const ohMonthCost = (d, m) => d.rows.reduce((s, r) => s + num((r.cells || {})[m]), 0);
+    const ohMonthAlloc = (d, m) => round2(ohMonthCost(d, m) * (Number(d.allocPct) || OH_ALLOC_PCT) / 100);
+    // The year's allocation is the sum of the rounded months, so the row adds up across.
+    const ohYearAlloc = d => round2(OH_MONTHS.reduce((s, m) => s + ohMonthAlloc(d, m), 0));
+    const pctLabel = d => (Number(d.allocPct) || OH_ALLOC_PCT) + '%';
+
     // ── Overhead Costs: lines down, Oct..Sep across, total column; colour scale like the sheet ──
     const overhead = {
         html(d) {
             let h = '<div class="mr-sheet-head"><h3>Overhead Costs, ' + fyLabel(MR.fy) + '</h3><div class="mr-tools">'
                 + '<button type="button" class="fp-btn" data-act="addRow">+ Add line</button></div></div>'
-                + '<p class="mr-hint">Oct ' + MR.fy + ' to Sep ' + (MR.fy + 1) + '. Lines that change month to month are shaded low (green) to high (red).</p>'
+                + '<p class="mr-hint">Oct ' + MR.fy + ' to Sep ' + (MR.fy + 1) + '. Enter each bill; the Food Program share ('
+                + pctLabel(d) + ' of the total) is calculated for you. Lines that change month to month are shaded low (green) to high (red).</p>'
                 + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide"><thead><tr><th scope="col">Line</th>'
                 + OH_MONTHS.map(m => '<th scope="col" class="right">' + SHORT[m] + '</th>').join('') + '<th scope="col" class="right">Total</th><th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
             d.rows.forEach((r, i) => {
@@ -385,15 +412,19 @@
                     + '<td class="right mr-strong" data-total="r' + i + '"></td>'
                     + '<td class="center"><button type="button" class="mr-x" data-act="delRow" data-arg="' + i + '" aria-label="Remove line ' + (i + 1) + '">✕</button></td></tr>';
             });
-            h += '<tr class="mr-total"><th scope="row">Total</th>' + OH_MONTHS.map(m => '<td class="right" data-total="m' + m + '"></td>').join('')
-                + '<td class="right" data-total="all"></td><td></td></tr></tbody></table></div>';
+            h += '<tr class="mr-total"><th scope="row">Total overhead</th>' + OH_MONTHS.map(m => '<td class="right" data-total="m' + m + '"></td>').join('')
+                + '<td class="right" data-total="all"></td><td></td></tr>'
+                + '<tr class="mr-total mr-alloc"><th scope="row">Food Program share (' + pctLabel(d) + ')</th>'
+                + OH_MONTHS.map(m => '<td class="right" data-total="a' + m + '"></td>').join('')
+                + '<td class="right" data-total="aall"></td><td></td></tr></tbody></table></div>';
             return h;
         },
         totals(d) {
             const t = {};
             d.rows.forEach((r, i) => { t['r' + i] = fmt(OH_MONTHS.reduce((s, m) => s + num((r.cells || {})[m]), 0)); });
-            OH_MONTHS.forEach(m => { t['m' + m] = fmt(d.rows.reduce((s, r) => s + num((r.cells || {})[m]), 0)); });
-            t.all = fmt(d.rows.reduce((s, r) => s + OH_MONTHS.reduce((a, m) => a + num((r.cells || {})[m]), 0), 0));
+            OH_MONTHS.forEach(m => { t['m' + m] = fmt(ohMonthCost(d, m)); t['a' + m] = fmt(ohMonthAlloc(d, m)); });
+            t.all = fmt(OH_MONTHS.reduce((s, m) => s + ohMonthCost(d, m), 0));
+            t.aall = fmt(ohYearAlloc(d));
             t.__scale = box => {
                 d.rows.forEach((r, i) => {
                     const cells = box.querySelectorAll('input[data-scale="' + i + '"]');
@@ -473,6 +504,7 @@
             ['Food Check', m => revMonth(m)],
             ['Amount Paid', m => fcMonth(m, 'amountPaid')], ['Food Cost', m => fcMonth(m, 'foodCost')],
             ['Non-Food', m => fcMonth(m, 'nonFood')], ['Milk (gal)', m => fcMonth(m, 'milk')],
+            ['Overhead share', m => (oh ? ohMonthAlloc(oh, m) : NaN)],
             ['Personnel: Operational', m => peMonth('operational', m)], ['Personnel: Admin', m => peMonth('admin', m)],
         ];
         // A sheet that could not be read shows "?" rather than a confident 0.
@@ -495,8 +527,11 @@
                 h += '<tr><th scope="row">' + esc(r.label) + '</th>' + OH_MONTHS.map(m => '<td class="right">' + fmt(num((r.cells || {})[m])) + '</td>').join('')
                     + '<td class="right mr-strong">' + fmt(OH_MONTHS.reduce((s, m) => s + num((r.cells || {})[m]), 0)) + '</td></tr>';
             });
-            h += '<tr class="mr-total"><th scope="row">Total</th>' + OH_MONTHS.map(m => '<td class="right">' + fmt(oh.rows.reduce((s, r) => s + num((r.cells || {})[m]), 0)) + '</td>').join('')
-                + '<td class="right">' + fmt(oh.rows.reduce((s, r) => s + OH_MONTHS.reduce((a, m) => a + num((r.cells || {})[m]), 0), 0)) + '</td></tr></tbody></table></div>';
+            h += '<tr class="mr-total"><th scope="row">Total overhead</th>' + OH_MONTHS.map(m => '<td class="right">' + fmt(ohMonthCost(oh, m)) + '</td>').join('')
+                + '<td class="right">' + fmt(OH_MONTHS.reduce((s, m) => s + ohMonthCost(oh, m), 0)) + '</td></tr>'
+                + '<tr class="mr-total mr-alloc"><th scope="row">Food Program share (' + pctLabel(oh) + ')</th>'
+                + OH_MONTHS.map(m => '<td class="right">' + fmt(ohMonthAlloc(oh, m)) + '</td>').join('')
+                + '<td class="right">' + fmt(ohYearAlloc(oh)) + '</td></tr></tbody></table></div>';
         }
         box.innerHTML = h;
         box.querySelector('#mrPrint').addEventListener('click', () => printSummary(box, fy));
