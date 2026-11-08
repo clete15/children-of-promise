@@ -29,11 +29,6 @@
     const SHORT = { 10: 'Oct', 11: 'Nov', 12: 'Dec', 1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Aug', 9: 'Sep' };
     const PER_LABEL = Object.assign({}, SHORT, { 7: 'July' });
 
-    const DEFAULT_FOOD_NOTES = [
-        "* Put Gallons of Milk first when you order from Instacart so it's easy to find them then enter here.",
-        '* Where do we buy our plates, napkins, plastic silver ware ? If amazon, can you put on single receipts with just those items. Once you, do record in this sheet.',
-        '* Sara do receipts and amazon non food cost (Plates, napkins, plasticware)',
-    ];
     /* The overhead COST lines. The old workbook's 5th line ("Overhead Costs") was the food
        program's share, typed in by hand; it is now calculated (OH_ALLOC_PCT of these lines),
        so it is not a line anyone enters and it is never added into the cost total. */
@@ -77,14 +72,31 @@
     const calYear = (fy, m) => (m >= 10 ? fy : fy + 1);
 
     // ── state ──
-    const MR = { section: 'revenue', fy: currentFy(), docs: {}, highlight: false };
+    /* Which fiscal year opens. The year being reported on, not the calendar's: the director
+       is working FY 2025-26 (Oct 2025 to Sep 2026), so that is the default, and whatever
+       year is picked is remembered on this browser so moving on to the next year is one
+       pick, once. */
+    const DEFAULT_FY = 2025;
+    const FY_KEY = 'copMrFiscalYear';
+    function startFy() {
+        try {
+            const v = parseInt(localStorage.getItem(FY_KEY), 10);
+            if (v >= 2000 && v <= 2100) return v;
+        } catch (e) { /* storage blocked: use the default */ }
+        return DEFAULT_FY;
+    }
+    function rememberFy(y) { try { localStorage.setItem(FY_KEY, String(y)); } catch (e) { /* ignore */ } }
+    // A fiscal year column/label without the "FY ": 2025 -> "2025-26".
+    const fyShort = y => y + '-' + String(+y + 1).slice(2);
+
+    const MR = { section: 'revenue', fy: startFy(), docs: {}, highlight: false };
     const keyOf = (book, fy) => book + '|' + (book === 'revenue' ? 'all' : fy);
     const doc = book => MR.docs[keyOf(book, MR.fy)];
     const anyDirty = () => Object.values(MR.docs).some(d => d && d.dirty);
 
     function blank(book) {
-        if (book === 'revenue') return { years: [String(currentFy())], cells: {}, highlights: {}, note: '' };
-        if (book === 'foodcosts') return { notes: DEFAULT_FOOD_NOTES.slice(), rows: [] };
+        if (book === 'revenue') return { years: [String(MR.fy)], cells: {}, highlights: {}, note: '' };
+        if (book === 'foodcosts') return { rows: [] };
         if (book === 'overhead') return { rows: DEFAULT_OVERHEAD.map(l => ({ label: l, cells: {} })), allocPct: OH_ALLOC_PCT };
         return {
             operational: DEFAULT_OPERATIONAL.map(n => ({ name: n, cells: {} })),
@@ -180,6 +192,7 @@
             if (anyDirty() && !confirm('You have unsaved changes. Switch fiscal year without saving?')) { e.target.value = MR.fy; return; }
             Object.values(MR.docs).forEach(d => { if (d) d.dirty = false; });
             MR.fy = parseInt(e.target.value, 10);
+            rememberFy(MR.fy);
             renderSection();
         });
         wire(document.getElementById('mrBody'));
@@ -303,15 +316,17 @@
                 + '<button type="button" class="fp-btn" data-act="addYear">+ Add year</button>'
                 + '<button type="button" class="fp-btn' + (MR.highlight ? ' fp-btn-primary' : '') + '" data-act="hlMode" aria-pressed="' + MR.highlight + '">'
                 + (MR.highlight ? 'Highlighting: click cells (done)' : 'Highlight cells') + '</button></div></div>'
-                + '<p class="mr-hint">Each column is a fiscal year, named by the year it starts in (2025 = Oct 2025 to Sep 2026). '
+                + '<p class="mr-hint">Each column is a fiscal year, October to September. '
                 + 'Enter the check as one amount or as a sum, e.g. <code>332+4225</code>.</p>'
-                + '<div class="fp-table-wrap"><table class="fp-table mr-grid"><thead><tr><th scope="col"></th>'
-                + yrs.map(y => '<th scope="col" class="right">' + esc(y) + '</th>').join('') + '</tr></thead><tbody>';
+                // Sized to its content (not the page width), so each box sits beside its month.
+                + '<div class="fp-table-wrap mr-rev-wrap"><table class="fp-table mr-grid mr-rev"><colgroup><col class="mr-c-rmonth">'
+                + yrs.map(() => '<col class="mr-c-ryear">').join('') + '</colgroup><thead><tr><th scope="col"><span class="mr-sr">Month</span></th>'
+                + yrs.map(y => '<th scope="col" class="center">' + esc(fyShort(y)) + '</th>').join('') + '</tr></thead><tbody>';
             FY_MONTHS.forEach(m => {
                 h += '<tr><th scope="row">' + REV_LABEL[m] + '</th>' + yrs.map(y => {
                     const k = y + '|' + m;
                     return '<td>' + numInput('cells.' + y + '.' + m, ((d.cells[y] || {})[m]) || '',
-                        ' data-hl="' + k + '" aria-label="' + REV_LABEL[m] + ' ' + esc(y) + '"' + (d.highlights[k] ? ' data-on="1"' : '')) + '</td>';
+                        ' data-hl="' + k + '" aria-label="' + REV_LABEL[m] + ', ' + esc(fyShort(y)) + '"' + (d.highlights[k] ? ' data-on="1"' : '')) + '</td>';
                 }).join('') + '</tr>';
             });
             h += '<tr class="mr-total"><th scope="row">Total</th>' + yrs.map(y => '<td class="right" data-total="y' + esc(y) + '"></td>').join('') + '</tr>';
@@ -328,7 +343,7 @@
         },
         action(d, act) {
             if (act === 'addYear') {
-                const last = d.years.length ? Math.max.apply(null, d.years.map(Number)) : currentFy() - 1;
+                const last = d.years.length ? Math.max.apply(null, d.years.map(Number)) : MR.fy - 1;
                 d.years.push(String(last + 1));
             } else if (act === 'hlMode') {
                 MR.highlight = !MR.highlight;
@@ -366,13 +381,13 @@
         html(d) {
             const open = fcOpenSet();
             const totalCols = FC_SUM.length;
+            // (The workbook's three reminder notes were removed from this sheet, Nov 2026.)
             let h = '<div class="mr-sheet-head"><h3>Food Costs, ' + fyLabel(MR.fy) + '</h3></div>'
-                + '<div class="mr-notes">' + d.notes.map((n, i) => textInput('notes.' + i, n, 'Note ' + (i + 1))).join('') + '</div>'
                 + '<p class="mr-hint">Click a month to open it, then add that month\u2019s purchases. The month\u2019s totals add up for you.</p>'
                 + '<div class="fp-table-wrap mr-fit"><table class="fp-table mr-grid mr-fc"><colgroup><col class="mr-c-month">'
                 + '<col class="mr-c-count">' + FC_SUM.map(() => '<col>').join('') + '</colgroup><thead><tr><th scope="col">Month</th>'
-                + '<th scope="col" class="right">Purchases</th>'
-                + FC_SUM.map(k => '<th scope="col" class="right">' + esc(FC_COLS.find(c => c[0] === k)[1].replace(/ \(.*\)/, '')) + '</th>').join('')
+                + '<th scope="col" class="center">Purchases</th>'
+                + FC_SUM.map(k => '<th scope="col" class="center">' + esc(FC_COLS.find(c => c[0] === k)[1].replace(/ \(.*\)/, '')) + '</th>').join('')
                 + '</tr></thead><tbody>';
             FY_MONTHS.forEach(m => {
                 const y = calYear(MR.fy, m);
@@ -382,15 +397,15 @@
                 h += '<tr class="mr-month' + (isOpen ? ' open' : '') + '"><th scope="row">'
                     + '<button type="button" class="mr-month-btn" data-act="toggle" data-arg="' + m + '" aria-expanded="' + isOpen
                     + '" aria-controls="mrFc' + m + '"><span class="mr-caret" aria-hidden="true">' + (isOpen ? '\u25BE' : '\u25B8') + '</span>' + label + '</button></th>'
-                    + '<td class="right" data-total="c' + m + '"></td>'
-                    + FC_SUM.map(k => '<td class="right" data-total="m' + m + k + '"></td>').join('') + '</tr>';
+                    + '<td class="center" data-total="c' + m + '"></td>'
+                    + FC_SUM.map(k => '<td class="center" data-total="m' + m + k + '"></td>').join('') + '</tr>';
                 if (!isOpen) return;
                 // The opened month: its purchases, every field visible, plus "add".
                 const min = y + '-' + pad2(m) + '-01', max = y + '-' + pad2(m) + '-' + pad2(lastDay(y, m));
                 h += '<tr class="mr-detail" id="mrFc' + m + '"><td colspan="' + (2 + totalCols) + '">'
                     + '<table class="fp-table mr-grid mr-fc-in"><caption class="mr-sr">Purchases in ' + label + '</caption>'
                     + '<colgroup><col class="mr-c-date"><col class="mr-c-num"><col><col class="mr-c-num"><col class="mr-c-num"><col class="mr-c-nf"><col class="mr-c-x"></colgroup>'
-                    + '<thead><tr>' + FC_FIELDS.map(c => '<th scope="col"' + (c[2] === 'num' ? ' class="right"' : '') + '>' + esc(c[1]) + '</th>').join('')
+                    + '<thead><tr>' + FC_FIELDS.map(c => '<th scope="col" class="center">' + esc(c[1]) + '</th>').join('')
                     + '<th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
                 if (!idx.length) h += '<tr><td colspan="7" class="mr-empty">No purchases in ' + label + ' yet.</td></tr>';
                 idx.forEach((i, n) => {
@@ -404,8 +419,8 @@
                 });
                 h += '</tbody></table><button type="button" class="fp-btn mr-add" data-act="addRow" data-arg="' + m + '">+ Add purchase to ' + label + '</button></td></tr>';
             });
-            h += '<tr class="mr-total"><th scope="row">Total</th><td class="right" data-total="call"></td>'
-                + FC_SUM.map(k => '<td class="right" data-total="t' + k + '"></td>').join('') + '</tr></tbody></table></div>';
+            h += '<tr class="mr-total"><th scope="row">Total</th><td class="center" data-total="call"></td>'
+                + FC_SUM.map(k => '<td class="center" data-total="t' + k + '"></td>').join('') + '</tr></tbody></table></div>';
 
             // Never hide data: an entry whose Year/Month is not in this fiscal year is listed
             // here with every field (Year and Month included) so it can be corrected.
@@ -490,7 +505,7 @@
                 + '<p class="mr-hint">Oct ' + MR.fy + ' to Sep ' + (MR.fy + 1) + '. Enter each bill; the Food Program share ('
                 + pctLabel(d) + ' of the total) is calculated for you. Lines that change month to month are shaded low (green) to high (red).</p>'
                 + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide">' + monthCols(true) + '<thead><tr><th scope="col">Line</th>'
-                + OH_MONTHS.map(m => '<th scope="col" class="right">' + SHORT[m] + '</th>').join('') + '<th scope="col" class="right">Total</th><th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
+                + OH_MONTHS.map(m => '<th scope="col" class="center">' + SHORT[m] + '</th>').join('') + '<th scope="col" class="center">Total</th><th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
             d.rows.forEach((r, i) => {
                 h += '<tr data-row="' + i + '"><th scope="row">' + textInput('rows.' + i + '.label', r.label, 'Line ' + (i + 1) + ' name') + '</th>'
                     + OH_MONTHS.map(m => '<td>' + numInput('rows.' + i + '.cells.' + m, (r.cells || {})[m] || '', ' data-scale="' + i + '" aria-label="' + esc(r.label) + ' ' + SHORT[m] + '"') + '</td>').join('')
@@ -535,23 +550,29 @@
     // ── Personnel Activity: staff down, Oct..Sep across, Operational and Admin totals ──
     const personnel = {
         html(d) {
-            const head = '<tr><th scope="col">Staff</th>' + FY_MONTHS.map(m => '<th scope="col" class="right">' + PER_LABEL[m] + '</th>').join('')
-                + '<th scope="col" class="right">Total</th><th scope="col"><span class="mr-sr">Remove</span></th></tr>';
-            const group = (g, title) => {
-                let h = '<tr class="mr-group"><th colspan="15" scope="colgroup">' + title + '</th></tr>';
+            /* The month names sit on the Operational line itself (no separate header row
+               above it), centred over their boxes. Admin's line is just its name. */
+            const group = (g, title, withMonths) => {
+                let h = withMonths
+                    ? '<tr class="mr-group"><th scope="col">' + title + '</th>'
+                        + FY_MONTHS.map(m => '<th scope="col" class="center">' + PER_LABEL[m] + '</th>').join('')
+                        + '<th scope="col" class="center">Total</th><th scope="col"><span class="mr-sr">Remove</span></th></tr>'
+                    : '<tr class="mr-group"><th colspan="15" scope="colgroup">' + title + '</th></tr>';
                 d[g].forEach((p, i) => {
                     h += '<tr><th scope="row">' + textInput(g + '.' + i + '.name', p.name, title + ' name ' + (i + 1)) + '</th>'
                         + FY_MONTHS.map(m => '<td>' + numInput(g + '.' + i + '.cells.' + m, (p.cells || {})[m] || '', ' aria-label="' + esc(p.name) + ' ' + PER_LABEL[m] + '"') + '</td>').join('')
-                        + '<td class="right mr-strong" data-total="' + g + 'r' + i + '"></td>'
+                        + '<td class="center mr-strong" data-total="' + g + 'r' + i + '"></td>'
                         + '<td class="center"><button type="button" class="mr-x" data-act="del" data-arg="' + g + ':' + i + '" aria-label="Remove ' + esc(p.name) + '">✕</button></td></tr>';
                 });
-                h += '<tr class="mr-total"><th scope="row">' + title + ' total</th>' + FY_MONTHS.map(m => '<td class="right" data-total="' + g + 'm' + m + '"></td>').join('')
-                    + '<td class="right" data-total="' + g + 'all"></td><td class="center"><button type="button" class="fp-btn mr-mini" data-act="add" data-arg="' + g + '">+ Add</button></td></tr>';
+                // "+ Add" on its own row: in the narrow last column it overflowed and caused the scroll bar.
+                h += '<tr class="mr-addrow"><td colspan="15"><button type="button" class="fp-btn mr-mini" data-act="add" data-arg="' + g + '">+ Add ' + title + ' staff</button></td></tr>'
+                    + '<tr class="mr-total"><th scope="row">' + title + ' total</th>' + FY_MONTHS.map(m => '<td class="center" data-total="' + g + 'm' + m + '"></td>').join('')
+                    + '<td class="center" data-total="' + g + 'all"></td><td></td></tr>';
                 return h;
             };
             return '<div class="mr-sheet-head"><h3>Personnel Activity Calculations, ' + fyLabel(MR.fy) + '</h3></div>'
-                + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide">' + monthCols(true) + '<thead>' + head + '</thead><tbody>'
-                + group('operational', 'Operational') + group('admin', 'Admin') + '</tbody></table></div>';
+                + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide">' + monthCols(true) + '<tbody>'
+                + group('operational', 'Operational', true) + group('admin', 'Admin', false) + '</tbody></table></div>';
         },
         totals(d) {
             const t = {};

@@ -140,15 +140,23 @@
            tables use a fixed layout with set label/total widths so the twelve months share
            the rest, and inputs shrink to their cell. No sideways scroll bar on a normal
            screen; only a very narrow one falls back to scrolling (fp-table's min-width). */
-        .fp-layout.fp-layout-wide { max-width:1640px; }
+        .fp-layout.fp-layout-wide { max-width:1280px; }
+        /* Food Costs and the Food Check stay compact instead of stretching across the page. */
+        .fp-table-wrap.mr-fit { max-width:1000px; }
+        .fp-table-wrap.mr-rev-wrap { display:inline-block;max-width:100%;vertical-align:top; }
+        .fp-table.mr-rev { width:auto;min-width:0;table-layout:auto; }
+        .mr-c-rmonth { width:70px; }
+        .mr-c-ryear { width:140px; }
+        .mr-note { max-width:520px; }
+        .mr-addrow td { padding:4px 8px;background:var(--sp-surface); }
         .mr-grid { table-layout:fixed; }
         .mr-grid th[scope="row"] { font-size:0.8rem;font-weight:700;color:var(--sp-text);text-transform:none;letter-spacing:0;white-space:nowrap;position:static;overflow:hidden;text-overflow:ellipsis; }
         .mr-grid td,.mr-grid th { padding:6px 5px; }
         .fp-table.mr-grid input { width:100%;min-width:0;padding:5px 6px;font-size:0.78rem; }
         .fp-table.mr-grid input[type="date"] { text-align:left; }
         .fp-table input.mr-text { text-align:left; }
-        .mr-c-label { width:210px; }
-        .mr-c-total { width:100px; }
+        .mr-c-label { width:180px; }
+        .mr-c-total { width:90px; }
         .mr-c-x { width:46px; }
         .mr-c-month { width:150px; }
         .mr-c-count { width:100px; }
