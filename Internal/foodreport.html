@@ -136,12 +136,36 @@
         .mr-hint { margin:0 0 10px;font-size:0.78rem;line-height:1.5;color:var(--sp-muted); }
         .mr-hint code { background:var(--sp-surface-2);padding:1px 5px;border-radius:4px; }
         .mr-sub { margin:18px 0 8px;font-size:0.86rem;color:var(--sp-text); }
-        .mr-grid { min-width:0;table-layout:auto; }
-        .mr-wide { min-width:980px; }
-        .mr-log { min-width:1040px;table-layout:auto; }
-        .mr-grid th[scope="row"],.mr-log th[scope="row"] { font-size:0.8rem;font-weight:700;color:var(--sp-text);text-transform:none;letter-spacing:0;white-space:nowrap;position:static; }
-        .mr-grid input,.mr-log input { min-width:64px; }
-        .fp-table input.mr-text { text-align:left;min-width:120px; }
+        /* Monthly Reporting fits the screen: the page widens for this tab (.fp-layout-wide),
+           tables use a fixed layout with set label/total widths so the twelve months share
+           the rest, and inputs shrink to their cell. No sideways scroll bar on a normal
+           screen; only a very narrow one falls back to scrolling (fp-table's min-width). */
+        .fp-layout.fp-layout-wide { max-width:1640px; }
+        .mr-grid { table-layout:fixed; }
+        .mr-grid th[scope="row"] { font-size:0.8rem;font-weight:700;color:var(--sp-text);text-transform:none;letter-spacing:0;white-space:nowrap;position:static;overflow:hidden;text-overflow:ellipsis; }
+        .mr-grid td,.mr-grid th { padding:6px 5px; }
+        .fp-table.mr-grid input { width:100%;min-width:0;padding:5px 6px;font-size:0.78rem; }
+        .fp-table.mr-grid input[type="date"] { text-align:left; }
+        .fp-table input.mr-text { text-align:left; }
+        .mr-c-label { width:210px; }
+        .mr-c-total { width:100px; }
+        .mr-c-x { width:46px; }
+        .mr-c-month { width:150px; }
+        .mr-c-count { width:100px; }
+        .mr-c-date { width:150px; }
+        .mr-c-num { width:120px; }
+        .mr-c-nf { width:190px; }
+        /* Food Costs: month rows open to show their purchases */
+        .mr-month-btn { appearance:none;background:none;border:0;padding:2px 0;font:inherit;font-weight:800;color:var(--sp-text);cursor:pointer;display:inline-flex;align-items:center;gap:6px; }
+        .mr-month-btn:hover { color:var(--sp-accent); }
+        .mr-month-btn:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px;border-radius:4px; }
+        .mr-caret { display:inline-block;width:1em;color:var(--sp-accent); }
+        .mr-month.open th,.mr-month.open td { background:var(--sp-accent-soft); }
+        .mr-detail > td { padding:8px 10px 12px 26px;background:var(--sp-surface-2); }
+        .mr-fc-in { width:100%; }
+        .mr-fc-in th { position:static; }
+        .mr-fc-in th:not(.right) { white-space:normal; }
+        .mr-add { margin-top:8px; }
         .fp-table input.mr-bad { border-color:var(--sp-bad-fg);background:var(--sp-bad-bg); }
         .fp-table input.mr-hl { background:rgba(250,204,21,0.55);color:#000; }
         .mr-total td,.mr-total th { font-weight:800;color:var(--sp-text);border-top:2px solid var(--sp-border); }
@@ -292,6 +316,9 @@ function showPanel(panel) {
     if (currentPanel === 'monthly' && panel !== 'monthly' && window.MonthlyReporting
         && MonthlyReporting.anyDirty() && !confirm('You have unsaved Monthly Reporting changes. Leave without saving?')) return;
     currentPanel = panel;
+    // Monthly Reporting's twelve-month sheets get the full screen width; other tabs keep theirs.
+    const layout = document.querySelector('.fp-layout');
+    if (layout) layout.classList.toggle('fp-layout-wide', panel === 'monthly');
     document.querySelectorAll('.fp-sidebar button').forEach(b => {
         b.classList.remove('active');
         b.setAttribute('aria-selected', 'false');

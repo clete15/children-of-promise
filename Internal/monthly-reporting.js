@@ -229,18 +229,31 @@
             markDirty(dc);
             applyTotals(box, r.totals(dc.data));
         });
+        // Correcting a stray Food Costs entry's Year or Month moves it into its month at once.
+        box.addEventListener('change', e => {
+            const p = e.target.dataset && e.target.dataset.path;
+            if (MR.section !== 'foodcosts' || !p || !/^rows\.\d+\.(year|month)$/.test(p)) return;
+            const c = current();
+            if (c) renderSectionKeep(box, c.dc, c.r);
+        });
         box.addEventListener('click', e => {
             const c = current();
             if (!c) return;
             const { dc, r } = c;
             const btn = e.target.closest('[data-act]');
             if (btn) {
-                // Toggling highlight mode is a view setting, not an edit.
-                if (btn.dataset.act !== 'hlMode') markDirty(dc);
+                // View settings (highlight mode, opening a month) are not edits.
+                const viewOnly = btn.dataset.act === 'hlMode' || (r.viewOnly && r.viewOnly[btn.dataset.act]);
+                // Keep the opened/closed month button focused after the redraw (keyboard users).
+                const refocus = btn.dataset.act === 'toggle' ? '[data-act="toggle"][data-arg="' + btn.dataset.arg + '"]' : null;
+                if (!viewOnly) markDirty(dc);
                 r.action(dc.data, btn.dataset.act, btn.dataset.arg);
                 const y = window.scrollY;
                 renderSectionKeep(box, dc, r);
                 window.scrollTo(0, y);
+                const target = MR.focus ? box.querySelector('[data-path="' + MR.focus + '"]') : (refocus ? box.querySelector(refocus) : null);
+                MR.focus = null;
+                if (target) target.focus({ preventScroll: true });
                 return;
             }
             // Highlight mode on the food check sheet: click a cell to mark it yellow.
@@ -331,49 +344,116 @@
     ];
     const FC_SUM = ['amountPaid', 'milk', 'foodCost', 'nonFood'];
     const inFy = (row, fy) => { const y = parseInt(row.year, 10), m = parseInt(row.month, 10); return m >= 1 && m <= 12 && y === calYear(fy, m); };
+    // The purchase fields entered inside an opened month. Year and Month come from the month.
+    const FC_FIELDS = FC_COLS.filter(c => c[0] !== 'year' && c[0] !== 'month');
+    const pad2 = n => String(n).padStart(2, '0');
+    const lastDay = (y, m) => new Date(y, m, 0).getDate();
+
+    /* Which months are opened. Starts with the current month (when it is in the year being
+       viewed) so the usual case, entering this month's receipts, is one click away. Opening
+       and closing a month is a view choice, not an edit. */
+    function fcOpenSet() {
+        if (MR.fcOpenFy !== MR.fy) {
+            MR.fcOpenFy = MR.fy;
+            MR.fcOpen = new Set();
+            const now = new Date(), m = now.getMonth() + 1;
+            if (calYear(MR.fy, m) === now.getFullYear()) MR.fcOpen.add(m);
+        }
+        return MR.fcOpen;
+    }
+
     const foodcosts = {
         html(d) {
-            let h = '<div class="mr-sheet-head"><h3>Food Costs, ' + fyLabel(MR.fy) + '</h3><div class="mr-tools">'
-                + '<button type="button" class="fp-btn" data-act="addRow">+ Add purchase</button></div></div>'
+            const open = fcOpenSet();
+            const totalCols = FC_SUM.length;
+            let h = '<div class="mr-sheet-head"><h3>Food Costs, ' + fyLabel(MR.fy) + '</h3></div>'
                 + '<div class="mr-notes">' + d.notes.map((n, i) => textInput('notes.' + i, n, 'Note ' + (i + 1))).join('') + '</div>'
-                + '<div class="fp-table-wrap"><table class="fp-table mr-log"><thead><tr>'
-                + FC_COLS.map(c => '<th scope="col"' + (c[2] === 'num' ? ' class="right"' : '') + '>' + esc(c[1]) + '</th>').join('')
-                + '<th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
-            if (!d.rows.length) h += '<tr><td colspan="9" class="mr-empty">No purchases entered for ' + fyLabel(MR.fy) + ' yet. Use <strong>+ Add purchase</strong>.</td></tr>';
-            d.rows.forEach((r, i) => {
-                const outside = r.year && r.month && !inFy(r, MR.fy);
-                h += '<tr' + (outside ? ' class="mr-outside" title="Year/Month is outside ' + fyLabel(MR.fy) + ', so it is not in the totals"' : '') + '>'
-                    + FC_COLS.map(c => '<td>' + (c[2] === 'num'
-                        ? numInput('rows.' + i + '.' + c[0], r[c[0]] || '', ' aria-label="' + esc(c[1]) + ' row ' + (i + 1) + '"')
-                        : textInput('rows.' + i + '.' + c[0], r[c[0]] || '', c[1] + ' row ' + (i + 1))) + '</td>').join('')
-                    + '<td class="center"><button type="button" class="mr-x" data-act="delRow" data-arg="' + i + '" aria-label="Remove row ' + (i + 1) + '">✕</button></td></tr>';
-            });
-            h += '</tbody></table></div><h4 class="mr-sub">Monthly totals</h4><div class="fp-table-wrap"><table class="fp-table mr-grid"><thead><tr><th scope="col">Month</th>'
-                + FC_SUM.map(k => '<th scope="col" class="right">' + esc(FC_COLS.find(c => c[0] === k)[1].replace(/ \(.*\)/, '')) + '</th>').join('') + '</tr></thead><tbody>';
+                + '<p class="mr-hint">Click a month to open it, then add that month\u2019s purchases. The month\u2019s totals add up for you.</p>'
+                + '<div class="fp-table-wrap mr-fit"><table class="fp-table mr-grid mr-fc"><colgroup><col class="mr-c-month">'
+                + '<col class="mr-c-count">' + FC_SUM.map(() => '<col>').join('') + '</colgroup><thead><tr><th scope="col">Month</th>'
+                + '<th scope="col" class="right">Purchases</th>'
+                + FC_SUM.map(k => '<th scope="col" class="right">' + esc(FC_COLS.find(c => c[0] === k)[1].replace(/ \(.*\)/, '')) + '</th>').join('')
+                + '</tr></thead><tbody>';
             FY_MONTHS.forEach(m => {
-                h += '<tr><th scope="row">' + SHORT[m] + ' ' + calYear(MR.fy, m) + '</th>' + FC_SUM.map(k => '<td class="right" data-total="m' + m + k + '"></td>').join('') + '</tr>';
+                const y = calYear(MR.fy, m);
+                const isOpen = open.has(m);
+                const idx = d.rows.map((r, i) => i).filter(i => inFy(d.rows[i], MR.fy) && parseInt(d.rows[i].month, 10) === m);
+                const label = SHORT[m] + ' ' + y;
+                h += '<tr class="mr-month' + (isOpen ? ' open' : '') + '"><th scope="row">'
+                    + '<button type="button" class="mr-month-btn" data-act="toggle" data-arg="' + m + '" aria-expanded="' + isOpen
+                    + '" aria-controls="mrFc' + m + '"><span class="mr-caret" aria-hidden="true">' + (isOpen ? '\u25BE' : '\u25B8') + '</span>' + label + '</button></th>'
+                    + '<td class="right" data-total="c' + m + '"></td>'
+                    + FC_SUM.map(k => '<td class="right" data-total="m' + m + k + '"></td>').join('') + '</tr>';
+                if (!isOpen) return;
+                // The opened month: its purchases, every field visible, plus "add".
+                const min = y + '-' + pad2(m) + '-01', max = y + '-' + pad2(m) + '-' + pad2(lastDay(y, m));
+                h += '<tr class="mr-detail" id="mrFc' + m + '"><td colspan="' + (2 + totalCols) + '">'
+                    + '<table class="fp-table mr-grid mr-fc-in"><caption class="mr-sr">Purchases in ' + label + '</caption>'
+                    + '<colgroup><col class="mr-c-date"><col class="mr-c-num"><col><col class="mr-c-num"><col class="mr-c-num"><col class="mr-c-nf"><col class="mr-c-x"></colgroup>'
+                    + '<thead><tr>' + FC_FIELDS.map(c => '<th scope="col"' + (c[2] === 'num' ? ' class="right"' : '') + '>' + esc(c[1]) + '</th>').join('')
+                    + '<th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
+                if (!idx.length) h += '<tr><td colspan="7" class="mr-empty">No purchases in ' + label + ' yet.</td></tr>';
+                idx.forEach((i, n) => {
+                    const r = d.rows[i], row = label + ' purchase ' + (n + 1);
+                    h += '<tr>' + FC_FIELDS.map(c => '<td>' + (c[0] === 'date'
+                        ? '<input type="date" data-path="rows.' + i + '.date" value="' + esc(r.date || '') + '" min="' + min + '" max="' + max + '" aria-label="Date, ' + esc(row) + '">'
+                        : c[2] === 'num'
+                            ? numInput('rows.' + i + '.' + c[0], r[c[0]] || '', ' aria-label="' + esc(c[1]) + ', ' + esc(row) + '"')
+                            : textInput('rows.' + i + '.' + c[0], r[c[0]] || '', c[1] + ', ' + row)) + '</td>').join('')
+                        + '<td class="center"><button type="button" class="mr-x" data-act="delRow" data-arg="' + i + '" aria-label="Remove ' + esc(row) + '">\u2715</button></td></tr>';
+                });
+                h += '</tbody></table><button type="button" class="fp-btn mr-add" data-act="addRow" data-arg="' + m + '">+ Add purchase to ' + label + '</button></td></tr>';
             });
-            h += '<tr class="mr-total"><th scope="row">Total</th>' + FC_SUM.map(k => '<td class="right" data-total="t' + k + '"></td>').join('') + '</tr></tbody></table></div>';
+            h += '<tr class="mr-total"><th scope="row">Total</th><td class="right" data-total="call"></td>'
+                + FC_SUM.map(k => '<td class="right" data-total="t' + k + '"></td>').join('') + '</tr></tbody></table></div>';
+
+            // Never hide data: an entry whose Year/Month is not in this fiscal year is listed
+            // here with every field (Year and Month included) so it can be corrected.
+            const strays = d.rows.map((r, i) => i).filter(i => !inFy(d.rows[i], MR.fy));
+            if (strays.length) {
+                h += '<h4 class="mr-sub">Entries outside ' + fyLabel(MR.fy) + ' (not in the totals)</h4>'
+                    + '<p class="mr-hint">Fix the Year and Month and each moves into its month above.</p>'
+                    + '<div class="fp-table-wrap mr-fit"><table class="fp-table mr-grid mr-fc-in"><thead><tr>'
+                    + FC_COLS.map(c => '<th scope="col">' + esc(c[1]) + '</th>').join('') + '<th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
+                strays.forEach(i => {
+                    const r = d.rows[i];
+                    h += '<tr>' + FC_COLS.map(c => '<td>' + (c[2] === 'num'
+                        ? numInput('rows.' + i + '.' + c[0], r[c[0]] || '', ' aria-label="' + esc(c[1]) + '"')
+                        : textInput('rows.' + i + '.' + c[0], r[c[0]] || '', c[1])) + '</td>').join('')
+                        + '<td class="center"><button type="button" class="mr-x" data-act="delRow" data-arg="' + i + '" aria-label="Remove this entry">\u2715</button></td></tr>';
+                });
+                h += '</tbody></table></div>';
+            }
             return h;
         },
         totals(d) {
             const t = {};
-            FY_MONTHS.forEach(m => FC_SUM.forEach(k => {
-                t['m' + m + k] = fmt(d.rows.filter(r => inFy(r, MR.fy) && parseInt(r.month, 10) === m).reduce((s, r) => s + num(r[k]), 0));
-            }));
-            FC_SUM.forEach(k => { t['t' + k] = fmt(d.rows.filter(r => inFy(r, MR.fy)).reduce((s, r) => s + num(r[k]), 0)); });
+            const yr = d.rows.filter(r => inFy(r, MR.fy));
+            FY_MONTHS.forEach(m => {
+                const rows = yr.filter(r => parseInt(r.month, 10) === m);
+                t['c' + m] = rows.length ? String(rows.length) : '';
+                FC_SUM.forEach(k => { t['m' + m + k] = fmt(rows.reduce((s, r) => s + num(r[k]), 0)); });
+            });
+            t.call = String(yr.length);
+            FC_SUM.forEach(k => { t['t' + k] = fmt(yr.reduce((s, r) => s + num(r[k]), 0)); });
             return t;
         },
+        // Opening/closing a month changes nothing that is saved.
+        viewOnly: { toggle: true },
         action(d, act, arg) {
-            if (act === 'addRow') {
-                const now = new Date();
-                let y = now.getFullYear(), m = now.getMonth() + 1;
-                if (y !== calYear(MR.fy, m)) { y = MR.fy; m = 10; }   // a past/future FY starts at its October
-                d.rows.push({ year: String(y), month: String(m), date: '', amountPaid: '', vendor: '', milk: '', foodCost: '', nonFood: '' });
+            const open = fcOpenSet();
+            if (act === 'toggle') {
+                const m = +arg;
+                if (open.has(m)) open.delete(m); else open.add(m);
+            } else if (act === 'addRow') {
+                const m = +arg;
+                d.rows.push({ year: String(calYear(MR.fy, m)), month: String(m), date: '', amountPaid: '', vendor: '', milk: '', foodCost: '', nonFood: '' });
+                open.add(m);
+                MR.focus = 'rows.' + (d.rows.length - 1) + '.date';   // ready to type
             } else if (act === 'delRow') {
                 const r = d.rows[+arg];
                 const filled = r && Object.keys(r).some(k => k !== 'year' && k !== 'month' && String(r[k] || '').trim());
-                if (!filled || confirm('Remove this purchase row?')) d.rows.splice(+arg, 1);
+                if (!filled || confirm('Remove this purchase?')) d.rows.splice(+arg, 1);
             }
         },
     };
@@ -397,6 +477,11 @@
     const ohYearAlloc = d => round2(OH_MONTHS.reduce((s, m) => s + ohMonthAlloc(d, m), 0));
     const pctLabel = d => (Number(d.allocPct) || OH_ALLOC_PCT) + '%';
 
+    /* Column widths for the "label + 12 months + total" sheets, so all twelve months fit
+       on screen without a sideways scroll bar (fixed layout; the months share the rest). */
+    const monthCols = withRemove => '<colgroup><col class="mr-c-label">' + FY_MONTHS.map(() => '<col>').join('')
+        + '<col class="mr-c-total">' + (withRemove ? '<col class="mr-c-x">' : '') + '</colgroup>';
+
     // ── Overhead Costs: lines down, Oct..Sep across, total column; colour scale like the sheet ──
     const overhead = {
         html(d) {
@@ -404,7 +489,7 @@
                 + '<button type="button" class="fp-btn" data-act="addRow">+ Add line</button></div></div>'
                 + '<p class="mr-hint">Oct ' + MR.fy + ' to Sep ' + (MR.fy + 1) + '. Enter each bill; the Food Program share ('
                 + pctLabel(d) + ' of the total) is calculated for you. Lines that change month to month are shaded low (green) to high (red).</p>'
-                + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide"><thead><tr><th scope="col">Line</th>'
+                + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide">' + monthCols(true) + '<thead><tr><th scope="col">Line</th>'
                 + OH_MONTHS.map(m => '<th scope="col" class="right">' + SHORT[m] + '</th>').join('') + '<th scope="col" class="right">Total</th><th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
             d.rows.forEach((r, i) => {
                 h += '<tr data-row="' + i + '"><th scope="row">' + textInput('rows.' + i + '.label', r.label, 'Line ' + (i + 1) + ' name') + '</th>'
@@ -465,7 +550,7 @@
                 return h;
             };
             return '<div class="mr-sheet-head"><h3>Personnel Activity Calculations, ' + fyLabel(MR.fy) + '</h3></div>'
-                + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide"><thead>' + head + '</thead><tbody>'
+                + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide">' + monthCols(true) + '<thead>' + head + '</thead><tbody>'
                 + group('operational', 'Operational') + group('admin', 'Admin') + '</tbody></table></div>';
         },
         totals(d) {
@@ -521,7 +606,7 @@
         h += '<h4 class="mr-sub">Overhead Costs (Oct ' + fy + ' to Sep ' + (fy + 1) + ')</h4>';
         if (!oh) h += '<div class="fp-error">Overhead Costs could not be read.</div>';
         else {
-            h += '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide"><thead><tr><th scope="col">Line</th>'
+            h += '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide">' + monthCols(false) + '<thead><tr><th scope="col">Line</th>'
                 + OH_MONTHS.map(m => '<th scope="col" class="right">' + SHORT[m] + '</th>').join('') + '<th scope="col" class="right">Total</th></tr></thead><tbody>';
             oh.rows.forEach(r => {
                 h += '<tr><th scope="row">' + esc(r.label) + '</th>' + OH_MONTHS.map(m => '<td class="right">' + fmt(num((r.cells || {})[m])) + '</td>').join('')
