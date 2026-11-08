@@ -5772,6 +5772,88 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         return sendJSON(res, 200, { ok: true, children: r.rows });
     }
 
+    /* ── Food Program Monthly Reporting (foodreport.html → Monthly Reporting tab) ──
+       Replaces the two FY workbooks ("Food Program Purchases and Reporting" and
+       "Personnel Activity Calculations"). Each SHEET is a "book", stored as one JSON
+       document per fiscal year, in the sheet's own layout:
+         revenue    Monthly Food Check, every year side by side (fiscal year 'all')
+         foodcosts  Food Costs purchase log (Sara and Jeremy)
+         overhead   Overhead Costs (Monroe, WM, Mortgage, other)
+         personnel  Personnel Activity Calculations
+       The fiscal year is its START year ("2025" = FY 2025-26), as in the workbook headers.
+
+       Tier: Food Costs is any signed-in staff member (Sara and Jeremy enter purchases);
+       the money sheets (revenue, overhead, personnel) are centre admin only.
+
+       Saves carry the Version they were loaded at. If someone else saved in between the
+       save is refused (409) instead of silently overwriting their entries. A failed read
+       is a 500, never an empty sheet (sql-reads steering). */
+    if (url.startsWith('/api/monthly-reporting') && (req.method === 'GET' || req.method === 'PUT')) {
+        const MR_BOOKS = { revenue: 'admin', foodcosts: 'staff', overhead: 'admin', personnel: 'admin' };
+        const qs = new URLSearchParams(req.url.split('?')[1] || '');
+        const book = qs.get('book') || '';
+        const fy = qs.get('fy') || '';
+        if (!Object.prototype.hasOwnProperty.call(MR_BOOKS, book)) return sendJSON(res, 400, { error: 'Unknown sheet' });
+        if (book === 'revenue' ? fy !== 'all' : !/^\d{4}$/.test(fy)) return sendJSON(res, 400, { error: 'Bad fiscal year' });
+        if (MR_BOOKS[book] === 'admin' ? !checkAuth(req, res) : !checkClassroomAuth(req, res)) return;
+        const MR_ENSURE = `IF OBJECT_ID(N'dbo.MonthlyReporting', N'U') IS NULL
+CREATE TABLE dbo.MonthlyReporting (
+    Id         INT IDENTITY(1,1) PRIMARY KEY,
+    Book       NVARCHAR(20)  NOT NULL,
+    FiscalYear NVARCHAR(10)  NOT NULL,
+    DataJson   NVARCHAR(MAX) NOT NULL,
+    Version    INT           NOT NULL DEFAULT 1,
+    UpdatedAt  DATETIME2     NOT NULL DEFAULT SYSDATETIME(),
+    UpdatedBy  NVARCHAR(100) NULL,
+    CONSTRAINT UQ_MonthlyReporting UNIQUE (Book, FiscalYear)
+);
+GO
+`;
+        // book and fy are whitelisted / pattern-checked above, so they are safe to inline.
+        const where = `Book = N'${book}' AND FiscalYear = N'${fy}'`;
+        if (req.method === 'GET') {
+            const r = runSQLRows(`SELECT DataJson, Version, CONVERT(NVARCHAR(16), UpdatedAt, 120) AS UpdatedAt,
+       ISNULL(UpdatedBy, N'') AS UpdatedBy FROM dbo.MonthlyReporting WHERE ${where}`, MR_ENSURE);
+            if (!r.ok) return sendJSON(res, 500, { error: 'Could not read this sheet: ' + r.error });
+            const row = r.rows[0];
+            if (!row) return sendJSON(res, 200, { ok: true, data: null, version: 0 });
+            let data;
+            try { data = JSON.parse(row.DataJson); }
+            catch (e) { return sendJSON(res, 500, { error: 'The saved sheet could not be read (corrupt data).' }); }
+            return sendJSON(res, 200, { ok: true, data, version: row.Version, updatedAt: row.UpdatedAt, updatedBy: row.UpdatedBy });
+        }
+        return readBody(req, (err, d) => {
+            if (err || !d || typeof d.data !== 'object' || d.data === null || Array.isArray(d.data)) {
+                return sendJSON(res, 400, { error: 'Nothing to save' });
+            }
+            const json = JSON.stringify(d.data);
+            if (json.length > 500000) return sendJSON(res, 413, { error: 'This sheet is too large to save' });
+            const base = parseInt(d.version, 10) || 0;
+            const by = String(actorLabel(req)).slice(0, 100);
+            const r = runSQL(MR_ENSURE + `SET NOCOUNT ON;
+DECLARE @v INT = (SELECT Version FROM dbo.MonthlyReporting WHERE ${where});
+IF @v IS NULL AND ${base} = 0
+BEGIN
+    INSERT INTO dbo.MonthlyReporting (Book, FiscalYear, DataJson, UpdatedBy) VALUES (N'${book}', N'${fy}', N${esc(json)}, N${esc(by)});
+    SELECT 'MR_SAVED=1';
+END
+ELSE IF @v = ${base}
+BEGIN
+    UPDATE dbo.MonthlyReporting SET DataJson = N${esc(json)}, Version = @v + 1, UpdatedAt = SYSDATETIME(), UpdatedBy = N${esc(by)} WHERE ${where};
+    SELECT 'MR_SAVED=' + CAST(@v + 1 AS VARCHAR(12));
+END
+ELSE SELECT 'MR_CONFLICT=' + CAST(ISNULL(@v, 0) AS VARCHAR(12));`);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            if (r.sqlError) return sendJSON(res, 500, { error: 'Could not save (someone may have saved at the same moment, try again): ' + r.sqlError });
+            const saved = (r.data.match(/MR_SAVED=(\d+)/) || [])[1];
+            if (saved) return sendJSON(res, 200, { success: true, version: parseInt(saved, 10) });
+            if (/MR_CONFLICT=/.test(r.data)) {
+                return sendJSON(res, 409, { error: 'Someone else saved this sheet after you opened it. Reload to see their changes, then enter yours again.' });
+            }
+            return sendJSON(res, 500, { error: 'The save did not confirm' });
+        });
+    }
+
     /* POST /api/history/end-date { id, lastDay } — enter that leaving date, once. */
     if (req.method === 'POST' && url === '/api/history/end-date') {
         if (!checkAuth(req, res)) return;

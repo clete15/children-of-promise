@@ -117,6 +117,46 @@
         .fp-frp.paid,.fp-frp.unknown { color:var(--sp-muted);background:var(--sp-surface-2);border:1px solid var(--sp-border); }
         .fp-save { min-width:54px;padding:5px 9px; }
 
+        /* Monthly Reporting (monthly-reporting.js) */
+        .mr-bar { display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px; }
+        .mr-tabs { display:flex;gap:4px;flex-wrap:wrap; }
+        .mr-tab { appearance:none;border:1px solid var(--sp-border);border-radius:999px;background:var(--sp-surface-2);color:var(--sp-text-2);padding:6px 12px;font:inherit;font-size:0.78rem;font-weight:700;cursor:pointer; }
+        .mr-tab:hover { border-color:var(--sp-accent);color:var(--sp-accent); }
+        .mr-tab.on { background:var(--sp-accent);border-color:var(--sp-accent);color:#fff; }
+        .mr-tab:focus-visible,.mr-x:focus-visible,#mrFy:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
+        .mr-fy { font-size:0.78rem;font-weight:700;color:var(--sp-muted);display:flex;align-items:center;gap:6px; }
+        .mr-fy select { padding:5px 8px;border:1px solid var(--sp-border-in);border-radius:6px;background:var(--sp-field-bg);color:var(--sp-text);font:inherit;font-size:0.8rem; }
+        .mr-actions { display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px; }
+        .mr-saved { font-size:0.76rem;color:var(--sp-muted); }
+        .mr-status { font-size:0.78rem;font-weight:700;color:var(--sp-good-fg); }
+        .mr-status.err { color:var(--sp-bad-fg); }
+        .mr-sheet-head { display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:4px 0 8px; }
+        .mr-sheet-head h3 { margin:0;font-size:0.96rem;color:var(--sp-text); }
+        .mr-tools { display:flex;gap:6px;flex-wrap:wrap; }
+        .mr-hint { margin:0 0 10px;font-size:0.78rem;line-height:1.5;color:var(--sp-muted); }
+        .mr-hint code { background:var(--sp-surface-2);padding:1px 5px;border-radius:4px; }
+        .mr-sub { margin:18px 0 8px;font-size:0.86rem;color:var(--sp-text); }
+        .mr-grid { min-width:0;table-layout:auto; }
+        .mr-wide { min-width:980px; }
+        .mr-log { min-width:1040px;table-layout:auto; }
+        .mr-grid th[scope="row"],.mr-log th[scope="row"] { font-size:0.8rem;font-weight:700;color:var(--sp-text);text-transform:none;letter-spacing:0;white-space:nowrap;position:static; }
+        .mr-grid input,.mr-log input { min-width:64px; }
+        .fp-table input.mr-text { text-align:left;min-width:120px; }
+        .fp-table input.mr-bad { border-color:var(--sp-bad-fg);background:var(--sp-bad-bg); }
+        .fp-table input.mr-hl { background:rgba(250,204,21,0.55);color:#000; }
+        .mr-total td,.mr-total th { font-weight:800;color:var(--sp-text);border-top:2px solid var(--sp-border); }
+        .mr-group th { background:var(--sp-surface-2);font-size:0.72rem;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--sp-muted); }
+        .mr-strong { font-weight:700;color:var(--sp-text); }
+        .mr-outside td { opacity:0.55; }
+        .mr-empty { text-align:center;color:var(--sp-muted);padding:14px; }
+        .mr-x { appearance:none;border:1px solid var(--sp-border);background:var(--sp-surface);color:var(--sp-bad-fg);border-radius:6px;padding:3px 8px;cursor:pointer;font:inherit;font-size:0.74rem; }
+        .mr-mini { padding:3px 8px;font-size:0.7rem; }
+        .mr-notes { display:flex;flex-direction:column;gap:4px;margin-bottom:10px; }
+        .mr-notes input,.mr-note input { width:100%;box-sizing:border-box;padding:5px 8px;border:1px solid var(--sp-border-in);border-radius:6px;background:var(--sp-field-bg);color:var(--sp-text);font:inherit;font-size:0.78rem; }
+        .mr-note { display:flex;align-items:center;gap:8px;margin-top:10px; }
+        .mr-swatch { flex:0 0 28px;height:18px;border-radius:4px;background:rgba(250,204,21,0.8); }
+        .mr-sr { position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap; }
+
         .fp-picker { max-width:620px;margin:0 auto; }
         .fp-picker-intro { margin:0 0 16px;font-size:0.86rem;line-height:1.6;color:var(--sp-muted); }
         .fp-month-grid { display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px; }
@@ -184,6 +224,11 @@
             <button role="tab" aria-selected="false" id="navTrainings" onclick="showPanel('trainings')">
                 <span class="nav-sub">Annual Training</span>
             </button>
+            <!-- The two FY workbooks (Food Program Purchases and Reporting, Personnel
+                 Activity Calculations), entered and summarised here. monthly-reporting.js -->
+            <button role="tab" aria-selected="false" id="navMonthly" onclick="showPanel('monthly')">
+                <span class="nav-sub">Monthly Reporting</span>
+            </button>
             <!-- Opens the blank training sheet to run + sign a NEW session. Not a tab
                  panel (it is a standalone handout served from the Handouts folder), so
                  it is an anchor styled like the nav buttons rather than a showPanel tab. -->
@@ -207,6 +252,7 @@
 
 <script src="app.js"></script>
 <script src="/staff/auth.js"></script>
+<script src="monthly-reporting.js"></script>
 <script>
 // AUTH, apiFetch, isTruthy, students and classrooms come from app.js.
 let currentPanel = 'food';
@@ -241,6 +287,9 @@ async function init() {
 }
 
 function showPanel(panel) {
+    // Leaving Monthly Reporting with unsaved entries: ask first, so a tab click cannot lose them.
+    if (currentPanel === 'monthly' && panel !== 'monthly' && window.MonthlyReporting
+        && MonthlyReporting.anyDirty() && !confirm('You have unsaved Monthly Reporting changes. Leave without saving?')) return;
     currentPanel = panel;
     document.querySelectorAll('.fp-sidebar button').forEach(b => {
         b.classList.remove('active');
@@ -321,6 +370,12 @@ function showPanel(panel) {
         document.getElementById('fpTitle').textContent = 'Annual Training';
         document.getElementById('fpBody').innerHTML = '<div class="fp-loading">Loading filed trainings&hellip;</div>';
         renderTrainings();
+    } else if (panel === 'monthly') {
+        document.getElementById('navMonthly').classList.add('active');
+        document.getElementById('navMonthly').setAttribute('aria-selected', 'true');
+        document.getElementById('fpTitle').textContent = 'Monthly Reporting';
+        if (window.MonthlyReporting) MonthlyReporting.open();
+        else document.getElementById('fpBody').innerHTML = '<div class="fp-error">Monthly Reporting did not load. Hard-refresh the page (Ctrl+Shift+R).</div>';
     }
 }
 
