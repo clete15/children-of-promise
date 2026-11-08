@@ -4,7 +4,7 @@
      Monthly Food Check  months down, years across (every year on one sheet), total row
      Food Costs          purchase log: Year, Month, Date, Amount Paid, Vendor, Gallons of
                          Milk, Food Cost, Non-Food Costs (plus a monthly totals table)
-     Overhead Costs      Monroe / WM / Mortgage / Overhead Costs, Sep..Aug, total column
+     Overhead Costs      Monroe / WM / Mortgage / Overhead Costs, Oct..Sep, total column
      Personnel Activity  staff down, Oct..Sep across, Operational + Admin totals
      Yearly Summary      one fiscal year, every sheet's monthly and yearly totals
 
@@ -22,7 +22,9 @@
 
     // Month numbers, in each sheet's own column order, with the sheet's own labels.
     const FY_MONTHS = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-    const OH_MONTHS = [9, 10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8];
+    // Overhead uses the same Oct..Sep fiscal year as every other sheet (the old workbook
+    // sheet ran Sep..Aug; the director confirmed it should be Oct..Sep, Nov 2026).
+    const OH_MONTHS = FY_MONTHS;
     const REV_LABEL = { 10: 'Oct', 11: 'Nov', 12: 'Dec', 1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'June', 7: 'July', 8: 'Aug', 9: 'Sep' };
     const SHORT = { 10: 'Oct', 11: 'Nov', 12: 'Dec', 1: 'Jan', 2: 'Feb', 3: 'Mar', 4: 'Apr', 5: 'May', 6: 'Jun', 7: 'Jul', 8: 'Aug', 9: 'Sep' };
     const PER_LABEL = Object.assign({}, SHORT, { 7: 'July' });
@@ -68,8 +70,6 @@
     const fyLabel = y => 'FY ' + y + '-' + String(y + 1).slice(2);
     // The calendar year a month falls in, for fiscal year y (Oct..Dec are y, Jan..Sep y+1).
     const calYear = (fy, m) => (m >= 10 ? fy : fy + 1);
-    // Overhead runs Sep..Aug: Sep..Dec are y, Jan..Aug y+1.
-    const ohYear = (fy, m) => (m >= 9 ? fy : fy + 1);
 
     // ── state ──
     const MR = { section: 'revenue', fy: currentFy(), docs: {}, highlight: false };
@@ -371,12 +371,12 @@
         },
     };
 
-    // ── Overhead Costs: lines down, Sep..Aug across, total column; colour scale like the sheet ──
+    // ── Overhead Costs: lines down, Oct..Sep across, total column; colour scale like the sheet ──
     const overhead = {
         html(d) {
             let h = '<div class="mr-sheet-head"><h3>Overhead Costs, ' + fyLabel(MR.fy) + '</h3><div class="mr-tools">'
                 + '<button type="button" class="fp-btn" data-act="addRow">+ Add line</button></div></div>'
-                + '<p class="mr-hint">Sep ' + MR.fy + ' to Aug ' + (MR.fy + 1) + ', as on the workbook sheet. Lines that change month to month are shaded low (green) to high (red).</p>'
+                + '<p class="mr-hint">Oct ' + MR.fy + ' to Sep ' + (MR.fy + 1) + '. Lines that change month to month are shaded low (green) to high (red).</p>'
                 + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide"><thead><tr><th scope="col">Line</th>'
                 + OH_MONTHS.map(m => '<th scope="col" class="right">' + SHORT[m] + '</th>').join('') + '<th scope="col" class="right">Total</th><th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
             d.rows.forEach((r, i) => {
@@ -486,8 +486,7 @@
             + cols.map(c => '<th scope="col" class="right">' + c[0] + '</th>').join('') + '</tr></thead><tbody>';
         FY_MONTHS.forEach(m => { h += '<tr><th scope="row">' + SHORT[m] + ' ' + calYear(fy, m) + '</th>' + cols.map(c => '<td class="right">' + show(c[1](m)) + '</td>').join('') + '</tr>'; });
         h += '<tr class="mr-total"><th scope="row">Year total</th>' + cols.map(c => '<td class="right">' + show(FY_MONTHS.reduce((s, m) => s + c[1](m), 0)) + '</td>').join('') + '</tr></tbody></table></div>';
-        // Overhead keeps its own Sep..Aug year, as on its sheet.
-        h += '<h4 class="mr-sub">Overhead Costs (Sep ' + fy + ' to Aug ' + (fy + 1) + ')</h4>';
+        h += '<h4 class="mr-sub">Overhead Costs (Oct ' + fy + ' to Sep ' + (fy + 1) + ')</h4>';
         if (!oh) h += '<div class="fp-error">Overhead Costs could not be read.</div>';
         else {
             h += '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide"><thead><tr><th scope="col">Line</th>'
