@@ -356,8 +356,9 @@
         ['year', 'Year', 'num'], ['month', 'Month', 'num'], ['date', 'Date', 'text'], ['amountPaid', 'Amount Paid', 'num'],
         ['vendor', 'Vendor', 'text'], ['milk', 'Gallons of Milk', 'num'], ['foodCost', 'Food Cost', 'num'],
         ['nonFood', 'Non-Food Costs (Plates, napkins, plasticware)', 'num'],
+        ['nonAllowable', 'Non-Allowable Costs', 'num'],
     ];
-    const FC_SUM = ['amountPaid', 'milk', 'foodCost', 'nonFood'];
+    const FC_SUM = ['amountPaid', 'milk', 'foodCost', 'nonFood', 'nonAllowable'];
     const inFy = (row, fy) => { const y = parseInt(row.year, 10), m = parseInt(row.month, 10); return m >= 1 && m <= 12 && y === calYear(fy, m); };
     // The purchase fields entered inside an opened month. Year and Month come from the month.
     const FC_FIELDS = FC_COLS.filter(c => c[0] !== 'year' && c[0] !== 'month');
@@ -404,10 +405,10 @@
                 const min = y + '-' + pad2(m) + '-01', max = y + '-' + pad2(m) + '-' + pad2(lastDay(y, m));
                 h += '<tr class="mr-detail" id="mrFc' + m + '"><td colspan="' + (2 + totalCols) + '">'
                     + '<table class="fp-table mr-grid mr-fc-in"><caption class="mr-sr">Purchases in ' + label + '</caption>'
-                    + '<colgroup><col class="mr-c-date"><col class="mr-c-num"><col><col class="mr-c-num"><col class="mr-c-num"><col class="mr-c-nf"><col class="mr-c-x"></colgroup>'
+                    + '<colgroup><col class="mr-c-date"><col class="mr-c-num"><col><col class="mr-c-num"><col class="mr-c-num"><col class="mr-c-nf"><col class="mr-c-num"><col class="mr-c-x"></colgroup>'
                     + '<thead><tr>' + FC_FIELDS.map(c => '<th scope="col" class="center">' + esc(c[1]) + '</th>').join('')
                     + '<th scope="col"><span class="mr-sr">Remove</span></th></tr></thead><tbody>';
-                if (!idx.length) h += '<tr><td colspan="7" class="mr-empty">No purchases in ' + label + ' yet.</td></tr>';
+                if (!idx.length) h += '<tr><td colspan="8" class="mr-empty">No purchases in ' + label + ' yet.</td></tr>';
                 idx.forEach((i, n) => {
                     const r = d.rows[i], row = label + ' purchase ' + (n + 1);
                     h += '<tr>' + FC_FIELDS.map(c => '<td>' + (c[0] === 'date'
@@ -462,7 +463,7 @@
                 if (open.has(m)) open.delete(m); else open.add(m);
             } else if (act === 'addRow') {
                 const m = +arg;
-                d.rows.push({ year: String(calYear(MR.fy, m)), month: String(m), date: '', amountPaid: '', vendor: '', milk: '', foodCost: '', nonFood: '' });
+                d.rows.push({ year: String(calYear(MR.fy, m)), month: String(m), date: '', amountPaid: '', vendor: '', milk: '', foodCost: '', nonFood: '', nonAllowable: '' });
                 open.add(m);
                 MR.focus = 'rows.' + (d.rows.length - 1) + '.date';   // ready to type
             } else if (act === 'delRow') {
@@ -609,7 +610,7 @@
         const cols = [
             ['Food Check', m => revMonth(m)],
             ['Amount Paid', m => fcMonth(m, 'amountPaid')], ['Food Cost', m => fcMonth(m, 'foodCost')],
-            ['Non-Food', m => fcMonth(m, 'nonFood')], ['Milk (gal)', m => fcMonth(m, 'milk')],
+            ['Non-Food', m => fcMonth(m, 'nonFood')], ['Non-Allowable', m => fcMonth(m, 'nonAllowable')], ['Milk (gal)', m => fcMonth(m, 'milk')],
             ['Overhead share', m => (oh ? ohMonthAlloc(oh, m) : NaN)],
             ['Personnel: Operational', m => peMonth('operational', m)], ['Personnel: Admin', m => peMonth('admin', m)],
         ];
