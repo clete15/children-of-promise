@@ -2912,7 +2912,7 @@ function renderAttnResults() {
                 + (r.matchBy === 'name' ? ' \u00b7 matched by name' : '') + '</span></div>'
                 + attnDiff('Credentials held (ECE / Infant Toddler / Director)', r.current.eceCredentials, r.proposed.eceCredentials)
                 + attnDiff('Gateways credential', r.current.gateways, r.proposed.gateways)
-                + attnDiff('Notes (pending)', r.current.notes, r.proposed.notes)
+                + attnDiff('Notes (replaced by this report; old text is archived)', r.current.notes, r.proposed.notes)
                 + '<div class="sp-attn-actions">'
                 + '<button type="button" class="sp-save attn-apply-one" data-i="' + idx + '">Apply this</button>'
                 + '<span class="sp-savemsg attn-one-msg"></span>'

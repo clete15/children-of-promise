@@ -3143,8 +3143,9 @@ function parseAttainments(text) {
         const body = lines.slice(bk.start, bk.end);
         const credentials = [];
         const pending = [];
+        const cda = [];
         let section = '';
-        body.forEach(line => {
+        body.forEach((line, bi) => {
             const t = line.trim();
             if (!t) return;
             if (/^Current Credentials/i.test(t)) { section = 'cred'; return; }
@@ -3152,6 +3153,16 @@ function parseAttainments(text) {
             if (/^Educational Qualifications|^Current Employment|^Completed Degrees|^Some Coursework/i.test(t)) { section = ''; return; }
 
             if (section === 'cred') {
+                /* A national CDA is not a Gateways level, but the credential pages read
+                   "Infant/Toddler CDA" / "Preschool CDA" out of the record, so it is kept.
+                   The setting often wraps onto the next line. */
+                if (/Child Development Associate|\(CDA\)/i.test(t)) {
+                    const look = t + ' ' + (body[bi + 1] || '');
+                    const set = /infant\s*\/?\s*toddler/i.test(look) ? 'Infant/Toddler'
+                        : /pre-?school/i.test(look) ? 'Preschool' : '';
+                    if (!cda.includes(set)) cda.push(set);
+                    return;
+                }
                 // e.g. "ECE Credential - Level 4   Department of Human Services   4/2/2025   12/31/2030"
                 const cm = t.match(CRED_TYPES);
                 if (!cm) return;
@@ -3177,7 +3188,7 @@ function parseAttainments(text) {
                 });
             }
         });
-        return { name: bk.name, registryId: bk.registryId, credentials, pending };
+        return { name: bk.name, registryId: bk.registryId, credentials, pending, cda };
     });
 }
 
@@ -3185,7 +3196,7 @@ function parseAttainments(text) {
      gateways  - the highest/awarded credential line(s), summarised
      pendingNote - a one-line "Pending: ..." summary for the Notes field, or ''
    These are proposals; the admin approves before anything is written. */
-function attainmentProposal(entry) {
+function attainmentProposal(entry, reportDate) {
     /* Gateways credential summary: the HIGHEST level held per credential type.
        The report lists every level a person has passed through (ECE Level 1 AND
        Level 2), but holding Level 2 supersedes Level 1 — listing both reads as a
@@ -3234,7 +3245,15 @@ function attainmentProposal(entry) {
         if (c && c.level) held.push('Director Level ' + c.level);
     });
 
-    return { gateways: credStr, pendingNote: pendingStr, held: held };
+    (entry.cda || []).forEach(set => held.push(set ? set + ' CDA' : 'CDA'));
+
+    /* The Notes field is REFRESHED from the report, not appended to: one dated line saying
+       what the Registry shows as open today. (The wording avoids "pending" when there is
+       nothing open, because the staff page flags any note containing that word.) */
+    const stamp = 'Per Gateways report' + (reportDate ? ' ' + reportDate : '') + '. ';
+    const notes = stamp + (pendingStr ? pendingStr + '.' : 'No open Gateways applications.');
+
+    return { gateways: credStr, pendingNote: pendingStr, held: held, notes: notes };
 }
 
 /* Rebuild a "Credentials held" string from the Registry report: the ECE / Infant Toddler /
@@ -3249,6 +3268,10 @@ function mergeHeldCredentials(existing, held) {
     ];
     let rest = String(existing || '');
     LEVEL.forEach(re => { rest = rest.replace(re, ''); });
+    // The report's CDA replaces any CDA wording already typed, so it is not listed twice.
+    if (held.some(h => /\bCDA\b/.test(h))) {
+        rest = rest.replace(/\b(?:Infant\s*\/?\s*Toddler|Preschool|Pre-?school)?\s*\bCDA\b/gi, '');
+    }
     const keep = rest.split(',').map(s => s.trim()).filter(Boolean);
     return held.concat(keep).join(', ');
 }
@@ -8017,6 +8040,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
             const staff = sr.rows;
 
             const norm = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+            const rd = String(ex.text || '').match(/Report as of:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+            const reportDate = rd ? rd[1] : '';
             const results = entries.map(entry => {
                 // Match on Registry N-number first; fall back to normalised name.
                 let row = staff.find(r => r.RegistryId && entry.registryId
@@ -8026,7 +8051,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                     row = staff.find(r => norm(r.Name) === norm(entry.name));
                     if (row) matchBy = 'name';
                 }
-                const proposal = attainmentProposal(entry);
+                const proposal = attainmentProposal(entry, reportDate);
                 const out = {
                     parsedName: entry.name,
                     registryId: entry.registryId,
@@ -8041,7 +8066,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                     out.current = { gateways: row.Gateways, notes: row.Notes, eceCredentials: row.EceCredentials };
                     out.proposed = {
                         gateways: proposal.gateways,
-                        notes: applyPendingToNotes(row.Notes, proposal.pendingNote),
+                        notes: proposal.notes,
                         eceCredentials: mergeHeldCredentials(row.EceCredentials, proposal.held)
                     };
                     // Flag whether anything actually changes, so the UI can show "no change".
@@ -8084,6 +8109,27 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                 if (typeof c.notes === 'string') sets.push(`Notes=${esc(c.notes)}`);
                 if (typeof c.eceCredentials === 'string') sets.push(`EceCredentials=${esc(c.eceCredentials)}`);
                 if (!sets.length) { failed.push({ staffId: id, error: 'nothing to set' }); continue; }
+                /* Notes are replaced by the refresh, so the previous text is copied to
+                   StaffNotesArchive first. Nothing the office wrote is unrecoverable. */
+                const archive = (typeof c.notes === 'string')
+                    ? `IF OBJECT_ID(N'dbo.StaffNotesArchive', N'U') IS NULL
+CREATE TABLE dbo.StaffNotesArchive (
+    Id INT IDENTITY(1,1) PRIMARY KEY, StaffId INT NOT NULL, Notes NVARCHAR(MAX),
+    EceCredentials NVARCHAR(MAX), ArchivedAt DATETIME DEFAULT GETDATE(), Reason NVARCHAR(100));
+GO
+INSERT INTO StaffNotesArchive (StaffId, Notes, EceCredentials, Reason)
+    SELECT Id, Notes, EceCredentials, N'Gateways attainments refresh' FROM Staff
+    WHERE Id=${id} AND (ISNULL(Notes,'')<>'' OR ISNULL(EceCredentials,'')<>'');
+GO
+`
+                    : '';
+                if (archive) {
+                    const ar = runSQL(staffEnsureSQL() + 'GO\n' + archive);
+                    if (!ar.ok || ar.sqlError) {
+                        failed.push({ staffId: id, error: 'could not archive the old notes first: ' + (ar.error || ar.sqlError) });
+                        continue;      // never overwrite what could not be saved elsewhere
+                    }
+                }
                 const sql = staffEnsureSQL() + 'GO\n'
                     + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
                 const r = runSQL(sql);
