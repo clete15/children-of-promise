@@ -544,6 +544,7 @@ async function fillTrainingFromPdrs() {
             lines.push('~ ' + r.name + ': ' + r.training + ' already says ' + r.existing + ', PDR says ' + r.date + ' (left alone)'));
         if (d.noPdr.length) lines.push('', 'No PDR filed for: ' + d.noPdr.join(', '));
         if (d.unreadable.length) lines.push('', 'Could not read: ' + d.unreadable.join('; '));
+        if (d.related && d.related.length) lines.push('', 'Rating-scale trainings on PDRs that did not match a column:', ...d.related);
         if (!fresh.length) {
             alert('Nothing new to fill in.\n\n' + (lines.join('\n') || 'No matching trainings found on the filed PDRs.'));
             return;

@@ -9934,7 +9934,7 @@ ELSE
         const root = findDocRoot();
         if (!root) return sendJSON(res, 500, { error: 'The document library is not reachable from the server.' });
 
-        const results = [], noPdr = [], unreadable = [];
+        const results = [], noPdr = [], unreadable = [], related = [];
         const inserts = [];
         staff.rows.forEach(s => {
             const mine = links.rows.filter(l => String(l.StaffId) === String(s.Id))
@@ -9950,6 +9950,11 @@ ELSE
                 unreadable.push(s.Name + ' (PDR Registry number ' + pdr.registryId + ' does not match the record)');
                 return;
             }
+            // Rating-scale trainings that matched none of the three above: shown so a title
+            // the matcher does not recognise can be seen rather than silently missed.
+            pdr.trainings.filter(t => /ecers|iters|sacers|environment rating|rating scale|\bERS\b/i.test(t.title)
+                && !KEYS.some(k => k.re.test(t.title)))
+                .forEach(t => related.push(s.Name + ': ' + t.date + ' ' + t.title.replace(/\s+\d+(\.\d+)?\s*\S*$/, '').slice(0, 110)));
             KEYS.forEach(k => {
                 const hits = pdr.trainings.filter(t => k.re.test(t.title)).sort((a, b) => a.date.localeCompare(b.date));
                 if (!hits.length) return;
@@ -9977,7 +9982,7 @@ END`);
             written = inserts.length;
             console.log('[PDR TRAINING] wrote ' + written + ' training rows from PDRs');
         }
-        return sendJSON(res, 200, { applied: apply, written: written, results: results, noPdr: noPdr, unreadable: unreadable });
+        return sendJSON(res, 200, { applied: apply, written: written, results: results, noPdr: noPdr, unreadable: unreadable, related: related });
     }
 
     // POST record or clear a staff training (internal - protected)
