@@ -649,6 +649,23 @@
     .sp-err { color: var(--sp-bad-fg); }
     .sp-warntext { color: var(--sp-warn-fg); }
 
+    /* Staff Attainments upload: a bordered pill in the top bar, and its preview window. */
+    .sp-attn-btn {
+        padding: 6px 12px; border: 1.5px solid var(--sp-border-in); border-radius: 7px;
+        background: var(--sp-surface-2); color: var(--sp-accent); font: inherit;
+        font-size: 0.8rem; font-weight: 700; cursor: pointer;
+    }
+    .sp-attn-btn:hover { border-color: var(--sp-accent); }
+    .sp-attn-btn:disabled { opacity: 0.6; cursor: default; }
+    .sp-attn-dlg {
+        width: min(760px, 94vw); max-height: 88vh; overflow: auto; padding: 16px 18px;
+        border: 1.5px solid var(--sp-border); border-radius: 12px;
+        background: var(--sp-surface); color: var(--sp-text);
+    }
+    .sp-attn-dlg::backdrop { background: rgba(0, 0, 0, 0.55); }
+    .sp-attn-dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+    .sp-attn-dlg-head h2 { margin: 0; font-size: 1.05rem; }
+
     /* Theme toggle. Looks like the other bar links rather than a control, because it
        is a preference and not part of the task. */
     .sp-theme {
@@ -797,6 +814,12 @@
         <!-- Back to the /staff/ dashboard of cards this page was reached from. -->
         <a href="/staff/" class="sp-back" title="Back to the staff portal">&#8592; Back</a>
         <strong style="font-size:0.9rem;">Staff Portal</strong>
+        <!-- Admin only (shown by applyIdentityToBar). Pick the Gateways "Staff Education and
+             Credentials" report; the preview opens in a window and nothing is saved until
+             it is approved there. -->
+        <button type="button" id="spAttnBtn" class="sp-attn-btn" style="display:none;margin-left:auto;"
+                title="Upload the Gateways Staff Education and Credentials report to update ECE and Infant Toddler credentials">Upload Staff Attainments</button>
+        <input type="file" id="spAttnFile" accept=".pdf,application/pdf" style="display:none;" aria-label="Staff Attainments report (PDF)">
         <!-- The chooser is the director's control. A staff member sees their own name
              instead, because there is nothing for them to choose: the server sends
              them one record, their own. -->
@@ -827,6 +850,17 @@
         <div class="sp-card"><div class="sp-sub">Loading your record…</div></div>
     </div>
 </div>
+
+<!-- Preview window for the Staff Attainments upload. -->
+<dialog id="spAttnDlg" class="sp-attn-dlg" aria-labelledby="spAttnDlgTitle">
+    <div class="sp-attn-dlg-head">
+        <h2 id="spAttnDlgTitle">Update credentials from the Gateways report</h2>
+        <button type="button" id="spAttnClose" class="sp-attn-btn" aria-label="Close">Close</button>
+    </div>
+    <div class="sp-sub">Matched by Registry number. Review what would change for each person, then apply. Nothing is saved until you do.</div>
+    <div id="attnDlgMsg" class="sp-savemsg" role="status"></div>
+    <div id="attnDlgResults"></div>
+</dialog>
 
 <script src="app.js"></script>
 <script src="/staff/auth.js"></script>
@@ -2818,20 +2852,29 @@ async function openStaffGatewaysReport(staffId, name, el) {
     }
 }
 
-async function runAttainmentsPreview() {
+/* Where the preview is drawn: the top-bar window when it is open, otherwise the Admin
+   tab's card. Both use the same preview, apply and diff code. */
+function attnOut() {
+    const dlg = $('spAttnDlg');
+    return dlg && dlg.open ? $('attnDlgResults') : $('attnResults');
+}
+
+async function runAttainmentsPreview(givenFile) {
+    const fromBar = givenFile instanceof File;
     const fileEl = $('attnFile');
-    const msg = $('attnMsg');
-    const out = $('attnResults');
-    if (!fileEl || !fileEl.files || !fileEl.files.length) {
+    const file = fromBar ? givenFile : (fileEl && fileEl.files && fileEl.files[0]);
+    const msg = fromBar ? $('attnDlgMsg') : $('attnMsg');
+    const out = fromBar ? $('attnDlgResults') : $('attnResults');
+    if (!file) {
         if (msg) { msg.className = 'sp-savemsg bad'; msg.textContent = 'Choose the PDF first.'; }
         return;
     }
-    const btn = $('attnUpload');
+    const btn = fromBar ? null : $('attnUpload');
     if (btn) { btn.disabled = true; btn.textContent = 'Reading\u2026'; }
     if (msg) { msg.className = 'sp-savemsg'; msg.textContent = 'Uploading and reading the report\u2026'; }
     try {
         const form = new FormData();
-        form.append('file', fileEl.files[0]);
+        form.append('file', file, file.name);
         // Multipart: let the browser set the boundary; attach the token by hand.
         const headers = (window.CofpAuth && CofpAuth.personalHeaders) ? CofpAuth.personalHeaders() : {};
         delete headers['Content-Type'];
@@ -2850,7 +2893,7 @@ async function runAttainmentsPreview() {
 }
 
 function renderAttnResults() {
-    const out = $('attnResults');
+    const out = attnOut();
     if (!out) return;
     const changed = ATTN_RESULTS.filter(r => r.matched && r.changed);
     const noChange = ATTN_RESULTS.filter(r => r.matched && !r.changed);
@@ -2867,6 +2910,7 @@ function renderAttnResults() {
                 + '<div class="sp-attn-name">' + esc(r.staffName || r.parsedName)
                 + ' <span class="sp-pill">' + esc(r.registryId || '')
                 + (r.matchBy === 'name' ? ' \u00b7 matched by name' : '') + '</span></div>'
+                + attnDiff('Credentials held (ECE / Infant Toddler / Director)', r.current.eceCredentials, r.proposed.eceCredentials)
                 + attnDiff('Gateways credential', r.current.gateways, r.proposed.gateways)
                 + attnDiff('Notes (pending)', r.current.notes, r.proposed.notes)
                 + '<div class="sp-attn-actions">'
@@ -2910,7 +2954,8 @@ async function applyAttainments(indexes, btn) {
     const changes = indexes
         .map(i => ATTN_RESULTS[i])
         .filter(r => r && r.matched && r.staffId)
-        .map(r => ({ staffId: r.staffId, gateways: r.proposed.gateways, notes: r.proposed.notes }));
+        .map(r => ({ staffId: r.staffId, gateways: r.proposed.gateways, notes: r.proposed.notes,
+                     eceCredentials: r.proposed.eceCredentials }));
     if (!changes.length) return;
     if (btn) { btn.disabled = true; btn.textContent = 'Applying\u2026'; }
     try {
@@ -2924,7 +2969,11 @@ async function applyAttainments(indexes, btn) {
         (data.applied || []).forEach(id => {
             const row = STAFF.find(x => String(x.Id) === String(id));
             const src = ATTN_RESULTS.find(r => String(r.staffId) === String(id));
-            if (row && src) { row.Gateways = src.proposed.gateways; row.Notes = src.proposed.notes; src.changed = false; }
+            if (row && src) {
+                row.Gateways = src.proposed.gateways; row.Notes = src.proposed.notes;
+                row.EceCredentials = src.proposed.eceCredentials;
+                src.current = Object.assign({}, src.proposed); src.changed = false;
+            }
         });
         if (data.failed && data.failed.length) {
             alert('Applied ' + (data.applied || []).length + ', but ' + data.failed.length
@@ -3839,8 +3888,22 @@ function applyIdentityToBar() {
             + '. Choose any member of staff above \u2014 including yourself.';
     }
     if (isPersonal) $('spStaffActions').style.display = 'inline-block';
+    // The Staff Attainments upload is a centre-wide action, so administrators only.
+    $('spAttnBtn').style.display = mayChoose ? '' : 'none';
     return { mayChoose: mayChoose, isPersonal: isPersonal };
 }
+
+/* Top-bar "Upload Staff Attainments": choose the PDF, preview in a window, apply there. */
+$('spAttnBtn').addEventListener('click', () => { $('spAttnFile').value = ''; $('spAttnFile').click(); });
+$('spAttnFile').addEventListener('change', () => {
+    const f = $('spAttnFile').files && $('spAttnFile').files[0];
+    if (!f) return;
+    const dlg = $('spAttnDlg');
+    $('attnDlgResults').innerHTML = '';
+    if (!dlg.open) dlg.showModal();
+    runAttainmentsPreview(f);
+});
+$('spAttnClose').addEventListener('click', () => $('spAttnDlg').close());
 
 /* ── Theme ──
    The light/dark toggle (THEME_KEY, prefersDark, applyTheme, initTheme, and the

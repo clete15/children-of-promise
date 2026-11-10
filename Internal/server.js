@@ -3218,7 +3218,39 @@ function attainmentProposal(entry) {
             p.credential + (p.reason ? ' (' + p.reason + ')' : '')).join('; ')
         : '';
 
-    return { gateways: credStr, pendingNote: pendingStr };
+    /* The same credentials in the compact form the staff record's "Credentials held"
+       field uses ("ECE Level 4, IT Level 2, Director Level I"). Standard 4 and the
+       credential tabs read the levels out of THAT field first, so refreshing only the
+       Gateways text would leave a stale lower level winning. */
+    const held = [];
+    const compact = (type, label) => {
+        const c = bestByType[typeOrder.find(t => t.toLowerCase() === type) || ''];
+        if (c && c.level) held.push(label + ' Level ' + c.level);
+    };
+    compact('ece credential', 'ECE');
+    compact('infant toddler credential', 'IT');
+    typeOrder.filter(t => /director credential/i.test(t)).slice(0, 1).forEach(t => {
+        const c = bestByType[t];
+        if (c && c.level) held.push('Director Level ' + c.level);
+    });
+
+    return { gateways: credStr, pendingNote: pendingStr, held: held };
+}
+
+/* Rebuild a "Credentials held" string from the Registry report: the ECE / Infant Toddler /
+   Director levels come from the report, and anything else the office wrote there (CDA,
+   Paraprofessional...) is kept as it was. Levels the report no longer shows are dropped,
+   which is why the preview lists the before and after for a person to read. */
+function mergeHeldCredentials(existing, held) {
+    const LEVEL = [
+        /\bECE(?:\s*Credential)?\s*-?\s*Level\s*\d\b/gi,
+        /\b(?:ITC|IT|Infant\s*\/?\s*Toddler)(?:\s*Credential)?\s*-?\s*Level\s*\d\b/gi,
+        /\b(?:Illinois\s+)?Director(?:\s*Credential)?\s*-?\s*Level\s*(?:III|II|I|\d)\b/gi
+    ];
+    let rest = String(existing || '');
+    LEVEL.forEach(re => { rest = rest.replace(re, ''); });
+    const keep = rest.split(',').map(s => s.trim()).filter(Boolean);
+    return held.concat(keep).join(', ');
 }
 
 /* Replace an existing "Pending: ..." sentence in a Notes field with a fresh one,
@@ -8006,14 +8038,16 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                 if (row) {
                     out.staffId = row.Id;
                     out.staffName = row.Name;
-                    out.current = { gateways: row.Gateways, notes: row.Notes };
+                    out.current = { gateways: row.Gateways, notes: row.Notes, eceCredentials: row.EceCredentials };
                     out.proposed = {
                         gateways: proposal.gateways,
-                        notes: applyPendingToNotes(row.Notes, proposal.pendingNote)
+                        notes: applyPendingToNotes(row.Notes, proposal.pendingNote),
+                        eceCredentials: mergeHeldCredentials(row.EceCredentials, proposal.held)
                     };
                     // Flag whether anything actually changes, so the UI can show "no change".
                     out.changed = (out.proposed.gateways && out.proposed.gateways !== row.Gateways)
-                        || (out.proposed.notes !== row.Notes);
+                        || (out.proposed.notes !== row.Notes)
+                        || (out.proposed.eceCredentials !== row.EceCredentials);
                 }
                 return out;
             });
@@ -8048,6 +8082,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                 const sets = [];
                 if (typeof c.gateways === 'string' && c.gateways.trim()) sets.push(`Gateways=${esc(c.gateways)}`);
                 if (typeof c.notes === 'string') sets.push(`Notes=${esc(c.notes)}`);
+                if (typeof c.eceCredentials === 'string') sets.push(`EceCredentials=${esc(c.eceCredentials)}`);
                 if (!sets.length) { failed.push({ staffId: id, error: 'nothing to set' }); continue; }
                 const sql = staffEnsureSQL() + 'GO\n'
                     + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
