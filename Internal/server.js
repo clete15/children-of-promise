@@ -3483,6 +3483,32 @@ function parsePdr(text) {
     // Round to 2dp to avoid float noise like 63.00000001.
     out.pdHoursThisYear = Math.round(out.pdHoursThisYear * 100) / 100;
 
+    /* The individual verified trainings (Sections Three to Five; Six is self-reported
+       and is not evidence). Each is { date: 'YYYY-MM-DD', title, hours }. A long title
+       wraps onto the next line, so a row's title is the line plus any continuation
+       line that does not start a new row. */
+    out.trainings = [];
+    (function parseTrainings() {
+        let on = false, cur = null;
+        const flush = () => { if (cur) out.trainings.push(cur); cur = null; };
+        for (const raw of lines) {
+            const l = raw.trim();
+            if (/^Section (Three|Four|Five)/i.test(l)) { flush(); on = true; continue; }
+            if (/^Section (One|Two|Six)/i.test(l)) { flush(); on = false; continue; }
+            if (!on) continue;
+            const dm = l.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(.*)$/);
+            if (dm) {
+                flush();
+                const hm = dm[4].match(/(\d+(?:\.\d+)?)\s*$/);
+                cur = { date: dm[3] + '-' + String(dm[1]).padStart(2, '0') + '-' + String(dm[2]).padStart(2, '0'),
+                        title: dm[4], hours: hm ? parseFloat(hm[1]) : null };
+            } else if (cur && l && !/^(Printed|Page|This document|Opportunity|Total|Contact Hrs|Gateways to|All trainings|Registry|Attendance|are listed)/i.test(l)) {
+                cur.title += ' ' + l;
+            } else { flush(); }
+        }
+        flush();
+    })();
+
     /* ── Training hours by Gateways Content Area ─────────────────────────────
        Section Three ends with a table Gateways has already totalled by content
        area — far more reliable than trying to code each training title. It prints
@@ -9880,6 +9906,78 @@ ELSE
                 };
             });
         return sendJSON(res, 200, rows);
+    }
+
+    /* Fill the ExceleRate training dates from the PDRs already filed for each person.
+       A Gateways PDR lists every Registry-verified training with its date, so "How ERS
+       Works", "Making ECERS-3 Work For You" and ITERS-3 can be read straight off it
+       rather than typed. POST /api/staff-training-from-pdrs        -> preview, writes nothing
+       POST /api/staff-training-from-pdrs?apply=1 -> writes the "new" rows only.
+       It never overwrites a date someone already entered, and a person with no PDR on
+       file is reported, not guessed. Reads each person's NEWEST filed PDR. */
+    if (req.method === 'POST' && url.startsWith('/api/staff-training-from-pdrs')) {
+        if (!checkAuth(req, res)) return;
+        const apply = new URLSearchParams(req.url.split('?')[1] || '').get('apply') === '1';
+        const KEYS = [
+            { key: 'howERSWorks', name: 'How ERS Works', re: /\bhow\s+ers\s+works\b/i },
+            { key: 'ecers3', name: 'Making ECERS-3 Work For You', re: /making\s+ecers-?\s*3\s+work/i },
+            { key: 'iters3', name: 'ITERS-3 classroom training', re: /\biters-?\s*3\b/i }
+        ];
+        const staff = runSQLRows(`SELECT Id, ISNULL(Name,'') AS Name, ISNULL(RegistryId,'') AS RegistryId FROM Staff ORDER BY Name`, staffEnsureSQL() + 'GO\n');
+        if (!staff.ok) return sendJSON(res, 500, { error: 'Could not read staff: ' + staff.error });
+        const links = runSQLRows(`SELECT StaffId, RelPath, ISNULL(UploadedDate,'') AS UploadedDate FROM StaffFileLinks
+            WHERE Status='Confirmed' AND RelPath LIKE 'Staff/Staff PDRs/%'`, staffFileLinksEnsureSQL() + 'GO\n');
+        if (!links.ok) return sendJSON(res, 500, { error: 'Could not read PDR links: ' + links.error });
+        const have = runSQLRows(`SELECT StaffId, TrainingKey, ISNULL(CompletedDate,'') AS CompletedDate FROM StaffTraining`,
+            staffTrainingEnsureSQL() + 'GO\n');
+        if (!have.ok) return sendJSON(res, 500, { error: 'Could not read existing training: ' + have.error });
+        const root = findDocRoot();
+        if (!root) return sendJSON(res, 500, { error: 'The document library is not reachable from the server.' });
+
+        const results = [], noPdr = [], unreadable = [];
+        const inserts = [];
+        staff.rows.forEach(s => {
+            const mine = links.rows.filter(l => String(l.StaffId) === String(s.Id))
+                .sort((a, b) => String(b.UploadedDate).localeCompare(String(a.UploadedDate)));
+            if (!mine.length) { noPdr.push(s.Name); return; }
+            const pdf = path.join(root, ...String(mine[0].RelPath).split('/'));
+            if (!fs.existsSync(pdf)) { unreadable.push(s.Name + ' (file missing)'); return; }
+            const ex = pdfToText(pdf);
+            if (!ex.ok) { unreadable.push(s.Name + ' (' + ex.error + ')'); return; }
+            const pdr = parsePdr(ex.text);
+            // The PDR must be this person's: same Registry number rule the upload uses.
+            if (pdr.registryId && s.RegistryId && pdr.registryId.toUpperCase() !== String(s.RegistryId).toUpperCase()) {
+                unreadable.push(s.Name + ' (PDR Registry number ' + pdr.registryId + ' does not match the record)');
+                return;
+            }
+            KEYS.forEach(k => {
+                const hits = pdr.trainings.filter(t => k.re.test(t.title)).sort((a, b) => a.date.localeCompare(b.date));
+                if (!hits.length) return;
+                const t = hits[0];          // earliest completion: the date it was first met
+                const ex2 = have.rows.find(h => String(h.StaffId) === String(s.Id) && h.TrainingKey === k.key
+                    && String(h.CompletedDate).trim());
+                const status = ex2 ? (ex2.CompletedDate === t.date ? 'already' : 'differs') : 'new';
+                results.push({ staffId: s.Id, name: s.Name, key: k.key, training: k.name, date: t.date,
+                    existing: ex2 ? ex2.CompletedDate : '', title: t.title, pdr: mine[0].RelPath, status: status });
+                if (status === 'new') {
+                    const note = 'From Gateways PDR (' + path.basename(mine[0].RelPath) + '): ' + t.title;
+                    inserts.push(`IF NOT EXISTS (SELECT 1 FROM StaffTraining WHERE StaffId=${parseInt(s.Id, 10)} AND TrainingKey=${esc(k.key)} AND ISNULL(CompletedDate,'')<>'')
+BEGIN
+    DELETE FROM StaffTraining WHERE StaffId=${parseInt(s.Id, 10)} AND TrainingKey=${esc(k.key)};
+    INSERT INTO StaffTraining (StaffId,TrainingKey,CompletedDate,EvidenceLink,Notes) VALUES (${parseInt(s.Id, 10)},${esc(k.key)},${esc(t.date)},'',${esc(note.slice(0, 900))});
+END`);
+                }
+            });
+        });
+        let written = 0;
+        if (apply && inserts.length) {
+            const w = runSQL(staffTrainingEnsureSQL() + 'GO\n' + inserts.join('\n'));
+            if (!w.ok) return sendJSON(res, 500, { error: w.error });
+            if (w.sqlError) return sendJSON(res, 500, { error: 'The database refused this change: ' + w.sqlError });
+            written = inserts.length;
+            console.log('[PDR TRAINING] wrote ' + written + ' training rows from PDRs');
+        }
+        return sendJSON(res, 200, { applied: apply, written: written, results: results, noPdr: noPdr, unreadable: unreadable });
     }
 
     // POST record or clear a staff training (internal - protected)

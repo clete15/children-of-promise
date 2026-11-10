@@ -523,7 +523,45 @@ function renderTrainingMatrix() {
         + '<th style="padding:8px 10px;text-align:left;font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#64748b;">Staff</th>'
         + '<th style="padding:8px 10px;text-align:left;font-size:0.66rem;font-weight:700;text-transform:uppercase;letter-spacing:0.03em;color:#64748b;">Classroom</th>'
         + head + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
-        + '<div style="font-size:0.72rem;color:#64748b;margin-bottom:6px;">Enter the completion date. Clearing a date marks the training as not done.</div>';
+        + '<div style="font-size:0.72rem;color:#64748b;margin-bottom:6px;">Enter the completion date. Clearing a date marks the training as not done.</div>'
+        + '<button type="button" id="pdrFillBtn" onclick="fillTrainingFromPdrs()" style="padding:6px 12px;border:1.5px solid #cbd5e1;border-radius:7px;background:white;font:inherit;font-size:0.74rem;font-weight:700;color:#1e293b;cursor:pointer;">Fill dates from filed PDRs</button> '
+        + '<span style="font-size:0.7rem;color:#64748b;">Reads each person\u2019s newest filed Gateways PDR. You see the list first; nothing is overwritten.</span>';
+}
+
+/* Reads the training dates off the PDRs already filed for staff. Two steps on purpose:
+   the server first returns what it WOULD write, the admin reads it, then confirms. */
+async function fillTrainingFromPdrs() {
+    const btn = document.getElementById('pdrFillBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Reading PDRs\u2026'; }
+    try {
+        const res = await apiFetch('/api/staff-training-from-pdrs', { method: 'POST' });
+        const d = await res.json();
+        if (d.error) throw new Error(d.error);
+        const fresh = d.results.filter(r => r.status === 'new');
+        const lines = [];
+        fresh.forEach(r => lines.push('+ ' + r.name + ': ' + r.training + ' on ' + r.date));
+        d.results.filter(r => r.status === 'differs').forEach(r =>
+            lines.push('~ ' + r.name + ': ' + r.training + ' already says ' + r.existing + ', PDR says ' + r.date + ' (left alone)'));
+        if (d.noPdr.length) lines.push('', 'No PDR filed for: ' + d.noPdr.join(', '));
+        if (d.unreadable.length) lines.push('', 'Could not read: ' + d.unreadable.join('; '));
+        if (!fresh.length) {
+            alert('Nothing new to fill in.\n\n' + (lines.join('\n') || 'No matching trainings found on the filed PDRs.'));
+            return;
+        }
+        if (!confirm('These dates will be recorded:\n\n' + lines.join('\n') + '\n\nRecord them?')) return;
+        const res2 = await apiFetch('/api/staff-training-from-pdrs?apply=1', { method: 'POST' });
+        const d2 = await res2.json();
+        if (d2.error) throw new Error(d2.error);
+        await loadTrainingData();
+        renderExcelerate4();
+        renderTrainingReqs();
+        renderTrainingMatrix();
+    } catch (e) {
+        alert('Could not read the PDRs: ' + e.message);
+    } finally {
+        const b = document.getElementById('pdrFillBtn');
+        if (b) { b.disabled = false; b.textContent = 'Fill dates from filed PDRs'; }
+    }
 }
 
 async function saveTraining(staffId, trainingKey, completedDate) {
