@@ -3402,7 +3402,8 @@ async function handIn(key, btn) {
         const headers = (window.CofpAuth && CofpAuth.personalHeaders)
             ? CofpAuth.personalHeaders() : {};
         delete headers['Content-Type'];
-        const res = await fetch('/api/staff-file-upload?category=' + encodeURIComponent(key), {
+        const res = await fetch('/api/staff-file-upload?category=' + encodeURIComponent(key)
+            + '&staffId=' + encodeURIComponent(current.Id), {
             method: 'POST', headers: headers, body: form
         });
         const body = await res.json();
