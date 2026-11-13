@@ -213,6 +213,19 @@
     /* The document/action buttons live in this group at the right end of the tab
        strip. The group owns the push-right, so it does not matter which buttons
        inside it are hidden — the visible ones still sit flush right, together. */
+    /* "Silver credentials": a link beside the tabs rather than a tab of its own. */
+    .sp-tablink {
+        align-self: center; appearance: none; -webkit-appearance: none; cursor: pointer;
+        background: transparent; border: 0; font-family: inherit; font-size: 0.84rem;
+        font-weight: 700; color: var(--sp-accent); text-decoration: underline;
+        text-underline-offset: 3px; padding: 6px 10px; white-space: nowrap;
+    }
+    .sp-tablink:hover { color: var(--sp-text); }
+    .sp-tablink:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
+    .sp-silver-sec { border-top: 1px solid var(--sp-border); padding: 10px 0; }
+    .sp-silver-sec h3 { margin: 0 0 4px; font-size: 0.92rem; }
+    .sp-silver-sec p { margin: 0 0 4px; font-size: 0.84rem; color: var(--sp-text-2); line-height: 1.5; }
+    .sp-silver-you { font-size: 0.82rem; font-weight: 700; color: var(--sp-text); }
     .sp-tabactions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
     .sp-pdrtoggle {
         align-self: center; appearance: none; -webkit-appearance: none;
@@ -851,6 +864,15 @@
     </div>
 </div>
 
+<!-- ExceleRate Silver credential requirements, opened from the link beside the tabs. -->
+<dialog id="spSilverDlg" class="sp-attn-dlg" aria-labelledby="spSilverTitle">
+    <div class="sp-attn-dlg-head">
+        <h2 id="spSilverTitle">ExceleRate Silver: staff credential requirements</h2>
+        <button type="button" id="spSilverClose" class="sp-attn-btn" aria-label="Close">Close</button>
+    </div>
+    <div id="spSilverBody"></div>
+</dialog>
+
 <!-- Preview window for the Staff Attainments upload. -->
 <dialog id="spAttnDlg" class="sp-attn-dlg" aria-labelledby="spAttnDlgTitle">
     <div class="sp-attn-dlg-head">
@@ -1417,6 +1439,10 @@ function tabBar(s, tabs) {
                 + (n ? '<span class="sp-count" aria-label="' + n + ' needing attention">' + n + '</span>' : '')
                 + '</button>';
         }).join('')
+        // A link, not a tab: opens the ExceleRate Silver credential requirements in a window.
+        + '<button type="button" id="spSilverBtn" class="sp-tablink" aria-haspopup="dialog" '
+        + 'title="What ExceleRate Silver asks of staff credentials, and where you stand">'
+        + '\uD83E\uDD48 Silver credentials</button>'
         // At the right end of the strip: My Work History (opens the PD75a form) and,
         // beside it, a row of document/action buttons at the right end of the strip:
         //   Transcript   — opens this person's most recent transcript (view only)
@@ -3893,6 +3919,76 @@ function applyIdentityToBar() {
     $('spAttnBtn').style.display = mayChoose ? '' : 'none';
     return { mayChoose: mayChoose, isPersonal: isPersonal };
 }
+
+/* ExceleRate Silver requirements window. The requirements are the same ones the ExceleRate
+   Silver page checks centre-wide (Standard 4A/4B/4C and How ERS Works); this lists them and
+   shows where THIS person stands on each, from their own record. Each status is written in
+   words as well as a mark. */
+function silverRequirementsHtml(s) {
+    const name = esc((s && s.Name) || 'This person');
+    const ece = s ? credLevel(s, 'ece') : 0;
+    const it = s ? credLevel(s, 'it') : 0;
+    const dir = s ? credLevel(s, 'dir') : 0;
+    const pd = s ? pdHours(s) : null;
+    const year = new Date().getFullYear();
+    const isDir = !!(s && /director|administrator/i.test(s.Role || ''));
+    const mark = (ok, yes, no) => '<div class="sp-silver-you">' + (ok ? '\u2713 ' + yes : '\u2022 ' + no) + '</div>';
+
+    let h = '<p class="sp-sub">What ExceleRate Silver asks for, and where ' + name + ' stands. '
+        + 'The centre meets each standard as a whole, so a person below the line is not a failure; '
+        + 'it shows where the team count comes from.</p>';
+
+    h += '<div class="sp-silver-sec"><h3>4A \u2014 Director credential</h3>'
+        + '<p>The Director or Administrator holds a Gateways Illinois Director Credential at Level I or above, '
+        + 'or a Principal Endorsement.</p>'
+        + (isDir ? mark(dir >= 1, 'Holds Illinois Director Credential Level ' + dir + '.', 'No Director Credential level on record.')
+                 : '<p>Applies to the Director/Administrator only.</p>')
+        + '</div>';
+
+    h += '<div class="sp-silver-sec"><h3>4B \u2014 Staff credentials</h3>'
+        + '<ul style="margin:0 0 4px 18px;padding:0;font-size:0.84rem;color:var(--sp-text-2);line-height:1.5;">'
+        + '<li>At least 30% of teaching staff hold an <b>ECE Credential, Level 3 or above</b>.</li>'
+        + '<li>At least 30% of infant/toddler staff hold an <b>Infant Toddler Credential, Level 2 or above</b>.</li>'
+        + '<li>Ownership is left out of both counts. Staff who teach two rooms are counted once.</li></ul>'
+        + mark(ece >= 3, 'ECE Level ' + ece + ' counts toward the 30%.',
+               ece ? 'ECE Level ' + ece + ' does not yet count (needs Level 3).' : 'No ECE level on record.')
+        + mark(it >= 2, 'Infant Toddler Level ' + it + ' counts toward the 30%.',
+               it ? 'Infant Toddler Level ' + it + ' does not yet count (needs Level 2).'
+                  : 'No Infant Toddler level on record (only counts for infant/toddler rooms).')
+        + '</div>';
+
+    h += '<div class="sp-silver-sec"><h3>4C \u2014 Professional development</h3>'
+        + '<p>Every teaching staff member completes <b>20 clock hours</b> of professional development each '
+        + 'calendar year. The count restarts on 1 January.</p>'
+        + (pd == null ? mark(false, '', 'No PD hours recorded for ' + year + ' yet. That means unknown, not zero.')
+                      : mark(pd >= 20, pd + ' of 20 hours for ' + year + '.', pd + ' of 20 hours for ' + year + ' (' + (20 - pd) + ' to go).'))
+        + '</div>';
+
+    h += '<div class="sp-silver-sec"><h3>Training: How ERS Works</h3>'
+        + '<p>Required for the Director/Administrator and 50% of teaching staff (assistants count). '
+        + 'One trained teacher in every classroom is encouraged. Completed through iLearning or the Gateways Registry; '
+        + 'the date is recorded on the ExceleRate Silver page.</p></div>';
+
+    h += '<div class="sp-silver-sec"><h3>Classroom self-assessments</h3>'
+        + '<p>One scoresheet per classroom: ITERS-3 for infants, toddlers and twos, ECERS-3 for 3\u20135 year olds, '
+        + 'SACERS-U for school age. A two-to-three room uses ECERS-3 when 75% or more of the children are 3.</p></div>';
+
+    if (isAdmin()) {
+        h += '<div class="sp-silver-sec"><p><a href="/staff/excelerate.html">Open the ExceleRate Silver page</a> '
+            + 'for the centre-wide counts.</p></div>';
+    }
+    return h;
+}
+
+$('spSilverClose').addEventListener('click', () => $('spSilverDlg').close());
+// The button is part of the tab strip, which is rebuilt on every render, so listen on the document.
+document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('#spSilverBtn');
+    if (!b) return;
+    $('spSilverBody').innerHTML = silverRequirementsHtml(current);
+    const dlg = $('spSilverDlg');
+    if (!dlg.open) dlg.showModal();
+});
 
 /* Top-bar "Upload Staff Attainments": choose the PDF, preview in a window, apply there. */
 $('spAttnBtn').addEventListener('click', () => { $('spAttnFile').value = ''; $('spAttnFile').click(); });
