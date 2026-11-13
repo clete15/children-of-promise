@@ -222,10 +222,21 @@
     }
     .sp-tablink:hover { color: var(--sp-text); }
     .sp-tablink:focus-visible { outline: 2px solid var(--sp-accent); outline-offset: 2px; }
-    .sp-silver-sec { border-top: 1px solid var(--sp-border); padding: 10px 0; }
-    .sp-silver-sec h3 { margin: 0 0 4px; font-size: 0.92rem; }
-    .sp-silver-sec p { margin: 0 0 4px; font-size: 0.84rem; color: var(--sp-text-2); line-height: 1.5; }
-    .sp-silver-you { font-size: 0.82rem; font-weight: 700; color: var(--sp-text); }
+    /* Silver training cards: grey until the training is on the PDR, then green. */
+    .sp-silver-group { margin: 14px 0 8px; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+    .sp-silver-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+    .sp-silver-card {
+        border: 1.5px solid var(--sp-border); border-radius: 9px; padding: 10px 12px;
+        background: var(--sp-surface-2);
+    }
+    .sp-silver-card.done { background: var(--sp-good-bg); border-color: var(--sp-good-br); }
+    .sp-silver-card-head { display: flex; align-items: baseline; gap: 7px; }
+    .sp-silver-std { font-size: 0.66rem; font-weight: 800; color: var(--sp-muted); letter-spacing: 0.03em; }
+    .sp-silver-name { font-size: 0.9rem; font-weight: 800; color: var(--sp-text); }
+    .sp-silver-status { font-size: 0.82rem; font-weight: 700; margin-top: 4px; color: var(--sp-muted); }
+    .sp-silver-card.done .sp-silver-status { color: var(--sp-good-fg); }
+    .sp-silver-pdr { font-size: 0.78rem; color: var(--sp-text-2); margin-top: 3px; font-style: italic; }
+    .sp-silver-accepts { font-size: 0.76rem; color: var(--sp-muted); margin-top: 6px; line-height: 1.45; }
     .sp-tabactions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
     .sp-pdrtoggle {
         align-self: center; appearance: none; -webkit-appearance: none;
@@ -867,7 +878,7 @@
 <!-- ExceleRate Silver credential requirements, opened from the link beside the tabs. -->
 <dialog id="spSilverDlg" class="sp-attn-dlg" aria-labelledby="spSilverTitle">
     <div class="sp-attn-dlg-head">
-        <h2 id="spSilverTitle">ExceleRate Silver: staff credential requirements</h2>
+        <h2 id="spSilverTitle">ExceleRate Silver trainings</h2>
         <button type="button" id="spSilverClose" class="sp-attn-btn" aria-label="Close">Close</button>
     </div>
     <div id="spSilverBody"></div>
@@ -1441,8 +1452,8 @@ function tabBar(s, tabs) {
         }).join('')
         // A link, not a tab: opens the ExceleRate Silver credential requirements in a window.
         + '<button type="button" id="spSilverBtn" class="sp-tablink" aria-haspopup="dialog" '
-        + 'title="What ExceleRate Silver asks of staff credentials, and where you stand">'
-        + '\uD83E\uDD48 Silver credentials</button>'
+        + 'title="The ExceleRate Silver trainings we require, checked against the PDR on file">'
+        + '\uD83E\uDD48 Silver trainings</button>'
         // At the right end of the strip: My Work History (opens the PD75a form) and,
         // beside it, a row of document/action buttons at the right end of the strip:
         //   Transcript   — opens this person's most recent transcript (view only)
@@ -3920,64 +3931,177 @@ function applyIdentityToBar() {
     return { mayChoose: mayChoose, isPersonal: isPersonal };
 }
 
-/* ExceleRate Silver requirements window. The requirements are the same ones the ExceleRate
-   Silver page checks centre-wide (Standard 4A/4B/4C and How ERS Works); this lists them and
-   shows where THIS person stands on each, from their own record. Each status is written in
-   words as well as a mark. */
-function silverRequirementsHtml(s) {
-    const name = esc((s && s.Name) || 'This person');
-    const ece = s ? credLevel(s, 'ece') : 0;
-    const it = s ? credLevel(s, 'it') : 0;
-    const dir = s ? credLevel(s, 'dir') : 0;
-    const pd = s ? pdHours(s) : null;
-    const year = new Date().getFullYear();
-    const isDir = !!(s && /director|administrator/i.test(s.Role || ''));
-    const mark = (ok, yes, no) => '<div class="sp-silver-you">' + (ok ? '\u2713 ' + yes : '\u2022 ' + no) + '</div>';
+/* ── Silver trainings ───────────────────────────────────────────────────────
+   The ExceleRate Illinois "Training Requirements for Licensed Child Care Centers" grid
+   (INCCRRA, REV 07.01.26), Silver column. The centre requires the teaching-staff
+   trainings of EVERY teacher, not just the 50% the grid asks for; the administrator
+   trainings are added for the site program administrator.
 
-    let h = '<p class="sp-sub">What ExceleRate Silver asks for, and where ' + name + ' stands. '
-        + 'The centre meets each standard as a whole, so a person below the line is not a failure; '
-        + 'it shows where the team count comes from.</p>';
+   A card lights green only when the training is on the person's newest filed PDR
+   (Sections 3-5, which is what makes a training ExceleRate-approved), or when the grid
+   says a Gateways credential meets it. Each card lists the accepted titles, since the
+   PDR prints the title and that is what is matched.
 
-    h += '<div class="sp-silver-sec"><h3>4A \u2014 Director credential</h3>'
-        + '<p>The Director or Administrator holds a Gateways Illinois Director Credential at Level I or above, '
-        + 'or a Principal Endorsement.</p>'
-        + (isDir ? mark(dir >= 1, 'Holds Illinois Director Credential Level ' + dir + '.', 'No Director Credential level on record.')
-                 : '<p>Applies to the Director/Administrator only.</p>')
+   Which person is the site program administrator is set here, by Registry number, so a
+   change of director is a one-line edit. */
+const SILVER_SITE_ADMIN_REGISTRY = ['N179660'];          // Megan Nooney
+
+/* Trainings a Gateways credential satisfies, per the grid's footnote: ECE Credential
+   Level 3-5, Infant Toddler Credential Level 3-5, or Illinois Director Credential I-III. */
+const SILVER_CRED_MEETS = ['curriculumOverview', 'screening', 'assessment', 'weec', 'family',
+    'transitions', 'cqi', 'clap', 'ipdp'];
+
+const SILVER_TRAININGS = [
+    // Every teacher (and the administrator)
+    { key: 'ers', who: 'all', std: '1A', name: 'Environment Rating Scales',
+      accepts: 'How ERS Works (2025), or An Introduction to the Environment Rating Scales (2007\u2013June 2025)',
+      re: /how\s+ers\s+works|introduction\s+to\s+the\s+environment\s+rating\s+scales/i },
+    { key: 'elg', who: 'all', std: '1B/1C', name: 'Early learning guidelines for your age group',
+      accepts: 'Birth to three: Illinois Early Learning Guidelines (IELG). Preschool: Illinois Early Learning & Development Standards (IELDS).',
+      re: /illinois\s+early\s+learning\s+guidelines|\bIELG\b|early\s+learning\s+(?:and|&)\s+development\s+standards|\bIELDS\b/i },
+    { key: 'curriculumSilver', who: 'all', std: '1B', name: 'Curriculum implementation',
+      accepts: 'Creative Curriculum for Infants, Toddlers and Twos, or for Preschool (5th ed.) ($20); or Off the Shelf and into Practice: Using Your Curriculum Every Day',
+      re: /creative\s+curriculum|off\s+the\s+shelf\s+and\s+into\s+practice/i },
+    { key: 'weec', who: 'all', std: '1F', name: 'Inclusion of children with disabilities or delays',
+      accepts: 'Welcoming Each & Every Child (WEEC), any length; or Special Care (2004\u20132012). An Associate or higher in ECE, child development or special education also meets it, confirmed by transcript.',
+      re: /welcoming\s+each\s*(?:&|and)\s*every\s+child|\bWEEC\b|\bspecial\s+care\b/i },
+    { key: 'clap', who: 'all', std: '3D', name: 'Linguistically & culturally appropriate practice',
+      accepts: 'Basics of Culturally and Linguistically Appropriate Practice(s)',
+      re: /culturally\s+and\s+linguistically\s+appropriate/i },
+    // Site program administrator only
+    { key: 'orientation', who: 'admin', std: '\u2014', name: 'ExceleRate Illinois Orientation',
+      accepts: 'ExceleRate Illinois Orientation (for Child Care Centers)',
+      re: /excelerate.{0,20}illinois.{0,30}orientation/i },
+    { key: 'curriculumOverview', who: 'admin', std: '1B', name: 'Curriculum overview',
+      accepts: 'Finding a Curriculum that Works for You',
+      re: /finding\s+a\s+curriculum/i },
+    { key: 'screening', who: 'admin', std: '1D', name: 'Child screening',
+      accepts: 'Introduction to Developmental Screening Tools, or Early Childhood Developmental Screening (ECDS)',
+      re: /introduction\s+to\s+developmental\s+screening|early\s+childhood\s+developmental\s+screening|\bECDS\b/i },
+    { key: 'assessment', who: 'admin', std: '1E', name: 'Child assessment',
+      accepts: 'Fundamentals of Child Assessment',
+      re: /fundamentals\s+of\s+child\s+assessment/i },
+    { key: 'family', who: 'admin', std: '2A', name: 'Family & community engagement',
+      accepts: 'Family and Community: Partners in Learning',
+      re: /family\s+and\s+community/i },
+    { key: 'transitions', who: 'admin', std: '2B', name: 'Transitions',
+      accepts: 'An Introduction to Transitions',
+      re: /introduction\s+to\s+transitions/i },
+    { key: 'pas', who: 'admin', std: '3A', name: 'Program administration',
+      accepts: 'Getting Ready for the PAS (2nd Edition) ($15)',
+      re: /getting\s+ready\s+for\s+the\s+pas/i },
+    { key: 'cqi', who: 'admin', std: '3C', name: 'Continuous quality improvement',
+      accepts: 'Understanding and Planning for Continuous Quality Improvement',
+      re: /continuous\s+quality\s+improvement/i },
+    { key: 'ipdp', who: 'admin', std: '4C', name: 'Staff development',
+      accepts: 'Creating Individual Professional Development Plans',
+      re: /individual\s+professional\s+development\s+plans?/i }
+];
+
+let SILVER_PDR = {};      // staffId -> { state: 'loading'|'ok'|'none'|'error', data, error }
+
+function isSilverSiteAdmin(s) {
+    return !!(s && SILVER_SITE_ADMIN_REGISTRY.indexOf(String(s.RegistryId || '').toUpperCase()) >= 0);
+}
+
+// The credential that satisfies the credential-met trainings, in words, or ''.
+function silverCredentialCover(s) {
+    const ece = credLevel(s, 'ece'), it = credLevel(s, 'it'), dir = credLevel(s, 'dir');
+    if (dir >= 1) return 'Illinois Director Credential Level ' + ['', 'I', 'II', 'III'][dir];
+    if (ece >= 3) return 'ECE Credential Level ' + ece;
+    if (it >= 3) return 'Infant Toddler Credential Level ' + it;
+    return '';
+}
+
+function fmtUsDate(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? (+m[2]) + '/' + (+m[3]) + '/' + m[1] : String(iso || '');
+}
+
+// How one training stands for one person: the earliest PDR row that matches, and/or the
+// credential that meets it. One function, so the card and the "N of M" count agree.
+function silverStatus(t, s, pdr) {
+    const hit = pdr && pdr.trainings
+        ? pdr.trainings.filter(x => t.re.test(x.title)).sort((a, b) => a.date.localeCompare(b.date))[0] || null
+        : null;
+    const cover = SILVER_CRED_MEETS.indexOf(t.key) >= 0 ? silverCredentialCover(s) : '';
+    return { hit: hit, cover: cover, done: !!hit || !!cover };
+}
+
+function silverCardHtml(t, s, pdr) {
+    const { hit, cover, done } = silverStatus(t, s, pdr);
+    const status = hit
+        ? '\u2713 On your PDR, completed ' + esc(fmtUsDate(hit.date))
+        : cover ? '\u2713 Met by your ' + esc(cover)
+        : 'Not on your PDR yet';
+    const shown = hit ? hit.title.replace(/\s+\d+(?:\.\d+)?\s*[A-Za-z .'-]*$/, '').trim() : '';
+    return '<div class="sp-silver-card' + (done ? ' done' : '') + '">'
+        + '<div class="sp-silver-card-head"><span class="sp-silver-std">' + esc(t.std) + '</span>'
+        + '<span class="sp-silver-name">' + esc(t.name) + '</span></div>'
+        + '<div class="sp-silver-status">' + status + '</div>'
+        + (shown ? '<div class="sp-silver-pdr">' + esc(shown) + '</div>' : '')
+        + '<div class="sp-silver-accepts">Accepted: ' + esc(t.accepts) + '</div>'
         + '</div>';
+}
 
-    h += '<div class="sp-silver-sec"><h3>4B \u2014 Staff credentials</h3>'
-        + '<ul style="margin:0 0 4px 18px;padding:0;font-size:0.84rem;color:var(--sp-text-2);line-height:1.5;">'
-        + '<li>At least 30% of teaching staff hold an <b>ECE Credential, Level 3 or above</b>.</li>'
-        + '<li>At least 30% of infant/toddler staff hold an <b>Infant Toddler Credential, Level 2 or above</b>.</li>'
-        + '<li>Ownership is left out of both counts. Staff who teach two rooms are counted once.</li></ul>'
-        + mark(ece >= 3, 'ECE Level ' + ece + ' counts toward the 30%.',
-               ece ? 'ECE Level ' + ece + ' does not yet count (needs Level 3).' : 'No ECE level on record.')
-        + mark(it >= 2, 'Infant Toddler Level ' + it + ' counts toward the 30%.',
-               it ? 'Infant Toddler Level ' + it + ' does not yet count (needs Level 2).'
-                  : 'No Infant Toddler level on record (only counts for infant/toddler rooms).')
-        + '</div>';
+function silverTrainingsHtml(s) {
+    if (!s) return '<p class="sp-sub">Choose a member of staff first.</p>';
+    const st = SILVER_PDR[s.Id] || { state: 'loading' };
+    const admin = isSilverSiteAdmin(s);
+    const list = SILVER_TRAININGS.filter(t => t.who === 'all' || admin);
 
-    h += '<div class="sp-silver-sec"><h3>4C \u2014 Professional development</h3>'
-        + '<p>Every teaching staff member completes <b>20 clock hours</b> of professional development each '
-        + 'calendar year. The count restarts on 1 January.</p>'
-        + (pd == null ? mark(false, '', 'No PD hours recorded for ' + year + ' yet. That means unknown, not zero.')
-                      : mark(pd >= 20, pd + ' of 20 hours for ' + year + '.', pd + ' of 20 hours for ' + year + ' (' + (20 - pd) + ' to go).'))
-        + '</div>';
+    let h = '<p class="sp-sub">The ExceleRate Silver trainings Children of Promise requires of '
+        + (admin ? esc(s.Name) + ' as the site program administrator' : 'every teacher')
+        + '. A card turns green once the training appears on ' + esc(s.Name) + '\u2019s Gateways PDR.</p>';
 
-    h += '<div class="sp-silver-sec"><h3>Training: How ERS Works</h3>'
-        + '<p>Required for the Director/Administrator and 50% of teaching staff (assistants count). '
-        + 'One trained teacher in every classroom is encouraged. Completed through iLearning or the Gateways Registry; '
-        + 'the date is recorded on the ExceleRate Silver page.</p></div>';
-
-    h += '<div class="sp-silver-sec"><h3>Classroom self-assessments</h3>'
-        + '<p>One scoresheet per classroom: ITERS-3 for infants, toddlers and twos, ECERS-3 for 3\u20135 year olds, '
-        + 'SACERS-U for school age. A two-to-three room uses ECERS-3 when 75% or more of the children are 3.</p></div>';
-
-    if (isAdmin()) {
-        h += '<div class="sp-silver-sec"><p><a href="/staff/excelerate.html">Open the ExceleRate Silver page</a> '
-            + 'for the centre-wide counts.</p></div>';
+    if (st.state === 'loading') return h + '<p class="sp-sub">Reading the PDR on file\u2026</p>';
+    if (st.state === 'error') {
+        // A read failure is not "nothing done": say so, and do not show a wall of grey cards.
+        return h + '<div class="sp-step alert"><div class="t">Could not read the PDR on file</div>'
+            + '<div class="d">' + esc(st.error || '') + ' The cards are not shown, because they would wrongly read as not done.</div></div>';
     }
+    if (st.state === 'none') {
+        h += '<div class="sp-step"><div class="t">No PDR on file yet</div><div class="d">Use <b>Update PDR</b> to file '
+            + esc(s.Name) + '\u2019s current Gateways PDR. Until then only credential-met trainings can show green.</div></div>';
+    } else if (st.data) {
+        h += '<p class="sp-sub">Read from ' + esc(st.data.file) + (st.data.printed ? ', printed ' + esc(st.data.printed) : '')
+            + '. Take a training and pull a new PDR to update this.</p>';
+    }
+
+    const pdr = st.state === 'ok' ? st.data : null;
+    const group = (who, title) => {
+        const items = list.filter(t => t.who === who);
+        if (!items.length) return '';
+        const done = items.filter(t => silverStatus(t, s, pdr).done).length;
+        return '<h3 class="sp-silver-group">' + esc(title) + ' <span class="sp-pill' + (done === items.length ? ' done' : '') + '">'
+            + done + ' of ' + items.length + ' complete</span></h3>'
+            + '<div class="sp-silver-grid">' + items.map(t => silverCardHtml(t, s, pdr)).join('') + '</div>';
+    };
+    h += group('all', 'Required of every teacher');
+    if (admin) h += group('admin', 'Also required of the site program administrator');
+    h += '<p class="sp-sub" style="margin-top:10px;">Source: ExceleRate Illinois, Training Requirements for Licensed Child Care '
+        + 'Centers (INCCRRA, rev. 07.01.26). A training must be Gateways Registry-approved and on Section 3, 4 or 5 of the PDR to count.</p>';
     return h;
+}
+
+function renderSilverDialog() {
+    const dlg = $('spSilverDlg');
+    if (dlg && dlg.open) $('spSilverBody').innerHTML = silverTrainingsHtml(current);
+}
+
+async function loadSilverPdr(s) {
+    if (!s || !s.Id) return;
+    SILVER_PDR[s.Id] = { state: 'loading' };
+    renderSilverDialog();
+    try {
+        const res = await myFetch('/api/staff-pdr-trainings?staffId=' + encodeURIComponent(s.Id));
+        const d = await res.json();
+        if (!res.ok || d.error) throw new Error(d.error || ('HTTP ' + res.status));
+        SILVER_PDR[s.Id] = d.found ? { state: 'ok', data: d } : { state: 'none' };
+    } catch (e) {
+        SILVER_PDR[s.Id] = { state: 'error', error: e.message || String(e) };
+    }
+    renderSilverDialog();
 }
 
 $('spSilverClose').addEventListener('click', () => $('spSilverDlg').close());
@@ -3985,9 +4109,10 @@ $('spSilverClose').addEventListener('click', () => $('spSilverDlg').close());
 document.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('#spSilverBtn');
     if (!b) return;
-    $('spSilverBody').innerHTML = silverRequirementsHtml(current);
     const dlg = $('spSilverDlg');
     if (!dlg.open) dlg.showModal();
+    // Re-read every time it opens, so a PDR filed a minute ago shows straight away.
+    loadSilverPdr(current);
 });
 
 /* Top-bar "Upload Staff Attainments": choose the PDF, preview in a window, apply there. */

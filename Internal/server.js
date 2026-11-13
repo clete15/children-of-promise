@@ -9989,6 +9989,40 @@ ELSE
         return sendJSON(res, 200, rows);
     }
 
+    /* The Registry-verified trainings on ONE person's newest filed PDR, for the staff
+       portal's "Silver trainings" cards. GET /api/staff-pdr-trainings?staffId=N
+       A staff member gets their own; an admin, anyone's. Reports "no PDR filed" and
+       "could not read it" as themselves, never as an empty list, so a card is only ever
+       left un-green because the training is genuinely not on the PDR. */
+    if (req.method === 'GET' && url.startsWith('/api/staff-pdr-trainings')) {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        const asked = parseInt(new URLSearchParams(req.url.split('?')[1] || '').get('staffId') || 0, 10);
+        const staffId = (actor.director || actor.admin) ? asked : parseInt(actor.staffId, 10);
+        if (!staffId) return sendJSON(res, 400, { error: 'Which staff member? (no staffId)' });
+        if (!actorMayTouch(actor, staffId)) return sendJSON(res, 403, { error: 'You can only see your own PDR.' });
+
+        const links = runSQLRows(`SELECT RelPath, ISNULL(UploadedDate,'') AS UploadedDate FROM StaffFileLinks
+            WHERE StaffId=${staffId} AND Status='Confirmed' AND RelPath LIKE 'Staff/Staff PDRs/%'`,
+            staffFileLinksEnsureSQL() + 'GO\n');
+        if (!links.ok) return sendJSON(res, 500, { error: 'Could not read the PDR list: ' + links.error });
+        const mine = links.rows.slice().sort((a, b) => String(b.UploadedDate).localeCompare(String(a.UploadedDate)));
+        if (!mine.length) return sendJSON(res, 200, { found: false, reason: 'No PDR is filed for this person yet.' });
+
+        const root = findDocRoot();
+        if (!root) return sendJSON(res, 500, { error: 'The document library is not reachable from the server.' });
+        const pdf = path.join(root, ...String(mine[0].RelPath).split('/'));
+        if (!fs.existsSync(pdf)) return sendJSON(res, 500, { error: 'The filed PDR is missing from the library: ' + mine[0].RelPath });
+        const ex = pdfToText(pdf);
+        if (!ex.ok) return sendJSON(res, 500, { error: 'Could not read the PDR: ' + ex.error });
+        const pdr = parsePdr(ex.text);
+        const printed = (String(ex.text).match(/Printed\s+(\d{1,2}\/\d{1,2}\/\d{4})/i) || [])[1] || '';
+        return sendJSON(res, 200, {
+            found: true, file: path.basename(mine[0].RelPath), printed: printed,
+            trainings: pdr.trainings.map(t => ({ date: t.date, title: t.title }))
+        });
+    }
+
     /* Fill the ExceleRate training dates from the PDRs already filed for each person.
        A Gateways PDR lists every Registry-verified training with its date, so "How ERS
        Works", "Making ECERS-3 Work For You" and ITERS-3 can be read straight off it
