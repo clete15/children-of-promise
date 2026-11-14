@@ -3952,13 +3952,17 @@ const SILVER_CRED_MEETS = ['curriculumOverview', 'screening', 'assessment', 'wee
     'transitions', 'cqi', 'clap', 'ipdp'];
 
 const SILVER_TRAININGS = [
-    // Every teacher (and the administrator)
+    /* Every teacher (and the administrator): every grid row whose attendees include
+       "50% teaching staff", at Bronze OR Silver, since the centre asks it of all. */
     { key: 'ers', who: 'all', std: '1A', name: 'Environment Rating Scales',
       accepts: 'How ERS Works (2025), or An Introduction to the Environment Rating Scales (2007\u2013June 2025)',
       re: /how\s+ers\s+works|introduction\s+to\s+the\s+environment\s+rating\s+scales/i },
     { key: 'elg', who: 'all', std: '1B/1C', name: 'Early learning guidelines for your age group',
       accepts: 'Birth to three: Illinois Early Learning Guidelines (IELG). Preschool: Illinois Early Learning & Development Standards (IELDS).',
       re: /illinois\s+early\s+learning\s+guidelines|\bIELG\b|early\s+learning\s+(?:and|&)\s+development\s+standards|\bIELDS\b/i },
+    { key: 'curriculumOverview', who: 'all', std: '1B', name: 'Curriculum overview',
+      accepts: 'Finding a Curriculum that Works for You',
+      re: /finding\s+a\s+curriculum/i },
     { key: 'curriculumSilver', who: 'all', std: '1B', name: 'Curriculum implementation',
       accepts: 'Creative Curriculum for Infants, Toddlers and Twos, or for Preschool (5th ed.) ($20); or Off the Shelf and into Practice: Using Your Curriculum Every Day',
       re: /creative\s+curriculum|off\s+the\s+shelf\s+and\s+into\s+practice/i },
@@ -3972,9 +3976,7 @@ const SILVER_TRAININGS = [
     { key: 'orientation', who: 'admin', std: '\u2014', name: 'ExceleRate Illinois Orientation',
       accepts: 'ExceleRate Illinois Orientation (for Child Care Centers)',
       re: /excelerate.{0,20}illinois.{0,30}orientation/i },
-    { key: 'curriculumOverview', who: 'admin', std: '1B', name: 'Curriculum overview',
-      accepts: 'Finding a Curriculum that Works for You',
-      re: /finding\s+a\s+curriculum/i },
+
     { key: 'screening', who: 'admin', std: '1D', name: 'Child screening',
       accepts: 'Introduction to Developmental Screening Tools, or Early Childhood Developmental Screening (ECDS)',
       re: /introduction\s+to\s+developmental\s+screening|early\s+childhood\s+developmental\s+screening|\bECDS\b/i },
