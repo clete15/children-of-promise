@@ -213,6 +213,12 @@
     /* The document/action buttons live in this group at the right end of the tab
        strip. The group owns the push-right, so it does not matter which buttons
        inside it are hidden — the visible ones still sit flush right, together. */
+    .sp-wh-refresh {
+        margin-left: 6px; padding: 2px 9px; border: 1.5px solid var(--sp-border); border-radius: 6px;
+        background: var(--sp-accent-soft); color: var(--sp-accent); font: inherit; font-size: 0.78rem;
+        font-weight: 700; cursor: pointer;
+    }
+    .sp-wh-refresh:hover { border-color: var(--sp-accent); }
     /* "Silver credentials": a link beside the tabs rather than a tab of its own. */
     .sp-tablink {
         align-self: center; appearance: none; -webkit-appearance: none; cursor: pointer;
@@ -901,7 +907,7 @@
 <script src="/pas/pas-store.js"></script>
 
 <!-- The Gateways ECE and Infant Toddler level tables, for the next-steps cards. -->
-<script src="credential-framework.js"></script>
+<script src="credential-framework.js?v=20261029"></script>
 
 <!-- Child-record form machinery, shared with isbe.html so the My Classroom tab and
      the ISBE roster's [form] links open the very same forms. child-forms.js tells a
@@ -1104,9 +1110,11 @@ function readWorkHistory(staffId) {
         const n = parseFloat(String(d[k] == null ? '' : d[k]).replace(/[^0-9.]/g, ''));
         return isFinite(n) ? n : 0;
     };
-    out.itHours = hrs('itTotal');
-    out.psHours = hrs('psTotal');
-    out.saHours = hrs('saTotal');
+    // The "= Total Hours" box, or hours x weeks x years when the total was left blank.
+    const total = p => hrs(p + 'Total') || Math.round(hrs(p + 'Hrs') * hrs(p + 'Wks') * hrs(p + 'Yrs'));
+    out.itHours = total('it');
+    out.psHours = total('ps');
+    out.saHours = total('sa');
     out.blank = (out.itHours + out.psHours + out.saHours) <= 0;
     return out;
 }
@@ -2002,14 +2010,42 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
     } else {
         comp += areaCol + guidance;
     }
+    comp += eceStillNeededHtml(model, kind, heldLevel, staff);
     // ── Classroom / experience ──
     // Sits right after College (above Competencies): it is a short, single-line
     // requirement like College, so the two brief rows read together at the top and the
     // wide coverage-by-area grid comes last.
+    /* Checked against the Work & Practical Experience form (PD75a). When the documented
+       hours on the form already meet this level, the row is removed: there is nothing
+       left to do on it. Otherwise it says how far the form gets, with a button to re-read
+       the form after it has been updated in its own tab.
+       ITC counts the infant/toddler section only. ECE counts every age-group section,
+       because the ECE credential covers work with children birth to age 8. */
     if (model.classroom) {
-        body += '<div class="sp-need">'
-            + '<div class="sp-need-k">Classroom</div>'
-            + '<div class="sp-need-v">' + esc(model.classroom) + '</div></div>';
+        const F = window.CredentialFramework;
+        const table = F ? (kind === 'itc' ? F.ITC_LEVELS : F.ECE_LEVELS) : null;
+        const row = table ? table.find(r => r.level === model.level) : null;
+        const need = row && row.experience ? (row.experience.documented || 0) : 0;
+        const wh = staff ? readWorkHistory(staff.Id) : { exists: false, itHours: 0, psHours: 0, saHours: 0 };
+        const have = kind === 'itc' ? wh.itHours : (wh.itHours + wh.psHours + wh.saHours);
+        if (!(need && have >= need)) {
+            const whLink = staff
+                ? '<a href="/pas/staff-work-history.html?staffId=' + encodeURIComponent(staff.Id) + '" target="_blank">Work History form</a>'
+                : 'Work History form';
+            const status = !wh.exists
+                ? 'No ' + whLink + ' on file yet.'
+                : 'The ' + whLink + ' records <b>' + have.toLocaleString('en-US') + '</b> of the <b>'
+                  + need.toLocaleString('en-US') + '</b> documented hours'
+                  + (kind === 'itc' ? ' with infants and toddlers' : '') + ' (' + (need - have).toLocaleString('en-US') + ' to go).';
+            const line = model.classroom.replace(/hours supervised/,
+                row && row.experience && row.experience.supervisedLabel ? row.experience.supervisedLabel : 'hours supervised');
+            body += '<div class="sp-need">'
+                + '<div class="sp-need-k">Classroom</div>'
+                + '<div class="sp-need-v">' + esc(line)
+                + '<div class="sp-need-sub">' + status
+                + ' <button type="button" class="sp-wh-refresh" title="Re-read the Work History form after updating it">\u21bb Refresh</button></div>'
+                + '</div></div>';
+        }
     }
 
     // The coverage grid spans the FULL card width. No "Competencies" label: the two
@@ -2019,6 +2055,56 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
         + '<div class="sp-need-body">' + comp + '</div></div>';
 
     return ladderShell(title, heldLevel, heldWord, body);
+}
+
+/* "What this ECE level still needs from you": the level's competencies, minus what ECE
+   Level 1 and a CDA already meet (framework PD229), grouped by area with the person's
+   training hours and college courses beside each, plus the framework's training cap.
+   College coursework is listed but never ticked off a competency: Gateways decides which
+   competency a course meets, and claiming it here would tell someone they are done when
+   they are not. */
+function eceStillNeededHtml(model, kind, heldLevel, staff) {
+    const F = window.CredentialFramework;
+    if (kind !== 'ece' || !F || !F.eceRemainingCompetencies || !model.level || model.level > 4) return '';
+    const r = F.eceRemainingCompetencies(model.level, Number(heldLevel) || 0, staff);
+    const cap = F.TRAINING_ALLOWANCE ? F.TRAINING_ALLOWANCE.ece.low : 6;
+    const byArea = {};
+    r.remaining.forEach(c => { const a = F.areaOf(c); (byArea[a] = byArea[a] || []).push(c); });
+    const areaInfo = {};
+    (model.areas || []).forEach(a => { areaInfo[a.code] = a; });
+
+    let h = '<div class="sp-need-sub" style="margin-top:14px;"><b>What ECE ' + esc(model.levelWord)
+        + ' still needs from you</b> \u2014 ' + r.remaining.length + ' of the ' + r.required.length + ' competencies.</div>';
+    if (r.met.length) {
+        const groups = {};
+        r.met.forEach(m => { (groups[m.by] = groups[m.by] || []).push(m.code); });
+        h += '<div class="sp-need-sub">Already met: ' + Object.keys(groups).map(k =>
+            esc(groups[k].join(', ')) + ' (by your ' + esc(k) + ')').join('; ') + '.</div>';
+    }
+    if (!r.remaining.length) return h;
+    h += '<ul style="margin:6px 0 0 18px;padding:0;font-size:0.88rem;line-height:1.6;">'
+        + Object.keys(byArea).map(code => {
+            const a = areaInfo[code] || {};
+            const name = (F.COMPETENCY_AREAS[code] && F.COMPETENCY_AREAS[code].area) || code;
+            const have = [];
+            if (a.hours) have.push(a.hours + ' training hrs on file');
+            if (a.collegeCourses && a.collegeCourses.length) have.push('college: ' + a.collegeCourses.join(', '));
+            return '<li><b>' + esc(byArea[code].join(', ')) + '</b> \u2014 ' + esc(name)
+                + (have.length ? ' <span style="color:var(--sp-muted);">(' + esc(have.join('; ')) + ')</span>' : '')
+                + '</li>';
+        }).join('') + '</ul>';
+    h += '<div class="sp-need-sub" style="margin-top:6px;">Gateways accepts up to <b>' + cap + '</b> competencies in total '
+        + 'from credential-approved training at Levels 2\u20134; the rest come from college coursework or a CDA.'
+        + (r.remaining.length > cap
+            ? ' With ' + r.remaining.length + ' still to show, training alone cannot finish this level: at least '
+              + (r.remaining.length - cap) + ' must come from college coursework or a CDA.'
+            : '')
+        + ' Gateways decides which training or course meets which competency.</div>'
+        + '<div class="sp-need-sub">To find the trainings, search the <a href="https://www.ilgateways.com" target="_blank" rel="noopener">Gateways '
+        + 'training calendar</a> or <a href="https://courses.inccrra.org" target="_blank" rel="noopener">i-Learning</a> for '
+        + 'credential-approved trainings in these areas. The surest list comes from Gateways: once you apply, the credential '
+        + 'specialist writes back naming the exact trainings to take.</div>';
+    return h;
 }
 
 function ladderShell(title, heldLevel, heldWord, body) {
@@ -4105,6 +4191,21 @@ async function loadSilverPdr(s) {
     }
     renderSilverDialog();
 }
+
+/* "Refresh" on the Classroom line: re-read the worksheet store (the Work History form is
+   edited in its own tab) and redraw, so a form just saved is reflected here. */
+document.addEventListener('click', async e => {
+    const b = e.target.closest && e.target.closest('.sp-wh-refresh');
+    if (!b) return;
+    b.disabled = true; b.textContent = 'Checking\u2026';
+    try {
+        await PasStore.refresh();
+        render();
+    } catch (err) {
+        b.disabled = false; b.textContent = '\u21bb Refresh';
+        alert('Could not re-read the Work History form: ' + (err.message || err));
+    }
+});
 
 $('spSilverClose').addEventListener('click', () => $('spSilverDlg').close());
 // The button is part of the tab strip, which is rebuilt on every render, so listen on the document.

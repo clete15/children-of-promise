@@ -336,6 +336,25 @@ var TRAINING_ALLOWANCE = {
 var PRESCHOOL_CDA_ECE = ['HSW1', 'HSW2', 'IRE1', 'IRE2', 'FCR1', 'PPD1'];
 var IT_CDA_ECE = ['FCR1', 'PPD1'];
 
+/* What ECE Credential Level 1 already meets, per the framework (PD229, 12/19/2022):
+   "Level 1 ... meets HGD1, HSW1, IRE1, IRE2, and FCR1." */
+var ECE_LEVEL1_MEETS = ['HGD1', 'HSW1', 'IRE1', 'IRE2', 'FCR1'];
+
+/* The ECE competencies a level still needs once what the person already holds is taken
+   off: Level 1 (if held) and a CDA. College coursework is not subtracted, because the PDR
+   ties a course to a content AREA, not to a numbered competency; only Gateways can say
+   which competency a course meets. Returns { required, met:[{code,by}], remaining }. */
+function eceRemainingCompetencies(level, heldEce, s) {
+    var required = eceCompetenciesFor(level);
+    var by = {};
+    if ((heldEce || 0) >= 1) ECE_LEVEL1_MEETS.forEach(function (c) { by[c] = by[c] || 'ECE Level 1'; });
+    if (s && hasPreschoolCda(s)) PRESCHOOL_CDA_ECE.forEach(function (c) { by[c] = by[c] || 'Preschool CDA'; });
+    else if (s && hasInfantToddlerCda(s)) IT_CDA_ECE.forEach(function (c) { by[c] = by[c] || 'Infant/Toddler CDA'; });
+    var met = [], remaining = [];
+    required.forEach(function (c) { if (by[c]) met.push({ code: c, by: by[c] }); else remaining.push(c); });
+    return { required: required, met: met, remaining: remaining };
+}
+
 // Everything an ECE level needs: its own additions plus every level below it.
 function eceCompetenciesFor(level) {
     var all = [];
@@ -989,6 +1008,9 @@ root.CredentialFramework = {
     IT_CDA_ECE: IT_CDA_ECE,
     competenciesFor: competenciesFor,
     eceCompetenciesFor: eceCompetenciesFor,
+    ECE_LEVEL1_MEETS: ECE_LEVEL1_MEETS,
+    eceRemainingCompetencies: eceRemainingCompetencies,
+    TRAINING_ALLOWANCE: TRAINING_ALLOWANCE,
     COMPETENCY_AREAS: COMPETENCY_AREAS,
     areaOf: areaOf,
     itcCompetencyChecklist: itcCompetencyChecklist,
