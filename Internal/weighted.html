@@ -279,13 +279,18 @@ async function init() {
         const scoresP = apiFetch('/api/weighted-eligibility-scores');
         await Promise.all([loadClassrooms(), loadStudents(), scoresP]);
         const sRes = await scoresP;
+        if (sRes.status === 401) {     // the sign-in lapsed: sign in again and come back
+            try { if (CofpAuth.staffLogout) CofpAuth.staffLogout(); } catch (e) {}
+            location.replace('/me');
+            return;
+        }
         const d = await sRes.json().catch(() => ({}));
         // A failed read must not look like "nobody has a score".
         if (!sRes.ok || d.error) throw new Error(d.error || ('HTTP ' + sRes.status));
         weScores = {};
         (d.children || []).forEach(c => { weScores[String(c.id)] = c; });
         // Rebuild and the catch-up are centre-admin only on the server; offer them only to admins.
-        try { const who = window.CofpAuth && CofpAuth.whoAmI ? await CofpAuth.whoAmI() : null; weIsAdmin = !!(who && (who.admin || who.director)); } catch (e) {}
+        weIsAdmin = !!(who.admin || who.director);
         render();
         if (weIsAdmin) updateCreateButton();
     } catch (e) {
