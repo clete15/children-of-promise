@@ -91,18 +91,10 @@
 </head>
 <body>
 
-<div id="pasPasswordOverlay">
-    <h2>🔒 ExceleRate Silver</h2>
-    <p>Enter password to access staff compliance figures</p>
-    <form class="pas-pw-box" id="pasPwForm">
-        <label for="pasPwInput">Password</label>
-        <input type="password" id="pasPwInput" placeholder="Enter password" autofocus>
-        <div class="pas-pw-error" id="pasPwError">Incorrect password.</div>
-        <button type="submit">Unlock</button>
-    </form>
-</div>
-
-<div id="pasMainContent" style="display:none;">
+<!-- The page-level password ("pasadmin", typed into this file) was removed Nov 2026.
+     It protected nothing (anyone could read it in the page source); the page is
+     behind the /me staff sign-in and its data comes through authenticated APIs. -->
+<div id="pasMainContent">
 
 <header class="site-header">
     <a class="brand-link" href="/staff/">
@@ -182,35 +174,6 @@
 <!-- Shared auth + apiFetch, and the shared classroom/student loaders. -->
 <script src="app.js"></script>
 <script src="/staff/auth.js"></script>
-<script>
-const PAS_PASSWORD = 'pasadmin';
-
-function checkPasAuth() {
-    if (sessionStorage.getItem('pasAuth') === '1') {
-        document.getElementById('pasPasswordOverlay').style.display = 'none';
-        document.getElementById('pasMainContent').style.display = 'block';
-    }
-}
-
-document.getElementById('pasPwForm').addEventListener('submit', function (e) {
-    e.preventDefault();
-    const val = document.getElementById('pasPwInput').value;
-    const err = document.getElementById('pasPwError');
-    if (val === PAS_PASSWORD) {
-        sessionStorage.setItem('pasAuth', '1');
-        err.style.display = 'none';
-        document.getElementById('pasPasswordOverlay').style.display = 'none';
-        document.getElementById('pasMainContent').style.display = 'block';
-    } else {
-        err.style.display = 'block';
-        document.getElementById('pasPwInput').value = '';
-        document.getElementById('pasPwInput').focus();
-    }
-});
-
-checkPasAuth();
-</script>
-
 <!-- Standard 4, the training matrix and the classroom self-assessments. -->
 <script src="excelerate-silver.js?v=20261029b"></script>
 
