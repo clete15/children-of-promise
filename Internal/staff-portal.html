@@ -1119,6 +1119,9 @@ function readWorkHistory(staffId) {
     out.exists = true;
     let d = {};
     try { d = JSON.parse(raw) || {}; } catch (e) { return out; }
+    // PasForm saves every blank under "fields" ({fields:{itTotal:'354'},ratings:{}}).
+    // Reading the top level found nothing, so a filled-in form always read as 0 hours.
+    if (d.fields && typeof d.fields === 'object') d = d.fields;
     const hrs = k => {
         const n = parseFloat(String(d[k] == null ? '' : d[k]).replace(/[^0-9.]/g, ''));
         return isFinite(n) ? n : 0;
