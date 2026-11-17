@@ -1179,6 +1179,9 @@ GO
    person's secondary. */
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='SecondaryRoomNumber')
     ALTER TABLE Staff ADD SecondaryRoomNumber INT NULL;
+-- Last day worked, set when a person is marked inactive from the staff portal.
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='InactiveDate')
+    ALTER TABLE Staff ADD InactiveDate NVARCHAR(20);
 `;
 }
 
@@ -8782,6 +8785,42 @@ GO
     // Ensure, seed-if-empty and select are separated by GO because the seed and
     // the select reference a table the first batch may have only just created;
     // SQL Server compiles a whole batch up front, so they cannot share one.
+    /* POST mark a staff member active or inactive (centre admin only).
+         { staffId, active: true|false, date: 'YYYY-MM-DD' }
+       Inactive is the same soft state the staff cards' Remove uses (Active=0): the
+       record and its qualification history stay, and it drops out of every active
+       list, Standard 4 counts and the classroom pickers. The date is kept as the last
+       day worked (InactiveDate), and cleared on reactivation. A person signed in as
+       themselves cannot switch themselves off. */
+    if (req.method === 'POST' && url === '/api/staff-active') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const id = parseInt(d && d.staffId, 10);
+            if (!id) return sendJSON(res, 400, { error: 'Which staff member? (no staffId)' });
+            const active = d.active === true || d.active === 1 || d.active === '1';
+            const date = String(d.date || '').trim();
+            if (!active && !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+                return sendJSON(res, 400, { error: 'A last day worked (YYYY-MM-DD) is required to mark someone inactive.' });
+            }
+            const actor = resolveActor(req);
+            if (!active && actor && String(actor.staffId || '') === String(id)) {
+                return sendJSON(res, 400, { error: 'You cannot mark yourself inactive. Ask another administrator.' });
+            }
+            const sql = staffEnsureSQL() + 'GO\n'
+                + `UPDATE Staff SET Active=${active ? 1 : 0}, InactiveDate=${active ? 'NULL' : esc(date)}, UpdatedAt=GETDATE() WHERE Id=${id};\n`
+                + `SELECT @@ROWCOUNT AS Updated;`;
+            const r = runSQL(sql);
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            if (r.sqlError) return sendJSON(res, 500, { error: 'The database refused this change: ' + r.sqlError });
+            const m = String(r.data || '').match(/(\d+)\s*$/m);
+            if (!m || parseInt(m[1], 10) === 0) return sendJSON(res, 404, { error: 'No staff record with id ' + id + '.' });
+            console.log('[STAFF] ' + id + ' marked ' + (active ? 'active' : 'inactive as of ' + date));
+            return sendJSON(res, 200, { success: true, active: active, date: active ? '' : date });
+        });
+        return;
+    }
+
     if (req.method === 'GET' && url === '/api/staff') {
         /* Either caller may ask, and the answer is scoped to who they are: the
            director gets the roster, a staff member gets one row — their own.
@@ -8804,18 +8843,22 @@ GO
         // anything a caller sends — the id comes from the signed token, not the URL.
         // admin as well as director, so Clete and Megan get the whole roster whether they
         // arrived by the shared password or signed in as themselves.
+        /* ?includeInactive=1 lets an administrator see former staff too (the staff
+           portal lists them so they can be reactivated). Every other caller keeps the
+           active-only list it has always had. */
+        const wantInactive = new URLSearchParams(req.url.split('?')[1] || '').get('includeInactive') === '1';
         const scope = (actor.director || actor.admin)
-            ? 'ISNULL(Active,1)=1'
+            ? (wantInactive ? '1=1' : 'ISNULL(Active,1)=1')
             : `Id=${parseInt(actor.staffId, 10)}`;
         const r = runSQLRows(
-            `SELECT ${select.join(',')},ISNULL(CAST(Active AS INT),1) AS Active
+            `SELECT ${select.join(',')},ISNULL(CAST(Active AS INT),1) AS Active,ISNULL(InactiveDate,'') AS InactiveDate
              FROM Staff WHERE ${scope} ORDER BY Name`,
             staffEnsureSQL() + 'GO\n' + staffSeedSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         // Strings throughout, as the pages expect; null becomes '' rather than "null".
         const rows = r.rows.map(row => {
             const o = {};
-            select.concat(['Active']).forEach(k => {
+            select.concat(['Active', 'InactiveDate']).forEach(k => {
                 o[k] = row[k] === null || row[k] === undefined ? '' : String(row[k]);
             });
             return o;

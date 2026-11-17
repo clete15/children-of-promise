@@ -213,6 +213,17 @@
     /* The document/action buttons live in this group at the right end of the tab
        strip. The group owns the push-right, so it does not matter which buttons
        inside it are hidden — the visible ones still sit flush right, together. */
+    .sp-active-btn {
+        margin-left: 8px; padding: 2px 9px; border: 1.5px solid var(--sp-border); border-radius: 6px;
+        background: transparent; color: var(--sp-muted); font: inherit; font-size: 0.72rem; font-weight: 700;
+        cursor: pointer; vertical-align: middle;
+    }
+    .sp-active-btn:hover { border-color: var(--sp-accent); color: var(--sp-accent); }
+    .sp-inactive-pill {
+        margin-left: 8px; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 800;
+        vertical-align: middle; background: var(--sp-bad-bg); color: var(--sp-bad-fg); border: 1px solid var(--sp-bad-br);
+    }
+    .sp-who.sp-inactive { opacity: 0.85; border-style: dashed; }
     .sp-wh-refresh {
         margin-left: 6px; padding: 2px 9px; border: 1.5px solid var(--sp-border); border-radius: 6px;
         background: var(--sp-accent-soft); color: var(--sp-accent); font: inherit; font-size: 0.78rem;
@@ -1671,10 +1682,10 @@ function identityHeader(s) {
         roomNameFor(s.SecondaryRoomNumber, s.SecondaryClassroom)
     ].filter(Boolean).join(' and ');
 
-    return '<div class="sp-card sp-who">'
+    return '<div class="sp-card sp-who' + (isStaffActive(s) ? '' : ' sp-inactive') + '">'
         + '<div class="sp-who-row">'
         + '<div>'
-        + '<h2>' + esc(s.Name) + '</h2>'
+        + '<h2>' + esc(s.Name) + staffStatusHtml(s) + '</h2>'
         // Registry number shown bare (no "Registry" word) — the N-prefix already reads
         // as a registry id, and it keeps the grey subtitle line short.
         + '<div class="sp-sub">' + esc(s.Role || 'Role not recorded')
@@ -2874,6 +2885,7 @@ function adminSection(s) {
     // 1. Outstanding Gateways across all staff, read from the already-loaded roster.
     const waiting = STAFF
         .filter(x => String(x.Name || '').trim() && !/^new teacher$/i.test(x.Name))
+        .filter(isStaffActive)
         .map(x => ({ id: x.Id, name: x.Name, reason: pendingText(x), registry: x.RegistryId }))
         .filter(x => x.reason);
 
@@ -3900,7 +3912,8 @@ async function load() {
         }
 
         const [sRes, tRes, rRes] = await Promise.all([
-            myFetch('/api/staff'),
+            // Administrators also get former staff, so they can be reactivated here.
+            myFetch(isAdmin() ? '/api/staff?includeInactive=1' : '/api/staff'),
             myFetch('/api/staff-training').catch(() => null),
             // Rooms, so an assigned classroom name can be turned into the room number
             // the roster is keyed on. Optional: without it the classroom card simply
@@ -3944,8 +3957,7 @@ async function load() {
             $('spBody').innerHTML = '<div class="sp-card"><div class="sp-sub">No staff records to show.</div></div>';
             return;
         }
-        sel.innerHTML = STAFF.map(s =>
-            '<option value="' + s.Id + '">' + esc(s.Name) + '</option>').join('');
+        fillStaffChooser(sel);
         /* Which record to open on: an explicit ?staffId= first, then your own if the
            server told us who you are, and only then the top of the list. Without the
            middle step an administrator signed in as themselves lands on whoever comes
@@ -4016,6 +4028,66 @@ function applyIdentityToBar() {
     $('spAttnBtn').style.display = mayChoose ? '' : 'none';
     return { mayChoose: mayChoose, isPersonal: isPersonal };
 }
+
+/* ── Active / inactive staff ──
+   Administrators load former staff too (?includeInactive=1). They sit in their own
+   "Inactive staff" group in the chooser, and the name card says so and offers
+   Reactivate. Marking someone inactive asks for the last day worked, the same dialog
+   the children's records use. Inactive is the soft state (Active=0): the record and
+   its qualification history are kept, and it drops out of every active list. */
+function isStaffActive(s) {
+    return !s || String(s.Active === undefined || s.Active === '' ? '1' : s.Active) !== '0';
+}
+function fmtUsDay(iso) {
+    const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? (+m[2]) + '/' + (+m[3]) + '/' + m[1] : String(iso || '');
+}
+function fillStaffChooser(sel) {
+    const opt = s => '<option value="' + s.Id + '">' + esc(s.Name) + '</option>';
+    const act = STAFF.filter(isStaffActive), gone = STAFF.filter(s => !isStaffActive(s));
+    sel.innerHTML = act.map(opt).join('')
+        + (gone.length ? '<optgroup label="Inactive staff">' + gone.map(opt).join('') + '</optgroup>' : '');
+}
+function staffStatusHtml(s) {
+    if (!isAdmin() || !s || !s.Id) return '';
+    const mineSelf = WHO && String(WHO.staffId || '') === String(s.Id);
+    if (isStaffActive(s)) {
+        return mineSelf ? '' : ' <button type="button" class="sp-active-btn" data-staff-active="0" '
+            + 'title="Mark ' + esc(s.Name) + ' as no longer working here">Mark inactive</button>';
+    }
+    return ' <span class="sp-inactive-pill">Inactive' + (s.InactiveDate ? ' since ' + esc(fmtUsDay(s.InactiveDate)) : '') + '</span>'
+        + ' <button type="button" class="sp-active-btn" data-staff-active="1">Reactivate</button>';
+}
+document.addEventListener('click', async e => {
+    const b = e.target.closest && e.target.closest('[data-staff-active]');
+    if (!b || !current) return;
+    const s = current, active = b.getAttribute('data-staff-active') === '1';
+    let date = '';
+    if (!active) {
+        date = await askLastDay(s.Name, {
+            label: 'Last day worked',
+            note: 'Their record and credential history are kept. They leave the active staff lists '
+                + 'and the ExceleRate counts. Reassign their classroom on Classrooms & Staffing.'
+        });
+        if (!date) return;
+    } else if (!confirm('Reactivate ' + s.Name + '?')) return;
+    b.disabled = true;
+    try {
+        const res = await myFetch('/api/staff-active', {
+            method: 'POST', body: JSON.stringify({ staffId: s.Id, active: active, date: date })
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        s.Active = active ? '1' : '0';
+        s.InactiveDate = active ? '' : date;
+        fillStaffChooser($('spStaff'));
+        $('spStaff').value = String(s.Id);
+        render();
+    } catch (err) {
+        b.disabled = false;
+        alert('Could not change ' + s.Name + '\u2019s status: ' + (err.message || err));
+    }
+});
 
 /* ── Silver trainings ───────────────────────────────────────────────────────
    The ExceleRate Illinois "Training Requirements for Licensed Child Care Centers" grid

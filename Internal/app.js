@@ -177,7 +177,7 @@ function normalizePayType(raw) {
    enrollment history knows when they left (they drop off the roster the day after).
    Resolves to 'YYYY-MM-DD', or null if cancelled — callers must not save on null.
    A real <dialog> with a date picker, keyboard and screen-reader friendly. */
-function askLastDay(childName) {
+function askLastDay(childName, opts) {
     const pad = n => String(n).padStart(2, '0');
     const now = new Date();
     const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
@@ -197,8 +197,8 @@ function askLastDay(childName) {
         dlg.innerHTML =
             '<form method="dialog" style="margin:0;">'
             + '<h3 id="ldTitle" style="margin:0 0 6px;font-size:1rem;"></h3>'
-            + '<p style="margin:0 0 12px;font-size:0.82rem;color:var(--sp-muted,#64748b);">They stay on the roster through this day and drop off the day after.</p>'
-            + '<label for="ldDate" style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;">Last day attended</label>'
+            + '<p id="ldNote" style="margin:0 0 12px;font-size:0.82rem;color:var(--sp-muted,#64748b);"></p>'
+            + '<label id="ldLabel" for="ldDate" style="display:block;font-size:0.8rem;font-weight:700;margin-bottom:4px;"></label>'
             + '<input type="date" id="ldDate" required style="width:100%;padding:6px 8px;font-size:0.9rem;box-sizing:border-box;">'
             + '<p id="ldErr" role="alert" style="margin:6px 0 0;font-size:0.78rem;color:#dc2626;min-height:1em;"></p>'
             + '<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px;">'
@@ -206,6 +206,10 @@ function askLastDay(childName) {
             + '<button type="submit" id="ldOk" style="padding:6px 14px;font-weight:700;">Mark inactive</button>'
             + '</div></form>';
         dlg.querySelector('#ldTitle').textContent = 'When did ' + childName + ' leave?';
+        // Defaults are the child wording; a staff caller passes its own (opts).
+        dlg.querySelector('#ldNote').textContent = (opts && opts.note)
+            || 'They stay on the roster through this day and drop off the day after.';
+        dlg.querySelector('#ldLabel').textContent = (opts && opts.label) || 'Last day attended';
         const input = dlg.querySelector('#ldDate');
         input.value = today;
         input.max = today;
