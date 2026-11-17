@@ -87,9 +87,11 @@
             <span class="we-count" id="weCount" aria-live="polite"></span>
         </div>
         <div class="we-body" id="weBody"><div class="we-msg">Loading…</div></div>
-        <div class="we-foot">Active children only, highest score first. Points use the same weighted-eligibility
-            scoring as the waiting list and the filed Weighted Eligibility form, from the child's pre-enrollment
-            answers. &ldquo;No score&rdquo; means no pre-enrollment record was found for that child.</div>
+        <div class="we-foot">Active children only, highest score first. Points are the total printed on the
+            child&rsquo;s filed Weighted Eligibility form. Where that form cannot be read (a scan, for example), the
+            points are worked out from the pre-enrollment answers and marked with *. &ldquo;No form&rdquo; means
+            no Weighted Eligibility form is on file; &ldquo;Form unreadable&rdquo; means the form is there but
+            its total could not be read.</div>
     </div>
 </div>
 
@@ -126,7 +128,7 @@ function weRows() {
             const sc = weScores[String(s.Id)] || null;
             return { s: s, name: s.Last_Name + ', ' + s.First_Name, room: getRoomName(s.RoomNumber) || '',
                 age: ageMonths(s.Birth_date), prog: String(s.PFA_PI_na || '').trim().toUpperCase(),
-                points: sc && sc.scored ? sc.points : null };
+                points: sc && sc.scored ? sc.points : null, sc: sc };
         });
 }
 
@@ -141,6 +143,18 @@ function weCompare(a, b) {
     }
     if (k === 'age') return d * ((a.age == null ? -1 : a.age) - (b.age == null ? -1 : b.age)) || a.name.localeCompare(b.name);
     return d * String(a[k]).localeCompare(String(b[k])) || a.name.localeCompare(b.name);
+}
+
+// The form's printed total; * when worked out from the pre-enrollment answers instead.
+function pointsCell(r) {
+    const sc = r.sc || {};
+    if (r.points != null) {
+        return sc.source === 'pre-enrollment'
+            ? '<span title="Worked out from the pre-enrollment answers' + (sc.formUnreadable ? '; the filed form\u2019s total could not be read' : '; no form on file') + '">' + r.points + '*</span>'
+            : '<span title="Total printed on the filed Weighted Eligibility form">' + r.points + '</span>';
+    }
+    if (sc.formUnreadable) return '<span class="we-none" title="The form is on file but its total could not be read; open it from Child Files">Form unreadable</span>';
+    return '<span class="we-none">No form</span>';
 }
 
 function render() {
@@ -160,7 +174,7 @@ function render() {
         + '</tr></thead><tbody>'
         + rows.map(r => '<tr><td>' + weEsc(r.name) + '</td><td>' + weEsc(r.room) + '</td><td>' + weEsc(ageText(r.age)) + '</td>'
             + '<td>' + (r.prog ? '<span class="we-prog">' + weEsc(r.prog) + '</span>' : '') + '</td>'
-            + '<td class="we-num we-pts">' + (r.points != null ? r.points : '<span class="we-none">No score</span>') + '</td></tr>').join('')
+            + '<td class="we-num we-pts">' + pointsCell(r) + '</td></tr>').join('')
         + '</tbody></table>';
 }
 

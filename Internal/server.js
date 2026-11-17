@@ -2302,6 +2302,39 @@ function childRecordsForSeed(studentId) {
     return { enroll, intake };
 }
 
+/* The total printed on a filed Weighted Eligibility form, or null when it cannot be
+   read (missing file, a scan with no text layer, or no recognisable total line). The
+   generated forms print "Total weighted points: N" (pdf-form.js drawScoreBanner).
+   Cached by path + modified time: reading a PDF spawns pdftotext, and the list and
+   roster ask for every child at once. A replaced form has a new mtime, so it rereads. */
+const WEIGHTED_FORM_SCORE_CACHE = new Map();
+function weightedScoreFromForm(full) {
+    let st;
+    try { st = fs.statSync(full); } catch (e) { return null; }
+    const key = full + '|' + st.mtimeMs;
+    if (WEIGHTED_FORM_SCORE_CACHE.has(key)) return WEIGHTED_FORM_SCORE_CACHE.get(key);
+    let score = null;
+    const ex = /\.pdf$/i.test(full) ? pdfToText(full) : { ok: false };
+    if (ex.ok) {
+        const t = String(ex.text || '');
+        const m = t.match(/Total\s+weighted\s+points\s*:?\s*(\d{1,3})\b/i)
+            || t.match(/Total\s+(?:eligibility\s+)?(?:points|score)\s*:?\s*(\d{1,3})\b/i);
+        if (m) score = parseInt(m[1], 10);
+    }
+    /* Forms this server generated are written uncompressed (pdf-form.js), so the total
+       is readable straight from the bytes even if pdftotext is unavailable or lays the
+       line out differently. */
+    if (score == null && /\.pdf$/i.test(full)) {
+        try {
+            const raw = fs.readFileSync(full).toString('latin1');
+            const m2 = raw.match(/\(Total weighted points:\s*(\d{1,3})\)/);
+            if (m2) score = parseInt(m2[1], 10);
+        } catch (e) { /* unreadable: stays null */ }
+    }
+    WEIGHTED_FORM_SCORE_CACHE.set(key, score);
+    return score;
+}
+
 /* Give every generated Weighted Eligibility PDF the same semantic index used by
    uploaded child evidence. The physical file stays in the permanent Administrative
    folder; ChildFiles says what it IS, and ISBETracking lets current checklist views
@@ -10686,14 +10719,44 @@ ELSE
              ) i
              WHERE e.Active='Yes' OR e.Active='YES'`);
         if (!r.ok) return sendJSON(res, 500, { error: 'Could not read the eligibility data: ' + r.error });
+
+        /* The child's filed Weighted Eligibility form is the score of record: it was
+           made from the pre-enrollment answers, or for children enrolled before that
+           form existed, from what the centre recorded at the time. Its printed total is
+           used first; the live pre-enrollment calculation is the fallback for a child
+           whose form cannot be read (a scan with no text, say). Newest form per child. */
+        const forms = runSQLRows(
+            `SELECT StudentId, RelPath FROM (
+                 SELECT StudentId, RelPath, ROW_NUMBER() OVER (PARTITION BY StudentId ORDER BY UploadedAt DESC, Id DESC) AS rn
+                 FROM ChildFiles WHERE FormField='WeightedEligibility'
+             ) x WHERE rn = 1`, childFileEnsureSQL());
+        if (!forms.ok) return sendJSON(res, 500, { error: 'Could not read the Weighted Eligibility forms: ' + forms.error });
+        const formByChild = {};
+        forms.rows.forEach(f => { formByChild[String(parseInt(f.StudentId, 10))] = String(f.RelPath || ''); });
+        const root = findDocRoot();
+
         const children = r.rows.map(row => {
-            const scored = row.PId != null && String(row.PId).trim() !== '';
-            const intake = {};
-            if (scored) ICOLS.forEach(c => { intake[c] = row['i_' + c]; });
-            const enroll = { Category: row.Category, IEP: row.IEP, Military: row.Military, HouseholdIncome: row.HouseholdIncome,
-                HouseholdSize: row.HouseholdSize, PublicBenefits: row.PublicBenefits, City_Town: row.City_Town };
-            return { id: String(row.Id), scored: scored, points: scored ? scoreWeightedTotal(intake, enroll) : null,
-                source: scored ? 'pre-enrollment' : 'none' };
+            const id = String(row.Id);
+            const rel = formByChild[id] || '';
+            const full = rel && root ? path.resolve(root, rel) : '';
+            // Only read inside the document library, whatever the stored path says.
+            const inside = full && full.toLowerCase().startsWith((path.resolve(root) + path.sep).toLowerCase());
+            const fromForm = inside ? weightedScoreFromForm(full) : null;
+            const hasIntake = row.PId != null && String(row.PId).trim() !== '';
+            let fromIntake = null;
+            if (hasIntake) {
+                const intake = {};
+                ICOLS.forEach(c => { intake[c] = row['i_' + c]; });
+                const enroll = { Category: row.Category, IEP: row.IEP, Military: row.Military, HouseholdIncome: row.HouseholdIncome,
+                    HouseholdSize: row.HouseholdSize, PublicBenefits: row.PublicBenefits, City_Town: row.City_Town };
+                fromIntake = scoreWeightedTotal(intake, enroll);
+            }
+            const points = fromForm != null ? fromForm : fromIntake;
+            return {
+                id: id, scored: points != null, points: points,
+                source: fromForm != null ? 'form' : (fromIntake != null ? 'pre-enrollment' : 'none'),
+                formOnFile: !!rel, formUnreadable: !!rel && fromForm == null
+            };
         });
         return sendJSON(res, 200, { children: children });
     }
