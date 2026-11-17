@@ -85,6 +85,9 @@
                 <button type="button" class="we-filter" data-prog="PFA" aria-pressed="false">PFA</button>
             </div>
             <span class="we-count" id="weCount" aria-live="polite"></span>
+            <button type="button" class="we-filter" id="weCreateBtn" hidden
+                    title="Create a Weighted Eligibility form for every active child who has none, in every program. Children who already have one are left as they are.">Create missing forms</button>
+            <span id="weCreateMsg" class="we-count" style="margin-left:0;" aria-live="polite"></span>
         </div>
         <div class="we-body" id="weBody"><div class="we-msg">Loading…</div></div>
         <div class="we-foot">Active children only, highest score first. Points are the total printed on the
@@ -191,6 +194,33 @@ document.getElementById('weBody').addEventListener('click', e => {
     render();
 });
 
+/* "Create missing forms": shown only when some active child has no form. Runs the same
+   catch-up the server already uses for new enrollments (create-only, never overwrites),
+   for every program, then reloads the list so the new totals appear. */
+function updateCreateButton() {
+    const missing = students.filter(s => isTruthy(s.Active))
+        .filter(s => { const sc = weScores[String(s.Id)]; return !sc || !sc.formOnFile; }).length;
+    const btn = document.getElementById('weCreateBtn');
+    btn.hidden = !missing;
+    btn.textContent = 'Create missing forms (' + missing + ')';
+}
+document.getElementById('weCreateBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('weCreateBtn'), msg = document.getElementById('weCreateMsg');
+    if (!confirm('Create a Weighted Eligibility form for every active child who does not have one?\n\n'
+        + 'Each is filled from the child\u2019s pre-enrollment answers, or from the enrollment record when there is '
+        + 'none; anything not on record scores 0. Children who already have a form are not touched.')) return;
+    btn.disabled = true; msg.textContent = 'Working\u2026 this can take a minute.';
+    try {
+        const res = await apiFetch('/api/backfill-child-folders', { method: 'POST' });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        msg.textContent = d.created + ' created' + (d.failed ? ', ' + d.failed + ' failed' : '') + '.';
+        await init();
+    } catch (e) {
+        msg.textContent = 'Could not create them: ' + (e.message || e);
+    } finally { btn.disabled = false; }
+});
+
 async function init() {
     try {
         // Named rather than array-destructured with holes (see sql-reads steering).
@@ -203,6 +233,10 @@ async function init() {
         weScores = {};
         (d.children || []).forEach(c => { weScores[String(c.id)] = c; });
         render();
+        // The catch-up is centre-admin only on the server; offer it only to admins.
+        let admin = false;
+        try { const who = window.CofpAuth && CofpAuth.whoAmI ? await CofpAuth.whoAmI() : null; admin = !!(who && (who.admin || who.director)); } catch (e) {}
+        if (admin) updateCreateButton();
     } catch (e) {
         document.getElementById('weBody').innerHTML = '<div class="we-msg err">Could not load the scores: ' + weEsc(e.message || e)
             + '. Nothing is missing; the page could not read them.</div>';
