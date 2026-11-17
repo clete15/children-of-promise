@@ -2063,7 +2063,7 @@ function ladderColumn(title, heldLevel, heldWord, model, kind, staff) {
                 + '<div class="sp-need-k">Classroom</div>'
                 + '<div class="sp-need-v">' + esc(line)
                 + '<div class="sp-need-sub">' + status
-                + ' <button type="button" class="sp-wh-refresh" title="Re-read the Work History form after updating it">\u21bb Refresh</button></div>'
+                + '</div>'
                 + '</div></div>';
         }
     }
@@ -4306,20 +4306,25 @@ async function loadSilverPdr(s) {
     renderSilverDialog();
 }
 
-/* "Refresh" on the Classroom line: re-read the worksheet store (the Work History form is
-   edited in its own tab) and redraw, so a form just saved is reflected here. */
-document.addEventListener('click', async e => {
-    const b = e.target.closest && e.target.closest('.sp-wh-refresh');
-    if (!b) return;
-    b.disabled = true; b.textContent = 'Checking\u2026';
+/* The Work History form is edited in its own tab, so the worksheet store loaded here goes
+   stale. Re-read it whenever this tab comes back into view (the moment someone returns
+   from the form) and redraw ONLY if the hours for the person on screen changed, so a
+   redraw never interrupts anything else. A failed re-read is silent: the page keeps what
+   it already shows, and the next return tries again. */
+let whReading = false;
+async function refreshWorkHistoryOnReturn() {
+    if (whReading || document.hidden || !current || !window.PasStore) return;
+    whReading = true;
     try {
+        const before = JSON.stringify(readWorkHistory(current.Id));
         await PasStore.refresh();
-        render();
+        if (JSON.stringify(readWorkHistory(current.Id)) !== before) render();
     } catch (err) {
-        b.disabled = false; b.textContent = '\u21bb Refresh';
-        alert('Could not re-read the Work History form: ' + (err.message || err));
-    }
-});
+        console.warn('[work history] could not re-read on return:', err && err.message || err);
+    } finally { whReading = false; }
+}
+document.addEventListener('visibilitychange', refreshWorkHistoryOnReturn);
+window.addEventListener('focus', refreshWorkHistoryOnReturn);
 
 $('spSilverClose').addEventListener('click', () => $('spSilverDlg').close());
 // The button is part of the tab strip, which is rebuilt on every render, so listen on the document.
