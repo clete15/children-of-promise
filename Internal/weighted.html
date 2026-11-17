@@ -92,7 +92,9 @@
         <div class="we-body" id="weBody"><div class="we-msg">Loading…</div></div>
         <div class="we-foot">Active children only, highest score first. Points are the total printed on the
             child&rsquo;s filed Weighted Eligibility form. Where that form cannot be read (a scan, for example), the
-            points are worked out from the pre-enrollment answers and marked with *. &ldquo;No form&rdquo; means
+            points are worked out from the records and marked with *. <b>Records support</b> is what a form rebuilt
+            today would score, from the pre-enrollment answers, then the enrollment record, then the Parent Interview
+            (only where it asks the same question). It is green, with a Rebuild button, only where it is higher. &ldquo;No form&rdquo; means
             no Weighted Eligibility form is on file; &ldquo;Form unreadable&rdquo; means the form is there but
             its total could not be read.</div>
     </div>
@@ -148,17 +150,59 @@ function weCompare(a, b) {
     return d * String(a[k]).localeCompare(String(b[k])) || a.name.localeCompare(b.name);
 }
 
-// The form's printed total; * when worked out from the pre-enrollment answers instead.
+// The form's printed total; * when worked out from the records instead.
 function pointsCell(r) {
     const sc = r.sc || {};
     if (r.points != null) {
-        return sc.source === 'pre-enrollment'
-            ? '<span title="Worked out from the pre-enrollment answers' + (sc.formUnreadable ? '; the filed form\u2019s total could not be read' : '; no form on file') + '">' + r.points + '*</span>'
+        return sc.source === 'records'
+            ? '<span title="Worked out from the pre-enrollment, enrollment and Parent Interview records' + (sc.formUnreadable ? '; the filed form\u2019s total could not be read' : '; no form on file') + '">' + r.points + '*</span>'
             : '<span title="Total printed on the filed Weighted Eligibility form">' + r.points + '</span>';
     }
     if (sc.formUnreadable) return '<span class="we-none" title="The form is on file but its total could not be read; open it from Child Files">Form unreadable</span>';
     return '<span class="we-none">No form</span>';
 }
+
+/* What rebuilding from today's records would give, with a Rebuild button only where it
+   is HIGHER than the filed form (an admin action; the old form is archived, not deleted).
+   A lower figure is shown but never offered: the filed form may hold answers staff gave
+   that no record carries, and a rebuild must never quietly cost a family points. */
+let weIsAdmin = false;
+function recordsCell(r) {
+    const sc = r.sc || {};
+    if (sc.recordsPoints == null) return '';
+    const n = sc.recordsPoints;
+    const sources = [sc.hasIntake ? 'pre-enrollment' : '', 'enrollment record', sc.hasInterview ? 'Parent Interview' : '']
+        .filter(Boolean).join(', ');
+    const higher = r.points == null || n > r.points;
+    const btn = weIsAdmin && higher && sc.formOnFile !== undefined
+        ? ' <button type="button" class="we-filter" style="padding:2px 9px;font-size:0.7rem;" data-rebuild="' + weEsc(r.s.Id) + '">'
+          + (sc.formOnFile ? 'Rebuild form' : 'Create form') + '</button>'
+        : '';
+    return '<span title="From: ' + weEsc(sources) + '"' + (higher && r.points != null ? ' style="color:var(--sp-good-fg);font-weight:800;"' : '') + '>'
+        + n + '</span>' + btn;
+}
+document.getElementById('weBody').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-rebuild]');
+    if (!b) return;
+    const id = b.getAttribute('data-rebuild');
+    const s = students.find(x => String(x.Id) === String(id));
+    const sc = weScores[String(id)] || {};
+    const name = s ? s.First_Name + ' ' + s.Last_Name : 'this child';
+    if (!confirm((sc.formOnFile ? 'Rebuild' : 'Create') + ' ' + name + '\u2019s Weighted Eligibility form from today\u2019s records?\n\n'
+        + 'It would score ' + sc.recordsPoints + (sc.formOnFile && sc.points != null ? ' (the filed form says ' + sc.points + ')' : '') + '. '
+        + (sc.formOnFile ? 'The current form is moved to the child\u2019s archive, not deleted. ' : '')
+        + 'Review the new form; anything no record answers still prints as 0.')) return;
+    b.disabled = true; b.textContent = 'Working\u2026';
+    try {
+        const res = await apiFetch('/api/weighted-eligibility/' + encodeURIComponent(id) + (sc.formOnFile ? '?rebuild=1' : ''), { method: 'POST' });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+        await init();
+    } catch (err) {
+        b.disabled = false; b.textContent = sc.formOnFile ? 'Rebuild form' : 'Create form';
+        alert('Could not ' + (sc.formOnFile ? 'rebuild' : 'create') + ' the form: ' + (err.message || err));
+    }
+});
 
 function render() {
     const rows = weRows().sort(weCompare);
@@ -174,10 +218,12 @@ function render() {
     };
     body.innerHTML = '<table class="we-table"><thead><tr>'
         + th('name', 'Child') + th('room', 'Room') + th('age', 'Age') + th('prog', 'Program') + th('points', 'Points', 'we-num')
+        + '<th scope="col" class="we-num" title="What a form rebuilt from today\u2019s records would score: pre-enrollment, then the enrollment record, then the Parent Interview">Records support</th>'
         + '</tr></thead><tbody>'
         + rows.map(r => '<tr><td>' + weEsc(r.name) + '</td><td>' + weEsc(r.room) + '</td><td>' + weEsc(ageText(r.age)) + '</td>'
             + '<td>' + (r.prog ? '<span class="we-prog">' + weEsc(r.prog) + '</span>' : '') + '</td>'
-            + '<td class="we-num we-pts">' + pointsCell(r) + '</td></tr>').join('')
+            + '<td class="we-num we-pts">' + pointsCell(r) + '</td>'
+            + '<td class="we-num">' + recordsCell(r) + '</td></tr>').join('')
         + '</tbody></table>';
 }
 
@@ -232,11 +278,10 @@ async function init() {
         if (!sRes.ok || d.error) throw new Error(d.error || ('HTTP ' + sRes.status));
         weScores = {};
         (d.children || []).forEach(c => { weScores[String(c.id)] = c; });
+        // Rebuild and the catch-up are centre-admin only on the server; offer them only to admins.
+        try { const who = window.CofpAuth && CofpAuth.whoAmI ? await CofpAuth.whoAmI() : null; weIsAdmin = !!(who && (who.admin || who.director)); } catch (e) {}
         render();
-        // The catch-up is centre-admin only on the server; offer it only to admins.
-        let admin = false;
-        try { const who = window.CofpAuth && CofpAuth.whoAmI ? await CofpAuth.whoAmI() : null; admin = !!(who && (who.admin || who.director)); } catch (e) {}
-        if (admin) updateCreateButton();
+        if (weIsAdmin) updateCreateButton();
     } catch (e) {
         document.getElementById('weBody').innerHTML = '<div class="we-msg err">Could not load the scores: ' + weEsc(e.message || e)
             + '. Nothing is missing; the page could not read them.</div>';

@@ -2193,38 +2193,87 @@ const BENEFIT_TYPES = ['WIC', 'Medicaid', 'SNAP', 'TANF'];
 function hasBenefit(str, name) {
     return new RegExp('\\b' + name + '\\b', 'i').test(String(str || ''));
 }
+
+/* ── The Parent Interview as a third source ──
+   Children enrolled before the online pre-enrollment form have no intake, so most
+   criteria were blank and scored 0. Their Parent Interview (ParentInterviews.FormData)
+   often asks the same thing. It is used ONLY where its question is the same question,
+   and a Yes from any source wins (the interview is the later, staff-taken answer).
+   Questions that are only roughly similar are deliberately NOT mapped: "diagnosed
+   disability" is not "has an IEP", "stress, trauma or violence" is not "abuse or DV
+   history", "chronic illness, mental illness or disability" is not "mental illness",
+   and "legal guardian" is not foster care. Those stay for staff to answer.
+   v = the interview fields below (keys as in pi-interview-schema.js), or {}. */
+const PI_INTERVIEW_SCORE_KEYS = ['livingSituation', 'childLivesWith', 'householdStructure',
+    'parent1Translator', 'parent2Translator', 'parent1Language', 'parent2Language',
+    'immigrated', 'incarcerated', 'activeMilitary', 'dcfs', 'drugAlcohol', 'familyDeath',
+    'income', 'householdSize'];
+// SELECT list reading those keys out of FormData (alias pi), prefixed v_. ISJSON guards
+// a malformed blob, which would otherwise fail the whole query.
+function piInterviewScoreCols() {
+    const j = k => `ISNULL(CASE WHEN ISJSON(pi.FormData)=1 THEN JSON_VALUE(pi.FormData,'$.${k}') END,'') AS v_${k}`;
+    return PI_INTERVIEW_SCORE_KEYS.map(j).join(',')
+        + `,ISNULL(CASE WHEN ISJSON(pi.FormData)=1 THEN JSON_QUERY(pi.FormData,'$.publicPrograms') END,'') AS v_publicPrograms`
+        + `,ISNULL(pi.TranslatorNeeded,'') AS v_TranslatorNeeded,ISNULL(pi.PreferredLanguage,'') AS v_PreferredLanguage`;
+}
+// The best interview for a child: a populated electronic one first, then the newest.
+const PI_INTERVIEW_ORDER = `CASE WHEN NULLIF(pi.FormData,'') IS NOT NULL THEN 0 ELSE 1 END, ISNULL(pi.UpdatedAt,pi.CreatedAt) DESC, pi.Id DESC`;
+function interviewFromRow(row) {
+    const v = {};
+    if (!row) return v;
+    PI_INTERVIEW_SCORE_KEYS.concat(['TranslatorNeeded', 'PreferredLanguage']).forEach(k => { v[k] = String(row['v_' + k] || ''); });
+    let progs = [];
+    try { progs = JSON.parse(row.v_publicPrograms || '[]'); } catch (e) { progs = []; }
+    v.publicPrograms = Array.isArray(progs) ? progs.join(', ') : '';
+    return v;
+}
+// Yes if any source says Yes; otherwise the first definite answer; otherwise blank.
+function anyYes() {
+    const vals = Array.prototype.map.call(arguments, seededYesNoOrBlank);
+    if (vals.includes('Yes')) return 'Yes';
+    return vals.find(x => x) || '';
+}
+const digits = s => String(s == null ? '' : s).replace(/[^0-9]/g, '');
+// "English" -> No, another language -> Yes, mixed or blank -> unknown.
+function nonEnglishFrom(lang) {
+    const s = String(lang || '').trim();
+    if (!s) return '';
+    if (/^english\.?$/i.test(s)) return 'No';
+    return /english/i.test(s) ? '' : 'Yes';
+}
+const HOMELESS_CODES = ['shares', 'motel', 'emergency', 'notDesigned', 'car', 'unaccompanied'];
 const SEEDED_WEIGHTED_CRITERIA = [
     // `group` tags cluster the criteria into labeled sections on the generated PDF so
     // the document reads as a few scannable groups rather than one long list.
-    { group: 'auto', label: 'Experiencing homelessness', picc: 'PI5.D', points: 50, from: (i) => i.Homeless },
-    { group: 'auto', label: 'Youth in Care (foster) or adopted', picc: 'PI5.E', points: 50, from: (i, e) => i.FosterAdopted || (String(e.Category || '') === 'Foster' ? 'Yes' : '') },
+    { group: 'auto', label: 'Experiencing homelessness', picc: 'PI5.D', points: 50, from: (i, e, v) => anyYes(i.Homeless, HOMELESS_CODES.includes((v || {}).livingSituation) ? 'Yes' : ((v || {}).livingSituation === 'stable' ? 'No' : '')) },
+    { group: 'auto', label: 'Youth in Care (foster) or adopted', picc: 'PI5.E', points: 50, from: (i, e, v) => anyYes(i.FosterAdopted, String(e.Category || '') === 'Foster' ? 'Yes' : '', (v || {}).livingSituation === 'awaitingFoster' ? 'Yes' : '') },
     { group: 'dev', label: 'Enrolled in Early Intervention with an identified delay', picc: 'PI5.B', points: 5, from: (i) => i.EarlyIntervention },
     { group: 'dev', label: 'Has an IEP', picc: 'PI5.B', points: 5, from: (i, e) => i.IEP || e.IEP },
     { group: 'dev', label: 'Screening indicated a delay but no current Early Intervention referral', picc: 'PI5.C', points: 5, from: (i) => i.ScreeningDelayNoEi },
     { group: 'dev', label: 'Low birth weight or failure to thrive', points: 5, from: (i) => i.LowBirthWeight },
     { group: 'income', label: 'Family income at or below 50% of the federal poverty level', picc: 'PI5.F', points: 5, from: (i) => i.IncomeBelow50Fpl },
-    { group: 'income', label: 'Family income eligible for CCAP (225% FPL)', points: 5, from: (i, e) => (isCcapEligibleByIncome(i.HouseholdIncome || e.HouseholdIncome, i.HouseholdSize || e.HouseholdSize) ? 'Yes' : 'No') },
-    { group: 'income', label: 'Receiving WIC', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'WIC') ? 'Yes' : 'No') },
-    { group: 'income', label: 'Receiving Medicaid', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'Medicaid') ? 'Yes' : 'No') },
-    { group: 'income', label: 'Receiving SNAP', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'SNAP') ? 'Yes' : 'No') },
-    { group: 'income', label: 'Receiving TANF', points: 5, from: (i, e) => (hasBenefit(i.PublicBenefits || e.PublicBenefits, 'TANF') ? 'Yes' : 'No') },
+    { group: 'income', label: 'Family income eligible for CCAP (225% FPL)', points: 5, from: (i, e, v) => (isCcapEligibleByIncome(digits(i.HouseholdIncome || e.HouseholdIncome || (v || {}).income), digits(i.HouseholdSize || e.HouseholdSize || (v || {}).householdSize)) ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving WIC', points: 5, from: (i, e, v) => (hasBenefit([i.PublicBenefits, e.PublicBenefits, (v || {}).publicPrograms].join(', '), 'WIC') ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving Medicaid', points: 5, from: (i, e, v) => (hasBenefit([i.PublicBenefits, e.PublicBenefits, (v || {}).publicPrograms].join(', '), 'Medicaid') ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving SNAP', points: 5, from: (i, e, v) => (hasBenefit([i.PublicBenefits, e.PublicBenefits, (v || {}).publicPrograms].join(', '), 'SNAP') ? 'Yes' : 'No') },
+    { group: 'income', label: 'Receiving TANF', points: 5, from: (i, e, v) => (hasBenefit([i.PublicBenefits, e.PublicBenefits, (v || {}).publicPrograms].join(', '), 'TANF') ? 'Yes' : 'No') },
     { group: 'income', label: 'Receiving Brightpoint childcare subsidy', points: 5, from: (i) => i.BrightpointSubsidy },
-    { group: 'lang', label: 'Parent or caregiver is an English language learner', picc: 'PI5.G', points: 5, from: (i) => i.ParentEll },
-    { group: 'lang', label: 'Primary language in the home is not English', points: 5, from: (i) => i.NonEnglishHome },
-    { group: 'lang', label: 'Child or parent born outside the United States', points: 5, from: (i) => i.BornOutsideUS },
-    { group: 'family', label: 'Single-parent household', points: 3, from: (i) => (String(i.LivingSituation || '') === 'Single Parent' ? 'Yes' : '') },
-    { group: 'family', label: 'Teen parent', points: 5, from: (i) => i.TeenParent },
+    { group: 'lang', label: 'Parent or caregiver is an English language learner', picc: 'PI5.G', points: 5, from: (i, e, v) => anyYes(i.ParentEll, (v || {}).parent1Translator === 'Yes' || (v || {}).parent2Translator === 'Yes' || seededYesNoOrBlank((v || {}).TranslatorNeeded) === 'Yes' ? 'Yes' : '') },
+    { group: 'lang', label: 'Primary language in the home is not English', points: 5, from: (i, e, v) => anyYes(i.NonEnglishHome, nonEnglishFrom(e.HomeLanguage || (v || {}).PreferredLanguage || (v || {}).parent1Language)) },
+    { group: 'lang', label: 'Child or parent born outside the United States', points: 5, from: (i, e, v) => anyYes(i.BornOutsideUS, (v || {}).immigrated === 'Yes' ? 'Yes' : '') },
+    { group: 'family', label: 'Single-parent household', points: 3, from: (i, e, v) => (String(i.LivingSituation || '') === 'Single Parent' || (v || {}).householdStructure === 'singleParent' ? 'Yes' : '') },
+    { group: 'family', label: 'Teen parent', points: 5, from: (i, e, v) => anyYes(i.TeenParent, (v || {}).householdStructure === 'teenParent' ? 'Yes' : '') },
     { group: 'family', label: 'Parent without a high school diploma', points: 5, from: (i) => i.NoHSDiploma },
-    { group: 'family', label: 'Parent incarcerated', points: 5, from: (i) => i.ParentIncarcerated },
-    { group: 'family', label: 'Active military family', points: 5, from: (i, e) => i.ActiveMilitary || seededYesNoOrBlank(e.Military) },
-    { group: 'family', label: 'Child cared for by someone other than a parent', points: 5, from: (i) => i.CaregiverOther },
+    { group: 'family', label: 'Parent incarcerated', points: 5, from: (i, e, v) => anyYes(i.ParentIncarcerated, (v || {}).incarcerated) },
+    { group: 'family', label: 'Active military family', points: 5, from: (i, e, v) => anyYes(i.ActiveMilitary, e.Military, (v || {}).activeMilitary) },
+    { group: 'family', label: 'Child cared for by someone other than a parent', points: 5, from: (i, e, v) => anyYes(i.CaregiverOther, ['foster', 'other'].includes((v || {}).childLivesWith) ? 'Yes' : ((v || {}).childLivesWith === 'parents' ? 'No' : '')) },
     { group: 'family', label: 'No prior formal early-learning program', points: 5, from: (i) => (seededYesNoOrBlank(i.PriorEarlyLearning) === 'No' ? 'Yes' : (seededYesNoOrBlank(i.PriorEarlyLearning) === 'Yes' ? 'No' : '')) },
     { group: 'family', label: 'Lives in a child-care desert (Belleville, Dupo, Cahokia Heights)', points: 5, from: (i, e) => (isChildDesertCity(i.City || e.City_Town) ? 'Yes' : 'No') },
     { group: 'trauma', label: 'Abuse or domestic violence history', points: 5, from: (i) => i.AbuseHistory },
     { group: 'trauma', label: 'Mental illness in the home', points: 5, from: (i) => i.MentalIllness },
-    { group: 'trauma', label: 'DCFS involvement', points: 5, from: (i) => i.DcfsInvolvement },
-    { group: 'trauma', label: 'Substance abuse in the home', points: 5, from: (i) => i.SubstanceAbuse },
-    { group: 'trauma', label: 'Death in the immediate family', points: 5, from: (i) => i.FamilyDeath }
+    { group: 'trauma', label: 'DCFS involvement', points: 5, from: (i, e, v) => anyYes(i.DcfsInvolvement, (v || {}).dcfs) },
+    { group: 'trauma', label: 'Substance abuse in the home', points: 5, from: (i, e, v) => anyYes(i.SubstanceAbuse, (v || {}).drugAlcohol) },
+    { group: 'trauma', label: 'Death in the immediate family', points: 5, from: (i, e, v) => anyYes(i.FamilyDeath, (v || {}).familyDeath) }
 ];
 
 /* Section headings for the grouped criteria, in the order they print. Any criterion
@@ -2242,10 +2291,10 @@ const WEIGHTED_CRITERIA_GROUPS = [
 
 /* The total weighted points for a child, summing the points of every criterion whose
    answer resolves to Yes. This is the same value the waiting list ranks by. */
-function scoreWeightedTotal(intake, enroll) {
+function scoreWeightedTotal(intake, enroll, interview) {
     return SEEDED_WEIGHTED_CRITERIA.reduce((sum, c) => {
         let ans = '';
-        try { ans = seededYesNoOrBlank(c.from(intake || {}, enroll || {})); } catch (e) { ans = ''; }
+        try { ans = seededYesNoOrBlank(c.from(intake || {}, enroll || {}, interview || {})); } catch (e) { ans = ''; }
         return sum + (ans === 'Yes' ? (c.points || 0) : 0);
     }, 0);
 }
@@ -2263,7 +2312,8 @@ function childRecordsForSeed(studentId) {
                 ISNULL(PFA_PI_na,'') AS PFA_PI_na, ISNULL(Category,'') AS Category,
                 ISNULL(IEP,'') AS IEP, ISNULL(Military,'') AS Military,
                 ISNULL(HouseholdIncome,'') AS HouseholdIncome, ISNULL(CAST(HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
-                ISNULL(PublicBenefits,'') AS PublicBenefits, ISNULL(City_Town,'') AS City_Town, ISNULL(PreEnrollmentId,0) AS PreEnrollmentId
+                ISNULL(PublicBenefits,'') AS PublicBenefits, ISNULL(City_Town,'') AS City_Town, ISNULL(PreEnrollmentId,0) AS PreEnrollmentId,
+                ISNULL(HomeLanguage,'') AS HomeLanguage
          FROM rptMasterEnrollment WHERE Id=${id}`);
     if (!e.ok || !e.rows.length) return { error: e.error || 'Child record not found.' };
     const enroll = e.rows[0];
@@ -2299,7 +2349,11 @@ function childRecordsForSeed(studentId) {
                 WHERE e.Id=${id} ORDER BY p.Id DESC
         ) matches ORDER BY pri`);
     const intake = (iq.ok && iq.rows.length) ? iq.rows[0] : {};
-    return { enroll, intake };
+    const vq = runSQLRows(
+        `SELECT TOP 1 ${piInterviewScoreCols()} FROM ParentInterviews pi WHERE pi.StudentId=${id} ORDER BY ${PI_INTERVIEW_ORDER}`,
+        parentInterviewEnsureSQL() + 'GO\n');
+    const interview = (vq.ok && vq.rows.length) ? interviewFromRow(vq.rows[0]) : {};
+    return { enroll, intake, interview };
 }
 
 /* The total printed on a filed Weighted Eligibility form, or null when it cannot be
@@ -2449,7 +2503,7 @@ function seedWeightedEligibilityDoc(studentId, opts) {
 
     const recs = childRecordsForSeed(studentId);
     if (recs.error) { console.warn('[SEED] ' + recs.error); return { ok: false, error: recs.error }; }
-    const { enroll, intake } = recs;
+    const { enroll, intake, interview } = recs;
     const programCode = String(enroll.PFA_PI_na || '').trim().toUpperCase();
     const programLabel = programCode === 'PFA' ? 'Preschool for All'
         : programCode === 'PI' ? 'Prevention Initiative'
@@ -2481,7 +2535,7 @@ function seedWeightedEligibilityDoc(studentId, opts) {
     const qualifying = [];
     SEEDED_WEIGHTED_CRITERIA.forEach(c => {
         let ans = '';
-        try { ans = seededYesNoOrBlank(c.from(intake, enroll)); } catch (e) { ans = ''; }
+        try { ans = seededYesNoOrBlank(c.from(intake, enroll, interview)); } catch (e) { ans = ''; }
         if (!ans) ans = 'No';
         const applies = ans === 'Yes';
         const pts = c.points || 0;
@@ -2509,7 +2563,7 @@ function seedWeightedEligibilityDoc(studentId, opts) {
         { heading: 'All weighted eligibility criteria (PICC PI5.A / PI5.B\u2013G)',
           text: 'Applicable factors are ticked, bold, and show their awarded points. '
               + 'Every unchecked factor shows 0. Values come from the family\u2019s '
-              + 'pre-enrollment submission, falling back to the enrollment record.' },
+              + 'pre-enrollment submission, then the enrollment record and the Parent Interview.' },
         ...criteriaBlocks
     ];
 
@@ -10584,10 +10638,14 @@ ELSE
        that copy and returns it without replacing possible handwritten/compliance work. */
     const weightedOne = url.match(/^\/api\/weighted-eligibility\/(\d+)$/);
     if (req.method === 'POST' && weightedOne) {
-        if (!checkClassroomAuth(req, res)) return;
+        /* ?rebuild=1 replaces the child's form with one built from the current records
+           (the old PDF is archived, not deleted). Centre admin only, because it changes
+           a compliance document; plain creation stays open to classroom staff. */
+        const rebuild = new URLSearchParams(req.url.split('?')[1] || '').get('rebuild') === '1';
+        if (rebuild ? !checkAuth(req, res) : !checkClassroomAuth(req, res)) return;
         const studentId = parseInt(weightedOne[1], 10);
         let out;
-        try { out = seedWeightedEligibilityDoc(studentId); }
+        try { out = seedWeightedEligibilityDoc(studentId, { overwrite: rebuild }); }
         catch (e) { out = { ok: false, error: e.message }; }
         if (!out || !out.ok) {
             return sendJSON(res, 500, {
@@ -10705,8 +10763,13 @@ ELSE
             `SELECT e.Id, ISNULL(e.Category,'') AS Category, ISNULL(e.IEP,'') AS IEP, ISNULL(e.Military,'') AS Military,
                     ISNULL(e.HouseholdIncome,'') AS HouseholdIncome, ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
                     ISNULL(e.PublicBenefits,'') AS PublicBenefits, ISNULL(e.City_Town,'') AS City_Town,
-                    i.*
+                    ISNULL(e.HomeLanguage,'') AS HomeLanguage,
+                    i.*, pv.*
              FROM rptMasterEnrollment e
+             OUTER APPLY (
+                 SELECT TOP 1 ${piInterviewScoreCols()} FROM ParentInterviews pi
+                 WHERE pi.StudentId = e.Id ORDER BY ${PI_INTERVIEW_ORDER}
+             ) pv
              OUTER APPLY (
                  SELECT TOP 1 m.* FROM (
                      SELECT 1 AS pri, p.Id AS PId, ${pcols} FROM PreEnrollment p WHERE p.Id = e.PreEnrollmentId
@@ -10717,7 +10780,7 @@ ELSE
                      SELECT 3 AS pri, p.Id AS PId, ${pcols} FROM PreEnrollment p WHERE ${nameMatch}
                  ) m ORDER BY m.pri, m.PId DESC
              ) i
-             WHERE e.Active='Yes' OR e.Active='YES'`);
+             WHERE e.Active='Yes' OR e.Active='YES'`, parentInterviewEnsureSQL() + 'GO\n');
         if (!r.ok) return sendJSON(res, 500, { error: 'Could not read the eligibility data: ' + r.error });
 
         /* The child's filed Weighted Eligibility form is the score of record: it was
@@ -10743,19 +10806,24 @@ ELSE
             const inside = full && full.toLowerCase().startsWith((path.resolve(root) + path.sep).toLowerCase());
             const fromForm = inside ? weightedScoreFromForm(full) : null;
             const hasIntake = row.PId != null && String(row.PId).trim() !== '';
-            let fromIntake = null;
-            if (hasIntake) {
-                const intake = {};
-                ICOLS.forEach(c => { intake[c] = row['i_' + c]; });
-                const enroll = { Category: row.Category, IEP: row.IEP, Military: row.Military, HouseholdIncome: row.HouseholdIncome,
-                    HouseholdSize: row.HouseholdSize, PublicBenefits: row.PublicBenefits, City_Town: row.City_Town };
-                fromIntake = scoreWeightedTotal(intake, enroll);
-            }
-            const points = fromForm != null ? fromForm : fromIntake;
+            const intake = {};
+            if (hasIntake) ICOLS.forEach(c => { intake[c] = row['i_' + c]; });
+            const enroll = { Category: row.Category, IEP: row.IEP, Military: row.Military, HouseholdIncome: row.HouseholdIncome,
+                HouseholdSize: row.HouseholdSize, PublicBenefits: row.PublicBenefits, City_Town: row.City_Town,
+                HomeLanguage: row.HomeLanguage };
+            const interview = interviewFromRow(row);
+            const hasInterview = PI_INTERVIEW_SCORE_KEYS.some(k => interview[k]) || !!interview.publicPrograms;
+            /* What the records support today: pre-enrollment, then enrollment, then the
+               Parent Interview, exactly as a rebuilt form would score. Shown beside the
+               filed total so staff can see where rebuilding would change it. */
+            const fromRecords = (hasIntake || hasInterview) ? scoreWeightedTotal(intake, enroll, interview) : null;
+            const points = fromForm != null ? fromForm : fromRecords;
             return {
                 id: id, scored: points != null, points: points,
-                source: fromForm != null ? 'form' : (fromIntake != null ? 'pre-enrollment' : 'none'),
-                formOnFile: !!rel, formUnreadable: !!rel && fromForm == null
+                source: fromForm != null ? 'form' : (fromRecords != null ? 'records' : 'none'),
+                formOnFile: !!rel, formUnreadable: !!rel && fromForm == null,
+                recordsPoints: scoreWeightedTotal(intake, enroll, interview),
+                hasIntake: hasIntake, hasInterview: hasInterview
             };
         });
         return sendJSON(res, 200, { children: children });
