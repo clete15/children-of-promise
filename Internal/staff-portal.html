@@ -254,6 +254,8 @@
     .sp-silver-card.done .sp-silver-status { color: var(--sp-good-fg); }
     .sp-silver-pdr { font-size: 0.78rem; color: var(--sp-text-2); margin-top: 3px; font-style: italic; }
     .sp-silver-accepts { font-size: 0.76rem; color: var(--sp-muted); margin-top: 6px; line-height: 1.45; }
+    .sp-silver-links { display: flex; flex-direction: column; gap: 3px; margin-top: 7px; }
+    .sp-silver-links a { font-size: 0.78rem; font-weight: 700; color: var(--sp-accent); text-decoration: underline; text-underline-offset: 2px; }
     .sp-tabactions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
     .sp-pdrtoggle {
         align-self: center; appearance: none; -webkit-appearance: none;
@@ -4162,6 +4164,31 @@ const SILVER_TRAININGS = [
       re: /individual\s+professional\s+development\s+plans?/i }
 ];
 
+/* Where to take each training. Most are on Gateways i-Learning (courses.inccrra.org),
+   linked as a search for the course title so a renamed or re-numbered course is still
+   found. Getting Ready for the PAS is on the McCormick Center site (i-Learning points
+   there itself). Creative Curriculum is a purchased Teaching Strategies course, so the
+   free i-Learning alternative is the link. Taking it through i-Learning while signed in
+   with your Registry ID is what puts it on your PDR. */
+const IL_SEARCH = q => 'https://courses.inccrra.org/course/search.php?search=' + encodeURIComponent(q);
+const SILVER_LINKS = {
+    ers: [['How ERS Works on i-Learning', IL_SEARCH('How ERS Works')]],
+    elg: [['IELG (birth to 3) on i-Learning', IL_SEARCH('Illinois Early Learning Guidelines')],
+          ['IELDS (preschool) on i-Learning', IL_SEARCH('Illinois Early Learning and Development Standards')]],
+    curriculumOverview: [['Finding a Curriculum on i-Learning', IL_SEARCH('Finding a Curriculum')]],
+    curriculumSilver: [['Off the Shelf and into Practice (free) on i-Learning', IL_SEARCH('Off the Shelf')]],
+    weec: [['Welcoming Each & Every Child on i-Learning', IL_SEARCH('Welcoming Each')]],
+    clap: [['Culturally & Linguistically Appropriate Practice on i-Learning', IL_SEARCH('Culturally and Linguistically Appropriate')]],
+    orientation: [['ExceleRate Orientation on i-Learning', IL_SEARCH('Orientation for Child Care Centers')]],
+    screening: [['Developmental Screening Tools on i-Learning', IL_SEARCH('Introduction to Developmental Screening Tools')]],
+    assessment: [['Fundamentals of Child Assessment on i-Learning', IL_SEARCH('Fundamentals of Child Assessment')]],
+    family: [['Family and Community on i-Learning', IL_SEARCH('Family and Community')]],
+    transitions: [['An Introduction to Transitions on i-Learning', IL_SEARCH('Introduction to Transitions')]],
+    pas: [['Getting Ready for the PAS (McCormick Center)', 'https://www.mccormickinstitute.nl.edu/events/excelerate-illinois-getting-ready-for-the-pas-online-module']],
+    cqi: [['Continuous Quality Improvement on i-Learning', IL_SEARCH('Continuous Quality Improvement')]],
+    ipdp: [['Individual PD Plans on i-Learning', IL_SEARCH('Individual Professional Development Plans')]]
+};
+
 let SILVER_PDR = {};      // staffId -> { state: 'loading'|'ok'|'none'|'error', data, error }
 
 function isSilverSiteAdmin(s) {
@@ -4205,6 +4232,11 @@ function silverCardHtml(t, s, pdr) {
         + '<div class="sp-silver-status">' + status + '</div>'
         + (shown ? '<div class="sp-silver-pdr">' + esc(shown) + '</div>' : '')
         + '<div class="sp-silver-accepts">Accepted: ' + esc(t.accepts) + '</div>'
+        // Where to take it, only while it is still to do; a done card stays uncluttered.
+        + (!done && SILVER_LINKS[t.key]
+            ? '<div class="sp-silver-links">' + SILVER_LINKS[t.key].map(l =>
+                '<a href="' + esc(l[1]) + '" target="_blank" rel="noopener noreferrer">' + esc(l[0]) + ' \u2197</a>').join('') + '</div>'
+            : '')
         + '</div>';
 }
 
@@ -4229,7 +4261,8 @@ function silverTrainingsHtml(s) {
             + esc(s.Name) + '\u2019s current Gateways PDR. Until then only credential-met trainings can show green.</div></div>';
     } else if (st.data) {
         h += '<p class="sp-sub">Read from ' + esc(st.data.file) + (st.data.printed ? ', printed ' + esc(st.data.printed) : '')
-            + '. Take a training and pull a new PDR to update this.</p>';
+            + '. Each card still to do links to the course. Sign in to i-Learning with your Gateways Registry '
+            + 'ID so the training lands on your PDR, then pull a new PDR to update this.</p>';
     }
 
     const pdr = st.state === 'ok' ? st.data : null;
