@@ -268,6 +268,12 @@ document.getElementById('weCreateBtn').addEventListener('click', async () => {
 });
 
 async function init() {
+    /* No sign-in in this tab (a bookmark, or a link opened in a new tab: the session
+       lives in the tab that signed in) - go through /me like the other staff pages,
+       rather than showing an HTTP 401. */
+    let who = null;
+    try { who = window.CofpAuth && CofpAuth.whoAmI ? await CofpAuth.whoAmI() : null; } catch (e) { who = null; }
+    if (!who) { location.replace('/me'); return; }
     try {
         // Named rather than array-destructured with holes (see sql-reads steering).
         const scoresP = apiFetch('/api/weighted-eligibility-scores');
