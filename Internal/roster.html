@@ -62,6 +62,7 @@
         .rr-prog { display:inline-block;margin-left:6px;font-size:0.6rem;font-weight:800;letter-spacing:0.03em;padding:1px 5px;border-radius:999px;vertical-align:middle; }
         .rr-prog.ok  { color:var(--sp-good-fg,#16a34a);background:var(--sp-good-bg,rgba(22,163,74,0.14));border:1px solid var(--sp-good-br,rgba(22,163,74,0.4)); }
         .rr-prog.bad { color:var(--sp-bad-fg,#dc2626);background:var(--sp-bad-bg,rgba(220,38,38,0.12));border:1px solid var(--sp-bad-br,rgba(220,38,38,0.4)); }
+        .rr-pts { display:inline-block;margin-left:6px;font-size:0.6rem;font-weight:800;padding:1px 6px;border-radius:999px;vertical-align:middle;color:var(--sp-accent);background:var(--sp-accent-soft);border:1px solid var(--sp-border); }
 
         /* Roster as of a past date */
         .rr-asof-pick { display:flex;align-items:center;gap:6px;font-size:0.75rem;font-weight:600;color:var(--sp-muted);white-space:nowrap; }
@@ -120,11 +121,11 @@
     <nav class="em-subnav" aria-label="Enrollment management">
         <a href="/staff/waitinglist.html">Waiting List</a>
         <a href="/staff/ems.html">Enrolled Students</a>
-        <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
         <a href="/staff/attendance.html">Attendance</a>
         <a href="/staff/roster.html" class="on" aria-current="page">Room Roster</a>
         <a href="/staff/rooms.html">Classrooms &amp; Staffing</a>
         <a href="/staff/scheduler.html">Staff Scheduler</a>
+        <a href="/staff/weighted.html">Weighted Eligibility</a>
     </nav>
 </div>
 
@@ -163,6 +164,37 @@ async function init() {
     await Promise.all([loadClassrooms(), loadStudents()]);
     setupAsOf();
     buildRoster();
+    loadEligibilityScores();     // badges fill in after; never holds up the roster
+}
+
+/* Weighted-eligibility points beside each name (same scoring as the Weighted
+   Eligibility tab). Only children with a pre-enrollment score get a badge. A failed
+   read leaves the badges off and says so in the console rather than showing blanks
+   that look like "no score". */
+let eligScores = null;
+async function loadEligibilityScores() {
+    try {
+        const res = await apiFetch('/api/weighted-eligibility-scores');
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok || d.error) throw new Error(d.error || ('HTTP ' + res.status));
+        eligScores = {};
+        (d.children || []).forEach(c => { if (c.scored) eligScores[String(c.id)] = c.points; });
+        // Add the badges in place rather than re-rendering, so an unsaved edit in the
+        // table is not wiped. Later renders pick them up through eligBadgeHtml().
+        if (!asOfKids) rosterStudents.forEach((s, i) => {
+            const tag = document.getElementById('rosterTag' + i);
+            if (tag && !(tag.nextElementSibling && tag.nextElementSibling.classList.contains('rr-pts'))) {
+                tag.insertAdjacentHTML('afterend', eligBadgeHtml(s));
+            }
+        });
+    } catch (e) {
+        console.warn('[ROSTER] eligibility scores not loaded:', e.message || e);
+    }
+}
+function eligBadgeHtml(s) {
+    if (!eligScores || eligScores[String(s.Id)] == null) return '';
+    const p = eligScores[String(s.Id)];
+    return `<span class="rr-pts" title="Weighted eligibility: ${p} points">${p} pts</span>`;
 }
 
 // ── ROSTER AS OF A PAST DATE ──
@@ -439,7 +471,7 @@ function renderRosterRoom() {
                     return `<tr>
                         <td>${dd('rosterRoom' + i, roomOpts)}</td>
                         <td class="student">
-                            <div class="rr-name">${s.Last_Name}, ${s.First_Name}${progTagHtml(s, cr, 'rosterTag' + i)}</div>
+                            <div class="rr-name">${s.Last_Name}, ${s.First_Name}${progTagHtml(s, cr, 'rosterTag' + i)}${eligBadgeHtml(s)}</div>
                             <div class="rr-age">${ageInMonthsDays(s.Birth_date)}</div>
                         </td>
                         ${dayChecks}

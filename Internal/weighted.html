@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weighted Eligibility – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { background: var(--sp-bg); color: var(--sp-text); min-height: 100vh; margin: 0; }
+        .we-layout { display:flex;align-items:flex-start;justify-content:flex-start;padding:20px 20px 20px 15%; }
+        .we-card { background:var(--sp-surface);border:1px solid var(--sp-border);flex:1;max-width:900px;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.12);max-height:calc(100vh - 130px); }
+        .we-head { padding:14px 20px;border-bottom:1px solid var(--sp-border);display:flex;align-items:center;gap:12px;flex-wrap:wrap; }
+        .we-title { font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--primary); }
+        .we-filters { display:flex;gap:6px;flex-wrap:wrap; }
+        .we-filter { padding:5px 12px;border:1.5px solid var(--sp-border);border-radius:999px;background:var(--sp-surface);color:var(--sp-text-2);font:inherit;font-size:0.78rem;font-weight:700;cursor:pointer; }
+        .we-filter:hover { border-color:var(--sp-accent); }
+        .we-filter[aria-pressed="true"] { background:var(--sp-accent);border-color:var(--sp-accent);color:#fff; }
+        .we-filter:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
+        .we-count { font-size:0.75rem;color:var(--sp-muted);margin-left:auto; }
+        .we-body { overflow:auto;flex:1; }
+        .we-table { width:100%;border-collapse:collapse;font-size:0.86rem; }
+        .we-table thead tr { background:var(--sp-surface-2);border-bottom:2px solid var(--sp-border);position:sticky;top:0;z-index:1; }
+        .we-table th { padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:var(--sp-muted); }
+        .we-table th button { all:unset;cursor:pointer; }
+        .we-table th button:focus-visible { outline:2px solid var(--sp-accent);outline-offset:2px; }
+        .we-table td { padding:7px 10px;border-bottom:1px solid var(--sp-border); }
+        .we-table tbody tr:hover { background:var(--sp-surface-2); }
+        .we-num { text-align:right; }
+        .we-pts { font-weight:800; }
+        .we-none { color:var(--sp-muted);font-style:italic;font-weight:400; }
+        .we-prog { font-size:0.68rem;font-weight:800;padding:1px 7px;border-radius:999px;background:var(--sp-surface-2);border:1px solid var(--sp-border); }
+        .we-msg { padding:24px;color:var(--sp-muted);font-size:0.88rem;text-align:center; }
+        .we-msg.err { color:var(--sp-bad-fg); }
+        .we-foot { padding:10px 20px;border-top:1px solid var(--sp-border);font-size:0.74rem;color:var(--sp-muted);line-height:1.5; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Weighted Eligibility &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <div class="header-actions">
+        <button type="button" class="header-theme-btn" id="spTheme" aria-pressed="false">☾ Dark mode</button>
+        <a class="header-back" href="/staff/">← Staff Portal</a>
+    </div>
+</header>
+
+<!-- Shared Enrollment Management sub-nav (see ems.html for the note). -->
+<style>
+    .em-subnav { display:flex;gap:4px;align-items:center;flex-wrap:wrap;max-width:1400px;margin:0;padding:10px 20px 0 15%; }
+    .em-subnav a {
+        font-size:0.9rem;font-weight:700;text-decoration:none;color:var(--sp-text-2);
+        padding:8px 15px;border-radius:8px 8px 0 0;border-bottom:3px solid transparent;
+        transition:color 0.12s,background 0.12s,border-color 0.12s;
+    }
+    .em-subnav a:hover { color:var(--sp-text);background:var(--sp-surface-2); }
+    .em-subnav a.on { color:var(--sp-accent);border-bottom-color:var(--sp-accent); }
+    .em-subnav-wrap { border-bottom:1.5px solid var(--sp-border); }
+</style>
+<div class="em-subnav-wrap">
+    <nav class="em-subnav" aria-label="Enrollment management">
+        <a href="/staff/waitinglist.html">Waiting List</a>
+        <a href="/staff/ems.html">Enrolled Students</a>
+        <a href="/staff/attendance.html">Attendance</a>
+        <a href="/staff/roster.html">Room Roster</a>
+        <a href="/staff/rooms.html">Classrooms &amp; Staffing</a>
+        <a href="/staff/scheduler.html">Staff Scheduler</a>
+        <a href="/staff/weighted.html" class="on" aria-current="page">Weighted Eligibility</a>
+    </nav>
+</div>
+
+<div class="we-layout">
+    <div class="we-card">
+        <div class="we-head">
+            <div class="we-title">Weighted Eligibility</div>
+            <div class="we-filters" role="group" aria-label="Filter by program">
+                <button type="button" class="we-filter" data-prog="" aria-pressed="true">All</button>
+                <button type="button" class="we-filter" data-prog="PI" aria-pressed="false">PI</button>
+                <button type="button" class="we-filter" data-prog="INCCRA" aria-pressed="false">INCCRA</button>
+                <button type="button" class="we-filter" data-prog="PFA" aria-pressed="false">PFA</button>
+            </div>
+            <span class="we-count" id="weCount" aria-live="polite"></span>
+        </div>
+        <div class="we-body" id="weBody"><div class="we-msg">Loading…</div></div>
+        <div class="we-foot">Active children only, highest score first. Points use the same weighted-eligibility
+            scoring as the waiting list and the filed Weighted Eligibility form, from the child's pre-enrollment
+            answers. &ldquo;No score&rdquo; means no pre-enrollment record was found for that child.</div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+<script>
+let weScores = {};          // studentId -> { points, scored }
+let weFilter = '';
+let weSort = { key: 'points', dir: -1 };
+
+function weEsc(v) {
+    return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Age in whole months, and as "2y 3m" (or "7m" under a year).
+function ageMonths(bd) {
+    const d = new Date(bd);
+    if (!bd || isNaN(d)) return null;
+    const now = new Date();
+    let m = (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+    if (now.getDate() < d.getDate()) m--;
+    return m;
+}
+function ageText(m) {
+    if (m == null) return '';
+    return m < 12 ? m + 'm' : Math.floor(m / 12) + 'y ' + (m % 12) + 'm';
+}
+
+function weRows() {
+    return students
+        .filter(s => isTruthy(s.Active))
+        .filter(s => !weFilter || String(s.PFA_PI_na || '').trim().toUpperCase() === weFilter)
+        .map(s => {
+            const sc = weScores[String(s.Id)] || null;
+            return { s: s, name: s.Last_Name + ', ' + s.First_Name, room: getRoomName(s.RoomNumber) || '',
+                age: ageMonths(s.Birth_date), prog: String(s.PFA_PI_na || '').trim().toUpperCase(),
+                points: sc && sc.scored ? sc.points : null };
+        });
+}
+
+function weCompare(a, b) {
+    const k = weSort.key, d = weSort.dir;
+    // Children with no score always sort after scored children, whichever direction.
+    if (k === 'points') {
+        if (a.points == null && b.points == null) return a.name.localeCompare(b.name);
+        if (a.points == null) return 1;
+        if (b.points == null) return -1;
+        return d * (a.points - b.points) || a.name.localeCompare(b.name);
+    }
+    if (k === 'age') return d * ((a.age == null ? -1 : a.age) - (b.age == null ? -1 : b.age)) || a.name.localeCompare(b.name);
+    return d * String(a[k]).localeCompare(String(b[k])) || a.name.localeCompare(b.name);
+}
+
+function render() {
+    const rows = weRows().sort(weCompare);
+    const scored = rows.filter(r => r.points != null).length;
+    document.getElementById('weCount').textContent = rows.length + ' children \u00b7 ' + scored + ' scored';
+    const body = document.getElementById('weBody');
+    if (!rows.length) { body.innerHTML = '<div class="we-msg">No active children' + (weFilter ? ' in ' + weEsc(weFilter) : '') + '.</div>'; return; }
+    const th = (key, label, cls) => {
+        const on = weSort.key === key;
+        const sortState = on ? (weSort.dir < 0 ? 'descending' : 'ascending') : 'none';
+        return '<th scope="col"' + (cls ? ' class="' + cls + '"' : '') + ' aria-sort="' + sortState + '">'
+            + '<button type="button" data-sort="' + key + '">' + label + (on ? (weSort.dir < 0 ? ' \u25BE' : ' \u25B4') : '') + '</button></th>';
+    };
+    body.innerHTML = '<table class="we-table"><thead><tr>'
+        + th('name', 'Child') + th('room', 'Room') + th('age', 'Age') + th('prog', 'Program') + th('points', 'Points', 'we-num')
+        + '</tr></thead><tbody>'
+        + rows.map(r => '<tr><td>' + weEsc(r.name) + '</td><td>' + weEsc(r.room) + '</td><td>' + weEsc(ageText(r.age)) + '</td>'
+            + '<td>' + (r.prog ? '<span class="we-prog">' + weEsc(r.prog) + '</span>' : '') + '</td>'
+            + '<td class="we-num we-pts">' + (r.points != null ? r.points : '<span class="we-none">No score</span>') + '</td></tr>').join('')
+        + '</tbody></table>';
+}
+
+document.querySelectorAll('.we-filter').forEach(b => b.addEventListener('click', () => {
+    weFilter = b.getAttribute('data-prog');
+    document.querySelectorAll('.we-filter').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+    render();
+}));
+document.getElementById('weBody').addEventListener('click', e => {
+    const b = e.target.closest('button[data-sort]');
+    if (!b) return;
+    const k = b.getAttribute('data-sort');
+    weSort = weSort.key === k ? { key: k, dir: -weSort.dir } : { key: k, dir: k === 'points' ? -1 : 1 };
+    render();
+});
+
+async function init() {
+    try {
+        // Named rather than array-destructured with holes (see sql-reads steering).
+        const scoresP = apiFetch('/api/weighted-eligibility-scores');
+        await Promise.all([loadClassrooms(), loadStudents(), scoresP]);
+        const sRes = await scoresP;
+        const d = await sRes.json().catch(() => ({}));
+        // A failed read must not look like "nobody has a score".
+        if (!sRes.ok || d.error) throw new Error(d.error || ('HTTP ' + sRes.status));
+        weScores = {};
+        (d.children || []).forEach(c => { weScores[String(c.id)] = c; });
+        render();
+    } catch (e) {
+        document.getElementById('weBody').innerHTML = '<div class="we-msg err">Could not load the scores: ' + weEsc(e.message || e)
+            + '. Nothing is missing; the page could not read them.</div>';
+    }
+}
+init();
+</script>
+</body>
+</html>

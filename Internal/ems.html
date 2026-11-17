@@ -121,11 +121,11 @@
     <nav class="em-subnav" aria-label="Enrollment management">
         <a href="/staff/waitinglist.html">Waiting List</a>
         <a href="/staff/ems.html" class="on" aria-current="page">Enrolled Students</a>
-        <a href="/staff/benefits.html">Benefits &amp; Eligibility</a>
         <a href="/staff/attendance.html">Attendance</a>
         <a href="/staff/roster.html">Room Roster</a>
         <a href="/staff/rooms.html">Classrooms &amp; Staffing</a>
         <a href="/staff/scheduler.html">Staff Scheduler</a>
+        <a href="/staff/weighted.html">Weighted Eligibility</a>
     </nav>
 </div>
 
@@ -261,8 +261,33 @@
                                 <div class="checkbox-item"><input type="checkbox" id="military"><label for="military">Military</label></div>
                             </div>
                         </div>
-                        <!-- Benefits are managed on the Benefits Roster page; kept here for F/R/P calc. -->
-                        <div class="form-group" style="display:none;margin-top:8px;">
+                    </div>
+
+                    <!-- Benefits & Eligibility. Merged in from the old Benefits & Eligibility tab
+                         (Nov 2026) so a child's income, household size, public benefits and pay
+                         type are edited on the one record, and saved by Update Student with the
+                         rest of it. The hints line is the old tab's Notes column. -->
+                    <div class="card" id="benCard" style="grid-column: 1 / -1;">
+                        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+                            <span>Benefits &amp; Eligibility</span>
+                            <button type="button" class="btn btn-secondary" onclick="recalculateAllFRP()"
+                                    style="padding:5px 12px;font-size:0.72rem;"
+                                    title="Recalculate Free/Reduced/Paid for every active student from the current thresholds">&#128260; Recalculate F/R/P (all)</button>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Annual Household Income</label>
+                                <input type="number" id="householdIncome" placeholder="e.g. 42000" min="0" oninput="calcFRP('householdIncome','householdSize','frpFood','');refreshBenNotes()">
+                            </div>
+                            <div class="form-group">
+                                <label>Household Size</label>
+                                <input type="number" id="householdSize" placeholder="e.g. 4" min="1" max="15" oninput="calcFRP('householdIncome','householdSize','frpFood','');refreshBenNotes()">
+                            </div>
+                            <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:2px;">
+                                <div class="checkbox-item"><input type="checkbox" id="proofOfIncome"><label for="proofOfIncome">Proof of Income</label></div>
+                            </div>
+                        </div>
+                        <div class="form-group" style="margin-top:8px;">
                             <label>Public Benefits</label>
                             <div class="checkbox-grid">
                                 <div class="checkbox-item"><input type="checkbox" id="benWIC" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benWIC">WIC</label></div>
@@ -271,43 +296,7 @@
                                 <div class="checkbox-item"><input type="checkbox" id="benTANF" onchange="calcFRP('householdIncome','householdSize','frpFood','')"><label for="benTANF">TANF</label></div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Read-only benefits & eligibility summary. Income, household size,
-                         pay type and public benefits have ONE home now: the Benefits &
-                         Eligibility page. Here they are shown for reference with a link
-                         to edit. Hidden while adding a new student (nothing to show yet,
-                         and the New Student flow sets pay type on the editable control). -->
-                    <div class="card" id="benSummaryCard" style="grid-column: 1 / -1; display:none;">
-                        <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-                            <span>Benefits &amp; Eligibility</span>
-                            <a id="benSummaryLink" href="/staff/benefits.html"
-                               style="font-size:0.78rem;font-weight:700;text-decoration:none;color:var(--sp-accent);white-space:nowrap;">Edit on Benefits &amp; Eligibility →</a>
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group"><label>Pay Type</label><div id="benSumPay" class="bn-sum-val">—</div></div>
-                            <div class="form-group"><label>Household Income</label><div id="benSumIncome" class="bn-sum-val">—</div></div>
-                            <div class="form-group"><label>Household Size</label><div id="benSumSize" class="bn-sum-val">—</div></div>
-                        </div>
-                        <div class="form-group" style="margin-top:8px;"><label>Public Benefits</label><div id="benSumBenefits" class="bn-sum-val">—</div></div>
-                    </div>
-
-                    <!-- Income (managed on the Benefits Roster page; kept for F/R/P calc) -->
-                    <div class="card" style="grid-column: 1 / -1; display:none;">
-                        <div class="card-title">Household Income</div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Annual Household Income</label>
-                                <input type="number" id="householdIncome" placeholder="e.g. 42000" max="100000" min="0" oninput="calcFRP('householdIncome','householdSize','frpFood','')">
-                            </div>
-                            <div class="form-group">
-                                <label>Household Size</label>
-                                <input type="number" id="householdSize" placeholder="e.g. 4" min="1" max="15" oninput="calcFRP('householdIncome','householdSize','frpFood','')">
-                            </div>
-                            <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:2px;">
-                                <div class="checkbox-item"><input type="checkbox" id="proofOfIncome"><label for="proofOfIncome">Proof of Income</label></div>
-                            </div>
-                        </div>
+                        <div id="benNotes" class="bn-sum-val" style="margin-top:8px;" aria-live="polite"></div>
                     </div>
 
                     <!-- Actions -->
@@ -496,7 +485,11 @@ function buildViewSidebar() {
             const count = hideInactive ? activeCount : inRoom.length;
             const extra = (!hideInactive && inactiveCount)
                 ? ` <span style="color:var(--sp-bad-fg);">(${inactiveCount} inactive)</span>` : '';
-            return `${count} student${count !== 1 ? 's' : ''}${extra}`;
+            // From the old Benefits tab: active children missing income/HH, or CCAP eligible.
+            const attn = inRoom.filter(s => isTruthy(s.Active)
+                && (!(parseInt(s.HouseholdIncome) || 0) || !(parseInt(s.HouseholdSize) || 0) || isCCAPEligible(s))).length;
+            const attnHtml = attn ? `<br><span style="color:var(--sp-bad-fg);" title="Missing income or household size, or CCAP eligible">${attn} benefits to check</span>` : '';
+            return `${count} student${count !== 1 ? 's' : ''}${extra}${attnHtml}`;
         },
     });
 }
@@ -591,32 +584,61 @@ function loadRecord(i) {
 
     calcFRP('householdIncome','householdSize','frpFood','');
 
-    // Benefits/income/pay type are edited on the Benefits & Eligibility page now, so
-    // here they are read-only: show the summary, lock the Pay Type control, and point
-    // the "edit" link at that student's room on the Benefits page.
-    setBenefitsReadOnly(true, s);
+    // Benefits, income and pay type are edited right here now (the separate Benefits &
+    // Eligibility tab was folded into this page, Nov 2026).
+    setBenefitsReadOnly(false, s);
 }
 
-/* Toggle the benefits fields between read-only (editing an existing record) and
-   editable (adding a new student, where pay type still has to be captured). */
+/* Kept under its old name because startNewStudent and loadRecord both call it. Benefits
+   are always editable now; this only keeps Pay Type unlocked and redraws the hints. */
 function setBenefitsReadOnly(readOnly, s) {
-    const card = document.getElementById('benSummaryCard');
     const pay = document.getElementById('category');
-    if (readOnly) {
-        if (card) card.style.display = '';
-        if (pay) pay.disabled = true;
-        // Fill the summary from the loaded record.
-        const val = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v || '—'; };
-        val('benSumPay', normalizePayType(s && s.Category));
-        val('benSumIncome', s && s.HouseholdIncome ? '$' + Number(s.HouseholdIncome).toLocaleString('en-US') : '');
-        val('benSumSize', s && s.HouseholdSize ? String(s.HouseholdSize) : '');
-        val('benSumBenefits', s && s.PublicBenefits ? s.PublicBenefits : 'None recorded');
-        const link = document.getElementById('benSummaryLink');
-        if (link) link.href = '/staff/benefits.html' + (s && s.RoomNumber ? '?room=' + encodeURIComponent(s.RoomNumber) : '');
+    if (pay) pay.disabled = false;
+    refreshBenNotes();
+}
+
+/* The old Benefits tab's Notes column, read live from the form so it follows edits:
+   CCAP eligible, qualifies Free / Reduced, or missing income data. */
+function refreshBenNotes() {
+    const el = document.getElementById('benNotes');
+    if (!el) return;
+    const v = id => document.getElementById(id);
+    const s = {
+        Active: v('active') ? v('active').value : 'Yes',
+        Category: v('category') ? v('category').value : '',
+        HouseholdIncome: v('householdIncome') ? v('householdIncome').value : '',
+        HouseholdSize: v('householdSize') ? v('householdSize').value : '',
+        F_R_P_Food: v('frpFood') ? v('frpFood').value : ''
+    };
+    const income = parseInt(s.HouseholdIncome) || 0;
+    const hh = parseInt(s.HouseholdSize) || 0;
+    const notes = [];
+    if (income && hh) {
+        const idx = Math.max(1, Math.min(hh, 8)) - 1;
+        if (isCCAPEligible(s)) notes.push('<span style="color:var(--sp-bad-fg);font-weight:700;">CCAP eligible</span>');
+        if (income <= USDA_FREE_THRESHOLDS[idx]) notes.push('<span style="color:var(--sp-good-fg);">Income qualifies Free</span>');
+        else if (income <= USDA_REDUCED_THRESHOLDS[idx]) notes.push('<span style="color:var(--sp-warn-fg);">Income qualifies Reduced</span>');
     } else {
-        if (card) card.style.display = 'none';
-        if (pay) pay.disabled = false;
+        notes.push('<span style="color:var(--text-muted);">Missing income or household size</span>');
     }
+    el.innerHTML = notes.join(' &middot; ');
+}
+
+// Moved from the Benefits tab: re-run F/R/P for every active student on the server.
+async function recalculateAllFRP() {
+    if (!confirm('Recalculate Free/Reduced/Paid for all active students based on current thresholds?')) return;
+    try {
+        const res = await apiFetch('/api/recalculate-frp', { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            showNotification('All F/R/P values recalculated', 'success');
+            await loadStudents();
+            buildViewSidebar();
+            applyFilter();
+        } else {
+            showNotification('Error: ' + (data.error || ''), 'error');
+        }
+    } catch (e) { showNotification('Network error', 'error'); }
 }
 
 function clearForm() {
@@ -637,10 +659,7 @@ function clearForm() {
     setVal('active', 'Yes');
     setVal('category', '');
     setVal('pfaPiNa', '');
-    // Blank the read-only benefits summary spans too, so nothing from the prior
-    // record lingers if the summary card is ever shown.
-    ['benSumPay', 'benSumIncome', 'benSumSize', 'benSumBenefits']
-        .forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+    refreshBenNotes();
 }
 
 function calcDaysOld() {

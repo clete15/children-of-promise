@@ -8066,7 +8066,12 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                     out.current = { gateways: row.Gateways, notes: row.Notes, eceCredentials: row.EceCredentials };
                     out.proposed = {
                         gateways: proposal.gateways,
-                        notes: proposal.notes,
+                        /* The report's line replaces the old Gateways-derived text, but a
+                           sentence the office starts with "Office note:" is the office's own
+                           (e.g. something Gateways is waiting on from a third party) and is
+                           kept, first, ahead of the report line. */
+                        notes: ((String(row.Notes || '').match(/Office note:[\s\S]*?\.(?=\s|$)/g) || [])
+                            .concat([proposal.notes]).join(' ')),
                         eceCredentials: mergeHeldCredentials(row.EceCredentials, proposal.held)
                     };
                     // Flag whether anything actually changes, so the UI can show "no change".
@@ -10591,6 +10596,54 @@ ELSE
             success: true, total: rows.rows.length, updated, failed,
             message: `${rows.rows.length} waiting-list children: ${updated} re-scored, ${failed} failed.`
         });
+    }
+
+    /* GET the weighted-eligibility points for every active child, for the Weighted
+       Eligibility list and the badges on the Room Roster.
+         { children: [ { id, points, scored, source } ] }
+       Scored with the SAME scoreWeightedTotal the waiting list and the filed PDF use,
+       from the child's pre-enrollment intake (matched exactly as childRecordsForSeed
+       does: PreEnrollmentId, then name + DOB, then name) with the enrollment row as
+       fallback. `scored` is false when no intake was found: the points would then rest
+       on the few enrollment-row fields alone, so the page shows no score rather than a
+       low one that only looks real. One query for every child, not two per child. */
+    if (req.method === 'GET' && url === '/api/weighted-eligibility-scores') {
+        if (!checkClassroomAuth(req, res)) return;
+        const ICOLS = ['Homeless', 'FosterAdopted', 'IEP', 'EarlyIntervention', 'AbuseHistory', 'MentalIllness',
+            'DcfsInvolvement', 'SubstanceAbuse', 'CaregiverOther', 'FamilyDeath', 'LowBirthWeight', 'ParentIncarcerated',
+            'TeenParent', 'NoHSDiploma', 'BornOutsideUS', 'NonEnglishHome', 'ActiveMilitary', 'LivingSituation',
+            'HouseholdIncome', 'HouseholdSize', 'PublicBenefits', 'City', 'BrightpointSubsidy', 'PriorEarlyLearning',
+            'ScreeningDelayNoEi', 'ParentEll', 'IncomeBelow50Fpl'];
+        const pcols = ICOLS.map(c => `ISNULL(CAST(p.${c} AS NVARCHAR(200)),'') AS i_${c}`).join(',');
+        const nameMatch = `LOWER(LTRIM(RTRIM(p.ChildName)))=LOWER(LTRIM(RTRIM(e.First_Name+' '+e.Last_Name)))`;
+        const r = runSQLRows(
+            `SELECT e.Id, ISNULL(e.Category,'') AS Category, ISNULL(e.IEP,'') AS IEP, ISNULL(e.Military,'') AS Military,
+                    ISNULL(e.HouseholdIncome,'') AS HouseholdIncome, ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
+                    ISNULL(e.PublicBenefits,'') AS PublicBenefits, ISNULL(e.City_Town,'') AS City_Town,
+                    i.*
+             FROM rptMasterEnrollment e
+             OUTER APPLY (
+                 SELECT TOP 1 m.* FROM (
+                     SELECT 1 AS pri, p.Id AS PId, ${pcols} FROM PreEnrollment p WHERE p.Id = e.PreEnrollmentId
+                     UNION ALL
+                     SELECT 2 AS pri, p.Id AS PId, ${pcols} FROM PreEnrollment p
+                         WHERE ${nameMatch} AND TRY_CONVERT(date,p.ChildBirthDate)=TRY_CONVERT(date,e.Birth_date)
+                     UNION ALL
+                     SELECT 3 AS pri, p.Id AS PId, ${pcols} FROM PreEnrollment p WHERE ${nameMatch}
+                 ) m ORDER BY m.pri, m.PId DESC
+             ) i
+             WHERE e.Active='Yes' OR e.Active='YES'`);
+        if (!r.ok) return sendJSON(res, 500, { error: 'Could not read the eligibility data: ' + r.error });
+        const children = r.rows.map(row => {
+            const scored = row.PId != null && String(row.PId).trim() !== '';
+            const intake = {};
+            if (scored) ICOLS.forEach(c => { intake[c] = row['i_' + c]; });
+            const enroll = { Category: row.Category, IEP: row.IEP, Military: row.Military, HouseholdIncome: row.HouseholdIncome,
+                HouseholdSize: row.HouseholdSize, PublicBenefits: row.PublicBenefits, City_Town: row.City_Town };
+            return { id: String(row.Id), scored: scored, points: scored ? scoreWeightedTotal(intake, enroll) : null,
+                source: scored ? 'pre-enrollment' : 'none' };
+        });
+        return sendJSON(res, 200, { children: children });
     }
 
     /* GET each child's weighted-eligibility file path (internal - protected).
