@@ -1179,6 +1179,9 @@ GO
    person's secondary. */
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='SecondaryRoomNumber')
     ALTER TABLE Staff ADD SecondaryRoomNumber INT NULL;
+-- Rooms a person covers as BACKUP (comma list of RoomNumbers), beyond Teacher 1/2.
+IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='BackupRoomNumbers')
+    ALTER TABLE Staff ADD BackupRoomNumbers NVARCHAR(100);
 -- Last day worked, set when a person is marked inactive from the staff portal.
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Staff' AND COLUMN_NAME='InactiveDate')
     ALTER TABLE Staff ADD InactiveDate NVARCHAR(20);
@@ -1208,7 +1211,13 @@ const STAFF_COLUMNS = [
        SecondaryRoomNumber is the link, SecondaryClassroom its derived text mirror. In
        the Classrooms & Staffing chart, Teacher 1 of a room = that person's primary
        (RoomNumber), Teacher 2 = their secondary (SecondaryRoomNumber). */
-    ['SecondaryRoomNumber', 'secondaryRoomNumber']
+    ['SecondaryRoomNumber', 'secondaryRoomNumber'],
+    /* Rooms the person covers as backup when the room's teachers are out, as a comma
+       list of RoomNumbers ("1,2,3"). Plain text through esc(); it is not a room link
+       with a mirror, so a rename never needs it rewritten. Used by ExceleRate Standard 4
+       for a Director/Teacher who is in classrooms 50%+ of the time (ExceleRate's own
+       definition of when a Director/Teacher counts as teaching staff). */
+    ['BackupRoomNumbers', 'backupRoomNumbers']
 ];
 
 /* The two room links and the text column each mirrors, so the staff INSERT/UPDATE

@@ -586,6 +586,8 @@ function cardHtml(s) {
                 `<select class="cf-input" data-f="roomNumber">${roomOptionsHtml(s.RoomNumber, '— none (no assigned room) —')}</select>`)}
             ${stack('Second classroom <span style="font-weight:400;color:#94a3b8;">(part time · Teacher 2)</span>',
                 `<select class="cf-input" data-f="secondaryRoomNumber">${roomOptionsHtml(s.SecondaryRoomNumber, '— none —')}</select>`)}
+            ${stack('Backup in <span style="font-weight:400;color:#94a3b8;">(covers when the room’s teachers are out · counts in Standard 4 only if 50%+ of their time is in classrooms)</span>',
+                backupRoomsHtml(s.BackupRoomNumbers))}
             ${row('Education', sel('education', s.Education,
                 [['', '—'], 'High School/GED', 'Some College', "Associate's", "Bachelor's", "Master's", 'Doctorate']))}
             <div class="cf-stack">
@@ -657,6 +659,8 @@ function readCard(card) {
     const other = g('other').value.split(',').map(t => t.trim()).filter(Boolean);
     body.eceCredentials = parts.concat(other).join(', ');
     body.gateways = g('ece').value ? 'ECE Credential - Level ' + g('ece').value : '';
+    body.backupRoomNumbers = Array.from(card.querySelectorAll('[data-f="_bk"]'))
+        .filter(el => el.checked).map(el => el.value).join(',');
     // A named reviewer always carries a date.
     if (body.reviewedBy && !body.reviewedDate) body.reviewedDate = new Date().toISOString().split('T')[0];
     return body;
@@ -694,7 +698,7 @@ async function saveCard(id) {
         reviewedDate: 'ReviewedDate', staffGroup: 'StaffGroup',
         semesterHoursTotal: 'SemesterHoursTotal', semesterHoursEce: 'SemesterHoursEce',
         transcriptOnFile: 'TranscriptOnFile', pdHoursYtd: 'PdHoursYtd',
-        pdHoursYear: 'PdHoursYear'
+        pdHoursYear: 'PdHoursYear', backupRoomNumbers: 'BackupRoomNumbers'
     };
     const changed = {};
     Object.keys(body).forEach(k => {
@@ -819,6 +823,18 @@ async function loadClassroomList() {
    `selectedNum` is the staff row's stored RoomNumber/SecondaryRoomNumber. A stored
    id that is not in the current room list is kept as its own option so opening a
    card never silently discards an assignment. */
+/* One checkbox per room for "Backup in". Stored as a comma list of RoomNumbers. A
+   stored number not in the current room list is kept, checked, so it is not lost. */
+function backupRoomsHtml(stored) {
+    const rooms = window.ROOM_OBJS || [];
+    const have = String(stored || '').split(',').map(t => t.trim()).filter(Boolean);
+    const list = rooms.slice();
+    have.filter(n => !rooms.some(r => r.num === n)).forEach(n => list.push({ num: n, name: 'Room ' + n + ' (not in current list)' }));
+    return '<div style="display:flex;flex-wrap:wrap;gap:4px 12px;">' + list.map(r =>
+        `<label class="cf-check" style="font-size:0.7rem;"><input type="checkbox" data-f="_bk" value="${escAttr(r.num)}"${have.includes(r.num) ? ' checked' : ''}> ${escHtml(r.name)}</label>`
+    ).join('') + '</div>';
+}
+
 function roomOptionsHtml(selectedNum, blankLabel) {
     const rooms = window.ROOM_OBJS || [];
     const sel = String(selectedNum == null ? '' : selectedNum);
@@ -847,6 +863,9 @@ function parseCredentials(text) {
             return;
         }
         if (/^CDA$/i.test(tok)) { res.cda = true; return; }
+        /* "Infant/Toddler CDA" / "Preschool CDA" stay as written (in Other), so saving a
+           card never collapses the setting to a bare "CDA" — the portal reads the
+           setting to decide which competencies the CDA meets. */
         res.other.push(tok);
     });
     return res;

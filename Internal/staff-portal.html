@@ -1681,6 +1681,9 @@ function identityHeader(s) {
         roomNameFor(s.RoomNumber, s.Classroom),
         roomNameFor(s.SecondaryRoomNumber, s.SecondaryClassroom)
     ].filter(Boolean).join(' and ');
+    // Rooms covered as backup (staff card "Backup in"), named from the live room list.
+    const backup = String(s.BackupRoomNumbers || '').split(',').map(t => t.trim()).filter(Boolean)
+        .map(n => roomNameFor(n, 'Room ' + n)).join(', ');
 
     return '<div class="sp-card sp-who' + (isStaffActive(s) ? '' : ' sp-inactive') + '">'
         + '<div class="sp-who-row">'
@@ -1689,7 +1692,8 @@ function identityHeader(s) {
         // Registry number shown bare (no "Registry" word) — the N-prefix already reads
         // as a registry id, and it keeps the grey subtitle line short.
         + '<div class="sp-sub">' + esc(s.Role || 'Role not recorded')
-        + (rooms ? ' \u00b7 ' + esc(rooms) : ' \u00b7 no classroom assigned')
+        + (rooms ? ' \u00b7 ' + esc(rooms) : (backup ? '' : ' \u00b7 no classroom assigned'))
+        + (backup ? ' \u00b7 backup in ' + esc(backup) : '')
         + (s.RegistryId ? ' \u00b7 ' + esc(s.RegistryId) : '')
         + '</div>'
         + '</div>'

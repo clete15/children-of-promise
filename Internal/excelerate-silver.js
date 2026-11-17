@@ -290,8 +290,20 @@ function roomKey(v) {
         .map(w => (w.length > 2 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)).join('/');
 }
 // `room` is a RoomNumber. Staff link to rooms by RoomNumber / SecondaryRoomNumber.
+/* Backup coverage: rooms a person covers when the room's teachers are out (staff card
+   "Backup in"). The centre sets this only for a Director/Teacher who is in classrooms
+   50%+ of the time, which is ExceleRate's test for counting a Director/Teacher as
+   teaching staff, so backups are counted here and labelled "(backup)". */
+function backupRooms(s) {
+    return String((s && s.BackupRoomNumbers) || '').split(',').map(t => parseInt(t, 10)).filter(n => !isNaN(n));
+}
+function isBackupIn(s, room) {
+    return backupRooms(s).includes(room)
+        && parseInt(s.RoomNumber, 10) !== room && parseInt(s.SecondaryRoomNumber, 10) !== room;
+}
 function servesRoom(s, room) {
-    return parseInt(s.RoomNumber, 10) === room || parseInt(s.SecondaryRoomNumber, 10) === room;
+    return parseInt(s.RoomNumber, 10) === room || parseInt(s.SecondaryRoomNumber, 10) === room
+        || backupRooms(s).includes(room);
 }
 function isPartTimeIn(s, room) {
     return parseInt(s.SecondaryRoomNumber, 10) === room && parseInt(s.RoomNumber, 10) !== room;
@@ -311,8 +323,10 @@ function countedStaff() {
     return staffRecords
         .filter(s => (s.StaffGroup || '') !== 'Ownership')
         .filter(s => isTeachingStaff(s))
-        .filter(s => (s.Classroom || '').trim() || (s.SecondaryClassroom || '').trim());
+        .filter(s => (s.Classroom || '').trim() || (s.SecondaryClassroom || '').trim() || backupRooms(s).length);
 }
+// Counted only through backup coverage (no Teacher 1 / Teacher 2 room of their own).
+const isBackupOnly = s => !(s.Classroom || '').trim() && !(s.SecondaryClassroom || '').trim() && backupRooms(s).length > 0;
 const peopleNeeded = n => Math.ceil(n * 0.3);
 
 function evaluate4A() {
@@ -381,7 +395,9 @@ function stdCard(code, title, met, bodyHtml, footNote) {
         + (footNote ? '<div style="margin-top:8px;font-size:0.7rem;color:#64748b;line-height:1.5;">' + footNote + '</div>' : '')
         + '</div>';
 }
-const nameList = arr => arr.length ? arr.map(s => (s.Name || '').split(' ')[0]).join(', ') : 'none';
+const nameList = arr => arr.length
+    ? arr.map(s => (s.Name || '').split(' ')[0] + (typeof isBackupOnly === 'function' && isBackupOnly(s) ? ' (backup)' : '')).join(', ')
+    : 'none';
 
 function renderExcelerate4() {
     const host = document.getElementById('excelerate4');
@@ -419,7 +435,12 @@ function renderExcelerate4() {
             ? ' <strong style="color:#92400e;">' + b.itPartTimeReliant + ' of the infant/toddler credential holders '
               + 'are there on a part-time assignment</strong>, so the schedule is what supports this.'
             : '')
-        + ' Ownership is excluded from both counts, per Genni. Staff teaching two rooms are counted once.');
+        + ' Ownership is excluded from both counts, per Genni. Staff teaching two rooms are counted once.'
+        + (b.staff.some(isBackupOnly)
+            ? ' <strong>(backup)</strong> = counted through backup coverage of those rooms; the centre records backups only '
+              + 'for a Director/Teacher in classrooms 50% or more of the time, which is when ExceleRate counts a '
+              + 'Director/Teacher as teaching staff. Keep the schedule that shows it.'
+            : ''));
 
     const cardC = stdCard('4C', 'Professional development', c.allMet,
         stdRow('Teaching staff', c.staff.length, 'good')
