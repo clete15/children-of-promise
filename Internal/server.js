@@ -3644,7 +3644,18 @@ function parsePdr(text) {
     out.trainings = [];
     (function parseTrainings() {
         let on = false, cur = null;
-        const flush = () => { if (cur) out.trainings.push(cur); cur = null; };
+        /* A row reads "<date> <title> <hours> <trainer>", and a long title or trainer
+           wraps. Split at the hours figure (two decimals, e.g. 6.00) so the trainer's
+           name is not left glued to the title, and hours are found even when a trainer
+           follows them. With no hours figure the row is left as it was. */
+        const flush = () => {
+            if (cur) {
+                const m = cur.title.match(/^(.*?)\s+(\d{1,3}\.\d{2})(?=\s|$)\s*(.*)$/);
+                if (m) { cur.title = m[1].trim(); cur.hours = parseFloat(m[2]); cur.trainer = m[3].trim(); }
+                out.trainings.push(cur);
+            }
+            cur = null;
+        };
         for (const raw of lines) {
             const l = raw.trim();
             if (/^Section (Three|Four|Five)/i.test(l)) { flush(); on = true; continue; }

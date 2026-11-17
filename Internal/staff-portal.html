@@ -705,6 +705,9 @@
         border: 1.5px solid var(--sp-border); border-radius: 12px;
         background: var(--sp-surface); color: var(--sp-text);
     }
+    .sp-whl { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    .sp-whl th, .sp-whl td { padding: 6px 8px; border-bottom: 1px solid var(--sp-border); text-align: left; }
+    .sp-whl .num { text-align: right; }
     .sp-attn-dlg::backdrop { background: rgba(0, 0, 0, 0.55); }
     .sp-attn-dlg-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
     .sp-attn-dlg-head h2 { margin: 0; font-size: 1.05rem; }
@@ -863,6 +866,8 @@
         <button type="button" id="spAttnBtn" class="sp-attn-btn" style="display:none;margin-left:auto;"
                 title="Upload the Gateways Staff Education and Credentials report to update ECE and Infant Toddler credentials">Upload Staff Attainments</button>
         <input type="file" id="spAttnFile" accept=".pdf,application/pdf" style="display:none;" aria-label="Staff Attainments report (PDF)">
+        <button type="button" id="spWhListBtn" class="sp-attn-btn" style="display:none;"
+                title="Every active employee's documented hours from their Work History form">Work History hours</button>
         <!-- The chooser is the director's control. A staff member sees their own name
              instead, because there is nothing for them to choose: the server sends
              them one record, their own. -->
@@ -901,6 +906,15 @@
         <button type="button" id="spSilverClose" class="sp-attn-btn" aria-label="Close">Close</button>
     </div>
     <div id="spSilverBody"></div>
+</dialog>
+
+<!-- Admin list: documented Work History hours for every active employee. -->
+<dialog id="spWhListDlg" class="sp-attn-dlg" aria-labelledby="spWhListTitle">
+    <div class="sp-attn-dlg-head">
+        <h2 id="spWhListTitle">Work History hours, all staff</h2>
+        <button type="button" id="spWhListClose" class="sp-attn-btn" aria-label="Close">Close</button>
+    </div>
+    <div id="spWhListBody"></div>
 </dialog>
 
 <!-- Preview window for the Staff Attainments upload. -->
@@ -3707,7 +3721,10 @@ async function loadClassroomData() {
     try {
         initClassroomForms();
         const yq = url => url + (url.indexOf('?') === -1 ? '?' : '&') + 'year=' + encodeURIComponent(CLS_YEAR);
-        const [sRes, tRes, scrRes, , , , weRes] = await Promise.all([
+        // Named, not counted by commas: the old elision-padded destructuring bound the
+        // wrong promise here (see sql-reads.md), so CLS_WEIGHTED was always empty.
+        const weightedP = myFetch('/api/weighted-eligibility-files').catch(() => null);
+        const [sRes, tRes, scrRes] = await Promise.all([
             myFetch('/api/students'),
             myFetch(yq('/api/isbe-tracking')).catch(() => null),
             myFetch(yq('/api/screening-summary')).catch(() => null),
@@ -3723,8 +3740,9 @@ async function loadClassroomData() {
             (window.CofpForms) ? CofpForms.loadSignatures(CLS_YEAR).then(s => { CLS_SIGNATURES = s || {}; }).catch(() => null) : Promise.resolve(),
             // Which children have a weighted-eligibility form on disk, so the pill can
             // highlight when it exists and open it. Optional; absent = no pills lit.
-            myFetch('/api/weighted-eligibility-files').catch(() => null)
+            weightedP
         ]);
+        const weRes = await weightedP;
         if (!sRes || !sRes.ok) throw new Error('students: HTTP ' + (sRes ? sRes.status : '—'));
         CLS_STUDENTS = await sRes.json();
         if (!Array.isArray(CLS_STUDENTS)) CLS_STUDENTS = [];
@@ -4035,6 +4053,7 @@ function applyIdentityToBar() {
     if (isPersonal) $('spStaffActions').style.display = 'inline-block';
     // The Staff Attainments upload is a centre-wide action, so administrators only.
     $('spAttnBtn').style.display = mayChoose ? '' : 'none';
+    $('spWhListBtn').style.display = mayChoose ? '' : 'none';
     return { mayChoose: mayChoose, isPersonal: isPersonal };
 }
 
@@ -4230,7 +4249,7 @@ function silverCardHtml(t, s, pdr) {
         ? '\u2713 On your PDR, completed ' + esc(fmtUsDate(hit.date))
         : cover ? '\u2713 Met by your ' + esc(cover)
         : 'Not on your PDR yet';
-    const shown = hit ? hit.title.replace(/\s+\d+(?:\.\d+)?\s*[A-Za-z .'-]*$/, '').trim() : '';
+    const shown = hit ? hit.title.replace(/\s+\d{1,3}\.\d{2}(?:\s.*)?$/, '').trim() : '';
     return '<div class="sp-silver-card' + (done ? ' done' : '') + '">'
         + '<div class="sp-silver-card-head"><span class="sp-silver-std">' + esc(t.std) + '</span>'
         + '<span class="sp-silver-name">' + esc(t.name) + '</span></div>'
@@ -4348,6 +4367,31 @@ $('spAttnFile').addEventListener('change', () => {
     runAttainmentsPreview(f);
 });
 $('spAttnClose').addEventListener('click', () => $('spAttnDlg').close());
+
+/* Admin list of every active employee's Work History hours. Read from the same worksheet
+   store and the same readWorkHistory() as the credential screens, so the numbers agree.
+   "No form" and "form blank" are shown as themselves, never as 0 hours. */
+async function renderWorkHistoryList() {
+    const body = $('spWhListBody');
+    body.innerHTML = '<p class="sp-sub">Reading the forms\u2026</p>';
+    try { await PasStore.refresh(); }
+    catch (e) { body.innerHTML = '<p class="sp-sub">Could not read the Work History forms (' + esc(e.message || String(e)) + '). Nothing is shown rather than guess.</p>'; return; }
+    const fmt = n => n ? n.toLocaleString('en-US') : '\u2014';
+    const rows = STAFF.filter(isStaffActive).slice().sort((a, b) => String(a.Name).localeCompare(String(b.Name))).map(s => {
+        const w = readWorkHistory(s.Id);
+        const status = !w.exists ? 'No form' : (w.blank ? 'Form blank' : '');
+        return '<tr><td>' + esc(s.Name) + '</td><td class="num">' + fmt(w.itHours) + '</td><td class="num">' + fmt(w.psHours)
+            + '</td><td class="num">' + fmt(w.saHours) + '</td><td class="num"><strong>' + fmt(w.itHours + w.psHours + w.saHours)
+            + '</strong></td><td>' + status + '</td><td><a href="/pas/staff-work-history.html?staffId=' + encodeURIComponent(s.Id) + '" target="_blank">Open</a></td></tr>';
+    });
+    body.innerHTML = '<table class="sp-whl"><thead><tr><th>Employee</th><th class="num">Infant/Toddler</th><th class="num">Preschool</th>'
+        + '<th class="num">School-age</th><th class="num">Total</th><th></th><th></th></tr></thead><tbody>'
+        + (rows.join('') || '<tr><td colspan="7">No active staff.</td></tr>') + '</tbody></table>'
+        + '<p class="sp-sub">ECE credentials count all three age groups; Infant Toddler counts the first column only. '
+        + 'Director/administrator hours are not included.</p>';
+}
+$('spWhListBtn').addEventListener('click', () => { const d = $('spWhListDlg'); if (!d.open) d.showModal(); renderWorkHistoryList(); });
+$('spWhListClose').addEventListener('click', () => $('spWhListDlg').close());
 
 /* ── Theme ──
    The light/dark toggle (THEME_KEY, prefersDark, applyTheme, initTheme, and the
