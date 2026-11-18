@@ -35,7 +35,9 @@
     const DEFAULT_OVERHEAD = ['Monroe County Electric', 'Aspen Waste', 'Shellpoint Mortgage'];
     const OH_ALLOC_PCT = 17.75;   // share of overhead allocated to the Food Program (Nov 2026)
     const round2 = n => Math.round(n * 100) / 100;
-    const DEFAULT_OPERATIONAL = ['Sue', 'Tara', 'Raquel', 'Megan', 'Paige', 'Keyona', 'Janell', 'Lindsey', 'Renee', 'Jeremy', 'Sara Holliday- Operational'];
+    // Same list as DEFAULT_OPERATIONAL in personnel-sync.js (the server builds a new year's sheet from that one).
+    // Raquel left for good (Nov 2026); Madeline and Molly joined.
+    const DEFAULT_OPERATIONAL = ['Sue', 'Tara', 'Megan', 'Paige', 'Keyona', 'Janell', 'Lindsey', 'Renee', 'Jeremy', 'Sara Holliday- Operational', 'Madeline', 'Molly'];
     const DEFAULT_ADMIN = ['Sara Holliday-Admin', 'Megan-Admin'];
 
     const SECTIONS = [
@@ -571,10 +573,33 @@
                     + '<td class="center" data-total="' + g + 'all"></td><td></td></tr>';
                 return h;
             };
-            return '<div class="mr-sheet-head"><h3>Personnel Activity Calculations, ' + fyLabel(MR.fy) + '</h3></div>'
+            const fromSchedule = MR.fy >= 2026;
+            /* From FY 2026-27 the monthly figures come from the staff scheduler: days scheduled x
+               CACFP hours per day x hourly wage. They refresh by themselves each time a scheduler
+               week is saved; the button recalculates the whole year on demand. */
+            let rates = '';
+            if (fromSchedule) {
+                rates = '<h4 class="mr-sub">Wage and CACFP hours per day</h4>'
+                    + '<p class="mr-hint">A person\u2019s month = days scheduled in the staff scheduler \u00d7 hours per day \u00d7 wage. '
+                    + 'Anyone without a wage here (Sara, Megan\u2019s admin line) is entered by hand. '
+                    + 'A change applies to months calculated after you save it; earlier months keep their figures.</p>'
+                    + '<div class="fp-table-wrap"><table class="fp-table mr-grid"><thead><tr><th scope="col">Staff</th>'
+                    + '<th scope="col" class="center">Wage per hour</th><th scope="col" class="center">CACFP hours per day</th></tr></thead><tbody>';
+                d.operational.forEach(p => {
+                    const r = (d.rates || {})[p.name] || {};
+                    rates += '<tr><th scope="row">' + esc(p.name) + '</th>'
+                        + '<td>' + numInput('rates.' + p.name + '.rate', r.rate == null ? '' : r.rate, ' aria-label="' + esc(p.name) + ' wage per hour"') + '</td>'
+                        + '<td>' + numInput('rates.' + p.name + '.hpd', r.hpd == null ? '' : r.hpd, ' aria-label="' + esc(p.name) + ' CACFP hours per day"') + '</td></tr>';
+                });
+                rates += '</tbody></table></div>';
+            }
+            return '<div class="mr-sheet-head"><h3>Personnel Activity Calculations, ' + fyLabel(MR.fy) + '</h3>'
+                + (fromSchedule ? '<div class="mr-tools"><button type="button" class="fp-btn" data-act="syncSched">Fill from schedule</button></div>' : '') + '</div>'
+                + (fromSchedule ? '<p class="mr-hint">Filled from the staff scheduler each time a week is saved there. Months fill in as their weeks are saved.</p>' : '')
                 + '<div class="fp-table-wrap"><table class="fp-table mr-grid mr-wide">' + monthCols(true) + '<tbody>'
-                + group('operational', 'Operational', true) + group('admin', 'Admin', false) + '</tbody></table></div>';
+                + group('operational', 'Operational', true) + group('admin', 'Admin', false) + '</tbody></table></div>' + rates;
         },
+        viewOnly: { syncSched: true },
         totals(d) {
             const t = {};
             ['operational', 'admin'].forEach(g => {
@@ -585,6 +610,7 @@
             return t;
         },
         action(d, act, arg) {
+            if (act === 'syncSched') { syncFromSchedule(); return; }
             if (act === 'add') d[arg].push({ name: 'New staff', cells: {} });
             else if (act === 'del') {
                 const [g, i] = arg.split(':');
@@ -592,6 +618,26 @@
             }
         },
     };
+
+    /* "Fill from schedule": the server recalculates every month of this fiscal year from the
+       saved scheduler weeks and writes the sheet; we then reload it. Unsaved edits would be
+       discarded by that reload, so they have to be saved first. */
+    async function syncFromSchedule() {
+        const dc = doc('personnel');
+        if (dc && dc.dirty) { status('Save your changes first, then fill from the schedule.', true); return; }
+        status('Filling from the schedule…');
+        try {
+            const res = await apiFetch('/api/personnel-sync', { method: 'POST', body: JSON.stringify({ fy: MR.fy }) });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok || !d.success) throw new Error(d.error || ('HTTP ' + res.status));
+            await renderSection(true);
+            const bits = [d.changed ? d.changed + ' month figure(s) updated.' : 'Nothing new to fill: no saved scheduler weeks changed anything.'];
+            if (d.unmatched && d.unmatched.length) bits.push('No active staff record found for: ' + d.unmatched.join(', ') + '.');
+            status(bits.join(' '), !!(d.unmatched && d.unmatched.length));
+        } catch (e) {
+            status('Could not fill from the schedule: ' + (e.message || e), true);
+        }
+    }
 
     const RENDER = { revenue, foodcosts, overhead, personnel };
 

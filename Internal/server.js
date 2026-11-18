@@ -5112,6 +5112,9 @@ function sendJSON(res, status, body) {
 const EH = require('./enrollment-history.js');
 const history = EH({ runSQL, runSQLRows, esc });
 
+/* Personnel Activity, filled from the staff scheduler (FY 2026-27 on). See personnel-sync.js. */
+const personnelSync = require('./personnel-sync.js')({ runSQL, runSQLRows, esc });
+
 /* Who made this change, for ChangedBy. A signed-in staff member by login name; the
    shared password as itself. Never throws. */
 function actorLabel(req) {
@@ -10385,6 +10388,25 @@ ELSE
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true, cleared: isEmpty });
+            // The save has already been answered; refresh the Personnel Activity months this
+            // week touches. It cannot fail the schedule save (it logs and moves on).
+            personnelSync.onWeekSaved(weekStart);
+        });
+        return;
+    }
+
+    /* POST { fy } recompute every month of that fiscal year's Personnel Activity sheet from
+       the saved scheduler weeks. Centre admin only. This is the sheet's "Fill from schedule"
+       button; the same code runs automatically each time a scheduler week is saved. */
+    if (req.method === 'POST' && url === '/api/personnel-sync') {
+        if (!checkAuth(req, res)) return;
+        readBody(req, (err, d) => {
+            if (err || !d) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const fy = parseInt(d.fy, 10);
+            if (!(fy >= 2000 && fy <= 2100)) return sendJSON(res, 400, { error: 'Which fiscal year?' });
+            const r = personnelSync.syncFy(fy, personnelSync.FY_MONTHS, String(actorLabel(req)).slice(0, 100));
+            if (!r.ok) return sendJSON(res, 500, { error: r.error });
+            return sendJSON(res, 200, { success: true, changed: r.changed, unmatched: r.unmatched || [], note: r.note || '' });
         });
         return;
     }
