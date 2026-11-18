@@ -318,11 +318,65 @@ function buildFormPdf(spec) {
         y = top - bannerH - 6;
     }
 
+    /* The monthly day grid of the CACFP Personnel Activity Report (ISBE 67-54): days 1-16
+       on the left, 17-31 on the right, each with Administrative and Operational hours, and
+       the month's totals closing the right-hand side. Weekends are shaded. A zero or empty
+       value prints blank, as on the paper form.
+         { daygrid: { days:[{ d, admin, oper, wknd }], totalAdmin, totalOper } }            */
+    function drawDayGrid(g) {
+        const days = Array.isArray(g.days) ? g.days : [];
+        const left = days.filter(x => x.d <= 16), right = days.filter(x => x.d > 16);
+        const GAP = 14, TW = (BODY - GAP) / 2, C1 = 46, C2 = (TW - C1) / 2;
+        const ROW = 14.5, HEAD = 24, ROWS = 16;
+        need(HEAD + ROWS * ROW + 16);
+        y -= 4;
+        const top = y;
+        const hrs = v => (v > 0 ? String(Math.round(v * 100) / 100) : '');
+        const rightText = (txt, xRight, baseline, size, bold) =>
+            coloredText(txt, xRight - textWidth(txt, size, bold), baseline, size, bold, 0, 0, 0);
+        [[left, 0], [right, 1]].forEach(pair => {
+            const rows = pair[0], idx = pair[1];
+            const x0 = MARGIN + idx * (TW + GAP);
+            const bottom = top - HEAD - ROWS * ROW;
+            fillRect(x0, top - HEAD, TW, HEAD, 0.90, 0.92, 0.96);
+            coloredText('Date', x0 + 7, top - 15, 8.5, true, 0.2, 0.24, 0.34);
+            coloredText('Administrative', x0 + C1 + (C2 - textWidth('Administrative', 8.5, true)) / 2, top - 15, 8.5, true, 0.2, 0.24, 0.34);
+            coloredText('Operational', x0 + C1 + C2 + (C2 - textWidth('Operational', 8.5, true)) / 2, top - 15, 8.5, true, 0.2, 0.24, 0.34);
+            rows.forEach((r, i) => {
+                const ry = top - HEAD - (i + 1) * ROW;
+                if (r.wknd) fillRect(x0, ry, TW, ROW, 0.955, 0.965, 0.975);
+                coloredText(String(r.d), x0 + 8, ry + 4, 9, false, 0.1, 0.1, 0.1);
+                rightText(hrs(r.admin), x0 + C1 + C2 - 14, ry + 4, 9.5, false);
+                rightText(hrs(r.oper), x0 + C1 + 2 * C2 - 14, ry + 4, 9.5, false);
+            });
+            if (idx === 1) {
+                const ry = top - HEAD - (right.length + 1) * ROW;
+                fillRect(x0, ry, TW, ROW, 0.90, 0.92, 0.96);
+                coloredText('Total', x0 + 8, ry + 4, 9, true, 0.1, 0.1, 0.1);
+                rightText(hrs(g.totalAdmin), x0 + C1 + C2 - 14, ry + 4, 9.5, true);
+                rightText(hrs(g.totalOper), x0 + C1 + 2 * C2 - 14, ry + 4, 9.5, true);
+            }
+            // Grid lines: one per row, the two column dividers, and the outline.
+            ops.push('0.5 w 0.75 0.79 0.85 RG');
+            for (let i = 0; i <= ROWS; i++) {
+                const ly = top - HEAD - i * ROW;
+                ops.push(x0.toFixed(2) + ' ' + ly.toFixed(2) + ' m ' + (x0 + TW).toFixed(2) + ' ' + ly.toFixed(2) + ' l S');
+            }
+            [C1, C1 + C2].forEach(dx => {
+                ops.push((x0 + dx).toFixed(2) + ' ' + top.toFixed(2) + ' m ' + (x0 + dx).toFixed(2) + ' ' + bottom.toFixed(2) + ' l S');
+            });
+            ops.push(x0.toFixed(2) + ' ' + bottom.toFixed(2) + ' ' + TW.toFixed(2) + ' ' + (HEAD + ROWS * ROW).toFixed(2) + ' re S 0 0 0 RG');
+        });
+        ops.push('0 0 0 rg');   // fillRect leaves the light fill colour set; plain text must be black
+        y = top - HEAD - ROWS * ROW - 12;
+    }
+
     const PTS_COL_W = 46;   // right-hand points column width, shared by rows + subtotal
 
     (spec.blocks || []).forEach(b => {
         if (!b) return;
 
+        if (b.daygrid) { drawDayGrid(b.daygrid); return; }
         if (b.summary) { drawScoreBanner(b.summary); return; }
 
         if (Array.isArray(b.items)) {

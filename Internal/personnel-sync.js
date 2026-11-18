@@ -85,6 +85,8 @@ function blankDoc() {
 
 module.exports = function PersonnelSync(deps) {
     const { runSQL, runSQLRows, esc } = deps;
+    let lockProvider = null;      // (fy) => Set of 'staffId|month' whose signed report freezes that cell
+    const setLockProvider = fn => { lockProvider = fn; };
 
     function readDoc(fy) {
         const r = runSQLRows(`SELECT DataJson, Version FROM dbo.MonthlyReporting WHERE Book=N'personnel' AND FiscalYear=N'${fy}'`);
@@ -179,6 +181,12 @@ ELSE SELECT 'MR_CONFLICT=' + CAST(ISNULL(@v, 0) AS VARCHAR(12));`);
 
         let changed = 0;
         const unmatched = {};
+        /* A month whose report the employee has signed is frozen: the signed paper is the
+           record, so a later scheduler edit must not move the number on the sheet. If the
+           locks cannot be read, stop rather than risk overwriting a signed figure. */
+        let locked = new Set();
+        try { if (lockProvider) locked = lockProvider(fy) || new Set(); }
+        catch (e) { return { ok: false, error: 'Could not check which months are signed: ' + (e.message || e) }; }
         for (const month of months) {
             const dm = daysInMonth(fy, month);
             if (dm.error) return { ok: false, error: dm.error };
@@ -188,6 +196,7 @@ ELSE SELECT 'MR_CONFLICT=' + CAST(ISNULL(@v, 0) AS VARCHAR(12));`);
                 if (!(rate > 0) || !(hpd > 0)) return;
                 const s = staffFor(p.name, st.byFirst);
                 if (!s) { unmatched[p.name] = true; return; }
+                if (locked.has(s.Id + '|' + month)) return;
                 const d = dm.days[s.Id] || 0;
                 if (d <= 0) return;                       // nothing scheduled: leave the cell alone
                 const v = String(round2(d * hpd * rate));
@@ -215,5 +224,54 @@ ELSE SELECT 'MR_CONFLICT=' + CAST(ISNULL(@v, 0) AS VARCHAR(12));`);
         } catch (e) { console.log('[PERSONNEL SYNC] ' + (e && e.message || e)); }
     }
 
-    return { syncFy, onWeekSaved, FY_MONTHS, DEFAULT_RATES, _monthsOfWeek: monthsOfWeek };
+    /* Which days each person is scheduled, for a whole fiscal year, in one read:
+       { staffId: { calendarMonth: Set(dayOfMonth) } }. The monthly reports read this. */
+    function daysByStaffMonth(fy) {
+        fy = parseInt(fy, 10);
+        const first = new Date(Date.UTC(fy, 9, 1));
+        const from = isoOf(new Date(first.getTime() - 6 * 86400000));
+        const to = (fy + 1) + '-09-30';
+        const r = runSQLRows(`SELECT StaffId, WeekStart, ISNULL(Mon,'') AS Mon, ISNULL(Tue,'') AS Tue, ISNULL(Wed,'') AS Wed,
+            ISNULL(Thu,'') AS Thu, ISNULL(Fri,'') AS Fri FROM StaffSchedule
+            WHERE StaffId > 0 AND WeekStart >= N'${from}' AND WeekStart <= N'${to}'`);
+        if (!r.ok) return { error: 'Could not read the schedule: ' + r.error };
+        const out = {};
+        r.rows.forEach(w => {
+            const [wy, wm, wd] = String(w.WeekStart).split('-').map(Number);
+            DAY_COLS.forEach((c, i) => {
+                if (!worked(w[c])) return;
+                const dt = new Date(Date.UTC(wy, wm - 1, wd + i));
+                const m = dt.getUTCMonth() + 1;
+                const byMonth = (out[w.StaffId] = out[w.StaffId] || {});
+                (byMonth[m] = byMonth[m] || new Set()).add(dt.getUTCDate());
+            });
+        });
+        return { days: out };
+    }
+
+    /* Write specific cells on the sheet: updates = [{ group:'operational'|'admin', name, month, value }].
+       Used when a report is signed (so the sheet matches the signed paper) and when the
+       hand-entered hours of someone like Sara are saved. Creates the row if it is missing. */
+    function setCells(fy, updates, by) {
+        const cur = readDoc(parseInt(fy, 10));
+        if (cur.error) return { ok: false, error: cur.error };
+        const doc = cur.doc;
+        let changed = 0;
+        updates.forEach(u => {
+            const g = u.group === 'admin' ? 'admin' : 'operational';
+            if (!Array.isArray(doc[g])) doc[g] = [];
+            let row = doc[g].find(p => p.name === u.name);
+            if (!row) { row = { name: u.name, cells: {} }; doc[g].push(row); }
+            row.cells = row.cells || {};
+            const v = u.value == null || u.value === '' ? '' : String(u.value);
+            if (v === '') { if (row.cells[u.month] != null) { delete row.cells[u.month]; changed++; } }
+            else if (row.cells[u.month] !== v) { row.cells[u.month] = v; changed++; }
+        });
+        if (!changed) return { ok: true, changed: 0 };
+        const w = writeDoc(parseInt(fy, 10), doc, cur.version, by || 'activity report');
+        return w.error ? { ok: false, error: w.error } : { ok: true, changed };
+    }
+
+    return { syncFy, onWeekSaved, FY_MONTHS, DEFAULT_RATES, _monthsOfWeek: monthsOfWeek,
+        setLockProvider, daysByStaffMonth, setCells, readDoc, readStaff, staffFor, blankDoc };
 };

@@ -1367,7 +1367,8 @@ const STAFF_DOC_CATEGORIES = [
     ['Staff Work History Forms', 'Work history form'],
     ['Staff Goal Plans', 'Goal plan'],
     ['Staff W4s', 'W4'],
-    ['Staff Authorization for Background Check', 'Background check authorisation']
+    ['Staff Authorization for Background Check', 'Background check authorisation'],
+    ['Staff Personnel Activity Reports', 'Personnel activity report']
 ];
 
 /* Every file under Staff, with the category it came from.
@@ -5114,6 +5115,10 @@ const history = EH({ runSQL, runSQLRows, esc });
 
 /* Personnel Activity, filled from the staff scheduler (FY 2026-27 on). See personnel-sync.js. */
 const personnelSync = require('./personnel-sync.js')({ runSQL, runSQLRows, esc });
+/* The monthly Personnel Activity Reports (signed by the employee and an authorised representative). */
+const personnelReports = require('./personnel-reports.js')({ runSQL, runSQLRows, esc, buildFormPdf, findDocRoot, invalidateDocCache,
+    sync: personnelSync, staffFileLinksEnsureSQL, STAFF_ROOT: STAFF_DOC_ROOT_FOLDER });
+personnelSync.setLockProvider(personnelReports.lockedSet);
 
 /* Who made this change, for ChangedBy. A signed-in staff member by login name; the
    shared password as itself. Never throws. */
@@ -10409,6 +10414,80 @@ ELSE
             return sendJSON(res, 200, { success: true, changed: r.changed, unmatched: r.unmatched || [], note: r.note || '' });
         });
         return;
+    }
+
+    /* ── Monthly Personnel Activity Reports (signed by the employee, then an authorised rep) ──
+       GET  /api/personnel-reports?staffId=&fy=        the twelve months for one person
+       GET  /api/personnel-report?staffId=&fy=&month=  one month in full, and what the caller may do
+       GET  /api/personnel-reports-queue?fy=           reports waiting for the caller's countersignature
+       POST /api/personnel-report-draft                Sara's hand-entered hours for a month
+       POST /api/personnel-report-sign                 { staffId, fy, month, role: 'employee'|'rep', dataUrl }
+       Identity is always the sign-in token. A staff member sees and signs their own; an
+       administrator can read anyone's; only the authorised representative countersigns. */
+    const prFy = q => { const v = parseInt(q.get('fy'), 10); if (v >= 2000 && v <= 2100) return v; const n = new Date(); return n.getMonth() >= 9 ? n.getFullYear() : n.getFullYear() - 1; };
+    if (req.method === 'GET' && url === '/api/personnel-reports') {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        const q = new URLSearchParams(req.url.split('?')[1] || '');
+        const asked = parseInt(q.get('staffId') || 0, 10);
+        const staffId = (actor.director || actor.admin) ? asked : parseInt(actor.staffId, 10);
+        if (!staffId) return sendJSON(res, 400, { error: 'Which staff member?' });
+        if (!actorMayTouch(actor, staffId)) return sendJSON(res, 403, { error: 'You can only open your own reports' });
+        const out = personnelReports.list(staffId, prFy(q));
+        if (!out.ok) return sendJSON(res, out.status || 500, { error: out.error });
+        return sendJSON(res, 200, out);
+    }
+    if (req.method === 'GET' && url === '/api/personnel-report') {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        const q = new URLSearchParams(req.url.split('?')[1] || '');
+        const asked = parseInt(q.get('staffId') || 0, 10);
+        const staffId = (actor.director || actor.admin) ? asked : parseInt(actor.staffId, 10);
+        const month = parseInt(q.get('month'), 10);
+        if (!staffId || !(month >= 1 && month <= 12)) return sendJSON(res, 400, { error: 'Which report?' });
+        if (!actorMayTouch(actor, staffId)) return sendJSON(res, 403, { error: 'You can only open your own reports' });
+        const out = personnelReports.detail(staffId, prFy(q), month);
+        if (!out.ok) return sendJSON(res, out.status || 500, { error: out.error });
+        const me = actor.staffId ? personnelReports.who(actor.staffId) : { login: '', name: '' };
+        const st = out.summary.status;
+        const isSelf = !!actor.staffId && String(actor.staffId) === String(staffId);
+        out.can = {
+            signEmployee: isSelf && st === 'ready',
+            signRep: !!actor.staffId && st === 'awaitRep' && personnelReports.mayCountersign(me.login, out.subjectLogin, actor.staffId, staffId),
+            edit: out.report.source === 'manual' && (st === 'ready' || st === 'upcoming' || st === 'none' || st === 'future') && (isSelf || actor.admin),
+            isSelf: isSelf
+        };
+        delete out.subjectLogin;
+        return sendJSON(res, 200, out);
+    }
+    if (req.method === 'GET' && url === '/api/personnel-reports-queue') {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        const q = new URLSearchParams(req.url.split('?')[1] || '');
+        const me = actor.staffId ? personnelReports.who(actor.staffId) : { login: '', name: '' };
+        const out = personnelReports.queue(actor, me.login, prFy(q));
+        if (!out.ok) return sendJSON(res, out.status || 500, { error: out.error });
+        return sendJSON(res, 200, out);
+    }
+    if (req.method === 'POST' && url === '/api/personnel-report-draft') {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        return readBody(req, (err, d) => {
+            if (err || !d) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const me = actor.staffId ? personnelReports.who(actor.staffId) : { login: '', name: '' };
+            const out = personnelReports.saveDraft(actor, me.login, d);
+            return sendJSON(res, out.status, out.body);
+        });
+    }
+    if (req.method === 'POST' && url === '/api/personnel-report-sign') {
+        const actor = requireActor(req, res);
+        if (!actor) return;
+        return readBody(req, (err, d) => {
+            if (err || !d) return sendJSON(res, 400, { error: 'Invalid JSON' });
+            const me = actor.staffId ? personnelReports.who(actor.staffId) : { login: '', name: '' };
+            const out = personnelReports.sign(actor, me.login, me.name, d);
+            return sendJSON(res, out.status, out.body);
+        });
     }
 
     // GET Silver self-assessment records (internal - protected)

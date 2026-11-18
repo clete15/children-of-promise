@@ -944,6 +944,9 @@
 <script src="sign-pad.js"></script>
 <script src="pi-forms.js"></script>
 <script src="classroom-forms.js"></script>
+<!-- Monthly Personnel Activity Reports: the "Activity Reports" tab, the report sheet and
+     Sara's signing queue. Uses sign-pad.js (above). Initialised in render(). -->
+<script src="personnel-reports-ui.js"></script>
 <script>
 /* ── One page per staff member ──────────────────────────────────────────────
    Answers the questions a member of staff actually has about their own standing:
@@ -1396,7 +1399,8 @@ function selfEditCard(s) {
 const SP_TABS = [
     { key: 'credentials', label: 'Gateways Credentials' },
     { key: 'classroom',   label: 'My Classroom' },
-    { key: 'schedule',    label: 'My Schedule' }
+    { key: 'schedule',    label: 'My Schedule' },
+    { key: 'reports',     label: 'Activity Reports' }
     /* "My files" and "Forms" are hidden for now — the portal is being rolled out one
        section at a time. The tab entries below are commented out so both the tab and
        its panel disappear; the sections themselves (filesCard, formsSection) and
@@ -1440,6 +1444,9 @@ function tabCount(key, s) {
                filesCard() has always guarded for this; this did not. */
             const up = (FILES && FILES.uploadable) || [];
             return up.filter(u => u && !u.hasOne).length;
+        }
+        if (key === 'reports') {
+            return (window.PersonnelReportsUI && PersonnelReportsUI.count) ? PersonnelReportsUI.count(s) : 0;
         }
         if (key === 'forms') {
             if (!s || !Array.isArray(MY_FORMS)) return 0;
@@ -1559,6 +1566,7 @@ function tabPanels(s, tabs) {
         classroom: classroomSection,
         credentials: credentialsSection,
         schedule: scheduleSection,
+        reports: function () { return (window.PersonnelReportsUI ? PersonnelReportsUI.panelHtml() : ''); },
         files: filesCard,
         forms: formsSection,
         admin: adminSection
@@ -1633,6 +1641,29 @@ function render() {
     wireDocButtons(s);
     // The Transcript UPLOAD button + panel (next to Work History).
     wireTranscriptUpload();
+    // The Activity Reports tab: monthly time reports and the signing queue.
+    wireActivityReports(s);
+}
+
+/* Starts the Activity Reports module the first time it is needed, then fills the tab for
+   whoever is on screen. A failure here must never stop the rest of the page from drawing,
+   so it is contained. */
+let prUiReady = false;
+function wireActivityReports(s) {
+    try {
+        if (!window.PersonnelReportsUI) return;
+        if (!prUiReady) {
+            PersonnelReportsUI.init({
+                fetch: (url, opts) => myFetch(url, opts),
+                getWho: () => WHO,
+                openFile: rel => fetchStaffFile(rel, null)
+            });
+            prUiReady = true;
+        }
+        PersonnelReportsUI.wire(s);
+    } catch (e) {
+        console.error('[MY PAGE] activity reports could not start', e);
+    }
 }
 
 /* The Transcript button next to Work History. It toggles a small upload panel and
