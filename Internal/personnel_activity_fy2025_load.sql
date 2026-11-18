@@ -1,0 +1,14 @@
+-- Personnel Activity FY 2025-26, read from the scanned forms (Oct 2025 - Aug 2026).
+-- Run on the VPS database (CofPMillstadt). Inserts only if no sheet is saved yet.
+IF OBJECT_ID(N'dbo.MonthlyReporting', N'U') IS NULL
+CREATE TABLE dbo.MonthlyReporting (Id INT IDENTITY(1,1) PRIMARY KEY, Book NVARCHAR(20) NOT NULL, FiscalYear NVARCHAR(10) NOT NULL, DataJson NVARCHAR(MAX) NOT NULL, Version INT NOT NULL DEFAULT 1, UpdatedAt DATETIME2 NOT NULL DEFAULT SYSDATETIME(), UpdatedBy NVARCHAR(100) NULL, CONSTRAINT UQ_MonthlyReporting UNIQUE (Book, FiscalYear));
+GO
+IF EXISTS (SELECT 1 FROM dbo.MonthlyReporting WHERE Book=N'personnel' AND FiscalYear=N'2025')
+    SELECT 'NOT INSERTED: a personnel sheet for FY2025 already exists. Nothing changed.' AS Result;
+ELSE
+BEGIN
+    INSERT INTO dbo.MonthlyReporting (Book, FiscalYear, DataJson, UpdatedBy) VALUES (N'personnel', N'2025', N'{"operational":[{"name":"Sue","cells":{"1":"360","2":"320","3":"360","4":"360","5":"360","6":"360","7":"320","8":"320","10":"360"}},{"name":"Tara","cells":{"1":"592","2":"555","3":"666","4":"555","5":"555","6":"629","7":"637.5","10":"629","12":"629"}},{"name":"Raquel","cells":{"1":"551.25","2":"540","3":"610.5","4":"540","5":"540","6":"594","7":"594","10":"603.75"}},{"name":"Megan","cells":{"2":"614.7","3":"676.17","4":"614.7","5":"614.7","6":"676.17","7":"676.17","8":"653","12":"614.7"}},{"name":"Paige","cells":{"1":"629","2":"592","3":"646","4":"684","5":"684","6":"684","7":"684","10":"703"}},{"name":"Keyona","cells":{"2":"148.73","3":"654.39","4":"594.9","5":"594.9","6":"654.39","7":"654.39","10":"684.14","12":"594.9"}},{"name":"Janell","cells":{"1":"575.51","2":"555","3":"610.5","4":"555","5":"555","6":"610.5","7":"610.5","8":"598.5","10":"630.32","12":"548.1"}},{"name":"Lindsey","cells":{"1":"582.75","4":"555","5":"555","6":"610.5","7":"610.5","8":"598.5","10":"638.25","12":"555"}},{"name":"Renee","cells":{"1":"543.38","2":"540","3":"594","4":"540","5":"540","6":"594","7":"594","8":"567","11":"491.63","12":"517.5"}},{"name":"Jeremy","cells":{"1":"582.75","4":"570","5":"570","6":"627","7":"627"}},{"name":"Sara Holliday- Operational","cells":{"2":"666","4":"722","5":"760","6":"779","7":"779","8":"788.5","10":"786.25","11":"712.25","12":"703"}},{"name":"Madeline","cells":{"1":"162","5":"540","6":"594","7":"610.5","8":"582.75","10":"638.25"}},{"name":"Velouria","cells":{"5":"103.5","6":"232.88","7":"232.88","8":"155.25"}},{"name":"Hannah","cells":{"5":"111","6":"360.75","7":"444"}},{"name":"Molly","cells":{"8":"305.25"}}],"admin":[{"name":"Sara Holliday-Admin","cells":{"2":"55.5","4":"57","5":"57","6":"47.5","7":"57","8":"57","10":"55.5","11":"55.5","12":"55.5"}},{"name":"Megan-Admin","cells":{}}]}', N'scan import');
+    SELECT 'INSERTED' AS Result;
+END
+GO
+SELECT Book, FiscalYear, Version, LEN(DataJson) AS Chars FROM dbo.MonthlyReporting WHERE Book=N'personnel';
