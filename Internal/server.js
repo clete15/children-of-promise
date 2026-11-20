@@ -9,7 +9,8 @@ const crypto = require('crypto');
 /* Writes a signed compliance form as a PDF. Hand-rolled rather than a dependency,
    because this project takes none; see pdf-form.js for what that costs and why the
    trade is worth it here. */
-const { buildFormPdf } = require('./pdf-form.js');
+// jpegSize doubles as "is this really a readable JPEG?" when a signature arrives.
+const { buildFormPdf, jpegSize } = require('./pdf-form.js');
 
 /* Prevent crashes from unhandled errors.
 
@@ -5116,7 +5117,7 @@ const history = EH({ runSQL, runSQLRows, esc });
 /* Personnel Activity, filled from the staff scheduler (FY 2026-27 on). See personnel-sync.js. */
 const personnelSync = require('./personnel-sync.js')({ runSQL, runSQLRows, esc });
 /* The monthly Personnel Activity Reports (signed by the employee and an authorised representative). */
-const personnelReports = require('./personnel-reports.js')({ runSQL, runSQLRows, esc, buildFormPdf, findDocRoot, invalidateDocCache,
+const personnelReports = require('./personnel-reports.js')({ runSQL, runSQLRows, esc, buildFormPdf, jpegSize, findDocRoot, invalidateDocCache,
     sync: personnelSync, staffFileLinksEnsureSQL, STAFF_ROOT: STAFF_DOC_ROOT_FOLDER });
 personnelSync.setLockProvider(personnelReports.lockedSet);
 
@@ -10454,7 +10455,10 @@ ELSE
         out.can = {
             signEmployee: isSelf && st === 'ready',
             signRep: !!actor.staffId && st === 'awaitRep' && personnelReports.mayCountersign(me.login, out.subjectLogin, actor.staffId, staffId),
-            edit: out.report.source === 'manual' && (st === 'ready' || st === 'upcoming' || st === 'none' || st === 'future') && (isSelf || actor.admin),
+            /* Any report may be corrected by hand until the employee signs it — the
+               schedule is a good first guess, not the last word, and the person who
+               worked the month is the one who knows. Signing is what closes it. */
+            edit: st !== 'complete' && st !== 'awaitRep' && (isSelf || actor.admin),
             isSelf: isSelf
         };
         delete out.subjectLogin;

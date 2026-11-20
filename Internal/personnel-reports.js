@@ -66,7 +66,7 @@ GO
 `;
 
 module.exports = function PersonnelReports(deps) {
-    const { runSQL, runSQLRows, esc, buildFormPdf, findDocRoot, invalidateDocCache, sync,
+    const { runSQL, runSQLRows, esc, buildFormPdf, jpegSize, findDocRoot, invalidateDocCache, sync,
         staffFileLinksEnsureSQL, STAFF_ROOT } = deps;
     const fs = require('fs');
     const path = require('path');
@@ -81,10 +81,12 @@ module.exports = function PersonnelReports(deps) {
         return { rows: r.rows };
     }
 
-    /* 'staffId|month' for every report the employee has signed, i.e. frozen. Throws if it
-       cannot be read, so the sheet sync stops instead of overwriting a signed figure. */
+    /* 'staffId|month' for every month the scheduler must stop deciding: the employee has
+       signed it, or someone has corrected the hours by hand. Either way the figure on the
+       sheet is now a human's, and a later schedule edit must not overwrite it. Throws if
+       it cannot be read, so the sync stops rather than guessing. */
     function lockedSet(fy) {
-        const r = readRows(`FiscalYear=${parseInt(fy, 10)} AND ISNULL(EmpSignedAt,'') <> ''`);
+        const r = readRows(`FiscalYear=${parseInt(fy, 10)} AND (ISNULL(EmpSignedAt,'') <> '' OR ISNULL(SnapshotJson,'') <> '')`);
         if (r.error) throw new Error(r.error);
         return new Set(r.rows.map(x => x.StaffId + '|' + x.Month));
     }
@@ -150,6 +152,15 @@ module.exports = function PersonnelReports(deps) {
         return MANUAL[String(staff.Name || '').trim().toLowerCase()] || null;
     }
 
+    // Does this person's month come from the staff scheduler (rather than typed in)?
+    function scheduledFor(staffId, fy) {
+        const s = staffById(staffId);
+        if (!s.staff) return false;
+        const ctx = loadContext(fy);
+        if (ctx.error) return false;
+        return !!scheduledRow(ctx, s.staff);
+    }
+
     /* The report as it stands now. For scheduled staff the day grid is derived; for manual
        staff it is the saved draft (or an empty month). Returns null when this person has
        no activity report at all. */
@@ -161,30 +172,36 @@ module.exports = function PersonnelReports(deps) {
         if (sr) source = 'schedule'; else if (man) source = 'manual';
         if (!source) return null;
 
+        /* A saved draft is a hand correction, and a hand correction outranks the schedule:
+           once someone has edited a month, the grid IS the draft and the scheduler stops
+           deciding that month (lockedSet keeps the sheet sync off it too). Without that,
+           the next schedule save would quietly undo the correction. */
         let draft = null;
-        if (source === 'manual' && stored && stored.SnapshotJson) {
+        if (stored && stored.SnapshotJson && !stored.EmpSignedAt) {
             try { draft = JSON.parse(stored.SnapshotJson); } catch (e) { draft = null; }
         }
+        const edited = !!(draft && Array.isArray(draft.days));
         const sched = (ctx.sched[staff.Id] || {})[month] || new Set();
-        const rate = source === 'schedule' ? sr.rate : (draft && draft.rate > 0 ? draft.rate : man.rate);
+        const fallbackRate = source === 'schedule' ? sr.rate : man.rate;
+        const rate = draft && draft.rate > 0 ? draft.rate : fallbackRate;
         const days = [];
         for (let d = 1; d <= meta.dim; d++) {
             const dt = new Date(Date.UTC(meta.year, month - 1, d));
             const dow = dt.getUTCDay();
             const wknd = dow === 0 || dow === 6;
             let oper = 0, admin = 0;
-            if (source === 'schedule') {
-                if (sched.has(d)) oper = sr.hpd;
-            } else if (draft && Array.isArray(draft.days)) {
+            if (edited) {
                 const x = draft.days.find(q => q.d === d);
                 if (x) { oper = +x.oper || 0; admin = +x.admin || 0; }
+            } else if (source === 'schedule' && sched.has(d)) {
+                oper = sr.hpd;
             }
             days.push({ d, dow: DOW[dow], wknd, oper, admin });
         }
         const operHours = round2(days.reduce((s, x) => s + x.oper, 0));
         const adminHours = round2(days.reduce((s, x) => s + x.admin, 0));
         return {
-            v: 1, source, staffId: staff.Id, name: staff.Name, fy, month, year: meta.year, monthLabel: meta.label,
+            v: 1, source, edited, staffId: staff.Id, name: staff.Name, fy, month, year: meta.year, monthLabel: meta.label,
             days, operHours, adminHours, rate, hpd: sr ? sr.hpd : null,
             opTotal: round2(operHours * rate), adTotal: round2(adminHours * rate),
             sheetRows: source === 'schedule' ? { op: sr.name } : { op: man.op, adm: man.adm },
@@ -207,7 +224,7 @@ module.exports = function PersonnelReports(deps) {
             month, label: meta.label, status,
             hours: snap ? round2(snap.operHours + snap.adminHours) : 0,
             total: snap ? round2(snap.opTotal + snap.adTotal) : 0,
-            source: snap ? snap.source : '',
+            source: snap ? snap.source : '', edited: !!(snap && snap.edited),
             emp: row && row.EmpSignedAt ? { at: row.EmpSignedAt, name: row.EmpSignedName, sig: row.EmpSigPath } : null,
             rep: row && row.RepSignedAt ? { at: row.RepSignedAt, name: row.RepSignedName, sig: row.RepSigPath } : null,
             pdf: row ? row.PdfRelPath : '',
@@ -259,18 +276,36 @@ module.exports = function PersonnelReports(deps) {
             subjectLogin: String(s.staff.LoginName || '').toLowerCase() };
     }
 
-    // ── saving a hand-entered month (Sara) ──
+    /* ── correcting a month's hours by hand ──
+       Anyone's report, not only the hand-entered ones: the schedule is a first guess and
+       the person who worked the month is the one who knows. Allowed until the employee
+       signs, by that employee or by an administrator. A saved correction outranks the
+       schedule from then on (see buildLive and lockedSet). */
     function saveDraft(actor, actorLogin, d) {
         const staffId = parseInt(d.staffId, 10), fy = parseInt(d.fy, 10), month = parseInt(d.month, 10);
         if (!staffId || !(fy >= FIRST_FY) || !(month >= 1 && month <= 12)) return { status: 400, body: { error: 'Which report?' } };
         const sObj = staffById(staffId);
         if (!sObj.staff) return { status: 404, body: { error: 'No such staff member' } };
-        const man = manualFor(sObj.staff);
-        if (!man) return { status: 400, body: { error: 'This report is filled from the schedule, not typed in.' } };
         if (!(actor.admin || String(actor.staffId) === String(staffId))) return { status: 403, body: { error: 'You can only enter your own hours.' } };
         const rr = readRows(`StaffId=${staffId} AND FiscalYear=${fy} AND Month=${month}`);
         if (rr.error) return { status: 500, body: { error: rr.error } };
         if (rr.rows[0] && rr.rows[0].EmpSignedAt) return { status: 409, body: { error: 'This report is already signed, so it cannot be changed.' } };
+
+        /* "Use the schedule again": drop the hand correction so the scheduler owns this
+           month once more. Only meaningful for someone whose hours come from a schedule;
+           for Sara there is nothing underneath, so it would just empty the month.
+           Checked before the hours are read, because a revert carries none. */
+        if (d.revert) {
+            if (!scheduledFor(staffId, fy)) return { status: 400, body: { error: 'There is no schedule behind this report to go back to.' } };
+            const wr = runSQL(ENSURE + `UPDATE PersonnelReports SET SnapshotJson=NULL, UpdatedAt=GETDATE()
+                WHERE StaffId=${staffId} AND FiscalYear=${fy} AND Month=${month} AND ISNULL(EmpSignedAt,'')=''`);
+            if (!wr.ok || wr.sqlError) return { status: 500, body: { error: 'Could not undo the correction: ' + (wr.error || wr.sqlError) } };
+            const back = detail(staffId, fy, month);
+            if (!back.ok) return { status: back.status, body: { error: back.error } };
+            pushToSheet(back.report, 'back to the schedule');
+            return { status: 200, body: { success: true, reverted: true, report: back.report, summary: back.summary } };
+        }
+
         const meta = monthMeta(fy, month);
         const days = [];
         (Array.isArray(d.days) ? d.days : []).forEach(x => {
@@ -280,7 +315,12 @@ module.exports = function PersonnelReports(deps) {
             const ad = Math.min(24, Math.max(0, parseFloat(x.admin) || 0));
             if (op || ad) days.push({ d: dd, oper: round2(op), admin: round2(ad) });
         });
-        const rate = Math.min(500, Math.max(0, parseFloat(d.rate) || man.rate));
+        /* No wage sent, or a nonsense one: fall back to whatever the report would have
+           used anyway (the sheet's rate for scheduled staff, the standing one for Sara),
+           so a correction to the hours can never silently zero the money. */
+        const current = detail(staffId, fy, month);
+        const fallbackRate = current.ok ? current.report.rate : 0;
+        const rate = Math.min(500, Math.max(0, parseFloat(d.rate) || fallbackRate));
         const json = JSON.stringify({ rate, days });
         const w = runSQL(ENSURE + `SET NOCOUNT ON;
 IF EXISTS (SELECT 1 FROM PersonnelReports WHERE StaffId=${staffId} AND FiscalYear=${fy} AND Month=${month})
@@ -296,8 +336,18 @@ ELSE
 
     function pushToSheet(snap, by) {
         const ups = [];
-        if (snap.sheetRows && snap.sheetRows.op) ups.push({ group: 'operational', name: snap.sheetRows.op, month: snap.month, value: snap.opTotal > 0 ? snap.opTotal : '' });
-        if (snap.sheetRows && snap.sheetRows.adm) ups.push({ group: 'admin', name: snap.sheetRows.adm, month: snap.month, value: snap.adTotal > 0 ? snap.adTotal : '' });
+        const rows = snap.sheetRows || {};
+        if (rows.op) ups.push({ group: 'operational', name: rows.op, month: snap.month, value: snap.opTotal > 0 ? snap.opTotal : '' });
+        /* Admin hours for someone whose sheet line is operational only: the Admin section
+           has a line for Sara and Megan and nobody else, so a teacher who records admin
+           time would have it on the report and nowhere on the sheet. A line is added for
+           them the first time there is something to put on it, and never just to hold a
+           zero — hence createIfMissing. */
+        if (rows.adm) ups.push({ group: 'admin', name: rows.adm, month: snap.month, value: snap.adTotal > 0 ? snap.adTotal : '' });
+        else if (snap.adTotal > 0 || snap.edited) {
+            ups.push({ group: 'admin', name: String(snap.name).split(' ')[0] + '-Admin', month: snap.month,
+                value: snap.adTotal > 0 ? snap.adTotal : '', createIfMissing: snap.adTotal > 0 });
+        }
         if (!ups.length) return;
         const r = sync.setCells(snap.fy, ups, by);
         if (!r.ok) console.log('[ACTIVITY REPORT] sheet update failed: ' + r.error);
@@ -310,6 +360,12 @@ ELSE
         const bytes = Buffer.from(m[1], 'base64');
         if (!bytes.length) return { error: 'The signature was empty' };
         if (bytes.length > 2 * 1024 * 1024) return { error: 'The signature image is unreasonably large' };
+        /* Prove the bytes really are a JPEG the PDF builder can read, HERE, while the
+           person who drew it is still looking at the screen. The PDF is only built when
+           the second signature lands, so without this check a bad first signature was
+           stored happily and then failed for whoever countersigned days later — the one
+           person who could do nothing about it. */
+        if (jpegSize && !jpegSize(bytes)) return { error: 'That signature image could not be read. Please sign again.' };
         return { bytes };
     }
 

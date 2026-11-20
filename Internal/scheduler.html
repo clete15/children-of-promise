@@ -215,6 +215,7 @@
             <div class="sch-actions">
                 <button class="sch-btn sch-btn-ghost" id="applyPaper" onclick="applyPaperSchedule()"
                         title="Write everyone's usual week into the week shown, to edit and save">Fill from standing schedule</button>
+                <button class="sch-btn sch-btn-ghost" id="altBadge" onclick="toggleAltWeek()">Week …</button>
                 <button class="sch-btn sch-btn-ghost" onclick="window.print()">&#x1F5A8;&#xFE0F; Print</button>
                 <button class="sch-btn" id="schSaveAll" onclick="saveAll()" disabled>Save all changes</button>
             </div>
@@ -312,9 +313,13 @@ const HIDE_FROM_SCHEDULE = ['janell', 'janelle', 'sara', 'pamela', 'clete'];
    simply skipped. The fill does NOT touch the week's NO SCHOOL days: those are a fact
    about one particular week, not part of anybody's usual pattern. */
 const PAPER = {
-    tara:    { Mon: '6:15-4:15', Tue: '6:30-4:30', Wed: '6:15-4:30', Thu: 'OFF',       Fri: '6:15-4:30' },
-    sue:     { Mon: 'OFF',       Tue: '6:15-5:30', Wed: '4:00-5:30', Thu: '6:15-5:30', Fri: '4:00-5:30' },
-    paige:   { Mon: '8:30-4:30', Tue: 'OFF',       Wed: '8:30-4:30', Thu: '8:30-4:30', Fri: 'OFF' },
+    /* Sue and Tara share Thursday and Friday, one each, swapping every other week — so
+       those two days are NOT in the base pattern below. They come from ALT_WEEKS, keyed
+       A/B, and the fill picks the week's letter. Everything else is the same every week. */
+    tara:    { Mon: '6:15-4:15', Tue: '6:30-4:30', Wed: '6:15-4:30' },
+    // Sue works two full days: Tuesday every week, plus her half of the Thu/Fri swap.
+    sue:     { Mon: 'OFF',       Tue: '6:15-5:30', Wed: 'OFF' },
+    paige:   { Mon: '8:30-4:30', Tue: 'OFF',       Wed: '8:30-4:30', Thu: '8:30-4:30', Fri: '8:30-4:30' },
     lindsey: { Mon: '8:30-4:30', Tue: '8:30-4:30', Wed: '8:30-4:30', Thu: '8:30-4:30', Fri: '8:30-4:30' },
     // The paper's "Renee" row is our staff member Donna Nier — the printed chart used a
     // different name. Keyed as `donna` so it matches the roster; `renee` kept as an alias
@@ -328,6 +333,65 @@ const PAPER = {
     megan:   { Mon: '6:30-5:30', Tue: '9:00-4:00', Wed: '10:30-5:30', Thu: '6:30-4:30', Fri: '9:00-4:00' },
     jeremy:  { Mon: '10:00-5:00', Tue: '10:00-5:00', Wed: '10:00-5:00', Thu: '10:00-5:00', Fri: '10:00-5:00' },
 };
+
+/* ── The fortnightly half of the pattern ────────────────────────────────────────
+   Sue and Tara cover Thursday and Friday between them, one day each, and swap which
+   day they take every other week. So the standing schedule is two alternating weeks
+   rather than one, and these are the days that differ.
+
+   A week's letter comes from how many whole weeks it sits from ALT_ANCHOR, which is an
+   A week. If the letters land the wrong way round for a given week, press the A/B
+   button next to Fill — it flips every week at once (the anchor moves by one week), so
+   this only ever has to be corrected once. */
+const ALT_WEEKS = {
+    A: {
+        sue:  { Thu: '6:15-5:30', Fri: 'OFF' },
+        tara: { Thu: 'OFF',       Fri: '6:15-4:30' },
+    },
+    B: {
+        sue:  { Thu: 'OFF',       Fri: '6:15-5:30' },
+        tara: { Thu: '6:15-4:30', Fri: 'OFF' },
+    },
+};
+const ALT_ANCHOR = '2026-11-16';     // a Monday that is an A week
+const ALT_FLIP_KEY = 'copSchedAltFlip';
+const altFlipped = () => { try { return localStorage.getItem(ALT_FLIP_KEY) === '1'; } catch (e) { return false; } };
+
+/* Which alternating week the given Monday is. Whole weeks between two Mondays, so DST
+   cannot nudge it: both dates are built at noon, which no shift can move across a day. */
+function altWeekOf(monday) {
+    const at = s => { const [y, m, d] = String(s).split('-').map(Number); return Date.UTC(y, m - 1, d, 12); };
+    const weeks = Math.round((at(monday) - at(ALT_ANCHOR)) / (7 * 86400000));
+    const even = ((weeks % 2) + 2) % 2 === 0;
+    return (even !== altFlipped()) ? 'A' : 'B';
+}
+function toggleAltWeek() {
+    try { localStorage.setItem(ALT_FLIP_KEY, altFlipped() ? '0' : '1'); } catch (e) { /* no storage: this week only */ }
+    renderAltBadge();
+    showNotification('Swapped: the week of ' + weekLabel().replace('Week of ', '') + ' is now week '
+        + altWeekOf(weekStart) + ' (' + altSummary(altWeekOf(weekStart)) + ').', 'success');
+}
+// Who has which day this alternating week, in words, for the button and the message.
+function altSummary(letter) {
+    const a = ALT_WEEKS[letter];
+    const dayOf = who => (/^off$/i.test(a[who].Thu) ? 'Fri' : 'Thu');
+    return 'Sue ' + dayOf('sue') + ', Tara ' + dayOf('tara');
+}
+function renderAltBadge() {
+    const el = document.getElementById('altBadge');
+    if (!el || !weekStart) return;
+    const letter = altWeekOf(weekStart);
+    el.textContent = 'Week ' + letter + ' \u00b7 ' + altSummary(letter);
+    el.title = 'Sue and Tara swap Thursday and Friday every other week. This week is '
+        + letter + '. Click to swap if that is the wrong way round.';
+}
+// The standing week for one person, with the alternating days folded in.
+function standingWeekFor(first, letter) {
+    const base = PAPER[first];
+    if (!base) return null;
+    const alt = (ALT_WEEKS[letter] || {})[first] || {};
+    return Object.assign({ Mon: '', Tue: '', Wed: '', Thu: '', Fri: '' }, base, alt);
+}
 
 let staff = [];
 let weekStart = null;
@@ -680,6 +744,7 @@ function renderBody() {
 
 function render() {
     document.getElementById('wkLabel').textContent = weekLabel();
+    renderAltBadge();
     const wrap = document.getElementById('schBodyWrap');
     if (wrap) wrap.setAttribute('data-weeklabel', weekLabel());
     renderHead();
@@ -802,8 +867,9 @@ async function applyPaperSchedule() {
         + (existing.length > 4 ? ', …' : '') + ').\n\nReplace with the standing schedule?\n\n'
         + 'Nothing is saved until you press Save all changes.')) return;
 
+    const letter = altWeekOf(weekStart);
     people.forEach(s => {
-        const row = PAPER[firstName(s)];
+        const row = standingWeekFor(firstName(s), letter);
         schedule[String(s.Id)] = {
             Mon: row.Mon || '', Tue: row.Tue || '', Wed: row.Wed || '', Thu: row.Thu || '', Fri: row.Fri || ''
         };
@@ -815,7 +881,7 @@ async function applyPaperSchedule() {
     // Anyone on the schedule the pattern says nothing about keeps whatever they had.
     const untouched = staff.filter(s => !isHidden(s) && !inPattern(s)).map(s => s.Name.split(' ')[0]);
     showNotification('Filled ' + people.length + ' staff for ' + weekLabel().replace('Week of ', '')
-        + '. Review, then press Save all changes.'
+        + ' as week ' + letter + ' (' + altSummary(letter) + '). Review, then press Save all changes.'
         + (untouched.length ? ' Not in the standing schedule, so left alone: ' + untouched.join(', ') + '.' : ''),
         'success');
 }

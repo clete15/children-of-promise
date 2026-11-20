@@ -261,6 +261,9 @@ ELSE SELECT 'MR_CONFLICT=' + CAST(ISNULL(@v, 0) AS VARCHAR(12));`);
             const g = u.group === 'admin' ? 'admin' : 'operational';
             if (!Array.isArray(doc[g])) doc[g] = [];
             let row = doc[g].find(p => p.name === u.name);
+            // createIfMissing:false means "only correct a line that is already there" —
+            // used to clear a figure without adding a line nobody asked for.
+            if (!row && u.createIfMissing === false) return;
             if (!row) { row = { name: u.name, cells: {} }; doc[g].push(row); }
             row.cells = row.cells || {};
             const v = u.value == null || u.value === '' ? '' : String(u.value);

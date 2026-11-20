@@ -81,7 +81,10 @@
         background: var(--sp-bg); color: var(--sp-text);
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    .sp-wrap { max-width: 1000px; margin: 0 auto; padding: 18px 16px 60px; }
+    /* Wide enough for the whole tab strip plus the document buttons on one line. At
+       1000px the strip ran off the edge and "Work History" was cut in half, which read
+       as a broken page rather than as something scrollable. */
+    .sp-wrap { max-width: 1320px; margin: 0 auto; padding: 18px 20px 60px; }
     .sp-bar {
         display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
         background: var(--sp-surface); border: 1.5px solid var(--sp-border); border-radius: 10px;
@@ -181,11 +184,12 @@
        would exclude anyone using a keyboard or a screen reader.
 
        The strip scrolls sideways rather than wrapping, so the tab row stays one line
-       and the panel below never shifts down as the window narrows. */
+       and the panel below never shifts down as the window narrows. The document buttons
+       at the right end DO wrap to their own line on a narrow window, because a tab that
+       is half visible looks broken while a button that has moved down does not. */
     .sp-tabs {
-        display: flex; gap: 2px; margin-bottom: 16px;
+        display: flex; gap: 2px; margin-bottom: 16px; flex-wrap: wrap;
         border-bottom: 1.5px solid var(--sp-border);
-        overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none;
     }
     .sp-tabs::-webkit-scrollbar { display: none; }
     .sp-tab {

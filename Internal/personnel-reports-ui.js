@@ -240,6 +240,11 @@
 
     function hintFor(m) {
         if (m.status === 'complete') return 'Filed ' + dayShort(m.rep && m.rep.at);
+        if (m.edited && (m.status === 'ready' || m.status === 'upcoming')) {
+            return 'Hours corrected by hand \u00b7 ' + (m.status === 'ready'
+                ? (isSelf(ST.staffId) ? 'your signature' : 'waiting for ' + firstName())
+                : 'signs on ' + dayShort(m.endsOn));
+        }
         if (m.status === 'awaitRep') return queueHas(ST.staffId, m.month) ? 'Your signature' : 'Waiting for Sara';
         if (m.status === 'ready') return isSelf(ST.staffId) ? 'Your signature' : 'Waiting for ' + firstName();
         if (m.status === 'upcoming') return 'Signs on ' + dayShort(m.endsOn);
@@ -459,9 +464,12 @@
         return h;
     }
 
-    function paintSheet(wrap, d, staffId, fy, month, close) {
+    function paintSheet(wrap, d, staffId, fy, month, close, startEditing) {
         var r = d.report, sm = d.summary, can = d.can;
-        var editable = !!can.edit;
+        /* Read-only until Edit hours is pressed. A grid of live inputs invites a stray
+           keystroke into a payroll figure, and it hides where the numbers came from —
+           the point of the schedule-driven report is that nobody types 31 days by hand. */
+        var editable = !!can.edit && (startEditing || r.source === 'manual');
         var left = r.days.filter(function (x) { return x.d <= 16; }), right = r.days.filter(function (x) { return x.d > 16; });
         var statusChip = chip(sm);
         var h = '<div class="pr-sheet" role="dialog" aria-modal="true" aria-labelledby="prTitle">'
@@ -469,7 +477,10 @@
             + '<div style="display:flex;gap:10px;align-items:center">' + statusChip + '<button type="button" class="pr-x" id="prX" aria-label="Close">\u00d7</button></div></div>'
             + '<div class="pr-body">'
             + '<div class="pr-meta"><div>Employee<b>' + esc(r.name) + '</b></div><div>Month<b>' + esc(r.monthLabel) + '</b></div>'
-            + '<div>Hours per day<b>' + (r.hpd ? hrs(r.hpd) + ' on scheduled days' : 'entered by hand') + '</b></div></div>'
+            + '<div>Hours<b>' + (r.edited ? 'corrected by hand'
+                : (r.hpd ? hrs(r.hpd) + ' per scheduled day' : 'entered by hand')) + '</b></div></div>'
+            + (editable ? '<p class="pr-cert" style="margin-top:0">Type the hours each day. Blank means none. '
+                + (r.source === 'schedule' ? 'Saving replaces the scheduled hours for this month, and later schedule changes will leave it alone.' : '') + '</p>' : '')
             + '<div class="pr-days" id="prDays"><div>' + dayTable(left, false, r, editable) + '</div><div>' + dayTable(right, true, r, editable) + '</div></div>'
             + (editable ? '<label class="pr-wage">Hourly wage $<input inputmode="decimal" id="prRate" value="' + esc(r.rate) + '" aria-label="Hourly wage"></label>' : '')
             + '<div class="pr-sum" id="prSum">' + totalsBlock(r) + '</div>'
@@ -478,6 +489,8 @@
             + '<div class="pr-sigs">' + sigBox('emp', d, 'prSigE') + sigBox('rep', d, 'prSigR') + '</div>'
             + '<div class="pr-foot"><div class="pr-msg" id="prMsg" role="status"></div>'
             + (sm.pdf ? '<button type="button" class="pr-btn" id="prPdf">Open the PDF</button>' : '')
+            + (can.edit && r.edited && r.source === 'schedule' ? '<button type="button" class="pr-btn" id="prRevert">Use the schedule again</button>' : '')
+            + (can.edit && !editable ? '<button type="button" class="pr-btn" id="prEdit">Edit hours</button>' : '')
             + (editable ? '<button type="button" class="pr-btn" id="prSave">Save hours</button>' : '')
             + (can.signEmployee ? '<button type="button" class="pr-btn primary" id="prSignE" disabled>Sign my report</button>' : '')
             + (can.signRep ? '<button type="button" class="pr-btn primary" id="prSignR" disabled>Sign as authorized representative</button>' : '')
@@ -487,6 +500,20 @@
         $('prX').onclick = close; $('prDone').onclick = close;
         $('prX').focus();
         if (sm.pdf && $('prPdf')) $('prPdf').onclick = function () { H.openFile(sm.pdf); };
+        // Edit hours: redraw the same sheet with the grid live. Nothing is sent yet.
+        if ($('prEdit')) $('prEdit').onclick = function () { paintSheet(wrap, d, staffId, fy, month, close, true); };
+        if ($('prRevert')) $('prRevert').onclick = async function () {
+            var b = $('prRevert'), msg = $('prMsg');
+            if (!confirm('Throw away the hand-entered hours for ' + r.monthLabel
+                + ' and go back to what the staff scheduler says?')) return;
+            b.disabled = true; msg.className = 'pr-msg'; msg.textContent = 'Undoing\u2026';
+            try {
+                await api('/api/personnel-report-draft', { method: 'POST', body: JSON.stringify({ staffId: staffId, fy: fy, month: month, revert: true }) });
+                var fresh = await api('/api/personnel-report?staffId=' + encodeURIComponent(staffId) + '&fy=' + fy + '&month=' + month);
+                paintSheet(wrap, fresh, staffId, fy, month, close);
+                ST.list = null; await load({ Id: ST.staffId }); paintBadge();
+            } catch (e) { msg.className = 'pr-msg bad'; msg.textContent = e.message || String(e); b.disabled = false; }
+        };
 
         // Signatures already on file, shown as the real ink.
         [['prSigEImg', sm.emp], ['prSigRImg', sm.rep]].forEach(function (p) {
