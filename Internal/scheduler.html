@@ -213,7 +213,8 @@
                 <div class="sub">Weekly shifts by classroom. Pick a start and end time, or mark a day OFF.</div>
             </div>
             <div class="sch-actions">
-                <button class="sch-btn sch-btn-ghost" id="applyPaper" onclick="applyPaperSchedule()">Fill from paper schedule</button>
+                <button class="sch-btn sch-btn-ghost" id="applyPaper" onclick="applyPaperSchedule()"
+                        title="Write everyone's usual week into the week shown, to edit and save">Fill from standing schedule</button>
                 <button class="sch-btn sch-btn-ghost" onclick="window.print()">&#x1F5A8;&#xFE0F; Print</button>
                 <button class="sch-btn" id="schSaveAll" onclick="saveAll()" disabled>Save all changes</button>
             </div>
@@ -301,17 +302,15 @@ const GROUP_OVERRIDE = {};
    person back. */
 const HIDE_FROM_SCHEDULE = ['janell', 'janelle', 'sara', 'pamela', 'clete'];
 
-/* The paper schedule, by lowercase first name, for the "Fill from paper schedule"
-   button. Monday was NO SCHOOL that week, so Monday shifts are omitted where the paper
-   left them blank. OFF is the literal word. Times are compact "start-end" exactly as
-   stored. Matched to staff by first name (case-insensitive); anyone not listed is left
-   untouched, and a listed name with no matching staff row is simply skipped. */
-const PAPER_WEEK = '2026-10-12';
-/* No no-school days: the "NO SCHOOL" header on the printed chart meant the grade
-   school was closed (so the afterschoolers were in all day) — OUR centre had school and
-   staff worked their normal Monday shifts. Marking Monday no-school here greyed out the
-   column and hid those shifts, which was wrong. Left blank so every day stays open. */
-const PAPER_NOSCHOOL = '';
+/* Everyone's STANDING week, by lowercase first name — the starting point the "Fill from
+   standing schedule" button writes into whichever week is on screen. Taken from the
+   printed chart of 12 Oct 2026; edit the lines below when someone's usual week changes.
+
+   OFF is the literal word, and a blank day means no shift. Times are compact
+   "start-end" exactly as stored. Matched to staff by first name (case-insensitive);
+   anyone not listed is left untouched, and a listed name with no matching staff row is
+   simply skipped. The fill does NOT touch the week's NO SCHOOL days: those are a fact
+   about one particular week, not part of anybody's usual pattern. */
 const PAPER = {
     tara:    { Mon: '6:15-4:15', Tue: '6:30-4:30', Wed: '6:15-4:30', Thu: 'OFF',       Fri: '6:15-4:30' },
     sue:     { Mon: 'OFF',       Tue: '6:15-5:30', Wed: '4:00-5:30', Thu: '6:15-5:30', Fri: '4:00-5:30' },
@@ -416,8 +415,11 @@ function minutesToCompact(mins) {
 function cellToStored(id, dayIdx) {
     const td = document.getElementById('cell_' + id + '_' + dayIdx);
     if (!td) return (schedule[id] && schedule[id][DAYS[dayIdx]]) || '';
-    if (td.dataset.off === '1') return 'OFF';
     const s = td.querySelector('.sel-start'), e = td.querySelector('.sel-end');
+    /* Live pickers win over every other reading of this cell. They only exist while the
+       cell is expanded, and then they ARE what the user is looking at — so whatever is
+       chosen in them is the answer, even if the cell arrived at the editor from OFF. */
+    if (!s && !e && td.dataset.off === '1') return 'OFF';
     if (!s && !e) {
         // Not in edit mode → trust the stored value (the chip is just a view of it).
         return (schedule[id] && schedule[id][DAYS[dayIdx]]) || '';
@@ -629,7 +631,12 @@ function cellHtml(id, dayIdx) {
         inner = '<button type="button" class="shift-chip empty" title="Click to set hours" '
             + 'onclick="editCell(\'' + id + '\',' + dayIdx + ')">+ add</button>';
     }
-    return '<td id="cell_' + id + '_' + dayIdx + '"' + (parsed.off ? ' data-off="1"' : '')
+    /* data-off marks a cell that is RESTING on OFF, never one that is open in the editor.
+       cellToStored treats data-off as "this day is OFF" and returns before it reads the
+       time pickers, so leaving the flag on an expanded cell threw away whatever was just
+       chosen: clicking an OFF day, picking times and saving put the day straight back to
+       OFF. An expanded cell says OFF through its own OFF button (setOff), not this flag. */
+    return '<td id="cell_' + id + '_' + dayIdx + '"' + (parsed.off && !isEditing ? ' data-off="1"' : '')
         + ' class="' + (closed ? 'closed' : '') + '">' + inner + '</td>';
 }
 
@@ -767,42 +774,50 @@ async function saveAll() {
     if (!dirty.size) { const all = document.getElementById('schSaveAll'); if (all) all.disabled = true; }
 }
 
-/* "Fill from paper schedule" — populate the Oct 12 week from the printed chart. It
-   jumps to that week if needed, writes the paper's shifts into each matching person's
-   row (by first name), marks Monday no school, and leaves everything DIRTY so the admin
-   reviews it and clicks Save. It never writes to the server on its own. */
-async function applyPaperSchedule() {
-    if (weekStart !== PAPER_WEEK) {
-        if (dirty.size && !confirm('Jump to the week of ' + PAPER_WEEK + ' and fill it from the paper schedule? Unsaved edits on this week will be lost.')) return;
-        weekStart = PAPER_WEEK;
-        await loadWeek();
-    }
-    // Monday no school, per the paper.
-    noSchoolDays = new Set(PAPER_NOSCHOOL.split(',').map(Number));
-    try {
-        await apiFetch('/api/staff-schedule', {
-            method: 'POST',
-            body: JSON.stringify({ weekStart: weekStart, noSchoolDays: PAPER_NOSCHOOL, broadcastNoSchool: true })
-        });
-    } catch (e) { /* non-fatal; the column still shows locally */ }
+/* "Fill from standing schedule" — write everyone's usual week into THE WEEK ON SCREEN
+   from the pattern in PAPER, by first name.
 
-    let matched = 0;
-    staff.forEach(s => {
-        const first = String(s.Name || '').trim().split(/\s+/)[0].toLowerCase();
-        const row = PAPER[first];
-        if (!row) return;
+   It used to be pinned to one historical week (PAPER_WEEK, the printed chart of 12 Oct
+   2026): pressing it jumped away from whatever week you were scheduling and filled that
+   old one instead, which looked like the button doing nothing. Each week is now saved as
+   its own record, so the pattern is a starting point for any week.
+
+   Nothing is sent to the server. Filled rows are left DIRTY so they are reviewed and
+   saved deliberately — and a week that already has shifts asks first, because overwriting
+   a week somebody has already built by hand is not undoable. */
+async function applyPaperSchedule() {
+    const inPattern = s => !!PAPER[firstName(s)];
+    const people = staff.filter(s => !isHidden(s) && inPattern(s));
+    if (!people.length) {
+        showNotification('No one on the schedule matches the standing pattern, so nothing was filled.', 'error');
+        return;
+    }
+    // Shifts already on this week, saved or unsaved: filling replaces them.
+    const existing = people.filter(s => {
+        const row = schedule[String(s.Id)] || {};
+        return DAYS.some(d => String(row[d] || '').trim() !== '');
+    });
+    if (existing.length && !confirm('This week already has shifts for ' + existing.length
+        + ' of them (' + existing.slice(0, 4).map(s => firstName(s)).join(', ')
+        + (existing.length > 4 ? ', …' : '') + ').\n\nReplace with the standing schedule?\n\n'
+        + 'Nothing is saved until you press Save all changes.')) return;
+
+    people.forEach(s => {
+        const row = PAPER[firstName(s)];
         schedule[String(s.Id)] = {
             Mon: row.Mon || '', Tue: row.Tue || '', Wed: row.Wed || '', Thu: row.Thu || '', Fri: row.Fri || ''
         };
-        matched++;
     });
+    // render() resets the dirty set, so the rows are marked afterwards.
     render();
-    // Mark every matched person dirty so Save all lights up.
-    staff.forEach(s => {
-        const first = String(s.Name || '').trim().split(/\s+/)[0].toLowerCase();
-        if (PAPER[first]) markDirty(String(s.Id));
-    });
-    showNotification('Filled ' + matched + ' staff from the paper schedule — review and Save all.', matched ? 'success' : 'error');
+    people.forEach(s => markDirty(String(s.Id)));
+
+    // Anyone on the schedule the pattern says nothing about keeps whatever they had.
+    const untouched = staff.filter(s => !isHidden(s) && !inPattern(s)).map(s => s.Name.split(' ')[0]);
+    showNotification('Filled ' + people.length + ' staff for ' + weekLabel().replace('Week of ', '')
+        + '. Review, then press Save all changes.'
+        + (untouched.length ? ' Not in the standing schedule, so left alone: ' + untouched.join(', ') + '.' : ''),
+        'success');
 }
 
 // ── Week navigation ────────────────────────────────────────────────────────────────
