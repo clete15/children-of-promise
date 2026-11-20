@@ -125,9 +125,21 @@ function ageText(m) {
     return m < 12 ? m + 'm' : Math.floor(m / 12) + 'y ' + (m % 12) + 'm';
 }
 
+/* Before and Afterschool children are not part of weighted eligibility. The score ranks
+   who gets a funded early-childhood place; school-age children in that room are there for
+   care around the school day, so scoring them put 5-to-12-year-olds in a priority order
+   that means nothing and buried the children the list exists to rank. Identified by their
+   ROOM's type being 'n/a' (room 8), not by name, so renaming the room cannot bring them
+   back. Their Program tag still reads INCCRA, which is why filtering on that misses them. */
+function isSchoolAge(s) {
+    const c = getClassroom(s.RoomNumber);
+    return !!c && String(c.Type || '').trim().toLowerCase() === 'n/a';
+}
+
 function weRows() {
     return students
         .filter(s => isTruthy(s.Active))
+        .filter(s => !isSchoolAge(s))
         .filter(s => !weFilter || String(s.PFA_PI_na || '').trim().toUpperCase() === weFilter)
         .map(s => {
             const sc = weScores[String(s.Id)] || null;
@@ -207,7 +219,12 @@ document.getElementById('weBody').addEventListener('click', async e => {
 function render() {
     const rows = weRows().sort(weCompare);
     const scored = rows.filter(r => r.points != null).length;
-    document.getElementById('weCount').textContent = rows.length + ' children \u00b7 ' + scored + ' scored';
+    /* Say that the school-age children are left out, rather than just showing a smaller
+       number. A count that quietly drops is the kind of thing that reads as missing
+       children, and someone would go looking for them. */
+    const excluded = students.filter(s => isTruthy(s.Active) && isSchoolAge(s)).length;
+    document.getElementById('weCount').textContent = rows.length + ' children \u00b7 ' + scored + ' scored'
+        + (excluded ? ' \u00b7 ' + excluded + ' Before and Afterschool not scored' : '');
     const body = document.getElementById('weBody');
     if (!rows.length) { body.innerHTML = '<div class="we-msg">No active children' + (weFilter ? ' in ' + weEsc(weFilter) : '') + '.</div>'; return; }
     const th = (key, label, cls) => {
