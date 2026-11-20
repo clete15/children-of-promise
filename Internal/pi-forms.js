@@ -206,6 +206,18 @@
             fromStudent: s => yesNoOrBlank(s.Military)
         },
         { key: 'caregiverOther', group: 'family', label: 'Child cared for by someone other than a parent', points: 5, intakeKey: 'CaregiverOther' },
+        /* The one criterion that scores on a BLANK. A child arriving here has not been in
+           a formal early-learning programme unless somebody says they have, and almost no
+           child enrolled before the online intake has an answer recorded — reading blank
+           as unknown denied the points to exactly those children. Untick it for a child
+           who transferred in from another programme. Matches the server's
+           SEEDED_WEIGHTED_CRITERIA and the public form's calcScore, which must agree with
+           this or the waiting-list order and the filed form would differ. */
+        {
+            key: 'noPriorProgram', group: 'family', label: 'No prior formal early-learning program', points: 5,
+            derive: d => (String(d.PriorEarlyLearning || '').trim().toLowerCase() === 'yes' ? 'No' : 'Yes'),
+            fromStudent: () => 'Yes'
+        },
         { key: 'abuseHistory', group: 'trauma', label: 'Abuse or domestic violence history', points: 5, intakeKey: 'AbuseHistory' },
         { key: 'mentalIllness', group: 'trauma', label: 'Mental illness in the home', points: 5, intakeKey: 'MentalIllness' },
         { key: 'dcfsInvolvement', group: 'trauma', label: 'DCFS involvement', points: 5, intakeKey: 'DcfsInvolvement' },

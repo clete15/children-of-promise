@@ -2269,7 +2269,14 @@ const SEEDED_WEIGHTED_CRITERIA = [
     { group: 'family', label: 'Parent incarcerated', points: 5, from: (i, e, v) => anyYes(i.ParentIncarcerated, (v || {}).incarcerated) },
     { group: 'family', label: 'Active military family', points: 5, from: (i, e, v) => anyYes(i.ActiveMilitary, e.Military, (v || {}).activeMilitary) },
     { group: 'family', label: 'Child cared for by someone other than a parent', points: 5, from: (i, e, v) => anyYes(i.CaregiverOther, ['foster', 'other'].includes((v || {}).childLivesWith) ? 'Yes' : ((v || {}).childLivesWith === 'parents' ? 'No' : '')) },
-    { group: 'family', label: 'No prior formal early-learning program', points: 5, from: (i) => (seededYesNoOrBlank(i.PriorEarlyLearning) === 'No' ? 'Yes' : (seededYesNoOrBlank(i.PriorEarlyLearning) === 'Yes' ? 'No' : '')) },
+    /* Scores unless we have been told the child HAS been in a formal early-learning
+       program before. This is the one criterion where a blank is not "unknown": a child
+       arriving here has not previously been in a program unless someone says otherwise,
+       and nearly every child enrolled before the online intake existed has no answer
+       recorded — so reading blank as unknown denied the points to exactly the children
+       most likely to deserve them. Directors' call, Nov 2026; untick it on the form for
+       a child who transferred in from another program. */
+    { group: 'family', label: 'No prior formal early-learning program', points: 5, from: (i) => (seededYesNoOrBlank(i.PriorEarlyLearning) === 'Yes' ? 'No' : 'Yes') },
     { group: 'family', label: 'Lives in a child-care desert (Belleville, Dupo, Cahokia Heights)', points: 5, from: (i, e) => (isChildDesertCity(i.City || e.City_Town) ? 'Yes' : 'No') },
     { group: 'trauma', label: 'Abuse or domestic violence history', points: 5, from: (i) => i.AbuseHistory },
     { group: 'trauma', label: 'Mental illness in the home', points: 5, from: (i) => i.MentalIllness },

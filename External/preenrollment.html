@@ -842,8 +842,11 @@ function calcScore(d) {
     if (yes(d.nonEnglishHome))     score += 5;
     if (yes(d.activeMilitary))     score += 5;
     if (yes(d.brightpointSubsidy)) score += 5;
-    // Prior early learning scores when the child has NOT had it (never enrolled before).
-    if (d.priorEarlyLearning === 'No') score += 5;
+    /* Prior early learning scores when the child has NOT had it. Anything other than a
+       definite Yes counts, so an unanswered question still scores — the server's
+       SEEDED_WEIGHTED_CRITERIA reads it the same way, and the two must agree or the
+       waiting-list order and the child's filed form would disagree. */
+    if (d.priorEarlyLearning !== 'Yes') score += 5;
     // Public benefits: 5 PER benefit (WIC, Medicaid, SNAP, TANF), up to 20.
     ['WIC', 'Medicaid', 'SNAP', 'TANF'].forEach(b => {
         if (new RegExp('\\b' + b + '\\b', 'i').test(d.publicBenefits || '')) score += 5;
