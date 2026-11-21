@@ -60,12 +60,18 @@
         font-weight: 800; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted);
         text-align: center;
     }
-    .half .body { padding: 12px 14px 14px; }
+    /* The name, the "this is our…" line and the bullets are centred as a block. The list
+       is an inline-block so it centres as a group while its items stay left-aligned —
+       centring each line individually would leave the bullets ragged and hard to scan. */
+    .half .body { padding: 12px 14px 14px; text-align: center; }
     .half .real { font-weight: 800; font-size: 1.02rem; color: var(--accent); margin: 0 0 2px; }
     .half .kind { font-size: 0.78rem; color: var(--muted); font-weight: 700; text-transform: uppercase;
         letter-spacing: 0.04em; margin: 0 0 8px; }
-    .half ul { margin: 0; padding-left: 18px; font-size: 0.88rem; }
+    .half ul { display: inline-block; text-align: left; margin: 0; padding-left: 18px; font-size: 0.88rem; }
     .half li { margin-bottom: 4px; }
+    /* The closing note stays left-aligned: it is a sentence or two of prose, and centred
+       prose is harder to read than a centred label. */
+    .half .note { text-align: left; font-size: 0.84rem; color: var(--muted); margin: 8px 0 0; }
 
     table { width: 100%; border-collapse: collapse; margin: 10px 0 4px; font-size: 0.88rem; }
     th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
@@ -135,7 +141,7 @@
                     <li>Mighty Minutes</li>
                     <li>The Digital Content Library</li>
                 </ul>
-                <p style="font-size:0.84rem;color:var(--muted);margin:8px 0 0;">
+                <p class="note">
                     The printed books and plans handed out in Year 1 were this same Creative Curriculum,
                     before it moved on screen.</p>
             </div>
@@ -151,7 +157,7 @@
                     <li>Checkpoint ratings each period</li>
                     <li>Progress reports for families</li>
                 </ul>
-                <p style="font-size:0.84rem;color:var(--muted);margin:8px 0 0;">
+                <p class="note">
                     GOLD measures where a child is. It is <b>not</b> a curriculum, so it cannot answer
                     &ldquo;what do you teach from?&rdquo; on its own.</p>
             </div>
