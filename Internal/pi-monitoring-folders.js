@@ -33,6 +33,9 @@
    The prep meeting shows the CURRENT SharePoint structure. This map is from ~2 years
    ago. Likely differences to check and update here:
      • A PI9 folder (Professional Development Plans) — not present in the 2024 shots.
+     • Whether CB3 part A (identifying the curriculum) gets its own folder or files
+       inside CB3.B. We have added a PROPOSED "CB3.A Curriculum Identification" below;
+       ask, and delete it if they want part A inside the lesson-plan folder.
      • Exact PI5 sub-splits (A-G, H-I, J, K, L) and whether they changed.
      • The " - M" / " - C" owner suffixes (Megan / Clete) — keep or drop.
      • Spelling fixes they may have made.
@@ -54,6 +57,10 @@
                 'external' — lives outside the app (public website, SharePoint-only,
                              or completed by the monitor after the visit)
      field    the ISBETracking column / DOC_FORM_SPECS field, where one exists
+     proposed true on a folder WE invented because an item had evidence and no home.
+              Everything without this flag is verbatim from the monitor's own site; an
+              exporter should treat a proposed folder as a suggestion to confirm, never
+              as part of the known structure.
      note     anything a person assembling the upload needs to know
    ───────────────────────────────────────────────────────────────────────────── */
 
@@ -67,8 +74,21 @@
           note: 'Class schedules, policies manual, sign-in sheets, attendance, PI-specific lesson plans.' },
         { folder: 'CB2.D - DCFS License and Evidence of Excelrate', piccItem: 'CB2', owner: 'Clete', source: 'program',
           field: '', note: 'DCFS license (also surfaced in the CB2 site license panel) + ExceleRate award/report. "Excelrate" spelled as on SharePoint.' },
+        /* PROPOSED, not transcribed. The 2024 screenshots had only a CB3.B folder, so
+           CB3 part A — identifying the curriculum — had nowhere to live, and that answer
+           existed only in the two handbooks and in whatever was said on the day. The
+           checklist lets part A be evidenced by the lesson plans or by "other, describe
+           in notes", so a monitor may well want it inside CB3.B rather than beside it.
+           Confirm at the Jan 4 prep meeting; drop this entry if they say it belongs in B. */
+        { folder: 'CB3.A Curriculum Identification', piccItem: 'CB3', owner: '', source: 'program', proposed: true,
+          note: 'OURS, not seen in the 2024 upload. Holds Handouts/CB3A-Curriculum-Identification.html printed to PDF '
+              + '(file it as "CB3.A - Curriculum and Assessment Identification.pdf"), plus the Teaching Strategies '
+              + 'subscription/invoice proving the CURRICULUM is included and not GOLD alone, and the publisher\u2019s '
+              + 'research/alignment documentation.' },
         { folder: 'CB3.B Lesson Plans', piccItem: 'CB3', owner: '', source: 'program',
-          note: 'Classroom lesson plans showing IELG references.' },
+          note: 'Classroom lesson plans showing IELG references. In the Teaching Strategies platform these come from '
+              + 'the Teach area, which IS The Creative Curriculum; the objectives printed on the child activities are '
+              + 'the references this item looks for. See Handouts/Curriculum-And-Assessment-Overview.html.' },
         { folder: 'CB4 Staffing plan - M', piccItem: 'CB4', owner: 'Megan', source: 'program',
           note: 'Staffing schedules / DCFS ratio documentation.' },
         { folder: 'CB5.A-B Meal Plan - C', piccItem: 'CB5', owner: 'Clete', source: 'program',
