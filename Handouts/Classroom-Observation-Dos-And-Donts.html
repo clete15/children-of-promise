@@ -60,7 +60,11 @@
 
     /* Do / Don't pairs. Two columns on screen and on paper, so each "do" sits beside
        the mistake it prevents. */
-    .pair { display: flex; gap: 14px; margin-bottom: 14px; page-break-inside: avoid; }
+    .pair { display: flex; gap: 14px; margin-bottom: 14px; }
+    /* A topic heading and its Do/Don't pair move as ONE unit. Keeping the two separate
+       is what produced the half-empty pages: the heading stayed behind and the pair
+       jumped to the next sheet. */
+    .block { break-inside: avoid; page-break-inside: avoid; }
     .col { flex: 1 1 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
     .col.do { border-color: var(--do-br); }
     .col.no { border-color: var(--no-br); }
@@ -93,7 +97,9 @@
         .callout { margin: 10px 0; }
         h2 { margin: 14px 0 6px; }
         .topic { margin: 12px 0 5px; }
-        .page-break { break-before: page; page-break-before: always; }
+        /* No forced page breaks. One used to sit on the room-and-materials pair and was
+           the other half of the blank-page problem: it threw a break while the heading
+           above it stayed put. Let the .block rule decide where pages fall. */
     }
 </style>
 </head>
@@ -144,6 +150,7 @@
         The Pre-School PFA room is not part of this observation. PFA is monitored separately and against different
         items.</p>
 
+    <section class="block">
     <div class="topic">While they are in the room</div>
     <div class="pair">
         <div class="col do">
@@ -171,7 +178,9 @@
             </ul>
         </div>
     </div>
+    </section>
 
+    <section class="block">
     <div class="topic">Supervision and safety</div>
     <div class="pair">
         <div class="col do">
@@ -192,7 +201,9 @@
             </ul>
         </div>
     </div>
+    </section>
 
+    <section class="block">
     <div class="topic">Talking with children</div>
     <div class="pair">
         <div class="col do">
@@ -218,9 +229,11 @@
             </ul>
         </div>
     </div>
+    </section>
 
+    <section class="block">
     <div class="topic">The room and the materials</div>
-    <div class="pair page-break">
+    <div class="pair">
         <div class="col do">
             <div class="head">&#10003; Do</div>
             <ul>
@@ -244,7 +257,9 @@
             </ul>
         </div>
     </div>
+    </section>
 
+    <section class="block">
     <div class="topic">The observer</div>
     <div class="pair">
         <div class="col do">
@@ -267,6 +282,7 @@
             </ul>
         </div>
     </div>
+    </section>
 
     <div class="last">
         <b>Afterwards:</b> the result turns into a written improvement plan for the room, not a verdict on you.

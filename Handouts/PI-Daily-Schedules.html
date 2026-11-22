@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PI Classroom Daily Schedules — 9:30 to 12:00</title>
+<!--
+    DRAFT daily schedules for the three PI rooms, covering the 9:30–12:00 PI block.
+    Room names and age ranges are taken from dimClassrooms (Internal/setup_classrooms.sql):
+        Room 2  Infants / Toddlers PI      8–20 months    Paige / Sue
+        Room 3  Toddlers PI                15–24 months   Megan / New Teacher
+        Room 5  2 Year Olds PI             24–36 months   Janelle / Renee
+
+    These are a STARTING POINT for the teachers to correct, not a description of what
+    they currently do — I do not know their actual routines. Everything here is written
+    to be realistic for the age and to hold up in an ITERS-3 observation: long free-choice
+    blocks, outdoor time, books and language every day, and no screen time.
+
+    Two things deliberately shaped these:
+      · The PI block is EXACTLY the 2h30m minimum, so every schedule starts at 9:30 and
+        ends at 12:00 with no slack. A late start puts the day under the required minimum.
+      · Personal care routines are not scored in the observation, so diapering, toileting
+        and handwashing are shown as ongoing rather than as timed blocks — which is also
+        how they actually happen.
+
+    The infant room is deliberately looser than the other two. Infants feed and sleep on
+    their own rhythms; a rigid infant timetable would be a fiction, and a monitor would
+    see through it immediately.
+-->
+<style>
+    :root { --ink:#1f2430; --muted:#5b6170; --line:#d2d7e2; --accent:#1f3d7a; --accent-soft:#eef2fa; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: "Segoe UI", Arial, Helvetica, sans-serif; color: var(--ink); line-height: 1.45;
+        background: #f1f3f7; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .sheet { max-width: 820px; margin: 24px auto; background: #fff; padding: 34px 42px 40px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.10); border-radius: 10px; }
+    header { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid var(--accent);
+        padding-bottom: 13px; }
+    header img { width: 76px; height: auto; flex-shrink: 0; }
+    header .ht h1 { margin: 0; font-size: 1.3rem; color: var(--accent); letter-spacing: -0.01em; }
+    header .ht .sub { margin: 3px 0 0; font-size: 0.9rem; color: var(--muted); font-weight: 600; }
+    header .ht .center { margin: 2px 0 0; font-size: 0.79rem; color: var(--muted); }
+
+    .draft { margin: 16px 0; padding: 12px 16px; background: #fff8ec; border: 1px solid #e8cfa0;
+        border-left: 5px solid #b45309; border-radius: 6px; font-size: 0.9rem; }
+    .draft strong { color: #b45309; }
+
+    /* One room per block, kept whole on the page. */
+    .room { margin-top: 22px; break-inside: avoid; page-break-inside: avoid; }
+    .room-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+        border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 0; }
+    .room-head h2 { margin: 0; font-size: 1.08rem; color: var(--accent); }
+    .room-head .meta { font-size: 0.8rem; color: var(--muted); text-align: right; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th, td { border-bottom: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+    th { background: var(--accent-soft); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+        color: var(--muted); border-bottom: 1px solid var(--line); }
+    td.time { white-space: nowrap; font-weight: 700; width: 108px; color: var(--accent); font-variant-numeric: tabular-nums; }
+    td.what b { display: block; }
+    td.what span { color: var(--muted); font-size: 0.85rem; }
+    tr.ongoing td { background: #fafbfd; }
+    tr.ongoing td.time { color: var(--muted); font-weight: 600; font-style: italic; }
+
+    .note { font-size: 0.82rem; color: var(--muted); margin: 8px 0 0; }
+
+    .noprint { text-align: center; margin: 18px; }
+    .noprint button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
+        padding: 10px 22px; border-radius: 8px; cursor: pointer; }
+
+    @media print {
+        body { background: #fff; }
+        .sheet { box-shadow: none; margin: 0; max-width: none; border-radius: 0; padding: 0 8mm; }
+        .noprint { display: none; }
+        @page { margin: 12mm; }
+        header { padding-bottom: 9px; }
+        .room { margin-top: 16px; }
+        .draft { margin: 10px 0; }
+    }
+</style>
+</head>
+<body>
+
+<div class="noprint"><button onclick="window.print()">&#128424; Print these schedules</button></div>
+
+<div class="sheet">
+    <header>
+        <img src="../Internal/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool">
+        <div class="ht">
+            <h1>PI Classroom Daily Schedules</h1>
+            <p class="sub">The 9:30 to 12:00 Prevention Initiative block &mdash; draft for teacher review</p>
+            <p class="center">Children of Promise Christian Dayschool &middot; Millstadt, IL</p>
+        </div>
+    </header>
+
+    <div class="draft">
+        <strong>These are drafts, not a record of what you do.</strong> Mark them up and give them back &mdash; the
+        posted schedule has to match what actually happens in the room, because the monitor compares the two.
+        The PI block is exactly the two and a half hours we are required to provide, so every schedule starts at
+        <strong>9:30</strong> and runs to <strong>12:00</strong> with nothing spare.
+    </div>
+
+    <!-- ── Room 2 ───────────────────────────────────────────────────────────── -->
+    <div class="room">
+        <div class="room-head">
+            <h2>Infants / Toddlers PI</h2>
+            <div class="meta">Room 2 &middot; 8&ndash;20 months<br>Paige &amp; Sue</div>
+        </div>
+        <table>
+            <thead><tr><th>Time</th><th>What happens</th></tr></thead>
+            <tbody>
+                <tr class="ongoing"><td class="time">Throughout</td>
+                    <td class="what"><b>Feeding, diapering and sleeping follow each baby&rsquo;s own rhythm</b>
+                        <span>Not on the clock. Each child&rsquo;s pattern is on their individual care chart, and
+                            the schedule below bends around it.</span></td></tr>
+                <tr><td class="time">9:30</td>
+                    <td class="what"><b>Hello and settling in</b>
+                        <span>Greet each baby and family by name at their level. Soft start on the floor.</span></td></tr>
+                <tr><td class="time">9:45</td>
+                    <td class="what"><b>Floor time and exploration</b>
+                        <span>Tummy time, reaching and grasping, treasure baskets, board books, mirrors, soft
+                            blocks. Adults down on the floor, naming what each baby is doing.</span></td></tr>
+                <tr><td class="time">10:15</td>
+                    <td class="what"><b>Morning bottles and snack</b>
+                        <span>Held and talked with for bottles. Finger food at the table for the older ones.</span></td></tr>
+                <tr><td class="time">10:40</td>
+                    <td class="what"><b>Songs, rhymes and books</b>
+                        <span>One to one or two or three at a time, never the whole room at once. Repeat
+                            favorites.</span></td></tr>
+                <tr><td class="time">11:00</td>
+                    <td class="what"><b>Outside or stroller walk</b>
+                        <span>Blanket on the grass, push toys for the walkers. Indoor gross motor if the weather
+                            is against us.</span></td></tr>
+                <tr><td class="time">11:30</td>
+                    <td class="what"><b>Sensory and messy play</b>
+                        <span>Water, scarves, textures, safe household objects. Named out loud throughout.</span></td></tr>
+                <tr><td class="time">11:50</td>
+                    <td class="what"><b>Quiet down and lunch transition</b>
+                        <span>Soft music, cuddles and books while lunch is set up.</span></td></tr>
+                <tr><td class="time">12:00</td>
+                    <td class="what"><b>PI block ends</b></td></tr>
+            </tbody>
+        </table>
+        <p class="note">Nothing here is a fixed group activity. With babies this young, the adults follow the
+            children and the times are a guide to what is offered, not a bell.</p>
+    </div>
+
+    <!-- ── Room 3 ───────────────────────────────────────────────────────────── -->
+    <div class="room">
+        <div class="room-head">
+            <h2>Toddlers PI</h2>
+            <div class="meta">Room 3 &middot; 15&ndash;24 months<br>Megan &amp; new teacher</div>
+        </div>
+        <table>
+            <thead><tr><th>Time</th><th>What happens</th></tr></thead>
+            <tbody>
+                <tr class="ongoing"><td class="time">Throughout</td>
+                    <td class="what"><b>Diapering, toileting and handwashing as needed</b>
+                        <span>Plus water offered freely all morning.</span></td></tr>
+                <tr><td class="time">9:30</td>
+                    <td class="what"><b>Arrival and hello song</b>
+                        <span>Each child greeted by name. Short and sung, on the rug.</span></td></tr>
+                <tr><td class="time">9:40</td>
+                    <td class="what"><b>Free choice</b>
+                        <span>Blocks, books, pretend play, art, fine motor. Adults spread out across the room,
+                            joining in and talking about what children are doing.</span></td></tr>
+                <tr><td class="time">10:20</td>
+                    <td class="what"><b>Snack</b>
+                        <span>At the table together, served family style where we can. Names of foods, colors
+                            and counting as it happens.</span></td></tr>
+                <tr><td class="time">10:40</td>
+                    <td class="what"><b>Story and songs</b>
+                        <span>Two short books with a small group. Fingerplays and movement in between.</span></td></tr>
+                <tr><td class="time">11:00</td>
+                    <td class="what"><b>Outside</b>
+                        <span>Climbing, balls, push and ride toys, digging. Gross motor indoors if the weather
+                            keeps us in.</span></td></tr>
+                <tr><td class="time">11:35</td>
+                    <td class="what"><b>Small group activity</b>
+                        <span>One short planned experience from the week&rsquo;s plan &mdash; sensory, music,
+                            painting or sorting &mdash; offered to a few children at a time.</span></td></tr>
+                <tr><td class="time">11:50</td>
+                    <td class="what"><b>Tidy up and lunch transition</b>
+                        <span>Children help put things away. Books while lunch arrives.</span></td></tr>
+                <tr><td class="time">12:00</td>
+                    <td class="what"><b>PI block ends</b></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ── Room 5 ───────────────────────────────────────────────────────────── -->
+    <div class="room">
+        <div class="room-head">
+            <h2>2 Year Olds PI</h2>
+            <div class="meta">Room 5 &middot; 24&ndash;36 months<br>Janelle &amp; Renee</div>
+        </div>
+        <table>
+            <thead><tr><th>Time</th><th>What happens</th></tr></thead>
+            <tbody>
+                <tr class="ongoing"><td class="time">Throughout</td>
+                    <td class="what"><b>Toileting, diapering and handwashing as needed</b>
+                        <span>Plus water available all morning.</span></td></tr>
+                <tr><td class="time">9:30</td>
+                    <td class="what"><b>Arrival and morning meeting</b>
+                        <span>Hello song, weather, who is here today. Kept to about ten minutes.</span></td></tr>
+                <tr><td class="time">9:45</td>
+                    <td class="what"><b>Free choice in the centers</b>
+                        <span>Blocks, pretend play, books, art, sand or water, puzzles and fine motor. Adults
+                            move between areas asking questions and extending play.</span></td></tr>
+                <tr><td class="time">10:30</td>
+                    <td class="what"><b>Snack</b>
+                        <span>Children help set up and pour. Conversation at the table.</span></td></tr>
+                <tr><td class="time">10:50</td>
+                    <td class="what"><b>Story and music or movement</b>
+                        <span>A book with the group, then dancing, instruments or a movement game.</span></td></tr>
+                <tr><td class="time">11:10</td>
+                    <td class="what"><b>Outside</b>
+                        <span>Climbing, riding toys, balls, sand, water. Gross motor indoors in bad weather.</span></td></tr>
+                <tr><td class="time">11:40</td>
+                    <td class="what"><b>Small group activity</b>
+                        <span>The week&rsquo;s planned experience with a few children at a time &mdash; art,
+                            science, cooking, sorting or counting.</span></td></tr>
+                <tr><td class="time">11:55</td>
+                    <td class="what"><b>Tidy up and lunch transition</b>
+                        <span>Children put materials away, wash hands, choose a book.</span></td></tr>
+                <tr><td class="time">12:00</td>
+                    <td class="what"><b>PI block ends</b></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+</body>
+</html>
