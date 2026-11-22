@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Classroom Observation — Do's and Don'ts</title>
+<!--
+    For teachers, ahead of the monitor's classroom observation (ITERS-3 in the
+    infant/toddler/twos rooms, ECERS-3 in the preschool room).
+
+    The one fact that drives this whole sheet: the score comes ONLY from what the
+    observer sees during one continuous three-hour block. Nothing you say afterwards
+    adds to it. That is why "run your normal day well" is the entire strategy, and why
+    the don'ts are mostly about not wasting the window.
+
+    Deliberately NOT in here: scale item names, indicator wording or score thresholds.
+    Those are the publisher's copyrighted material, and a teacher does not need them to
+    run a good morning. Plain words only — no item codes.
+-->
+<style>
+    :root { --ink:#1f2430; --muted:#5b6170; --line:#d2d7e2; --accent:#1f3d7a; --accent-soft:#eef2fa;
+            --do-bg:#f0fdf4; --do-br:#86cf9f; --do-fg:#15803d;
+            --no-bg:#fef2f2; --no-br:#f0a5a5; --no-fg:#9b1c1c; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+        font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+        color: var(--ink); line-height: 1.5; background: #f1f3f7;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .sheet { max-width: 820px; margin: 24px auto; background: #fff; padding: 36px 44px 42px;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.10); border-radius: 10px; }
+    header { display: flex; align-items: center; gap: 18px; border-bottom: 3px solid var(--accent); padding-bottom: 14px; }
+    header img { width: 80px; height: auto; flex-shrink: 0; }
+    header .ht h1 { margin: 0; font-size: 1.38rem; color: var(--accent); letter-spacing: -0.01em; }
+    header .ht .sub { margin: 3px 0 0; font-size: 0.93rem; color: var(--muted); font-weight: 600; }
+    header .ht .center { margin: 2px 0 0; font-size: 0.8rem; color: var(--muted); }
+
+    .callout { margin: 18px 0; padding: 13px 17px; background: var(--accent-soft); border: 1px solid #c3d0e8;
+        border-left: 5px solid var(--accent); border-radius: 6px; font-size: 0.93rem; }
+    .callout strong { color: var(--accent); }
+
+    h2 { font-size: 0.98rem; color: var(--accent); margin: 22px 0 8px; text-align: center; }
+
+    .rooms { display: flex; gap: 12px; margin: 12px 0 4px; }
+    .room { flex: 1 1 0; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; page-break-inside: avoid; }
+    .room .scale { font-weight: 800; color: var(--accent); font-size: 0.95rem; }
+    .room .who { font-size: 0.86rem; color: var(--muted); margin-top: 3px; }
+
+    /* Do / Don't pairs. Two columns on screen and on paper, so each "do" sits beside
+       the mistake it prevents. */
+    .pair { display: flex; gap: 14px; margin-bottom: 14px; page-break-inside: avoid; }
+    .col { flex: 1 1 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+    .col.do { border-color: var(--do-br); }
+    .col.no { border-color: var(--no-br); }
+    .col .head { padding: 7px 13px; font-weight: 800; font-size: 0.72rem; text-transform: uppercase;
+        letter-spacing: 0.07em; }
+    .col.do .head { background: var(--do-bg); color: var(--do-fg); border-bottom: 1px solid var(--do-br); }
+    .col.no .head { background: var(--no-bg); color: var(--no-fg); border-bottom: 1px solid var(--no-br); }
+    .col ul { margin: 0; padding: 10px 13px 12px 30px; font-size: 0.88rem; }
+    .col li { margin-bottom: 6px; }
+    .col li:last-child { margin-bottom: 0; }
+    .col li b { font-weight: 700; }
+
+    .topic { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+        color: var(--muted); margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
+
+    .last { margin-top: 18px; padding: 13px 17px; background: #f7f8fb; border: 1px solid var(--line);
+        border-radius: 8px; font-size: 0.9rem; }
+    .last b { color: var(--accent); }
+
+    .noprint { text-align: center; margin: 18px; }
+    .noprint button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
+        padding: 10px 22px; border-radius: 8px; cursor: pointer; }
+
+    @media print {
+        body { background: #fff; }
+        .sheet { box-shadow: none; margin: 0; max-width: none; border-radius: 0; padding: 0 8mm; }
+        .noprint { display: none; }
+        @page { margin: 12mm; }
+        header { padding-bottom: 10px; }
+        .callout { margin: 10px 0; }
+        h2 { margin: 14px 0 6px; }
+        .topic { margin: 12px 0 5px; }
+        .page-break { break-before: page; page-break-before: always; }
+    }
+</style>
+</head>
+<body>
+
+<div class="noprint"><button onclick="window.print()">&#128424; Print this sheet</button></div>
+
+<div class="sheet">
+    <header>
+        <img src="../Internal/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool">
+        <div class="ht">
+            <h1>Classroom Observation &mdash; Do&rsquo;s and Don&rsquo;ts</h1>
+            <p class="sub">For the monitor&rsquo;s classroom rating visit</p>
+            <p class="center">Children of Promise Christian Dayschool &middot; Millstadt, IL</p>
+        </div>
+    </header>
+
+    <div class="callout">
+        <strong>The one thing to know:</strong> the score comes only from what the observer <em>sees</em> during one
+        continuous <strong>three-hour block</strong>, usually a morning. There is no interview afterwards where you
+        can explain what normally happens. So the whole job is to run your normal morning, out loud and in full,
+        inside that window.
+    </div>
+
+    <h2>Which scale your room gets</h2>
+    <div class="rooms">
+        <div class="room">
+            <div class="scale">ITERS-3</div>
+            <div class="who">Infants / Toddlers PI &middot; Toddlers PI &middot; 2 Year Olds PI</div>
+        </div>
+        <div class="room">
+            <div class="scale">ECERS-3</div>
+            <div class="who">Pre-School PFA</div>
+        </div>
+    </div>
+    <p style="font-size:0.84rem;color:var(--muted);text-align:center;margin:8px 0 0;">
+        Two different scales, same visit and the same do&rsquo;s and don&rsquo;ts. A mixed 2&ndash;3 room follows
+        whichever scale matches the ages actually enrolled.</p>
+
+    <div class="topic">The three hours</div>
+    <div class="pair">
+        <div class="col do">
+            <div class="head">&#10003; Do</div>
+            <ul>
+                <li><b>Run your normal schedule</b> &mdash; arrival, breakfast, free choice, outdoor time, nappies or
+                    toileting, lunch. If it normally happens before noon, let it happen.</li>
+                <li><b>Stay with your children</b> the whole window. Position yourself where you can see the
+                    whole room.</li>
+                <li><b>Let the morning be busy and a bit messy.</b> Children using materials scores better than a
+                    tidy, quiet room.</li>
+            </ul>
+        </div>
+        <div class="col no">
+            <div class="head">&#10007; Don&rsquo;t</div>
+            <ul>
+                <li><b>Don&rsquo;t stage a special day.</b> A lesson you have never taught, borrowed toys or an
+                    unusual activity reads as exactly what it is, and it goes worse than your ordinary routine.</li>
+                <li><b>Don&rsquo;t lose the window</b> to paperwork, your phone, cleaning, or chatting with other
+                    adults. Anything that is not teaching is a missed three hours.</li>
+                <li><b>Don&rsquo;t skip a routine</b> to save time or keep the room calm. A skipped nappy change
+                    or hand wash cannot be scored.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="topic">Routines, hygiene and safety</div>
+    <div class="pair">
+        <div class="col do">
+            <div class="head">&#10003; Do</div>
+            <ul>
+                <li><b>Wash hands every single time</b> &mdash; yours and the children&rsquo;s. On arrival, before
+                    and after food, after nappies and toileting, after outside.</li>
+                <li><b>Follow the nappy and toileting steps exactly</b> as trained, including the surface
+                    afterwards, every child, every time.</li>
+                <li><b>Walk the room and the playground first thing</b> and fix anything unsafe &mdash; cords,
+                    small loose parts, blocked exits, broken items.</li>
+                <li><b>Keep your eyes up</b> during sleep and transitions. Count and scan.</li>
+            </ul>
+        </div>
+        <div class="col no">
+            <div class="head">&#10007; Don&rsquo;t</div>
+            <ul>
+                <li><b>Don&rsquo;t take a shortcut</b> because you are being watched and feel rushed. Rushing is
+                    where steps get dropped.</li>
+                <li><b>Don&rsquo;t leave food, bottles or medicine out</b> or unlabelled.</li>
+                <li><b>Don&rsquo;t sit with your back to part of the room</b>, or group all the adults in one
+                    corner.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="topic">Talking with children</div>
+    <div class="pair">
+        <div class="col do">
+            <div class="head">&#10003; Do</div>
+            <ul>
+                <li><b>Talk out loud, constantly</b> &mdash; name what children are doing, what you are doing,
+                    what you see. With babies too.</li>
+                <li><b>Ask questions that need more than yes or no</b>, then wait for the answer and build
+                    on it.</li>
+                <li><b>Get down to their level</b> and follow what the child is interested in.</li>
+                <li><b>Use the moment</b> &mdash; counting at snack, colours while dressing, words for feelings
+                    during a squabble.</li>
+            </ul>
+        </div>
+        <div class="col no">
+            <div class="head">&#10007; Don&rsquo;t</div>
+            <ul>
+                <li><b>Don&rsquo;t go quiet</b> because someone is in the room. Silence is the single most
+                    common thing that costs a room points.</li>
+                <li><b>Don&rsquo;t talk mainly to the other adult</b>, or over the children&rsquo;s heads.</li>
+                <li><b>Don&rsquo;t spend the window directing</b> &mdash; &ldquo;sit down, put that back&rdquo;
+                    &mdash; without any conversation in between.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="topic">The room and the materials</div>
+    <div class="pair page-break">
+        <div class="col do">
+            <div class="head">&#10003; Do</div>
+            <ul>
+                <li><b>Put the usual materials out and within reach</b> &mdash; books, art, blocks, pretend play,
+                    fine motor &mdash; enough for the number of children.</li>
+                <li><b>Have books out and faced forward</b>, and read with children during the morning.</li>
+                <li><b>Display the children&rsquo;s own work</b> at their eye level.</li>
+                <li><b>Check it is all clean and complete</b> beforehand &mdash; no broken pieces, no puzzles
+                    missing half the parts.</li>
+            </ul>
+        </div>
+        <div class="col no">
+            <div class="head">&#10007; Don&rsquo;t</div>
+            <ul>
+                <li><b>Don&rsquo;t tidy materials away to keep the room looking neat.</b> Shelves cleared for
+                    appearance mean nothing is accessible.</li>
+                <li><b>Don&rsquo;t introduce brand-new toys that morning.</b> Children who have never seen them
+                    cannot use them well.</li>
+                <li><b>Don&rsquo;t leave the screen or music on as background.</b> Turn it off unless it is a
+                    planned, short, purposeful activity.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="topic">The observer</div>
+    <div class="pair">
+        <div class="col do">
+            <div class="head">&#10003; Do</div>
+            <ul>
+                <li><b>Say good morning, then carry on</b> as though they are not there.</li>
+                <li><b>Let them move around the room</b> and step outside with you.</li>
+                <li><b>Answer a direct question briefly</b> if they ask one, then return to the children.</li>
+            </ul>
+        </div>
+        <div class="col no">
+            <div class="head">&#10007; Don&rsquo;t</div>
+            <ul>
+                <li><b>Don&rsquo;t explain or apologise.</b> &ldquo;We usually do it differently&rdquo; cannot be
+                    added to the score, so the breath is better spent on the children.</li>
+                <li><b>Don&rsquo;t ask how you are doing</b> or how they would score something. They are not
+                    allowed to coach during the observation.</li>
+                <li><b>Don&rsquo;t read it as a judgement of you</b> if they stay silent and write. That is
+                    simply the job.</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="last">
+        <b>Before the day:</b> tell Megan straight away if your room will be short-staffed, or if a field trip,
+        party, photographer or outing falls in the morning &mdash; most of the children need to be there for the
+        observation to count, and it cannot be split into two shorter visits.
+        <br><br>
+        <b>Afterwards:</b> the result turns into a written improvement plan for the room, not a verdict on you.
+        A low-scoring item is something we fix together, and nobody is in trouble for it.
+    </div>
+</div>
+
+</body>
+</html>
