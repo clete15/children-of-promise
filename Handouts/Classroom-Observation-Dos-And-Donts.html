@@ -24,6 +24,10 @@
     observation in it at all — its item 12 is about the program's own ongoing authentic
     assessment, which is a different thing. Do not re-add ECERS-3 here.
 
+    The "this is a plan, not a verdict on you" message LEADS the sheet, by request. It
+    was the closing box; a teacher reading a page of do's and don'ts needs the
+    reassurance before the list, not after it.
+
     Deliberately NOT in here: scale item names, indicator wording or score thresholds.
     Those are the publisher's copyrighted material, and a teacher does not need them to
     run a good morning. Plain words only — no item codes.
@@ -80,9 +84,14 @@
     .topic { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
         color: var(--muted); margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
 
-    .last { margin-top: 18px; padding: 13px 17px; background: #f7f8fb; border: 1px solid var(--line);
-        border-radius: 8px; font-size: 0.9rem; }
-    .last b { color: var(--accent); }
+    /* The reassurance, and it leads the sheet. It used to be the last box on the page,
+       which both buried it and left it stranded alone on a fourth printed sheet. Green
+       rather than the house blue so it reads as the good news it is, and visually
+       separate from the "one thing to know" callout under it. */
+    .reassure { margin: 18px 0 0; padding: 14px 18px; background: var(--do-bg);
+        border: 1px solid var(--do-br); border-left: 5px solid var(--do-fg);
+        border-radius: 6px; font-size: 0.95rem; break-inside: avoid; page-break-inside: avoid; }
+    .reassure b { color: var(--do-fg); }
 
     .noprint { text-align: center; margin: 18px; }
     .noprint button { font: inherit; font-weight: 700; background: var(--accent); color: #fff; border: none;
@@ -121,6 +130,12 @@
         </div>
     </header>
 
+    <div class="reassure">
+        <b>Before anything else:</b> this is a rating of the <b>room</b>, not of you. The result turns into a written
+        improvement plan we work on together &mdash; a low-scoring item is something we fix, not something anyone is
+        in trouble for. Nothing in it goes against your name or your job.
+    </div>
+
     <div class="callout">
         <strong>The one thing to know:</strong> the score comes only from what the observer <em>sees</em> while they
         are in your room. There is no interview afterwards where you can explain what normally happens. So the whole
@@ -147,8 +162,8 @@
         <li><b>Personal care routines are not scored</b> in this observation &mdash; diapering, toileting and
             handwashing are not part of the score. Keep doing them properly because licensing requires it, but
             don&rsquo;t spend the morning worrying about them.</li>
-        <li>Afterwards you get back strengths (items scored 5 and above) and areas for growth (below 5), with a
-            short explanation of each lower score.</li>
+        <li>The report back names <b>strengths</b> (items scored 5 and above) and <b>areas for growth</b> (below 5),
+            with a short explanation of each lower score.</li>
     </ul>
     <p style="font-size:0.84rem;color:var(--muted);text-align:center;margin:10px 0 0;">
         The Pre-School PFA room is not part of this observation. PFA is monitored separately and against different
@@ -287,11 +302,11 @@
         </div>
     </div>
     </section>
-
-    <div class="last">
-        <b>Afterwards:</b> the result turns into a written improvement plan for the room, not a verdict on you.
-        A low-scoring item is something we fix together, and nobody is in trouble for it.
-    </div>
+    <!-- The "it is a plan, not a verdict" message used to close the sheet here. It now
+         OPENS it (.reassure, under the header): it is the thing a teacher most needs to
+         hear before reading a page of do's and don'ts, and last place is where it was
+         least likely to be read. Printing it last also stranded it alone on a fourth
+         sheet. Do not add a second copy down here. -->
 </div>
 
 </body>
