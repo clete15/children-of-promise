@@ -6,10 +6,20 @@
 <title>PI Classroom Daily Schedules — 9:30 to 12:00</title>
 <!--
     DRAFT daily schedules for the three PI rooms, covering the 9:30–12:00 PI block.
-    Room names and age ranges are taken from dimClassrooms (Internal/setup_classrooms.sql):
-        Room 2  Infants / Toddlers PI      8–20 months    Paige / Sue
-        Room 3  Toddlers PI                15–24 months   Megan / New Teacher
-        Room 5  2 Year Olds PI             24–36 months   Janelle / Renee
+
+    Room names and age ranges come from dimClassrooms (Internal/setup_classrooms.sql).
+    The TEACHERS DO NOT. That table's TeacherDescription column is hand-typed free text
+    and it is stale — it still reads "Megan / New Teacher" for room 3 (Megan is Director
+    only as of 2026-27) and "Janelle / Renee" for room 5. Confirmed by the director,
+    Nov 2026:
+        Room 2  Infants / Toddlers PI      8–20 months    Paige & Sue
+        Room 3  Toddlers PI                15–24 months   Lindsey
+        Room 5  2 Year Olds PI             24–36 months   Molly & Renee
+    Staff.RoomNumber already has rooms 2 and 3 right, so take the staffing from there or
+    from a person, never from TeacherDescription.
+
+    Renee: her record name is Renee Nier and some paperwork reads "Donna". She prefers
+    Renee, so that is what goes on anything she or a family will read.
 
     These are a STARTING POINT for the teachers to correct, not a description of what
     they currently do — I do not know their actual routines. Everything here is written
@@ -157,7 +167,7 @@
     <div class="room">
         <div class="room-head">
             <h2>Toddlers PI</h2>
-            <div class="meta">Room 3 &middot; 15&ndash;24 months<br>Megan &amp; new teacher</div>
+            <div class="meta">Room 3 &middot; 15&ndash;24 months<br>Lindsey</div>
         </div>
         <table>
             <thead><tr><th>Time</th><th>What happens</th></tr></thead>
@@ -200,7 +210,7 @@
     <div class="room">
         <div class="room-head">
             <h2>2 Year Olds PI</h2>
-            <div class="meta">Room 5 &middot; 24&ndash;36 months<br>Janelle &amp; Renee</div>
+            <div class="meta">Room 5 &middot; 24&ndash;36 months<br>Molly &amp; Renee</div>
         </div>
         <table>
             <thead><tr><th>Time</th><th>What happens</th></tr></thead>
