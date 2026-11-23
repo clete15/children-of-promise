@@ -148,29 +148,45 @@ function attr(v) {
     return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-/* Split a stored TeacherDescription into up to two names. Existing values use "/", "&"
-   or "," as separators and may carry a "(pt)" note — kept as part of the name. */
+/* Split a room's teacher caption into up to two names. Values use "/", "&" or "," as
+   separators and may carry a "(pt)" note — kept as part of the name.
+
+   Only a FALLBACK now: /api/classrooms sends Teacher1Id / Teacher2Id and the caption is
+   derived from the staff room links, so the dropdowns pre-select by id. This still
+   matters when the server could not read the staff table and returned the stored
+   caption instead. */
 function splitTeachers(desc) {
     const parts = String(desc || '').split(/\s*[\/&,]\s*/).map(s => s.trim()).filter(Boolean);
     return [parts[0] || '', parts[1] || ''];
 }
 
-/* A dropdown of staff, pre-selected to the person named in the room caption.
+/* A dropdown of staff, pre-selected to the person holding that slot in the room.
 
    The option VALUE is the staff Id, not the name — that is what makes the two-way
    sync possible: on save we send those Ids and the server points each person's
    Staff.RoomNumber at this room (an ID link that survives a room rename). The label
-   stays the name. `selectedName` comes from splitting the stored TeacherDescription
-   caption, so we resolve it back to an Id to pre-select the right row.
+   stays the name.
+
+   `selectedId` is the room's Teacher1Id / Teacher2Id from /api/classrooms, which is the
+   link itself and so always resolves. `selectedName` is only used when there is no id
+   (the server fell back to the stored caption because it could not read the staff
+   table) — then we match on the name as before. Matching on name alone is no longer
+   enough, because the derived caption holds FIRST names.
 
    A legacy name that matches no current staff is kept as its own option valued
    "name:<the name>" so it stays selected and is not lost; readRoomRow understands
    that prefix. Falls back to a plain text field if the staff list didn't load. */
-function teacherSelect(id, selectedName, i) {
+function teacherSelect(id, selectedId, selectedName, i) {
     if (!roomsStaff.length) {
         return `<input type="text" id="${id}" value="${attr(selectedName)}" placeholder="Teacher name" oninput="markSettingsChanged(${i})">`;
     }
-    const match = roomsStaff.find(s => String(s.Name).trim() === String(selectedName || '').trim());
+    const byId = parseInt(selectedId, 10)
+        ? roomsStaff.find(s => String(s.Id) === String(parseInt(selectedId, 10)))
+        : null;
+    const match = byId
+        || roomsStaff.find(s => String(s.Name).trim() === String(selectedName || '').trim());
+    // With an id in hand the caption is irrelevant; without a match, keep the caption.
+    if (byId) selectedName = '';
     const selectedVal = match ? String(match.Id) : (selectedName ? 'name:' + selectedName : '');
     let opts = '<option value="">— none —</option>';
     // Preserve an unrecognized legacy name as its own option so it stays selected.
@@ -203,12 +219,14 @@ function renderSettings() {
         return;
     }
     tbody.innerHTML = classrooms.map((r, i) => {
+        // Ids are the real slot holders; the split caption is only a fallback for when
+        // the server could not read the staff links (see teacherSelect).
         const [t1, t2] = splitTeachers(r.TeacherDescription);
         return `<tr>
             <td class="rs-num">${r.RoomNumber}</td>
             <td><input type="text" id="setRoom${i}" value="${attr(r.Room)}" oninput="markSettingsChanged(${i})"></td>
-            <td>${teacherSelect('setTeacher1_' + i, t1, i)}</td>
-            <td>${teacherSelect('setTeacher2_' + i, t2, i)}</td>
+            <td>${teacherSelect('setTeacher1_' + i, r.Teacher1Id, t1, i)}</td>
+            <td>${teacherSelect('setTeacher2_' + i, r.Teacher2Id, t2, i)}</td>
             <td><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" oninput="markSettingsChanged(${i})"></td>
             <td><input type="text" id="setAge${i}" value="${attr(r.AgeRange)}" oninput="markSettingsChanged(${i})"></td>
             <td style="text-align:center;"><button class="btn-row-save" id="setSave${i}" onclick="saveRoom(${i})" disabled>Save</button></td>
@@ -281,8 +299,18 @@ async function putRoom(i) {
         const res = await apiFetch(`/api/classrooms/${r.RoomNumber}`, { method: 'PUT', body: JSON.stringify(vals) });
         const data = await res.json();
         if (data.success) {
-            r.Room = vals.room; r.TeacherDescription = vals.teacher;
+            r.Room = vals.room;
             r.DCFSCapacity = vals.capacity; r.AgeRange = vals.ageRange;
+            /* Keep this page's copy of the room matching what the server actually
+               stored. When teacher slots carry staff Ids the server rebuilds the caption
+               from those links as FIRST names, so echoing back the dropdowns' full names
+               would leave this page showing something no other page does until a reload.
+               Ids too, so a re-render pre-selects the dropdowns. */
+            r.Teacher1Id = vals.teacher1Id || 0;
+            r.Teacher2Id = vals.teacher2Id || 0;
+            r.TeacherDescription = (vals.teacher1Id || vals.teacher2Id)
+                ? vals.teacher.split(/\s*\/\s*/).map(n => n.trim().split(/\s+/)[0]).filter(Boolean).join(' / ')
+                : vals.teacher;
             dirtyRooms.delete(i);
             const btn = document.getElementById(`setSave${i}`);
             if (btn) btn.disabled = true;
@@ -293,11 +321,24 @@ async function putRoom(i) {
     } catch (e) { showNotification('Network error', 'error'); return false; }
 }
 
+/* Re-read the rooms after a save so the table shows what the server stored rather than
+   what this page assumed. The server rebuilds each room's teacher caption from the staff
+   links, which can name a third person these two slots don't show. Skipped while any row
+   is still dirty, because renderSettings() rebuilds the table and would discard edits
+   that haven't been saved yet. */
+async function refreshRoomsAfterSave() {
+    if (dirtyRooms.size) return;
+    await loadClassrooms();
+    renderSettings();
+}
+
 async function saveRoom(i) {
+    const num = classrooms[i] ? classrooms[i].RoomNumber : '';
     const ok = await putRoom(i);
     if (ok) {
-        showNotification(`Room ${classrooms[i].RoomNumber} updated`, 'success');
+        showNotification(`Room ${num} updated`, 'success');
         if (!dirtyRooms.size) { const all = document.getElementById('setSaveAll'); if (all) all.disabled = true; }
+        await refreshRoomsAfterSave();
     }
 }
 
@@ -309,6 +350,7 @@ async function saveAllRooms() {
     if (directorDirty) { (await saveDirector()) ? saved++ : failed++; }
     if (saved) showNotification(`Saved ${saved} change${saved === 1 ? '' : 's'}` + (failed ? `, ${failed} failed` : ''), failed ? 'error' : 'success');
     if (!dirtyRooms.size) { const all = document.getElementById('setSaveAll'); if (all) all.disabled = true; }
+    if (saved) await refreshRoomsAfterSave();
 }
 
 // ── DIRECTOR (centre-wide, SiteSettings key "GrantDirector") ──

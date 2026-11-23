@@ -16,7 +16,12 @@
         Room 3  Toddlers PI                15–24 months   Lindsey
         Room 5  2 Year Olds PI             24–36 months   Molly & Renee
     Staff.RoomNumber already has rooms 2 and 3 right, so take the staffing from there or
-    from a person, never from TeacherDescription.
+    from a person, never from the raw TeacherDescription column.
+
+    Since Nov 2026 /api/classrooms derives that caption from the Staff room links on
+    every read, so the room list in the app is correct even where the stored column is
+    not. The warning above still stands for the COLUMN itself (what you see in SSMS).
+    To repair it, run Internal/dimclassrooms_teacher_caption_rebuild.sql.
 
     Renee: her record name is Renee Nier and some paperwork reads "Donna". She prefers
     Renee, so that is what goes on anything she or a family will read.
