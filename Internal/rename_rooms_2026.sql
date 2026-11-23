@@ -71,6 +71,7 @@ UPDATE dimClassrooms
 -- UPDATE Staff SET SecondaryClassroom = '2 & 3 Year Olds'        WHERE SecondaryClassroom = 'Pre-School 2';
 
 -- ── 4. Show the result ──
-SELECT RoomNumber, Room, TeacherDescription, Type, AgeRange, DCFSCapacity
+-- (No teacher column: a room's teachers are the Staff rows linked to it.)
+SELECT RoomNumber, Room, Type, AgeRange, DCFSCapacity
   FROM dimClassrooms
  ORDER BY RoomNumber;

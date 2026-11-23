@@ -29,7 +29,7 @@
 | Table | Purpose |
 |-------|---------|
 | `rptMasterEnrollment` | All students (Id PK). Has: names, DOB, room, days, active, category, PFA_PI_na, F_R_P_Food, IEP, Military, HouseholdIncome, HouseholdSize, PublicBenefits, ProofOfIncomeUploaded, CCAPStartDate |
-| `dimClassrooms` | Rooms: RoomNumber, Room, TeacherDescription, DCFSCapacity, AgeRange |
+| `dimClassrooms` | Rooms: RoomNumber, Room, Type, DCFSCapacity, AgeRange. NO teacher column — a room's teachers are the `Staff` rows linked to it (`Staff.RoomNumber` = first slot, `SecondaryRoomNumber` = second). The old `TeacherDescription` column is orphaned; nothing reads or writes it |
 | `PreEnrollment` | Waiting list / pre-enrollment submissions (public form) |
 | `ISBETracking` | Per-student checklist: PermissionSlip, ParentInterview, ProofOfIncome, BegASQ, BegASE, MidYearReport, EndASQ, EndASE, EndYearReport |
 | `ParentInterviews` | Full PI interview form data (FormData column stores JSON) |

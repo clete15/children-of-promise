@@ -8,20 +8,18 @@
     DRAFT daily schedules for the three PI rooms, covering the 9:30–12:00 PI block.
 
     Room names and age ranges come from dimClassrooms (Internal/setup_classrooms.sql).
-    The TEACHERS DO NOT. That table's TeacherDescription column is hand-typed free text
-    and it is stale — it still reads "Megan / New Teacher" for room 3 (Megan is Director
-    only as of 2026-27) and "Janelle / Renee" for room 5. Confirmed by the director,
-    Nov 2026:
+    The staffing below was confirmed by the director, Nov 2026:
         Room 2  Infants / Toddlers PI      8–20 months    Paige & Sue
         Room 3  Toddlers PI                15–24 months   Lindsey
         Room 5  2 Year Olds PI             24–36 months   Molly & Renee
-    Staff.RoomNumber already has rooms 2 and 3 right, so take the staffing from there or
-    from a person, never from the raw TeacherDescription column.
+    Renee partners with Molly for the PI block only; her own room is 4.
 
-    Since Nov 2026 /api/classrooms derives that caption from the Staff room links on
-    every read, so the room list in the app is correct even where the stored column is
-    not. The warning above still stands for the COLUMN itself (what you see in SSMS).
-    To repair it, run Internal/dimclassrooms_teacher_caption_rebuild.sql.
+    A room's teachers live in ONE place: the Staff rows linked to it, Staff.RoomNumber
+    and SecondaryRoomNumber. There used to be a hand-typed copy on the classroom
+    (dimClassrooms.TeacherDescription) and it went stale — it read "Megan / New Teacher"
+    for room 3 long after Lindsey took it. That column is no longer read or written by
+    anything. Take staffing from the staff records or from a person; if the app ever
+    shows the wrong teacher for a room, fix it on the staff card.
 
     Renee: her record name is Renee Nier and some paperwork reads "Donna". She prefers
     Renee, so that is what goes on anything she or a family will read.

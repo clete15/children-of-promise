@@ -97,10 +97,10 @@ const COLS = ['Last_Name','First_Name','Birth_date','Start_Date','City_Town','Da
               'RoomNumber','Monday','Tuesday','Wednesday','Thursday','Friday',
               'Active','Category','PFA_PI_na','F_R_P_Food','IEP','Military'];
 
-/* TeacherDescription is still selected here, but it is a FALLBACK, not the truth:
-   /api/classrooms overwrites it from the Staff room links (applyDerivedRoomTeachers).
-   Don't add a new reader of the raw column — read the endpoint. */
-const ROOM_COLS = ['RoomNumber','Building','Room','TeacherDescription','Type','RequiredSlots','AgeRange','DCFSCapacity'];
+/* No TeacherDescription here on purpose. The room's teachers come from the Staff room
+   links and nowhere else — see roomTeacherCaptions. The old column still exists in the
+   table but nothing reads it; don't put it back. */
+const ROOM_COLS = ['RoomNumber','Building','Room','Type','RequiredSlots','AgeRange','DCFSCapacity'];
 
 /* The staff password must NEVER be written into this file.
 
@@ -5091,78 +5091,37 @@ function sqlRows(raw, columns) {
         return o;
     });
 }
-/* dimClassrooms.TeacherDescription is LEGACY free text. A room's real teachers are the
-   Staff rows that link to it — Staff.RoomNumber is the first slot, SecondaryRoomNumber
-   the second — which is what the room editor writes and what every staff card
-   maintains. The two drifted badly: room 3 still read "Megan / New Teacher" long after
-   Lindsey took it, and that stale text is what parent permission slips and the PFA/PI
-   forms print. So the room list now DERIVES the label from Staff on every read and the
-   stored column is a fallback only.
+/* ── Who teaches a room ───────────────────────────────────────────────────────
+   ONE source of truth: the Staff rows that link to the room. Staff.RoomNumber is
+   the first slot, Staff.SecondaryRoomNumber the second. That is what the staff card
+   and the room editor write, and it is the only thing anything reads.
 
-   First names joined with ' / ', because that is exactly how the column has always
-   read — this changes where the names come from, not how anything looks.
+   There used to be a second copy — dimClassrooms.TeacherDescription, hand-typed free
+   text — and the two drifted badly: room 3 still read "Megan / New Teacher" long after
+   Lindsey took it, and room 5 "Janelle / Renee" when Molly had it. That text printed on
+   parent permission slips and the PFA/PI forms, so the drift reached documents families
+   sign. Keeping the copy in step needed a trigger-like UPDATE on every save plus a
+   repair script; it is gone. Nothing reads or writes that column now. The column itself
+   is left in the table, orphaned, because dropping it buys nothing and costs a
+   migration.
 
-   Teacher1Id / Teacher2Id go out alongside so the room editor can pre-select its
-   dropdowns by id instead of matching the display text (first names alone would match
-   nothing).
+   Format: FIRST names joined with ' / ', which is how the old captions read, so
+   nothing downstream looks different. Everyone linked is listed, not just two — some
+   rooms genuinely have three (room 8 has long read "Pam / Jeremy / Sara").
 
-   Two deliberate fallbacks to the stored text:
-   - The Staff read FAILED. A failed read must never render as "this room has no
-     teacher" (see sql-reads.md — that exact shape cost eleven days).
-   - The read succeeded but NO active staff link to the room. A blank teacher line on a
-     document handed to a parent is worse than an old one, and a room nobody is linked
-     to is a gap to fix on the staff card, not something to erase here.
-
-   Two functions implement this, to the SAME rule, and must stay in step:
-   roomCaptionRebuildSQL applies it on WRITE (to the stored column) and
-   applyDerivedRoomTeachers on READ (to what /api/classrooms returns). */
-
-/* ONE statement that rewrites every room's stored TeacherDescription from the staff
-   room links, so the fallback column stays true to the same rule the API derives from.
-   Appended to the batch of any save that can change who is in a room: the staff card
-   (a person moved rooms) and the room editor (a teacher slot changed).
-
-   Why FOR XML PATH and not STRING_AGG: STRING_AGG needs SQL Server 2017+ and this runs
-   on an Express install of unknown version. A silent failure here would take the whole
-   save with it. STUFF() trims the leading ' / '.
-
-   A person belongs to a room if EITHER link points at it — their primary (RoomNumber)
-   or their secondary (SecondaryRoomNumber) — primary listed first so the caption reads
-   in Teacher 1 / Teacher 2 order. One row per staff member either way, so nobody is
-   listed twice. FIRST names only, matching applyDerivedRoomTeachers; the two formats
-   must agree or the caption would visibly change shape depending on which path last
-   wrote it. A room with no linked staff is left alone rather than blanked (see
-   applyDerivedRoomTeachers for why). */
-function roomCaptionRebuildSQL() {
-    const firstName = "LEFT(LTRIM(s.Name), CASE WHEN CHARINDEX(' ', LTRIM(s.Name)) > 0"
-        + " THEN CHARINDEX(' ', LTRIM(s.Name)) - 1 ELSE LEN(LTRIM(s.Name)) END)";
-    return `;UPDATE c SET TeacherDescription = x.Names
-             FROM dimClassrooms c
-             CROSS APPLY (
-                 SELECT STUFF((
-                     SELECT ' / ' + ${firstName}
-                     FROM Staff s
-                     WHERE (s.RoomNumber = c.RoomNumber OR s.SecondaryRoomNumber = c.RoomNumber)
-                       AND ISNULL(s.Active,1)=1
-                       AND LTRIM(RTRIM(ISNULL(s.Name,''))) <> ''
-                     ORDER BY CASE WHEN s.RoomNumber = c.RoomNumber THEN 0 ELSE 1 END, s.Id
-                     FOR XML PATH(''), TYPE
-                 ).value('.', 'NVARCHAR(MAX)'), 1, 3, '') AS Names
-             ) x
-             WHERE x.Names IS NOT NULL AND x.Names <> ''`;
-}
-function applyDerivedRoomTeachers(rooms) {
-    if (!Array.isArray(rooms) || !rooms.length) return rooms;
+   Call roomTeacherCaptions() once and reuse the map; it costs one query. */
+function roomTeacherCaptions() {
     const st = runSQLRows(
         "SELECT Id, ISNULL(Name,'') AS Name, ISNULL(RoomNumber,0) AS RoomNumber,"
         + " ISNULL(SecondaryRoomNumber,0) AS SecondaryRoomNumber"
         + " FROM Staff WHERE ISNULL(Active,1)=1");
-    if (!st.ok || !st.rows.length) {
-        // Loud, because the pages below will look merely out of date, not broken.
-        console.log('[ROOMS] teacher derivation skipped; falling back to the stored '
-            + 'TeacherDescription: ' + (st.ok ? 'no active Staff rows' : st.error));
-        rooms.forEach(r => { r.Teacher1Id = 0; r.Teacher2Id = 0; });
-        return rooms;
+    /* A failed read is reported, never papered over. With no stored column to fall back
+       to there is nothing to show but a blank teacher name, and a blank name on a
+       document handed to a parent must not pass for an answer (see sql-reads.md). The
+       callers turn this into an error the page can show. */
+    if (!st.ok) {
+        console.error('[ROOMS] could not read the staff room links:', st.error);
+        return { ok: false, error: st.error, byRoom: {} };
     }
 
     const prim = {}, sec = {};
@@ -5174,17 +5133,19 @@ function applyDerivedRoomTeachers(rooms) {
         if (q) (sec[q] = sec[q] || []).push(s);
     });
     const first = s => String(s.Name || '').trim().split(/\s+/)[0] || '';
-    // By staff Id within each slot group — the same order roomCaptionRebuildSQL uses,
-    // so the derived caption and the stored one can't disagree about who comes first.
+    // By staff Id within each slot group: deterministic, so the order cannot shuffle
+    // between two reads of the same data.
     const byId = (a, b) => (parseInt(a.Id, 10) || 0) - (parseInt(b.Id, 10) || 0);
 
-    rooms.forEach(r => {
-        const rn = parseInt(r.RoomNumber, 10) || 0;
+    const byRoom = {};
+    Object.keys(prim).concat(Object.keys(sec)).forEach(key => {
+        const rn = parseInt(key, 10) || 0;
+        if (!rn || byRoom[rn]) return;
         const list = [];
         const seen = {};
-        // First-slot holders, then second-slot. Deduped by id: one person can hold both
-        // links to the same room (the editor sets a slot without clearing the other),
-        // and they must not be listed twice.
+        /* First-slot holders, then second-slot, deduped by id: one person can hold both
+           links to the same room (the editor sets one slot without clearing the other)
+           and must not be listed twice. */
         (prim[rn] || []).slice().sort(byId)
             .concat((sec[rn] || []).slice().sort(byId))
             .forEach(s => {
@@ -5193,13 +5154,25 @@ function applyDerivedRoomTeachers(rooms) {
                 seen[id] = 1;
                 list.push(s);
             });
-        /* The caption lists EVERYONE linked, not just the first two, because some rooms
-           really do have three (room 8 has long read "Pam / Jeremy / Sara") and capping
-           it here would quietly drop a name the stored column shows. The two Ids are
-           only for the room editor, which has two slots. */
-        r.Teacher1Id = list[0] ? (parseInt(list[0].Id, 10) || 0) : 0;
-        r.Teacher2Id = list[1] ? (parseInt(list[1].Id, 10) || 0) : 0;
-        if (list.length) r.TeacherDescription = list.map(first).join(' / ');
+        byRoom[rn] = {
+            caption: list.map(first).join(' / '),
+            // Only the first two: the room editor has two slots and pre-selects by id.
+            teacher1Id: list[0] ? (parseInt(list[0].Id, 10) || 0) : 0,
+            teacher2Id: list[1] ? (parseInt(list[1].Id, 10) || 0) : 0,
+        };
+    });
+    return { ok: true, error: null, byRoom: byRoom };
+}
+
+/* Fill TeacherDescription / Teacher1Id / Teacher2Id on room rows from that one source.
+   A room with nobody linked gets an empty caption, which is the truth: it says "no
+   teacher is assigned to this room", and the fix is on a staff card. */
+function applyRoomTeachers(rooms, captions) {
+    (rooms || []).forEach(r => {
+        const t = captions.byRoom[parseInt(r.RoomNumber, 10) || 0] || null;
+        r.TeacherDescription = t ? t.caption : '';
+        r.Teacher1Id = t ? t.teacher1Id : 0;
+        r.Teacher2Id = t ? t.teacher2Id : 0;
     });
     return rooms;
 }
@@ -5523,13 +5496,17 @@ function handleRequest(req, res) {
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='HomeLanguage') ALTER TABLE rptMasterEnrollment ADD HomeLanguage NVARCHAR(60);
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='TransferredOut') ALTER TABLE rptMasterEnrollment ADD TransferredOut BIT NOT NULL DEFAULT 0;
 IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMasterEnrollment' AND COLUMN_NAME='TransferDate') ALTER TABLE rptMasterEnrollment ADD TransferDate NVARCHAR(20)`);
-        const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.TeacherDescription,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate,ISNULL(e.HomeLanguage,'') AS HomeLanguage,ISNULL(CAST(e.TransferredOut AS NVARCHAR),'0') AS TransferredOut,ISNULL(e.TransferDate,'') AS TransferDate FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
+        const r = runSQL(`SELECT e.Id,e.Last_Name,e.First_Name,e.Birth_date,e.Start_Date,e.City_Town,e.Days_Old,e.RoomNumber,r.Room,r.Type,r.DCFSCapacity,e.Monday,e.Tuesday,e.Wednesday,e.Thursday,e.Friday,e.Active,e.Category,e.PFA_PI_na,e.F_R_P_Food,e.IEP,e.Military,ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(e.ProofOfIncomeFile,'') AS ProofOfIncomeFile,ISNULL(CAST(e.ProofOfIncomeUploaded AS NVARCHAR),'0') AS ProofOfIncomeUploaded,ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,ISNULL(e.CCAPStartDate,'') AS CCAPStartDate,ISNULL(e.HomeLanguage,'') AS HomeLanguage,ISNULL(CAST(e.TransferredOut AS NVARCHAR),'0') AS TransferredOut,ISNULL(e.TransferDate,'') AS TransferDate FROM rptMasterEnrollment e LEFT JOIN dimClassrooms r ON e.RoomNumber=r.RoomNumber ORDER BY e.RoomNumber,e.Last_Name`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        // NB the SELECT's 12th column is DCFSCapacity but the API exposes it as
-        // Room_Capacity, so the key list here is authoritative, not the SELECT aliases.
+        /* POSITIONAL: each key names the column at the same position in the SELECT
+           above, so the two lists must be edited together or every field after the
+           change is silently mis-keyed. The 11th column is DCFSCapacity but the API
+           exposes it as Room_Capacity, so this list is authoritative over the aliases.
+           No teacher name here: a child's teacher comes from the room, via
+           /api/classrooms. */
         const rows = sqlRows(r.data, [
             'Id','Last_Name','First_Name','Birth_date','Start_Date','City_Town','Days_Old',
-            'RoomNumber','Room','TeacherDescription','Type','Room_Capacity',
+            'RoomNumber','Room','Type','Room_Capacity',
             'Monday','Tuesday','Wednesday','Thursday','Friday','Active','Category','PFA_PI_na',
             'F_R_P_Food','IEP','Military','HouseholdIncome','ProofOfIncomeFile',
             'ProofOfIncomeUploaded','PublicBenefits','HouseholdSize','CCAPStartDate','HomeLanguage',
@@ -5551,15 +5528,20 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         // sidebar matches the attendance sidebars and the projection.
         const r = runSQL(`SELECT ${ROOM_COLS.join(',')} FROM dimClassrooms ORDER BY ${roomAgeOrderSql('RoomNumber')}`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
-        const rows = sqlRows(r.data, ['RoomNumber','Building','Room','TeacherDescription','Type','RequiredSlots','AgeRange','DCFSCapacity']);
+        const rows = sqlRows(r.data, ROOM_COLS);
         // No rooms means no page can place a child, so this one is never legitimately empty.
         const fault = readFault(r, rows, '/api/classrooms');
         if (fault) return sendJSON(res, 500, {
             error: 'Could not read the classroom list - the database reported: ' + fault });
-        /* TeacherDescription comes back derived from the Staff room links, not as the
-           stored free text, so the dozen pages and generated documents that print it
-           can never show a teacher who left. See applyDerivedRoomTeachers. */
-        return sendJSON(res, 200, applyDerivedRoomTeachers(rows));
+        /* Teachers are attached from the Staff room links, the one source of truth, so
+           no page or generated document can show a teacher who left. If that read
+           fails, say so rather than sending rooms with blank teacher names: a dozen
+           pages print this, including documents a parent signs. */
+        const captions = roomTeacherCaptions();
+        if (!captions.ok) return sendJSON(res, 500, {
+            error: 'Could not read which staff are assigned to each room - the database '
+                 + 'reported: ' + captions.error });
+        return sendJSON(res, 200, applyRoomTeachers(rows, captions));
     }
 
     /* GET the F/R/P + CCAP guidelines and the in-force year (internal - protected).
@@ -5582,7 +5564,9 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         if (!checkAuth(req, res)) return;
         readBody(req, (err, d) => {
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
-            const sql = `INSERT INTO dimClassrooms (RoomNumber,Room,TeacherDescription,DCFSCapacity,AgeRange) VALUES (${parseInt(d.roomNumber)},${esc(d.room)},${esc(d.teacher)},${parseInt(d.capacity)||10},${esc(d.ageRange)})`;
+            // No teacher column: a new room gets its teachers by linking staff to it,
+            // from the room editor's dropdowns or the person's own staff card.
+            const sql = `INSERT INTO dimClassrooms (RoomNumber,Room,DCFSCapacity,AgeRange) VALUES (${parseInt(d.roomNumber)},${esc(d.room)},${parseInt(d.capacity)||10},${esc(d.ageRange)})`;
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });
             sendJSON(res, 200, { success: true });
@@ -5598,7 +5582,8 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             if (err) return sendJSON(res, 400, { error: 'Invalid JSON' });
             const fields = [];
             if (d.room !== undefined)     fields.push(`Room=${esc(d.room)}`);
-            if (d.teacher !== undefined)  fields.push(`TeacherDescription=${esc(d.teacher)}`);
+            // A `teacher` caption is deliberately NOT accepted. Teachers are the staff
+            // links set below; there is no second copy to write.
             if (d.capacity !== undefined) fields.push(`DCFSCapacity=${parseInt(d.capacity) || 0}`);
             if (d.ageRange !== undefined) fields.push(`AgeRange=${esc(d.ageRange)}`);
             if (!fields.length) return sendJSON(res, 400, { error: 'Nothing to update' });
@@ -5643,13 +5628,6 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
                         + `SecondaryClassroom=(SELECT Room FROM dimClassrooms WHERE RoomNumber=${rn}),`
                         + `UpdatedAt=GETDATE() WHERE Id=${t2}`;
                 }
-                /* Then rebuild the caption from those links, which overrides the
-                   d.teacher text set above for any room that has staff linked to it.
-                   The links are the truth and the caption only a mirror, so letting the
-                   client's text win would let the two differ from the moment of the
-                   save. Same statement the staff card runs; runs after the link updates
-                   in the same batch, so it sees them. */
-                if (!isNaN(t1) || !isNaN(t2)) sql += roomCaptionRebuildSQL();
             }
             console.log('[PUT CLASSROOM]', sql);
             const r = runSQL(sql);
@@ -7626,7 +7604,7 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                     Code NVARCHAR(10) NOT NULL UNIQUE,
                     CreatedAt DATETIME DEFAULT GETDATE()
                 );
-                SELECT pc.StudentId,e.First_Name,e.Last_Name,e.Birth_date,e.RoomNumber,r.Room,r.TeacherDescription,
+                SELECT pc.StudentId,e.First_Name,e.Last_Name,e.Birth_date,e.RoomNumber,r.Room,
                     ISNULL(e.HouseholdIncome,'') AS HouseholdIncome,ISNULL(CAST(e.HouseholdSize AS NVARCHAR),'') AS HouseholdSize,
                     ISNULL(e.PublicBenefits,'') AS PublicBenefits,ISNULL(e.IEP,'') AS IEP,ISNULL(e.Military,'') AS Military,
                     ISNULL(e.Category,'') AS Category,ISNULL(e.City_Town,'') AS City_Town,ISNULL(e.PFA_PI_na,'') AS PFA_PI_na,
@@ -7641,7 +7619,15 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='PreEnr
                 .filter(l => l.trim() && !l.includes('rows affected') && !/^[-|]+$/.test(l.trim()));
             if (!lines.length) return sendJSON(res, 200, { success: false, error: 'Invalid code' });
             const v = lines[0].split('|').map(x => x.trim());
-            const student = { Id:v[0], First_Name:v[1], Last_Name:v[2], Birth_date:v[3], RoomNumber:v[4], Room:v[5], TeacherDescription:v[6], HouseholdIncome:v[7], HouseholdSize:v[8], PublicBenefits:v[9], IEP:v[10], Military:v[11], Category:v[12], City_Town:v[13], PFA_PI_na:v[14], HomeLanguage:v[15] };
+            const student = { Id:v[0], First_Name:v[1], Last_Name:v[2], Birth_date:v[3], RoomNumber:v[4], Room:v[5], HouseholdIncome:v[6], HouseholdSize:v[7], PublicBenefits:v[8], IEP:v[9], Military:v[10], Category:v[11], City_Town:v[12], PFA_PI_na:v[13], HomeLanguage:v[14] };
+            /* The teacher's name comes from the staff room links, like everywhere else.
+               It used to be selected from dimClassrooms.TeacherDescription, which is
+               exactly how a departed teacher's name reached the permission slip a parent
+               signs. A read failure leaves it blank rather than guessing, and the slip
+               prints its underscore line, which is at least honest. */
+            const parentCaptions = roomTeacherCaptions();
+            const parentRoom = parentCaptions.byRoom[parseInt(student.RoomNumber, 10) || 0];
+            student.TeacherDescription = parentRoom ? parentRoom.caption : '';
 
             // Get tracking status for the year in progress. A parent following a
             // code should see whether THIS year's slip and interview are done, not
@@ -9219,11 +9205,9 @@ GO
                 .filter(([, key]) => !STAFF_ROOM_LINK_KEYS.has(key) && !STAFF_ROOM_MIRROR_KEYS.has(key))
                 .map(([c, key]) => `${c}=${esc(d[key])}`);
             // Each room link (primary + secondary) sets its own link col and derived mirror.
-            let roomChanged = false;
             STAFF_ROOM_LINKS.forEach(link => {
                 if (d[link.payloadKey] !== undefined) {
                     staffRoomSetSql(d[link.payloadKey], link).forEach(frag => sets.push(frag));
-                    roomChanged = true;
                 }
             });
             if (!sets.length) return sendJSON(res, 400, { error: 'Nothing to update' });
@@ -9241,19 +9225,14 @@ GO
                 sets.push('ReviewedBy=NULL', 'ReviewedDate=NULL');
             }
 
-            let sql = staffEnsureSQL() + 'GO\n'
+            /* Changing this person's room needs no second write. The room's teacher
+               caption is read from these very links (roomTeacherCaptions), so moving
+               someone between rooms updates both rooms the moment this UPDATE lands.
+               There used to be a sync statement here rebuilding every room's stored
+               caption; it existed only to keep a duplicate honest, and the duplicate
+               is gone. */
+            const sql = staffEnsureSQL() + 'GO\n'
                 + `UPDATE Staff SET ${sets.join(',')},UpdatedAt=GETDATE() WHERE Id=${id}`;
-
-            /* Two-way sync, the staff-card -> room direction. When this save changes
-               the person's room, rebuild every room's TeacherDescription caption from
-               the staff actually linked to it, so the Classrooms & Staffing chart shows
-               who is really assigned — including dropping this person from the room they
-               just left and adding them to the one they joined. Rebuilt for ALL rooms
-               (there are a handful) rather than tracking the old room number, so no
-               caption can be left stale. This runs in the same batch as the staff
-               UPDATE above, so it sees the new assignment. One shared statement, also
-               used by the room editor: see roomCaptionRebuildSQL. */
-            if (roomChanged) sql += roomCaptionRebuildSQL();
 
             const r = runSQL(sql);
             if (!r.ok) return sendJSON(res, 500, { error: r.error });

@@ -148,65 +148,31 @@ function attr(v) {
     return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
-/* Split a room's teacher caption into up to two names. Values use "/", "&" or "," as
-   separators and may carry a "(pt)" note — kept as part of the name.
-
-   Only a FALLBACK now: /api/classrooms sends Teacher1Id / Teacher2Id and the caption is
-   derived from the staff room links, so the dropdowns pre-select by id. This still
-   matters when the server could not read the staff table and returned the stored
-   caption instead. */
-function splitTeachers(desc) {
-    const parts = String(desc || '').split(/\s*[\/&,]\s*/).map(s => s.trim()).filter(Boolean);
-    return [parts[0] || '', parts[1] || ''];
-}
-
 /* A dropdown of staff, pre-selected to the person holding that slot in the room.
 
-   The option VALUE is the staff Id, not the name — that is what makes the two-way
-   sync possible: on save we send those Ids and the server points each person's
-   Staff.RoomNumber at this room (an ID link that survives a room rename). The label
-   stays the name.
+   The option VALUE is the staff Id, and an Id is the ONLY thing this editor deals in:
+   saving sends those Ids and the server points each person's Staff.RoomNumber (slot 1)
+   or SecondaryRoomNumber (slot 2) at this room. Those links are what every page reads a
+   room's teachers from, so there is one fact here, not a name and a link to keep in
+   step.
 
-   `selectedId` is the room's Teacher1Id / Teacher2Id from /api/classrooms, which is the
-   link itself and so always resolves. `selectedName` is only used when there is no id
-   (the server fell back to the stored caption because it could not read the staff
-   table) — then we match on the name as before. Matching on name alone is no longer
-   enough, because the derived caption holds FIRST names.
+   `selectedId` is the room's Teacher1Id / Teacher2Id from /api/classrooms, which comes
+   from the link itself and so always resolves to a row in this list. Nothing is matched
+   by name any more — names were matched when the room carried a hand-typed caption, and
+   that caption is gone.
 
-   A legacy name that matches no current staff is kept as its own option valued
-   "name:<the name>" so it stays selected and is not lost; readRoomRow understands
-   that prefix. Falls back to a plain text field if the staff list didn't load. */
-function teacherSelect(id, selectedId, selectedName, i) {
+   If the staff list could not be loaded there is nothing truthful to show, so the slot
+   says so rather than offering a text box that would write a name nothing reads. */
+function teacherSelect(id, selectedId, i) {
     if (!roomsStaff.length) {
-        return `<input type="text" id="${id}" value="${attr(selectedName)}" placeholder="Teacher name" oninput="markSettingsChanged(${i})">`;
+        return '<span class="rs-empty">staff list unavailable</span>';
     }
-    const byId = parseInt(selectedId, 10)
-        ? roomsStaff.find(s => String(s.Id) === String(parseInt(selectedId, 10)))
-        : null;
-    const match = byId
-        || roomsStaff.find(s => String(s.Name).trim() === String(selectedName || '').trim());
-    // With an id in hand the caption is irrelevant; without a match, keep the caption.
-    if (byId) selectedName = '';
-    const selectedVal = match ? String(match.Id) : (selectedName ? 'name:' + selectedName : '');
+    const wanted = parseInt(selectedId, 10) || 0;
     let opts = '<option value="">— none —</option>';
-    // Preserve an unrecognized legacy name as its own option so it stays selected.
-    if (selectedName && !match) {
-        opts += `<option value="name:${attr(selectedName)}" selected>${attr(selectedName)} (not in staff list)</option>`;
-    }
     opts += roomsStaff.map(s =>
-        `<option value="${attr(s.Id)}"${String(s.Id) === selectedVal ? ' selected' : ''}>${attr(s.Name)}</option>`
+        `<option value="${attr(s.Id)}"${(parseInt(s.Id, 10) || 0) === wanted ? ' selected' : ''}>${attr(s.Name)}</option>`
     ).join('');
     return `<select id="${id}" onchange="markSettingsChanged(${i})">${opts}</select>`;
-}
-
-/* Resolve a teacher-select's value back to a display NAME for the caption string.
-   An Id maps to the staff name; a "name:<x>" legacy value yields <x>; '' yields ''. */
-function teacherValueToName(val) {
-    const v = String(val || '');
-    if (!v) return '';
-    if (v.indexOf('name:') === 0) return v.slice(5);
-    const s = roomsStaff.find(x => String(x.Id) === v);
-    return s ? s.Name : '';
 }
 
 function renderSettings() {
@@ -219,14 +185,11 @@ function renderSettings() {
         return;
     }
     tbody.innerHTML = classrooms.map((r, i) => {
-        // Ids are the real slot holders; the split caption is only a fallback for when
-        // the server could not read the staff links (see teacherSelect).
-        const [t1, t2] = splitTeachers(r.TeacherDescription);
         return `<tr>
             <td class="rs-num">${r.RoomNumber}</td>
             <td><input type="text" id="setRoom${i}" value="${attr(r.Room)}" oninput="markSettingsChanged(${i})"></td>
-            <td>${teacherSelect('setTeacher1_' + i, r.Teacher1Id, t1, i)}</td>
-            <td>${teacherSelect('setTeacher2_' + i, r.Teacher2Id, t2, i)}</td>
+            <td>${teacherSelect('setTeacher1_' + i, r.Teacher1Id, i)}</td>
+            <td>${teacherSelect('setTeacher2_' + i, r.Teacher2Id, i)}</td>
             <td><input type="number" id="setCap${i}" value="${r.DCFSCapacity || ''}" min="1" max="30" oninput="markSettingsChanged(${i})"></td>
             <td><input type="text" id="setAge${i}" value="${attr(r.AgeRange)}" oninput="markSettingsChanged(${i})"></td>
             <td style="text-align:center;"><button class="btn-row-save" id="setSave${i}" onclick="saveRoom(${i})" disabled>Save</button></td>
@@ -254,11 +217,14 @@ async function addNewRoom() {
     const nextNum = classrooms.length ? Math.max(...classrooms.map(r => parseInt(r.RoomNumber) || 0)) + 1 : 1;
     const name = prompt('Room name (e.g., "Pre-School 3"):');
     if (!name) return;
-    const teacher = prompt('Teacher description (e.g., "Ms. Smith"):') || '';
+    /* No teacher is asked for here. A room gets its teachers by linking staff to it —
+       the Teacher 1 / Teacher 2 dropdowns on the new row, or the person's staff card —
+       and this prompt used to collect a name that only ever went into a column nothing
+       reads. */
     try {
         const res = await apiFetch('/api/classrooms', {
             method: 'POST',
-            body: JSON.stringify({ roomNumber: nextNum, room: name, teacher: teacher, capacity: 10, ageRange: '' })
+            body: JSON.stringify({ roomNumber: nextNum, room: name, capacity: 10, ageRange: '' })
         });
         const data = await res.json();
         if (data.success) {
@@ -272,19 +238,16 @@ async function addNewRoom() {
 }
 
 function readRoomRow(i) {
-    // The two teacher selects carry staff Ids (or a "name:" legacy value), not plain
-    // names. Build the display caption from the resolved names, and send each slot's
-    // staff Id separately: Teacher 1 -> teacher1Id (that room becomes the person's
-    // PRIMARY), Teacher 2 -> teacher2Id (their SECONDARY). The server points the
-    // matching link column at this room.
-    const v1 = (document.getElementById(`setTeacher1_${i}`).value || '').trim();
-    const v2 = (document.getElementById(`setTeacher2_${i}`).value || '').trim();
-    const names = [teacherValueToName(v1), teacherValueToName(v2)].filter(Boolean);
-    const id1 = parseInt(v1, 10);   // 'name:...' / '' -> NaN
-    const id2 = parseInt(v2, 10);
+    /* The two teacher selects carry staff Ids, and only Ids are sent: Teacher 1 ->
+       teacher1Id (this room becomes that person's PRIMARY), Teacher 2 -> teacher2Id
+       (their SECONDARY). The server points the matching link column at this room.
+       No teacher NAME is sent — there is nowhere to store one, which is the point. */
+    const el1 = document.getElementById(`setTeacher1_${i}`);
+    const el2 = document.getElementById(`setTeacher2_${i}`);
+    const id1 = parseInt(el1 ? el1.value : '', 10);   // '' / missing -> NaN
+    const id2 = parseInt(el2 ? el2.value : '', 10);
     return {
         room:       document.getElementById(`setRoom${i}`).value.trim(),
-        teacher:    names.join(' / '),
         teacher1Id: isNaN(id1) ? null : id1,
         teacher2Id: isNaN(id2) ? null : id2,
         capacity:   document.getElementById(`setCap${i}`).value,
@@ -301,16 +264,11 @@ async function putRoom(i) {
         if (data.success) {
             r.Room = vals.room;
             r.DCFSCapacity = vals.capacity; r.AgeRange = vals.ageRange;
-            /* Keep this page's copy of the room matching what the server actually
-               stored. When teacher slots carry staff Ids the server rebuilds the caption
-               from those links as FIRST names, so echoing back the dropdowns' full names
-               would leave this page showing something no other page does until a reload.
-               Ids too, so a re-render pre-selects the dropdowns. */
+            /* Only the Ids are updated locally. The teacher caption is derived by the
+               server from the staff links, so refreshRoomsAfterSave() re-reads it rather
+               than this page guessing at it. */
             r.Teacher1Id = vals.teacher1Id || 0;
             r.Teacher2Id = vals.teacher2Id || 0;
-            r.TeacherDescription = (vals.teacher1Id || vals.teacher2Id)
-                ? vals.teacher.split(/\s*\/\s*/).map(n => n.trim().split(/\s+/)[0]).filter(Boolean).join(' / ')
-                : vals.teacher;
             dirtyRooms.delete(i);
             const btn = document.getElementById(`setSave${i}`);
             if (btn) btn.disabled = true;

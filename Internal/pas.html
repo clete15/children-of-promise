@@ -322,11 +322,12 @@ checkPasAuth();
    Several facts are asserted in more than one place, and a monitor reading two of
    our documents together would notice if they disagree:
 
-     · who staffs a room  - dimClassrooms.TeacherDescription says one thing, the
-       staff records' Classroom/SecondaryClassroom say another. The PAS Teaching
-       Staff Qualifications worksheets and the ExceleRate Standard 4 percentages
-       are both built from the staff records, so a room description that disagrees
-       means the worksheet and the roster describe different classrooms.
+     · who staffs a room - a staff record's room LINK (RoomNumber) against its room
+       NAME (Classroom). The PAS Teaching Staff Qualifications worksheets and the
+       ExceleRate Standard 4 percentages are grouped by the name, so a name that
+       disagrees with the link counts that person under the wrong room, or under none.
+       There used to be a third copy of this fact, a hand-typed teacher caption on the
+       classroom itself; it is gone, and so are the two checks that policed it.
      · room capacity     - DCFS capacity against who is enrolled. Reported as a note
        rather than a contradiction: capacity caps who is PRESENT at once, and part-time
        attendance makes over-enrollment normal rather than a finding.
@@ -344,59 +345,17 @@ function ccRoomKey(v) {
         .join('/');
 }
 
-/* Names in TeacherDescription are informal first names, sometimes with a note:
-   "Sue / Paige / Keyona (pt)", "Pam / Jeremy / Sara". Split on the separator, drop
-   any parenthetical, and keep what is left. */
-function ccNamesFrom(desc) {
-    const raw = String(desc || '').trim();
-    /* Bail on placeholders BEFORE splitting. "n/a" contains the same slash used as
-       the name separator, so splitting first turned it into two "names", n and a,
-       which then reported as staff with no record. */
-    if (!raw || /^(n\/?a|none|tbd|unassigned)$/i.test(raw)) return [];
-    return raw
-        .split(/[\/,&]|\band\b/i)
-        .map(s => s.replace(/\([^)]*\)/g, '').trim())
-        // Two characters cannot be a name; anything that short is punctuation debris.
-        .filter(s => s.length >= 3 && !/^(n\/?a|none|tbd)$/i.test(s));
-}
-
-/* Names staff are known by day to day that do not appear on their record.
-
-   Renee Nier is "Donna" on the classroom board. Without this she reports as staffing
-   a room with no staff record at all, which is the kind of false alarm that teaches
-   people to ignore the panel. Keyed informal name -> the name on the staff record. */
-const STAFF_ALIASES = {
-    donna: 'Renee Nier'
-};
+/* Gone with the hand-typed teacher captions: ccNamesFrom (split "Pam / Jeremy / Sara"
+   into names), STAFF_ALIASES (Renee Nier is "Donna" on the classroom board) and
+   ccNameMatches (fuzzy "Maddie" against "Madeline Muir"). All three existed only to
+   reconcile informal names on a classroom against the names on staff records. A room's
+   teachers are now the staff rows linked to it, so there are no informal names left to
+   reconcile and nothing to guess at. */
 
 /* Staff who work only in the summer programme, so their absence from the school-year
    staff records is correct rather than a gap. Named here so the cross-check does not
    keep reporting them, and so it is written down somewhere. */
 const SUMMER_ONLY_STAFF = ['Hannah Engel', 'Velouria White'];
-
-/* An informal first name against a staff record. Deliberately generous, because the
-   cost of a missed match here is a false accusation that someone has no staff record.
-
-   Handles three shapes seen in the real data:
-     "Janelle" / "Janell Poenitske"   one is a prefix of the other
-     "Pam"     / "Pamela Holliday"    ditto
-     "Maddie"  / "Madeline Muir"      a nickname that DIVERGES after three letters,
-                                      so prefix matching alone is not enough
-   The three-letter fallback only applies when at least one side is short enough to
-   be a nickname, which keeps "Sue" away from "Sara" and "Jeremy" away from "Jessica". */
-function ccNameMatches(informal, staffName) {
-    const a = String(informal || '').toLowerCase().replace(/[^a-z]/g, '');
-    if (!a) return false;
-    // A known alias resolves straight to the person, before any guessing.
-    if (STAFF_ALIASES[a] && STAFF_ALIASES[a] === staffName) return true;
-    return String(staffName || '').toLowerCase().split(/\s+/).filter(Boolean).some(p => {
-        const b = p.replace(/[^a-z]/g, '');
-        if (!b || a.length < 3 || b.length < 3) return false;
-        if (b.indexOf(a) === 0 || a.indexOf(b) === 0) return true;
-        const looksLikeNickname = a.length <= 7 || b.length <= 7;
-        return looksLikeNickname && a.slice(0, 3) === b.slice(0, 3);
-    });
-}
 
 function ccFindings(staff, rooms, kids) {
     const findings = [];
@@ -405,51 +364,48 @@ function ccFindings(staff, rooms, kids) {
         // Summer-programme staff are correctly absent from the school-year records.
         .filter(s => SUMMER_ONLY_STAFF.indexOf(s.Name) === -1);
 
-    /* 1. Names in a room description that cannot be matched to a staff record, and
-       names that match someone who is recorded in a DIFFERENT room. The second case
-       is the one that quietly breaks the ExceleRate infant/toddler percentage: a
-       teacher listed on the room but not assigned to it is not counted for it. */
-    rooms.forEach(room => {
-        ccNamesFrom(room.TeacherDescription).forEach(nm => {
-            const match = active.find(s => ccNameMatches(nm, s.Name));
-            if (!match) {
-                findings.push({
-                    severity: 'medium',
-                    what: '\u201c' + nm + '\u201d is listed as staffing ' + room.Room
-                        + ', but could not be matched to any staff record',
-                    why: 'The Teaching Staff Qualifications worksheet for this room, and the ExceleRate '
-                        + 'Standard 4 percentages, are both built from the staff records \u2014 so whoever '
-                        + 'this is does not appear on either. It may also just be a nickname this page '
-                        + 'could not resolve.',
-                    fix: 'Add them on Staff Cards, or correct the classroom\u2019s teacher list.'
-                });
-                return;
-            }
-            const servesHere = ccRoomKey(match.Classroom) === ccRoomKey(room.Room)
-                || ccRoomKey(match.SecondaryClassroom) === ccRoomKey(room.Room);
-            if (!servesHere) {
-                /* Reported, not prescribed. A teacher who covers a second room part
-                   time is recorded as they actually work, and whether that counts
-                   toward the ExceleRate credential percentages is Genni's call, not
-                   this page's. So this states the position and its consequence and
-                   stops there, rather than telling anyone to change a record to
-                   produce a particular score. */
-                const isInfantToddler = /infant|toddler/i.test(room.Room);
-                findings.push({
-                    severity: 'note',
-                    what: room.Room + ' lists \u201c' + nm + '\u201d, and ' + match.Name
-                        + '\u2019s staff record shows \u201c'
-                        + (String(match.Classroom || '').trim() || 'no classroom') + '\u201d',
-                    why: 'Recorded as it stands. The credential percentages are counted from the staff '
-                        + 'record, so as things are this room does not count them'
-                        + (isInfantToddler
-                            ? ' \u2014 and this is an infant/toddler room, which is where the ExceleRate '
-                              + '4B infant/toddler percentage comes from.'
-                            : '.'),
-                    fix: 'Nothing to change here. Genni reviews how a part-time or shared assignment '
-                        + 'is scored \u2014 this is listed so the position is visible when she does.'
-                });
-            }
+    /* 1. A staff member's room LINK against their room NAME mirror.
+
+       Staff.RoomNumber is the link; Staff.Classroom is a readable copy of that room's
+       name. Both the Teaching Staff Qualifications worksheets and the ExceleRate
+       Standard 4 percentages group people by the NAME, so a row whose name disagrees
+       with its link is counted under the wrong room or under none — and on an
+       infant/toddler room that moves the 4B percentage. Every writer derives the name
+       from the link, so a disagreement means a row written before that was true, or
+       edited straight in the database.
+
+       This replaces two checks that compared the staff records against a hand-typed
+       teacher caption on the classroom. That caption is gone: a room's teachers ARE
+       the staff rows linked to it, so the two can no longer disagree and those checks
+       could only ever report nothing. */
+    const ccRoomNameFor = rn => {
+        const r = rooms.find(x => String(x.RoomNumber) === String(rn));
+        return r ? r.Room : '';
+    };
+    active.forEach(s => {
+        [{ link: s.RoomNumber,          mirror: s.Classroom,          label: 'classroom' },
+         { link: s.SecondaryRoomNumber, mirror: s.SecondaryClassroom, label: 'second classroom' }]
+        .forEach(pair => {
+            const rn = parseInt(pair.link, 10) || 0;
+            if (!rn) return;
+            const real = ccRoomNameFor(rn);
+            if (!real) return;                                   // check 2 covers this
+            if (ccRoomKey(real) === ccRoomKey(pair.mirror)) return;
+            const isInfantToddler = /infant|toddler/i.test(real);
+            findings.push({
+                severity: 'medium',
+                what: s.Name + ' is linked to room ' + rn + ' (' + real + '), but their '
+                    + pair.label + ' reads \u201c'
+                    + (String(pair.mirror || '').trim() || 'blank') + '\u201d',
+                why: 'The qualifications worksheets and the credential percentages are grouped by '
+                    + 'that name, so as it stands this person is counted under the wrong room, or '
+                    + 'under none'
+                    + (isInfantToddler
+                        ? ' \u2014 and this is an infant/toddler room, which is where the ExceleRate '
+                          + '4B infant/toddler percentage comes from.'
+                        : '.'),
+                fix: 'Re-save their room on Staff Cards. That rewrites the name from the link.'
+            });
         });
     });
 
@@ -471,30 +427,24 @@ function ccFindings(staff, rooms, kids) {
         });
     });
 
-    // 3. Staff the records place in a room that the room's own description omits.
+    /* 3. A room with nobody linked to it. Worth saying, because such a room produces
+       an empty Teaching Staff Qualifications worksheet. Rooms that are not classrooms
+       (the before/after-school room is typed "n/a") are skipped — nobody expects a
+       qualifications worksheet for those. */
     rooms.forEach(room => {
-        const named = ccNamesFrom(room.TeacherDescription);
+        const rn = parseInt(room.RoomNumber, 10) || 0;
+        if (/^n\/?a$/i.test(String(room.Type || '').trim())) return;
         const assigned = active.filter(s =>
-            ccRoomKey(s.Classroom) === ccRoomKey(room.Room)
-            || ccRoomKey(s.SecondaryClassroom) === ccRoomKey(room.Room));
-        assigned.forEach(s => {
-            if (named.length && !named.some(nm => ccNameMatches(nm, s.Name))) {
-                findings.push({
-                    severity: 'medium',
-                    what: s.Name + ' is assigned to ' + room.Room + ' on their staff record, but the '
-                        + 'classroom lists \u201c' + (room.TeacherDescription || '\u2014') + '\u201d',
-                    why: 'The two records describe different staffing for the same room.',
-                    fix: 'Decide which is current and correct the other.'
-                });
-            }
-        });
-        if (!assigned.length && named.length) {
+            (parseInt(s.RoomNumber, 10) || 0) === rn
+            || (parseInt(s.SecondaryRoomNumber, 10) || 0) === rn);
+        if (!assigned.length) {
             findings.push({
                 severity: 'medium',
-                what: room.Room + ' lists \u201c' + room.TeacherDescription + '\u201d but no staff record '
-                    + 'is assigned to that room',
-                why: 'This room produces an empty Teaching Staff Qualifications worksheet.',
-                fix: 'Set the classroom on each of those staff members.'
+                what: 'No staff member is assigned to ' + room.Room,
+                why: 'This room produces an empty Teaching Staff Qualifications worksheet, and it '
+                    + 'shows no teacher on the roster, the forms, or a parent\u2019s permission slip.',
+                fix: 'Set the room on each teacher\u2019s staff card, or use the Teacher 1 / Teacher 2 '
+                    + 'dropdowns in Settings \u203a Classrooms.'
             });
         }
     });

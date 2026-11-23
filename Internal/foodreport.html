@@ -288,6 +288,16 @@
 <script src="monthly-reporting.js"></script>
 <script>
 // AUTH, apiFetch, isTruthy, students and classrooms come from app.js.
+
+/* A child's teacher comes from their ROOM, not from the child's own record. This page
+   used to print s.TeacherDescription, which /api/students carried over from a
+   hand-typed column on dimClassrooms — that column is gone, and the room list this page
+   already loads carries the teachers derived from the staff assignments. So the name
+   here is whoever is actually linked to the room today. */
+function fpTeacherFor(roomNumber) {
+    const c = classrooms.find(x => String(x.RoomNumber) === String(roomNumber));
+    return (c && c.TeacherDescription) || '';
+}
 let currentPanel = 'food';
 const fpEsc = s => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -582,7 +592,7 @@ function renderFullRoster() {
                 return filtered.map((s, i) => {
                     if (s.Room !== lastRoom) { if (lastRoom) roomIdx++; lastRoom = s.Room; }
                     return `<tr class="${roomIdx % 2 ? 'fp-band' : ''}">
-                <td><span class="fp-child-name">${fpEsc(s.Last_Name)}, ${fpEsc(s.First_Name)}</span><span class="fp-teacher">${fpEsc(s.TeacherDescription || 'No teacher listed')}</span></td>
+                <td><span class="fp-child-name">${fpEsc(s.Last_Name)}, ${fpEsc(s.First_Name)}</span><span class="fp-teacher">${fpEsc(fpTeacherFor(s.RoomNumber) || 'No teacher assigned')}</span></td>
                 <td><select id="frRoom_${i}" onchange="markFRChanged(${i})">${roomOpts}</select></td>
                 <td class="center"><span class="fp-frp ${frpClass(s.F_R_P_Food)}" id="frFRP_${i}">${fpEsc(s.F_R_P_Food || 'Unknown')}</span></td>
                 <td><input type="number" aria-label="Household income for ${fpEsc(s.First_Name)} ${fpEsc(s.Last_Name)}" id="frIncome_${i}" value="${fpEsc(s.HouseholdIncome || '')}" onchange="markFRChanged(${i})"></td>
@@ -655,7 +665,7 @@ function exportFoodExcel() {
             '"' + (s.First_Name||'') + '"',
             '"' + (s.Last_Name||'') + '"',
             '"' + (s.Room||'') + '"',
-            '"' + (s.TeacherDescription||'') + '"',
+            '"' + fpTeacherFor(s.RoomNumber) + '"',
             '"' + (s.F_R_P_Food||'') + '"',
             s.HouseholdIncome||'',
             s.HouseholdSize||''

@@ -61,6 +61,7 @@ END
 GO
 
 -- Show the result: check the names and types read as intended.
-SELECT RoomNumber, Room, Type, AgeRange, DCFSCapacity, TeacherDescription
+-- (No teacher column: a room's teachers are the Staff rows linked to it.)
+SELECT RoomNumber, Room, Type, AgeRange, DCFSCapacity
   FROM dimClassrooms
  ORDER BY RoomNumber;
