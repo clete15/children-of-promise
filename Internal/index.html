@@ -340,8 +340,9 @@
     <p id="dashLead" style="max-width:680px;margin:0 auto 18px;color:var(--sp-muted);font-size:0.9rem;"></p>
 
     <div class="dashboard">
-        <!-- Daily Operations now holds Enrollment Management, ISBE PFA/PI (next to it)
-             and Child Files (under it). The SECTION is data-role="all" so the ISBE card
+        <!-- Daily Operations now holds Enrollment Management, ISBE PFA/PI (next to it),
+             Child Files (under it) and Handouts (beside Child Files). The SECTION is
+             data-role="all" so the ISBE and Handouts cards
              — which every teacher must see — is reachable here; the Enrollment Management
              and Child Files cards carry data-role="ops" so they show for the Operations
              tier (Keyona/Paige/Tara + admins) but stay hidden from plain teachers. (A
@@ -389,6 +390,20 @@
                     <div class="di-content">
                         <div class="di-title">Child Files</div>
                         <div class="di-desc">Every child's documents — Administrative records (birth cert, physical, income proof) and Teacher forms (permission slips, interviews, screenings)</div>
+                    </div>
+                    <div class="di-arrow">›</div>
+                </a>
+                <!-- Printable handouts, in the empty slot beside Child Files. data-role="all":
+                     these are mostly written FOR teachers (the observation do's and don'ts, the
+                     ASQ scoring steps), and until now they were reachable only by knowing a URL.
+                     Separate from Handbooks under Administration: a handbook is policy in force
+                     for the whole centre, a handout is a one-page sheet you print and hand to
+                     somebody. -->
+                <a class="dash-item" href="/staff/handouts.html" data-role="all">
+                    <div class="di-icon">🖨️</div>
+                    <div class="di-content">
+                        <div class="di-title">Handouts</div>
+                        <div class="di-desc">Printable one-page sheets — classroom observation do's and don'ts, ASQ scoring steps, PI daily schedules, CACFP training and the family guides</div>
                     </div>
                     <div class="di-arrow">›</div>
                 </a>
@@ -597,7 +612,8 @@ function showPortal() {
          ops    — Keyona/Paige/Tara: the data-role="all" cards PLUS data-role="ops"
                   cards (the Daily Operations set: Enrollment Management, Child Files;
                   ISBE is already "all"). No Administration/Compliance, no IT.
-         teacher— only the data-role="all" cards (Staff Portal, ISBE, Parents).
+         teacher— only the data-role="all" cards (Staff Portal, ISBE, Handouts,
+                  Parents).
        Admin is a superset of ops, so an admin also satisfies the ops gate. */
     const isAdmin = !!(window.WHO && window.WHO.admin);
     const isOps = isAdmin || !!(window.WHO && window.WHO.ops);

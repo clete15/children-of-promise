@@ -107,7 +107,12 @@
 
 <div class="sheet">
     <header>
-        <img src="../Internal/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool">
+        <!-- Absolute /staff/ path first, relative disk path as the fallback. Served from
+             the portal this page sits at /staff/handouts/, so "../Internal/..." resolves
+             to /staff/Internal/... which is not a route - the logo came up broken. The
+             fallback keeps it working when the file is opened straight off disk. -->
+        <img src="/staff/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool"
+             onerror="this.onerror=null;this.src='../Internal/ChildrenOfPromise.png';">
         <div class="ht">
             <h1>Our Curriculum &amp; Assessment, in Plain Names</h1>
             <p class="sub">What the TEACH and ASSESS tabs actually are &mdash; and what a monitor checks</p>

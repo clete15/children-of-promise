@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Handouts – Children Of Promise</title>
+    <link rel="stylesheet" href="styles.css">
+    <!--
+        One place to find every printable handout.
+
+        The handouts themselves live in the Handouts/ folder (a SIBLING of Internal/) and
+        are served by the /staff/handouts/ route in server.js. They were only reachable by
+        knowing a URL, except the CACFP training sheet, which the Food Program page links.
+
+        They stay as HTML on purpose. Each one already carries its own print stylesheet
+        and a "Print this sheet" button, so Print > Save as PDF produces the sheet exactly
+        as designed, from the single copy that is always current. Generating PDF files
+        beside them would create a second version to keep in step, and the stale one is
+        the one that ends up in a monitor's hands.
+
+        Every link opens in a new tab. That matters for more than convenience: auth.js
+        watches for target="_blank" links into /staff/handouts/ and hands the signed-in
+        token to the new tab, which is what lets the CACFP sheet save its signatures.
+    -->
+    <style>
+        body { background: linear-gradient(to right, #5585e0 0%, #2563eb 10%, #1e3a8a 100%); min-height: 100vh; }
+
+        /* Same card/grid vocabulary as handbooks.html, deliberately: the two pages do
+           the same job (find a document, open it) and should not look like cousins. */
+        .pas-layout { display:flex;height:calc(100vh - 90px);align-items:flex-start;justify-content:center;padding:20px; }
+        .pas-wrapper { display:flex;flex-direction:column;max-height:calc(100vh - 130px);width:100%;max-width:1000px; }
+        .pas-card { background:white;flex:1;display:flex;flex-direction:column;overflow:hidden;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,0.2); }
+        .pas-header { padding:14px 20px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;gap:12px;justify-content:space-between; }
+        .pas-header h2 { font-size:1rem;font-weight:800;color:#1e3a8a;margin:0; }
+        .pas-body { overflow-y:auto;flex:1;padding:24px 28px; }
+
+        .doc-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .doc-card {
+            background: #f8fafc;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px 18px;
+            text-decoration: none;
+            color: #1e293b;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+        }
+        .doc-card:hover { transform: translateY(-3px); border-color: #2563eb; box-shadow: 0 8px 24px rgba(37,99,235,0.12); }
+        .doc-card .card-icon { font-size: 1.8rem; }
+        .doc-card h3 { font-size: 0.88rem; font-weight: 700; color: #2563eb; margin: 0; }
+        .doc-card p { font-size: 0.75rem; color: #64748b; line-height: 1.4; margin: 0; }
+        .doc-card .badge-row { display:flex;flex-wrap:wrap;gap:5px;margin-top:auto; }
+        .doc-card .badge {
+            display: inline-block;
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .badge-html  { background: #dbeafe; color: #1d4ed8; }
+        .badge-pdf   { background: #fee2e2; color: #b91c1c; }
+        /* Who the sheet is written FOR - the thing people actually scan the page for. */
+        .badge-staff  { background: #dcfce7; color: #15803d; }
+        .badge-parent { background: #fef3c7; color: #92400e; }
+        .badge-mon    { background: #ede9fe; color: #6d28d9; }
+        .badge-draft  { background: #fde68a; color: #92400e; }
+
+        .section-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #6b7280;
+            margin-top: 24px;
+            margin-bottom: 8px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+        .section-note { font-size:0.74rem;color:#94a3b8;line-height:1.5;margin:6px 0 0; }
+    </style>
+</head>
+<body>
+
+<header class="site-header">
+    <a class="brand-link" href="/staff/">
+        <img src="logo-sm.png" alt="Children Of Promise">
+        <div class="brand-text">
+            <h1>Children Of Promise</h1>
+            <p>Handouts &nbsp;·&nbsp; Millstadt, IL</p>
+        </div>
+    </a>
+    <a class="header-back" href="/staff/">← Staff Portal</a>
+</header>
+
+<div class="pas-layout">
+    <div class="pas-wrapper">
+        <div class="pas-card">
+            <div class="pas-header">
+                <h2>🖨️ Handouts</h2>
+                <a href="/staff/handbooks.html" style="font-size:0.75rem;font-weight:700;color:#2563eb;text-decoration:none;white-space:nowrap;">Handbooks →</a>
+            </div>
+            <div class="pas-body">
+                <p style="font-size:0.85rem;color:#64748b;margin-bottom:8px;">
+                    Printable sheets for teachers, families and the monitoring folder. Open one
+                    and use its <b>Print</b> button &mdash; choose <b>Save as PDF</b> in the print
+                    dialog if you need a file to email or file. Each sheet is laid out for paper,
+                    so what prints is what was designed.
+                </p>
+                <p style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px;">
+                    They are kept as living pages rather than saved PDF files on purpose: there is
+                    one copy of each, it is always the current one, and nobody has to wonder whether
+                    the PDF in their downloads folder is still right.
+                </p>
+
+                <div class="section-title">For Teachers</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/staff/handouts/Classroom-Observation-Dos-And-Donts.html" target="_blank" rel="noopener">
+                        <div class="card-icon">👀</div>
+                        <h3>Classroom Observation &mdash; Do&rsquo;s and Don&rsquo;ts</h3>
+                        <p>What to do, and what to leave alone, while the monitor is rating your room. The room is chosen at random on the day, so every PI room should read it.</p>
+                        <div class="badge-row">
+                            <span class="badge badge-html">HTML</span>
+                            <span class="badge badge-staff">Teachers</span>
+                        </div>
+                    </a>
+                    <a class="doc-card" href="/staff/handouts/Curriculum-And-Assessment-Overview.html" target="_blank" rel="noopener">
+                        <div class="card-icon">🧩</div>
+                        <h3>Curriculum &amp; Assessment, in Plain Names</h3>
+                        <p>What the TEACH and ASSESS tabs actually are, in the words we use day to day, and what a monitor looks for in them.</p>
+                        <div class="badge-row">
+                            <span class="badge badge-html">HTML</span>
+                            <span class="badge badge-staff">Teachers</span>
+                        </div>
+                    </a>
+                    <a class="doc-card" href="/staff/handouts/ASQ-ASE-Teacher-Scoring-Instructions.html" target="_blank" rel="noopener">
+                        <div class="card-icon">📝</div>
+                        <h3>ASQ-3 &amp; ASQ:SE-2 &mdash; Updated Process</h3>
+                        <p>Step by step, with screenshots: the parent fills out the questionnaire, you upload it and score the summary, then both signatures go on the IdeaTab.</p>
+                        <div class="badge-row">
+                            <span class="badge badge-html">HTML</span>
+                            <span class="badge badge-staff">Teachers</span>
+                        </div>
+                    </a>
+                    <a class="doc-card" href="/staff/handouts/PI-Daily-Schedules.html" target="_blank" rel="noopener">
+                        <div class="card-icon">🕘</div>
+                        <h3>PI Classroom Daily Schedules</h3>
+                        <p>Draft 9:30&ndash;12:00 schedules for the three PI rooms, written to hold up in an observation. A starting point for the teachers to correct, not a description of what they do now.</p>
+                        <div class="badge-row">
+                            <span class="badge badge-html">HTML</span>
+                            <span class="badge badge-staff">Teachers</span>
+                            <span class="badge badge-draft">Draft</span>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="section-title">Training</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/staff/handouts/CACFP-Annual-Training.html" target="_blank" rel="noopener">
+                        <div class="card-icon">🍽️</div>
+                        <h3>CACFP Annual Staff Training</h3>
+                        <p>The mandatory annual food-program training, with the sign-off sheet attached. Present it, then everyone signs on whatever device they are on and it files itself.</p>
+                        <div class="badge-row">
+                            <span class="badge badge-html">HTML</span>
+                            <span class="badge badge-staff">Staff</span>
+                        </div>
+                    </a>
+                </div>
+                <p class="section-note">
+                    This one is more than a printout: it saves its roster and signatures to the
+                    server, and past sessions are listed on the
+                    <a href="/staff/foodreport.html" style="color:#2563eb;font-weight:600;">Food Program</a>
+                    page. Print a blank copy only if you need to run the session on paper.
+                </p>
+
+                <div class="section-title">For Families</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/staff/handouts/ASQ%20and%20Teaching%20Strategies%20-%20Parent%20Guide.pdf" target="_blank" rel="noopener">
+                        <div class="card-icon">👪</div>
+                        <h3>ASQ &amp; Teaching Strategies &mdash; Parent Guide</h3>
+                        <p>One page for families: what the screenings are, why we do them for every child, and what the parent&rsquo;s part is. Hand out at enrollment or when asking for a signature.</p>
+                        <div class="badge-row">
+                            <span class="badge badge-pdf">PDF</span>
+                            <span class="badge badge-parent">Families</span>
+                        </div>
+                    </a>
+                    <a class="doc-card" href="/staff/handouts/ASQ%20and%20Teaching%20Strategies%20-%20Staff%20Guide.pdf" target="_blank" rel="noopener">
+                        <div class="card-icon">🎓</div>
+                        <h3>ASQ &amp; Teaching Strategies &mdash; Staff Guide</h3>
+                        <p>The same ground from the staff side, including what to say when a parent asks &ldquo;is something wrong with my child?&rdquo;</p>
+                        <div class="badge-row">
+                            <span class="badge badge-pdf">PDF</span>
+                            <span class="badge badge-staff">Staff</span>
+                        </div>
+                    </a>
+                </div>
+                <p class="section-note">
+                    These two are built as PDFs by <code>Handouts/build_handouts.py</code> rather
+                    than printed from a page, because they go out to families as a file. If the
+                    wording needs to change, edit that script and re-run it &mdash; editing the PDF
+                    directly will be overwritten.
+                </p>
+
+                <div class="section-title">For the Monitoring Folder</div>
+                <div class="doc-grid">
+                    <a class="doc-card" href="/staff/handouts/CB3A-Curriculum-Identification.html" target="_blank" rel="noopener">
+                        <div class="card-icon">🏛️</div>
+                        <h3>CB3.A &mdash; Curriculum Identification</h3>
+                        <p>The signed statement naming our curriculum and assessment, for the PI monitoring visit folder. Three blanks still to fill in: edition, current subscription, signature.</p>
+                        <div class="badge-row">
+                            <span class="badge badge-html">HTML</span>
+                            <span class="badge badge-mon">Monitor</span>
+                        </div>
+                    </a>
+                </div>
+                <p class="section-note">
+                    Written for the monitor, not the classroom, so this is the one sheet that uses
+                    PICC item codes and statute citations. The teacher-facing sheets above
+                    deliberately do not.
+                </p>
+
+                <p style="font-size:0.74rem;color:#94a3b8;line-height:1.6;margin-top:22px;
+                          border-top:1px solid #e5e7eb;padding-top:12px;">
+                    Adding a handout: drop the HTML in the <code>Handouts/</code> folder and add a
+                    card above pointing at <code>/staff/handouts/&lt;file&gt;.html</code>. Copy the
+                    print stylesheet and the Print button from any existing sheet so it prints the
+                    same way. No server change is needed &mdash; that folder is already served.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="app.js"></script>
+<script src="/staff/auth.js"></script>
+
+<!-- Deploy / Restart controls while this area is under active development. -->
+<script src="deploy-widget.js"></script>
+</body>
+</html>

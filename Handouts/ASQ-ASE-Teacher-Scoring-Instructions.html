@@ -81,7 +81,11 @@
 
 <div class="sheet">
     <header>
-        <img src="../Internal/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool">
+        <!-- Absolute /staff/ path first, relative disk path as the fallback: served from
+             the portal this page is at /staff/handouts/, where "../Internal/..." resolves
+             to /staff/Internal/... which is not a route. Same for the screenshots below. -->
+        <img src="/staff/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool"
+             onerror="this.onerror=null;this.src='../Internal/ChildrenOfPromise.png';">
         <div class="ht">
             <h1>ASQ-3 &amp; ASQ:SE-2 — Updated Process</h1>
             <p class="sub">Scoring &amp; signatures for Prevention Initiative (PI) children</p>
@@ -113,8 +117,11 @@
             <div class="step-title">Teacher uploads the parent's form in their staff portal <span class="who teacher">Teacher</span></div>
         </div>
         <figure>
-            <img src="../Internal/pictures/asq-step-upload.png" alt="Upload the ASQ / ASE — Choose File, then Upload ASQ / ASE"
-                 onerror="this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the UPLOAD screenshot as Internal/pictures/asq-step-upload.png ]&lt;/div&gt;'">
+            <!-- Two-step fallback: the portal path, then the on-disk path, and only then
+                 the "screenshot missing" placeholder. Going straight to the placeholder
+                 is what showed on every one of these when opened from the portal. -->
+            <img src="/staff/pictures/asq-step-upload.png" alt="Upload the ASQ / ASE — Choose File, then Upload ASQ / ASE"
+                 onerror="if(!this.dataset.retry){this.dataset.retry='1';this.src='../Internal/pictures/asq-step-upload.png';return;}this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the UPLOAD screenshot as Internal/pictures/asq-step-upload.png ]&lt;/div&gt;'">
             <figcaption>In the child's card, use <b>Beg ASQ / Beg ASE</b>, then <b>Upload ASQ / ASE</b> (PDF or clear photo). Required for a PI child.</figcaption>
         </figure>
     </div>
@@ -126,8 +133,8 @@
             <div class="step-title">Teacher scores the summary in their staff portal <span class="who teacher">Teacher</span></div>
         </div>
         <figure>
-            <img src="../Internal/pictures/asq-step-scoring.png" alt="ASQ-3 Score Entry — area scores and statuses"
-                 onerror="this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the SCORING screenshot as Internal/pictures/asq-step-scoring.png ]&lt;/div&gt;'">
+            <img src="/staff/pictures/asq-step-scoring.png" alt="ASQ-3 Score Entry — area scores and statuses"
+                 onerror="if(!this.dataset.retry){this.dataset.retry='1';this.src='../Internal/pictures/asq-step-scoring.png';return;}this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the SCORING screenshot as Internal/pictures/asq-step-scoring.png ]&lt;/div&gt;'">
             <figcaption>Enter each area score and status, the date, interval, and any notes/referral. <b>The teacher scores the summary — not the parent.</b></figcaption>
         </figure>
     </div>
@@ -139,8 +146,8 @@
             <div class="step-title">Teacher collects the parent's signature on the IdeaTab <span class="who teacher">Teacher</span></div>
         </div>
         <figure>
-            <img src="../Internal/pictures/asq-step-signatures.png" alt="Signatures — Parent/Guardian and Staff signature pads"
-                 onerror="this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the SIGNATURES screenshot as Internal/pictures/asq-step-signatures.png ]&lt;/div&gt;'">
+            <img src="/staff/pictures/asq-step-signatures.png" alt="Signatures — Parent/Guardian and Staff signature pads"
+                 onerror="if(!this.dataset.retry){this.dataset.retry='1';this.src='../Internal/pictures/asq-step-signatures.png';return;}this.outerHTML='&lt;div class=&quot;no-img&quot;&gt;[ Save the SIGNATURES screenshot as Internal/pictures/asq-step-signatures.png ]&lt;/div&gt;'">
             <figcaption>Hand the Lenovo IdeaTab to the parent to sign the scored summary, then add the staff signature. Do this for <b>every PI child</b>, even if they already signed the paper document.</figcaption>
         </figure>
     </div>

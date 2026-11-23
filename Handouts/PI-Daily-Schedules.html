@@ -108,7 +108,11 @@
 
 <div class="sheet">
     <header>
-        <img src="../Internal/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool">
+        <!-- Absolute /staff/ path first, relative disk path as the fallback: served from
+             the portal this page is at /staff/handouts/, where "../Internal/..." resolves
+             to /staff/Internal/... which is not a route. -->
+        <img src="/staff/ChildrenOfPromise.png" alt="Children of Promise Christian Dayschool"
+             onerror="this.onerror=null;this.src='../Internal/ChildrenOfPromise.png';">
         <div class="ht">
             <h1>PI Classroom Daily Schedules</h1>
             <p class="sub">The 9:30 to 12:00 Prevention Initiative block &mdash; draft for teacher review</p>
