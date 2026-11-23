@@ -42,20 +42,27 @@
     header .ht .sub { margin: 3px 0 0; font-size: 0.9rem; color: var(--muted); font-weight: 600; }
     header .ht .center { margin: 2px 0 0; font-size: 0.79rem; color: var(--muted); }
 
-    .draft { margin: 16px 0; padding: 12px 16px; background: #fff8ec; border: 1px solid #e8cfa0;
-        border-left: 5px solid #b45309; border-radius: 6px; font-size: 0.9rem; }
-    .draft strong { color: #b45309; }
+    /* Same light blue as the callouts on the other handouts, rather than an amber warning
+       box. This is a request for input, not a hazard. */
+    .draft { margin: 16px 0; padding: 12px 16px; background: var(--accent-soft); border: 1px solid #c3d0e8;
+        border-left: 5px solid var(--accent); border-radius: 6px; font-size: 0.9rem; }
+    .draft strong { color: var(--accent); }
 
     /* One room per block, kept whole on the page. */
     .room { margin-top: 22px; break-inside: avoid; page-break-inside: avoid; }
+    /* Each schedule opens with a light blue band carrying the room name, so the three
+       schedules are easy to tell apart at a glance on one sheet. */
     .room-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
-        border-bottom: 2px solid var(--accent); padding-bottom: 6px; margin-bottom: 0; }
+        background: var(--accent-soft); border: 1px solid #c3d0e8; border-bottom: none;
+        border-radius: 8px 8px 0 0; padding: 9px 14px; margin-bottom: 0; }
     .room-head h2 { margin: 0; font-size: 1.08rem; color: var(--accent); }
     .room-head .meta { font-size: 0.8rem; color: var(--muted); text-align: right; }
 
     table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
     th, td { border-bottom: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
-    th { background: var(--accent-soft); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
+    /* Neutral grey, not the same blue as the band above it, so the two header rows do
+       not merge into one block of colour. */
+    th { background: #f5f6fa; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em;
         color: var(--muted); border-bottom: 1px solid var(--line); }
     td.time { white-space: nowrap; font-weight: 700; width: 108px; color: var(--accent); font-variant-numeric: tabular-nums; }
     td.what b { display: block; }
@@ -95,9 +102,9 @@
     </header>
 
     <div class="draft">
-        <strong>These are drafts, not a record of what you do.</strong> Mark them up and give them back &mdash; the
+        <strong>This is a draft, not a record of what you do.</strong> Mark it up and give it back &mdash; the
         posted schedule has to match what actually happens in the room, because the monitor compares the two.
-        The PI block is exactly the two and a half hours we are required to provide, so every schedule starts at
+        The PI block is exactly the two and a half hours we are required to provide, so each one starts at
         <strong>9:30</strong> and runs to <strong>12:00</strong> with nothing spare.
     </div>
 
