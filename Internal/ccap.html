@@ -21,9 +21,38 @@
         .ccap-header span { font-size:0.72rem;color:#64748b; }
         .ccap-body { overflow-y:auto;flex:1;padding:20px 24px; }
         table { width:100%;border-collapse:collapse;font-size:0.78rem; }
-        thead tr { background:#f8fafc;border-bottom:2px solid #e5e7eb; }
-        th { padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#64748b; }
-        td { padding:6px 10px;border-bottom:1px solid #f3f4f6; }
+        thead tr { background:#f1f5f9;border-bottom:2px solid #cbd5e1; }
+        th { padding:7px 10px;text-align:left;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;color:#475569; }
+        td { padding:6px 10px;border-bottom:1px solid #e2e8f0; }
+
+        /* ── Readability ──────────────────────────────────────────────────────────
+           This card is hard-coded white, but styles.css ships themed --sp-* tokens
+           that a bare <td>, <input> or <select> inherits. In dark mode that left the
+           student names pale grey on white and painted the income boxes near-black:
+           the roster was legible nowhere. So the colours this card needs are pinned
+           here rather than inherited. */
+        .ccap-body, .ccap-body td, .ccap-body p { color:#1e293b; }
+        .ccap-body input, .ccap-body select { background:#fff;color:#0f172a;border:1px solid #cbd5e1; }
+        .ccap-body option { background:#fff;color:#0f172a; }
+        /* The name is what the eye looks for first on every row, so it is the darkest
+           and heaviest thing in the table and never wraps mid-name. */
+        .ccap-name { font-size:0.82rem;font-weight:700;color:#0f172a;white-space:nowrap; }
+        /* Banding: 21 rows of numbers are hard to track across without it. */
+        tbody tr:nth-child(even) { background:#f8fafc; }
+        tbody tr:hover { background:#eef2ff; }
+
+        /* Renewal status. Red is past due, amber is due soon, grey is "we still need
+           the start date before we can tell you anything". */
+        .exp-date { font-weight:700;color:#0f172a; }
+        .exp-note { display:block;font-size:0.66rem;font-weight:700;letter-spacing:0.02em;margin-top:1px; }
+        .exp-over .exp-date, .exp-over .exp-note { color:#b91c1c; }
+        .exp-soon .exp-date, .exp-soon .exp-note { color:#b45309; }
+        .exp-ok .exp-note { color:#15803d; }
+        .exp-none { color:#94a3b8;font-style:italic;font-size:0.72rem; }
+        .exp-pill { display:inline-block;padding:2px 8px;border-radius:999px;font-size:0.7rem;font-weight:700;margin-left:8px; }
+        .pill-over { background:#fee2e2;color:#b91c1c; }
+        .pill-soon { background:#fef3c7;color:#92400e; }
+        .pill-none { background:#f1f5f9;color:#475569; }
         .btn-export { padding:6px 14px;background:#16a34a;color:white;border:none;border-radius:6px;font-size:0.75rem;font-weight:600;cursor:pointer; }
         .btn-export:hover { background:#15803d; }
     </style>
@@ -107,6 +136,64 @@ async function init() {
 // Local alias; app.js exposes the same lookup as getRoomName.
 function getRoom(rn) { return getRoomName(rn); }
 
+/* ── CCAP renewal dates ───────────────────────────────────────────────────────
+   Illinois CCAP runs in 12-month eligibility periods: redetermination happens no
+   sooner than 12 months after the initial determination or the most recent
+   redetermination. Sources, both paraphrased here:
+     · IDHS Redetermination — families must requalify for a new 12-month period.
+       https://www.dhs.state.il.us/page.aspx?item=10568
+     · IDHS child care memo, Aug 2019 — minimum 12-month eligibility and
+       redetermination periods were established in Oct 2018.
+       https://www.dhs.state.il.us/OneNetLibrary/27894/documents/CCAP/ChildCareUpdateMemo082019.pdf
+
+   So start + 12 months is the EARLIEST the family's eligibility can lapse. Their
+   approval letter may run later but never shorter, which makes this the safe date
+   to chase paperwork against: acting on it is never too late, only ever early.
+   Derived, never stored — one date is typed in, the other cannot drift from it. */
+const CCAP_PERIOD_MONTHS = 12;
+const CCAP_WARN_DAYS = 60;          // how far ahead a renewal starts showing amber
+
+function ccapExpiry(startStr) {
+    const m = String(startStr || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    /* Built from the parts rather than handed to new Date(): new Date('2026-03-01')
+       is parsed as UTC midnight and displays as the day BEFORE in our timezone, which
+       would put every renewal date one day early. */
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    if (isNaN(d.getTime())) return null;
+    d.setMonth(d.getMonth() + CCAP_PERIOD_MONTHS);
+    return d;
+}
+
+function ccapDaysLeft(expiry) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((expiry - today) / 86400000);
+}
+
+/* One place that decides a child's renewal state, so the cell, the row count in the
+   header and the CSV can never disagree about who is overdue.
+   Returns { state: 'none'|'over'|'soon'|'ok', expiry, days, text }. */
+function ccapRenewal(startStr) {
+    const expiry = ccapExpiry(startStr);
+    if (!expiry) return { state: 'none', expiry: null, days: null, text: '' };
+    const days = ccapDaysLeft(expiry);
+    const text = expiry.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' });
+    if (days < 0)               return { state: 'over',  expiry, days, text };
+    if (days <= CCAP_WARN_DAYS) return { state: 'soon',  expiry, days, text };
+    return { state: 'ok', expiry, days, text };
+}
+
+function ccapRenewalCell(startStr) {
+    const r = ccapRenewal(startStr);
+    if (r.state === 'none') return '<span class="exp-none">needs a start date</span>';
+    const note = r.state === 'over' ? 'EXPIRED ' + Math.abs(r.days) + ' day' + (Math.abs(r.days) === 1 ? '' : 's') + ' ago'
+               : r.state === 'soon' ? 'in ' + r.days + ' day' + (r.days === 1 ? '' : 's')
+               : 'in ' + Math.round(r.days / 30) + ' months';
+    return '<span class="exp-' + r.state + '"><span class="exp-date">' + r.text + '</span>'
+         + '<span class="exp-note">' + note + '</span></span>';
+}
+
 function showTab(tab) {
     activeTab = tab;
     ['navRoster','navEligible','navThresholds'].forEach(id => document.getElementById(id).classList.remove('active'));
@@ -117,13 +204,34 @@ function showTab(tab) {
     else renderThresholds();
 }
 
+/* Lead with the renewals, because they are the thing with a deadline on them. Counting
+   the overdue and due-soon families in the header means nobody has to read 21 rows to
+   learn whether anyone needs chasing this week. Recomputed, not remembered, so editing
+   one start date keeps it honest. */
+function refreshRosterTally() {
+    const ccap = students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP');
+    const tally = { over: 0, soon: 0, none: 0, ok: 0 };
+    ccap.forEach(s => { tally[ccapRenewal(s.CCAPStartDate).state]++; });
+    const bits = [ccap.length + ' active CCAP students'];
+    if (tally.over) bits.push(tally.over + ' expired');
+    if (tally.soon) bits.push(tally.soon + ' expiring within ' + CCAP_WARN_DAYS + ' days');
+    if (tally.none) bits.push(tally.none + ' missing a start date');
+    const el = document.getElementById('ccapSubtitle');
+    if (!el) return;
+    el.innerHTML = bits.join(' &nbsp;·&nbsp; ')
+        + (tally.over ? '<span class="exp-pill pill-over">action needed</span>'
+          : tally.soon ? '<span class="exp-pill pill-soon">expiring soon</span>'
+          : tally.none ? '<span class="exp-pill pill-none">start dates needed</span>' : '');
+}
+
 function renderRoster() {
     document.getElementById('ccapTitle').textContent = 'Full CCAP Roster';
     const ccap = students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP').sort(sortByName);
     document.getElementById('rosterCount').textContent = ccap.length + ' students';
-    document.getElementById('ccapSubtitle').textContent = ccap.length + ' active CCAP students';
     document.getElementById('exportBtn').style.display = '';
     document.getElementById('printBtn').style.display = 'none';
+
+    refreshRosterTally();
 
     if (!ccap.length) { document.getElementById('ccapBody').innerHTML = '<p style="color:#64748b;padding:20px;">No CCAP students found.</p>'; return; }
 
@@ -135,22 +243,31 @@ function renderRoster() {
                 <th style="text-align:right;">Income</th>
                 <th style="text-align:center;">HH Size</th>
                 <th>Threshold</th>
-                <th style="text-align:center;">Start Date</th>
+                <th style="text-align:center;">CCAP Start</th>
+                <th style="text-align:center;" title="12 months after the start date — the earliest the family's eligibility can lapse. Get their annual paperwork in before this date.">Expires</th>
             </tr></thead>
             <tbody>${ccap.map(s => {
                 const hhIdx = Math.max(1, Math.min(parseInt(s.HouseholdSize)||1, 8)) - 1;
                 const threshold = CCAP_THRESHOLDS[hhIdx];
                 const roomOpts = classrooms.map(c => '<option value="'+c.RoomNumber+'"'+(String(c.RoomNumber)===String(s.RoomNumber)?' selected':'')+'>'+c.Room+'</option>').join('');
                 return `<tr>
-                    <td style="font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
-                    <td><select onchange="saveCCAPField(${s.Id},'roomNumber',this.value)" style="padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:0.72rem;width:100%;">${roomOpts}</select></td>
-                    <td style="text-align:right;"><input type="number" value="${s.HouseholdIncome||''}" onchange="saveCCAPField(${s.Id},'householdIncome',this.value)" style="width:80px;padding:2px 5px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;text-align:right;"></td>
-                    <td style="text-align:center;"><input type="number" value="${s.HouseholdSize||''}" min="1" max="15" onchange="saveCCAPField(${s.Id},'householdSize',this.value)" style="width:45px;padding:2px 5px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;text-align:center;"></td>
-                    <td style="color:#16a34a;font-weight:600;">$${threshold.toLocaleString()}</td>
-                    <td style="text-align:center;"><input type="date" value="${s.CCAPStartDate || ''}" onchange="saveCCAPDate(${s.Id},this.value)" style="padding:3px 6px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;width:130px;"></td>
+                    <td class="ccap-name">${s.Last_Name}, ${s.First_Name}</td>
+                    <td><select onchange="saveCCAPField(${s.Id},'roomNumber',this.value)" style="padding:2px 4px;border-radius:4px;font-size:0.72rem;width:100%;">${roomOpts}</select></td>
+                    <td style="text-align:right;"><input type="number" value="${s.HouseholdIncome||''}" onchange="saveCCAPField(${s.Id},'householdIncome',this.value)" style="width:80px;padding:2px 5px;border-radius:4px;font-size:0.75rem;text-align:right;"></td>
+                    <td style="text-align:center;"><input type="number" value="${s.HouseholdSize||''}" min="1" max="15" onchange="saveCCAPField(${s.Id},'householdSize',this.value)" style="width:45px;padding:2px 5px;border-radius:4px;font-size:0.75rem;text-align:center;"></td>
+                    <td style="color:#15803d;font-weight:700;">$${threshold.toLocaleString()}</td>
+                    <td style="text-align:center;"><input type="date" value="${s.CCAPStartDate || ''}" onchange="saveCCAPDate(${s.Id},this.value)" style="padding:3px 6px;border-radius:4px;font-size:0.75rem;width:130px;"></td>
+                    <td style="text-align:center;" id="exp_${s.Id}">${ccapRenewalCell(s.CCAPStartDate)}</td>
                 </tr>`;
             }).join('')}</tbody>
-        </table>`;
+        </table>
+        <p style="font-size:0.74rem;color:#64748b;margin-top:14px;border-top:1px solid #e2e8f0;padding-top:10px;">
+            <b>Expires</b> is 12 months after the CCAP start date. Illinois CCAP eligibility runs in
+            12-month periods and redetermination is no sooner than 12 months after the last one, so this is the
+            <i>earliest</i> a family's eligibility can lapse &mdash; their IDHS approval letter may run later,
+            never shorter. Chase the annual paperwork against this date and you are never late.
+            Amber from ${CCAP_WARN_DAYS} days out, red once past.
+        </p>`;
 }
 
 function renderEligible() {
@@ -191,8 +308,8 @@ function renderEligible() {
                 const diff = threshold - income;
                 const roomOpts = classrooms.map(c => '<option value="'+c.RoomNumber+'"'+(String(c.RoomNumber)===String(s.RoomNumber)?' selected':'')+'>'+c.Room+'</option>').join('');
                 return `<tr>
-                    <td style="font-weight:600;">${s.Last_Name}, ${s.First_Name}</td>
-                    <td><select onchange="saveCCAPField(${s.Id},'roomNumber',this.value)" style="padding:2px 4px;border:1px solid #d1d5db;border-radius:4px;font-size:0.72rem;width:100%;">${roomOpts}</select></td>
+                    <td class="ccap-name">${s.Last_Name}, ${s.First_Name}</td>
+                    <td><select onchange="saveCCAPField(${s.Id},'roomNumber',this.value)" style="padding:2px 4px;border-radius:4px;font-size:0.72rem;width:100%;">${roomOpts}</select></td>
                     <td>${s.Category || '—'}</td>
                     <td style="text-align:right;"><input type="number" value="${s.HouseholdIncome||''}" onchange="saveCCAPField(${s.Id},'householdIncome',this.value)" style="width:80px;padding:2px 5px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;text-align:right;"></td>
                     <td style="text-align:center;"><input type="number" value="${s.HouseholdSize||''}" min="1" max="15" onchange="saveCCAPField(${s.Id},'householdSize',this.value)" style="width:45px;padding:2px 5px;border:1px solid #d1d5db;border-radius:4px;font-size:0.75rem;text-align:center;"></td>
@@ -285,9 +402,17 @@ function printEligible() {
 function exportCCAP() {
     let csv = '';
     if (activeTab === 'roster') {
-        csv = 'Last Name,First Name,Room,Income,HH Size,Start Date\n';
+        // Renewal date and status travel with the export, so the spreadsheet someone
+        // works a phone list from says the same thing the screen does.
+        csv = 'Last Name,First Name,Room,Income,HH Size,CCAP Start,Expires,Status,Days Left\n';
         students.filter(s => isTruthy(s.Active) && s.Category === 'CCAP').sort(sortByName).forEach(s => {
-            csv += ['"'+s.Last_Name+'"','"'+s.First_Name+'"','"'+getRoom(s.RoomNumber)+'"',s.HouseholdIncome||'',s.HouseholdSize||'','"'+(s.CCAPStartDate||'')+'"'].join(',') + '\n';
+            const r = ccapRenewal(s.CCAPStartDate);
+            const status = r.state === 'over' ? 'EXPIRED'
+                         : r.state === 'soon' ? 'Expiring soon'
+                         : r.state === 'none' ? 'No start date' : 'OK';
+            csv += ['"'+s.Last_Name+'"','"'+s.First_Name+'"','"'+getRoom(s.RoomNumber)+'"',
+                    s.HouseholdIncome||'',s.HouseholdSize||'','"'+(s.CCAPStartDate||'')+'"',
+                    '"'+r.text+'"','"'+status+'"', (r.days === null ? '' : r.days)].join(',') + '\n';
         });
     } else {
         csv = 'Last Name,First Name,Room,Pay Type,Income,HH Size,Threshold\n';
@@ -333,6 +458,13 @@ async function saveCCAPDate(studentId, dateValue) {
             body: JSON.stringify({ ccapStartDate: dateValue })
         });
         s.CCAPStartDate = dateValue;
+        /* Repaint this row's renewal date and the header tally straight away. The
+           renewal is derived from the start date, so leaving it until the next page
+           load would show a date that contradicts the one just typed in. Only the one
+           cell is rewritten, so nobody's half-typed income box is thrown away. */
+        const cell = document.getElementById('exp_' + s.Id);
+        if (cell) cell.innerHTML = ccapRenewalCell(dateValue);
+        if (activeTab === 'roster') refreshRosterTally();
     } catch(e) { console.error('Failed to save CCAP date', e); }
 }
 
