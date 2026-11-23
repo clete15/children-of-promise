@@ -5203,6 +5203,30 @@ function applyDerivedRoomTeachers(rooms) {
     });
     return rooms;
 }
+/* A failed read must never answer "there is nothing here."
+
+   runSQL deliberately reports a batch error as ok:true with sqlError set, so that the
+   ensure blocks running on every request cannot kill a response. The cost: a SELECT that
+   fails leaves its error text where the rows should be, sqlDataLines drops every line of
+   it (error text has no '|'), and the handler sends HTTP 200 [] — which is
+   indistinguishable from "no children are enrolled". That exact shape cost eleven days
+   in Oct 2026 on /api/child-files, and it is the first thing to rule out whenever a page
+   goes blank: the database had every row the whole time.
+
+   Rows parsed, or no error: fine. An error AND nothing parsed: say so, loudly, with the
+   database's own message. Returns null when the read is sound, else the error text.
+
+   Pass this the rows you are about to send, from any handler whose empty answer a page
+   would render as missing data. */
+function readFault(r, rows, what) {
+    if (!r.sqlError) return null;
+    // An ensure block can report a harmless error beside a perfectly good result; only
+    // the combination of an error and no rows is a failed read.
+    if (rows && rows.length) return null;
+    console.error('[READ FAULT]', (what || 'read') + ': SQL error with an empty result —',
+        r.sqlError);
+    return r.sqlError;
+}
 function sqlIdLines(raw) {
     return String(raw || '').trim().split('\n').filter(l => /^\s*\d+\s*\|/.test(l));
 }
@@ -5510,6 +5534,13 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
             'F_R_P_Food','IEP','Military','HouseholdIncome','ProofOfIncomeFile',
             'ProofOfIncomeUploaded','PublicBenefits','HouseholdSize','CCAPStartDate','HomeLanguage',
             'TransferredOut','TransferDate']);
+        /* Every roster, the CCAP page, the food program and the waiting list read this
+           one endpoint, so an empty success here blanks the whole tool at once and looks
+           like the data is gone. Refuse to be quiet about it. */
+        const fault = readFault(r, rows, '/api/students');
+        if (fault) return sendJSON(res, 500, {
+            error: 'Could not read the student list, so this page is not showing an empty '
+                 + 'centre - the database reported: ' + fault });
         return sendJSON(res, 200, rows);
     }
 
@@ -5521,6 +5552,10 @@ IF NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rptMas
         const r = runSQL(`SELECT ${ROOM_COLS.join(',')} FROM dimClassrooms ORDER BY ${roomAgeOrderSql('RoomNumber')}`);
         if (!r.ok) return sendJSON(res, 500, { error: r.error });
         const rows = sqlRows(r.data, ['RoomNumber','Building','Room','TeacherDescription','Type','RequiredSlots','AgeRange','DCFSCapacity']);
+        // No rooms means no page can place a child, so this one is never legitimately empty.
+        const fault = readFault(r, rows, '/api/classrooms');
+        if (fault) return sendJSON(res, 500, {
+            error: 'Could not read the classroom list - the database reported: ' + fault });
         /* TeacherDescription comes back derived from the Staff room links, not as the
            stored free text, so the dozen pages and generated documents that print it
            can never show a teacher who left. See applyDerivedRoomTeachers. */

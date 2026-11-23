@@ -82,8 +82,21 @@ let activeTab = 'roster';
 async function init() {
     try {
         const [sRes, cRes] = await Promise.all([apiFetch('/api/students'), apiFetch('/api/classrooms')]);
-        students = await sRes.json();
-        classrooms = await cRes.json();
+        const sData = await sRes.json();
+        const cData = await cRes.json();
+        /* Tell a FAILED read apart from an empty one, and never render the first as the
+           second. "No CCAP students found" over a roster of 21 children is worse than an
+           error: it sends the office looking for lost data that was never lost. The
+           server now answers a failed read with an error rather than an empty list, so
+           anything that is not an array is a fault, and the catch below shows why. */
+        if (!sRes.ok || !Array.isArray(sData)) {
+            throw new Error((sData && sData.error) || 'the student list could not be read');
+        }
+        if (!cRes.ok || !Array.isArray(cData)) {
+            throw new Error((cData && cData.error) || 'the classroom list could not be read');
+        }
+        students = sData;
+        classrooms = cData;
         await loadGuidelines();   // authoritative CCAP thresholds from the server
         showTab('roster');
     } catch (e) {
